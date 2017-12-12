@@ -20,7 +20,11 @@ def load_png(name):
 class Player(pygame.sprite.Sprite):
     def __init__(self, side):
         pygame.sprite.Sprite.__init__(self)
-        self.image, self.rect = load_png('test.png')
+	if side =="left":
+           self.image, self.rect = load_png('player1.png')
+        else:
+           self.image, self.rect = load_png('player2.png')
+
         screen = pygame.display.get_surface()
         self.area = screen.get_rect()
         self.side = side
@@ -63,7 +67,7 @@ def main():
     # Initialise screen
     pygame.init()
     screen = pygame.display.set_mode((1250, 850))
-    pygame.display.set_caption('Basic Pygame program')
+    pygame.display.set_caption('Swordknight')
 
     # Fill background
     background = pygame.Surface(screen.get_size())
@@ -78,6 +82,9 @@ def main():
 
     playersprites = pygame.sprite.RenderPlain((player1, player2))
 
+    # We need Muke
+#    pygame.mixer.music.load('res/music/8bit.mp3')
+#    pygame.mixer.music.play(-1, 0.0)
 
     # Blit everything to the screen
     screen.blit(background, (0, 0))
@@ -93,10 +100,14 @@ def main():
             if event.type == QUIT:
                 return
             elif event.type == KEYDOWN:
-                if event.key == K_a:
+                if event.key == K_w:
                     player1.moveup()
-                if event.key == K_z:
+                if event.key == K_s:
                     player1.movedown()
+                if event.key == K_a:
+                    player1.moveleft()
+                if event.key == K_d:
+                    player1.moveright()
                 if event.key == K_UP:
                     player2.moveup()
                 if event.key == K_LEFT:
@@ -105,8 +116,11 @@ def main():
                     player2.moveright()
                 if event.key == K_DOWN:
                     player2.movedown()
+                if event.key == 27:
+                    return
+
             elif event.type == KEYUP:
-                if event.key == K_a or event.key == K_z:
+                if event.key == K_a or event.key == K_s or event.key == K_d or event.key == K_w:
                     player1.movepos = [0,0]
                     player1.state = "still"
                 if event.key == K_UP or event.key == K_DOWN or event.key == K_LEFT or event.key == K_RIGHT:
