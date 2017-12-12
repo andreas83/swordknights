@@ -1,30 +1,50 @@
 #!/usr/bin/python
 
-import pygame, os
+import pygame, pixelperfect,os
+
 from pygame.locals import *
-	
-def load_png(name):
+from pixelperfect import *
+
+
+def load_png(name, colorkey=None, alpha=False):
     """ Load image and return image object"""
     fullname = os.path.join('res', name)
     try:
         image = pygame.image.load(fullname)
-        if image.get_alpha is None:
-            image = image.convert()
-        else:
-            image = image.convert_alpha()
     except pygame.error, message:
         print 'Cannot load image:', fullname
         raise SystemExit, message
+    if alpha:image = image.convert_alpha()
+    else:image=image.convert()
+    if colorkey is not None:
+        if colorkey is -1:
+            colorkey = image.get_at((0,0))
+        image.set_colorkey(colorkey, RLEACCEL)
     return image, image.get_rect()
 
+
+
 class Player(pygame.sprite.Sprite):
-    def __init__(self, side):
+    def __init__(self, side, colorkey=None, alpha=None):
         pygame.sprite.Sprite.__init__(self)
 	if side =="left":
-           self.image, self.rect = load_png('player1.png')
+           self.image, self.rect = load_png('player1.png', colorkey=colorkey, alpha=alpha)
         else:
-           self.image, self.rect = load_png('player2.png')
+           self.image, self.rect = load_png('player2.png', colorkey=colorkey, alpha=alpha)
 
+        if colorkey and alpha:
+            self.hitmask=get_colorkey_and_alpha_hitmask(self.image, self.rect,
+                                                        colorkey, alpha)
+        elif colorkey:
+            self.hitmask=get_colorkey_hitmask(self.image, self.rect,
+                                              colorkey)
+        elif alpha:
+            self.hitmask=get_alpha_hitmask(self.image, self.rect,
+                                           alpha)
+        else:
+            self.hitmask=get_full_hitmask(self.image, self.rect)
+
+        self.mask = pygame.mask.from_surface(self.image)
         screen = pygame.display.get_surface()
         self.area = screen.get_rect()
         self.side = side
@@ -77,8 +97,10 @@ def main():
     # Initialise players
     global player1
     global player2
-    player1 = Player("left")
-    player2 = Player("right")
+#    player1 = Player("left",-1,None)
+#    player2 = Player("right",None,True)
+    player1 = Player("left",None,False)
+    player2 = Player("right", None,False)
 
     playersprites = pygame.sprite.RenderPlain((player1, player2))
 
@@ -126,6 +148,10 @@ def main():
                 if event.key == K_UP or event.key == K_DOWN or event.key == K_LEFT or event.key == K_RIGHT:
                     player2.movepos = [0,0]
                     player2.state = "still"
+
+        if check_collision(player1, player2):
+            print "hit"
+
         screen.blit(background, player1.rect, player1.rect)
         screen.blit(background, player2.rect, player2.rect)
         playersprites.update()
