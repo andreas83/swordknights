@@ -1,0 +1,7 @@
+Changelog 
+
+Added Win/Lose Text 
+Now with real pixel perfect collision detection
+Added pixelperfect collision detection, which does not work properly 
+First major improvemnt, now both players can actually move
+inital commit

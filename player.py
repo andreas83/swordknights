@@ -23,7 +23,7 @@ class Player(pygame.sprite.Sprite):
     def __init__(self, side, colorkey=None, alpha=None):
         pygame.sprite.Sprite.__init__(self)
 	if side =="left":
-           self.image, self.rect = load_png('player1.png', colorkey=colorkey, alpha=alpha)
+           self.image, self.rect = load_png('player1v2.png', colorkey=colorkey, alpha=alpha)
         else:
            self.image, self.rect = load_png('player2.png', colorkey=colorkey, alpha=alpha)
 
@@ -53,6 +53,7 @@ class Player(pygame.sprite.Sprite):
             self.rect = newpos
         pygame.event.pump()
 
+
     def reinit(self):
         self.state = "still"
         self.movepos = [0,0]
@@ -62,8 +63,8 @@ class Player(pygame.sprite.Sprite):
             self.rect.midright = self.area.midright
 
     def moveup(self):
-        self.movepos[1] = self.movepos[1] - (self.speed)
-        self.state = "moveup"
+        self.movepos[1] = self.movepos[1] - (self.speed*2)
+        self.state = "jump"
 
     def moveleft(self):
         self.movepos[0] = self.movepos[0] - (self.speed)
