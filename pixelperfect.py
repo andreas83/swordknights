@@ -38,7 +38,7 @@ def get_alpha_hitmask(image, rect, alpha=0):
             mask[x].append(not image.get_at((x,y))[3]==alpha)
     return mask
 
-def get_colorkey_and_alpha_hitmask(image, rect, key=None, alpha=0):
+def get_colorkey_and_alpha_hitmask(image, rect, colorkey=None, alpha=0):
     """returns a hitmask using an image's colorkey and alpha."""
     mask=[]
     for x in range(rect.width):
