@@ -9,6 +9,8 @@ from player import *
 
 size = [1300, 800]
 
+
+
 def text_to_screen(screen, text, x, y, size = 50,
             color = (200, 000, 000), font_type = 'res/fonts/Capture_it_2.ttf'):
     try:
@@ -26,12 +28,13 @@ class Ground (pygame.sprite.Sprite):
     def __init__(self, screen):
         color = (255,255,255)
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.Surface((size[0], size[0]))
+        self.image = pygame.Surface((size[0], size[1]))
         rect = pygame.Rect(20, 20, 20, 3)
         pygame.draw.rect(self.image, color, rect, 1)
         self.image.fill((color))
         self.rect = self.image.get_rect()
         self.rect.center = (size[0] / 2 , size[1]+550 )
+
 
 def main():
     # Initialise screen
@@ -43,9 +46,6 @@ def main():
     background = pygame.Surface(screen.get_size())
     background = background.convert()
     background.fill((255,0,0))
-
-
-
 
     # Initialise players
     global player1
@@ -73,12 +73,13 @@ def main():
     # Event loop
     while 1:
         clock.tick(60)
+
         for event in pygame.event.get():
             if event.type == QUIT:
                 return
             elif event.type == KEYDOWN:
                 if event.key == K_w:
-                    player1.moveup()
+                    player1.jump()
                 if event.key == K_s:
                     player1.movedown()
                 if event.key == K_a:
@@ -86,7 +87,7 @@ def main():
                 if event.key == K_d:
                     player1.moveright()
                 if event.key == K_UP:
-                    player2.moveup()
+                    player2.jump()
                 if event.key == K_LEFT:
                     player2.moveleft()
                 if event.key == K_RIGHT:
@@ -118,15 +119,12 @@ def main():
 
         screen.blit(background, player1.rect, player1.rect)
         screen.blit(background, player2.rect, player2.rect)
-        #playersprites.update()
-        #playersprites.draw(screen)
 
 
         allSprites.clear(screen, background)
         allSprites.update()
         allSprites.draw(screen)
 
-#        screen.blit(background, (0, 0))
         pygame.display.flip()
 
 
