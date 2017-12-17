@@ -31,7 +31,7 @@ class Ground (pygame.sprite.Sprite):
         pygame.draw.rect(self.image, color, rect, 1)
         self.image.fill((color))
         self.rect = self.image.get_rect()
-        self.rect.center = (size[0] / 2 , size[1]+550 )
+        self.rect.center = (size[0] / 2 , size[1]+250 )
 
 def main():
     # Initialise screen
@@ -42,7 +42,7 @@ def main():
     # Fill background
     background = pygame.Surface(screen.get_size())
     background = background.convert()
-    background.fill((255,0,0))
+    background.fill((0,0,0))
 
 
 
@@ -93,6 +93,9 @@ def main():
                     player2.moveright()
                 if event.key == K_DOWN:
                     player2.movedown()
+                if event.key == K_SPACE:
+                    player2.attack()
+
                 if event.key == 27:
                     return
 
@@ -100,13 +103,14 @@ def main():
                 if event.key == K_a or event.key == K_s or event.key == K_d or event.key == K_w:
                     player1.movepos = [0,0]
                     player1.state = "still"
-                if event.key == K_UP or event.key == K_DOWN or event.key == K_LEFT or event.key == K_RIGHT:
+                if  event.key == K_UP or event.key == K_DOWN or event.key == K_LEFT or event.key == K_RIGHT:
                     player2.movepos = [0,0]
                     player2.state = "still"
 
         if check_collision(player1, player2):
             print  int(round(time.time() * 1000))
             screen.blit(background, (0, 0))
+            # todo only in attack mode player would win
             if player1.state == "still" and player2.state == "moveleft" or  player2.state == "moveright":
                 text_to_screen(screen, "player 2 won!", size[0]/3, size[1]-600 );
             if player2.state == "still" and player1.state == "moveleft" or  player1.state == "moveright":
@@ -118,15 +122,12 @@ def main():
 
         screen.blit(background, player1.rect, player1.rect)
         screen.blit(background, player2.rect, player2.rect)
-        #playersprites.update()
-        #playersprites.draw(screen)
 
 
         allSprites.clear(screen, background)
         allSprites.update()
         allSprites.draw(screen)
 
-#        screen.blit(background, (0, 0))
         pygame.display.flip()
 
 

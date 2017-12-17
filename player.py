@@ -46,8 +46,24 @@ class Player(pygame.sprite.Sprite):
         self.speed = 10
         self.state = "still"
         self.reinit()
+        self.gravity=3;
+        self.ground=10
+        self.velocity_x=-10
+        self.velocity_y=-20
+        self.orientation = "attack" # attack or defens
+        
 
     def update(self):
+
+        if self.state=="jump":
+           self.velocity_y= self.velocity_y - self.gravity
+
+           if self.movepos[1] - self.velocity_y > self.ground:
+              self.movepos[1] = self.movepos[1] + self.velocity_y
+
+           self.movepos[0] = self.movepos[0] + self.velocity_x
+
+
         newpos = self.rect.move(self.movepos)
         if self.area.contains(newpos):
             self.rect = newpos
@@ -57,20 +73,48 @@ class Player(pygame.sprite.Sprite):
     def reinit(self):
         self.state = "still"
         self.movepos = [0,0]
+        print self.area.midleft
         if self.side == "left":
-            self.rect.midleft = self.area.midleft
+            self.rect.midleft = (50, 600)
         elif self.side == "right":
             self.rect.midright = self.area.midright
 
+
     def moveup(self):
-        self.movepos[1] = self.movepos[1] - (self.speed*2)
         self.state = "jump"
 
+    def attack(self):
+        if self.side == "right":
+                print self.movepos
+                old_rect=self.rect
+                self.image, self.rect = load_png('player2_attack.png', (0,0,0), -1)
+		self.rect = old_rect
+
+
+
     def moveleft(self):
+        self.velocity_x=-10
+
+        if self.side == "left" and self.orientation=="attack":
+	        self.image = pygame.transform.flip(self.image, True, False)
+		self.orientation = "defens"
+        if self.side == "right" and self.orientation=="defens":
+	        self.image = pygame.transform.flip(self.image, True, False)
+		self.orientation = "attack"
+
         self.movepos[0] = self.movepos[0] - (self.speed)
         self.state = "moveleft"
 
     def moveright(self):
+        self.velocity_x=10
+        if self.side == "left" and self.orientation=="defens":
+	        self.image = pygame.transform.flip(self.image, True, False)
+		self.orientation = "attack"
+
+        if self.side == "right" and self.orientation=="attack":
+	        self.image = pygame.transform.flip(self.image, True, False)
+		self.orientation = "defens"
+
         self.movepos[0] = self.movepos[0] + (self.speed)
         self.state = "moveright"
 

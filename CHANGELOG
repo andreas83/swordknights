@@ -1,5 +1,7 @@
 Changelog 
 
+Added Attack mode (which is not pixel perfect right now) 
+Added jump mode which doesnt work at all
 Added Win/Lose Text 
 Now with real pixel perfect collision detection
 Added pixelperfect collision detection, which does not work properly 
