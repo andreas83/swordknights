@@ -31,7 +31,7 @@ class Ground (pygame.sprite.Sprite):
         pygame.draw.rect(self.image, color, rect, 1)
         self.image.fill((color))
         self.rect = self.image.get_rect()
-        self.rect.center = (size[0] / 2 , size[1]+250 )
+        self.rect.center = (size[0] / 2 , size[1]+350 )
 
 def main():
     # Initialise screen
@@ -103,9 +103,11 @@ def main():
                 if event.key == K_a or event.key == K_s or event.key == K_d or event.key == K_w:
                     player1.movepos = [0,0]
                     player1.state = "still"
+                    player1.isJump =0
                 if  event.key == K_UP or event.key == K_DOWN or event.key == K_LEFT or event.key == K_RIGHT:
                     player2.movepos = [0,0]
                     player2.state = "still"
+                    player2.isJump =0
 
         if check_collision(player1, player2):
             print  int(round(time.time() * 1000))

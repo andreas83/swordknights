@@ -19,6 +19,7 @@ def load_png(name, colorkey=None, alpha=False):
         image.set_colorkey(colorkey, RLEACCEL)
     return image, image.get_rect()
 
+
 class Player(pygame.sprite.Sprite):
     def __init__(self, side, colorkey=None, alpha=None):
         pygame.sprite.Sprite.__init__(self)
@@ -42,27 +43,34 @@ class Player(pygame.sprite.Sprite):
         self.mask = pygame.mask.from_surface(self.image)
         screen = pygame.display.get_surface()
         self.area = screen.get_rect()
-        self.side = side
-        self.speed = 10
+        self.side = side #left or right 
         self.state = "still"
-        self.reinit()
-        self.gravity=3;
-        self.ground=10
-        self.velocity_x=-10
-        self.velocity_y=-20
         self.orientation = "attack" # attack or defens
+        self.speed = 10
+	self.velocity = 8
+	self.mass = 2
+        self.isJump = 0	
+        self.reinit()
         
 
     def update(self):
 
-        if self.state=="jump":
-           self.velocity_y= self.velocity_y - self.gravity
+        if self.isJump:
+           if self.velocity > 0:
+              self.force=( 0.5 * self.mass * (self.velocity *self.velocity) )
+           else: 
+              self.force=-( 0.5 * self.mass * (self.velocity *self.velocity) )
 
-           if self.movepos[1] - self.velocity_y > self.ground:
-              self.movepos[1] = self.movepos[1] + self.velocity_y
+           print self.force
 
-           self.movepos[0] = self.movepos[0] + self.velocity_x
+           self.movepos[1] = self.movepos[1] - self.force
 
+           self.velocity = self.velocity -1
+
+           if self.movepos[1] >= 500:
+              self.movepos[1] = 500
+              self.isJump=0
+              self.velocity = 8
 
         newpos = self.rect.move(self.movepos)
         if self.area.contains(newpos):
@@ -73,15 +81,15 @@ class Player(pygame.sprite.Sprite):
     def reinit(self):
         self.state = "still"
         self.movepos = [0,0]
-        print self.area.midleft
         if self.side == "left":
-            self.rect.midleft = (50, 600)
+            self.rect.midleft = self.area.midleft
         elif self.side == "right":
             self.rect.midright = self.area.midright
 
 
     def moveup(self):
         self.state = "jump"
+        self.isJump = 1
 
     def attack(self):
         if self.side == "right":
