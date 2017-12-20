@@ -24,9 +24,11 @@ class Player(pygame.sprite.Sprite):
     def __init__(self, side, colorkey=None, alpha=None):
         pygame.sprite.Sprite.__init__(self)
 	if side =="left":
-           self.image, self.rect = load_png('player1v2.png', colorkey=colorkey, alpha=alpha)
+           self.image, self.rect = load_png('player1v3_still.png', colorkey=colorkey, alpha=alpha)
+           self.image = pygame.transform.flip(self.image, True, False)
         else:
-           self.image, self.rect = load_png('player2.png', colorkey=colorkey, alpha=alpha)
+           self.image, self.rect = load_png('player2v3_still.png', colorkey=colorkey, alpha=alpha)
+
 
         if colorkey and alpha:
             self.hitmask=get_colorkey_and_alpha_hitmask(self.image, self.rect,
@@ -47,8 +49,8 @@ class Player(pygame.sprite.Sprite):
         self.state = "still"
         self.orientation = "attack" # attack or defens
         self.speed = 10
-	self.velocity = 8
-	self.mass = 2
+        self.velocity = 8
+        self.mass = 2
         self.isJump = 0	
         self.reinit()
         
@@ -93,10 +95,14 @@ class Player(pygame.sprite.Sprite):
 
     def attack(self):
         if self.side == "right":
-                print self.movepos
-                old_rect=self.rect
-                self.image, self.rect = load_png('player2_attack.png', (0,0,0), -1)
-		self.rect = old_rect
+            print self.movepos
+            old_rect=self.rect
+            self.image, self.rect = load_png('player2v3_attack.png', (0,0,0), -1)
+        if self.side == "left":
+            print self.movepos
+            old_rect=self.rect
+            self.image, self.rect = load_png('player1v3_attack.png', (0,0,0), -1)
+        self.rect = old_rect
 
 
 
