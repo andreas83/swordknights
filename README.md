@@ -25,10 +25,12 @@ space = attack
 
 
 
-Screenshot
+Screenshot / Artwork
 
+![Image of Swordfight Artwork](https://github.com/andreas83/swordknights/blob/master/res/artwork3.jpg)
+![Image of Swordfight Artwork](https://github.com/andreas83/swordknights/blob/master/res/artwork2.jpg)
+![Image of Swordfight Artwork](https://github.com/andreas83/swordknights/blob/master/res/artwork1.jpg)
 
-![Image of Swordfight](https://github.com/andreas83/swordknights/blob/master/res/preview.jpg)
 
 
 
