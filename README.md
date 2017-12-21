@@ -5,6 +5,16 @@ Inspired from nidhogg and prince of persia i like to build something for fun
 
 pip install pygame
 
+## Status
+
+Please be aware this is an early stage development.
+There is no playable game right now, just a proof of concept and some art work with a lot of bugs. 
+
+## Features
+
++ Pixel perfect collision detection
++ Jumping without Gravity, jepp this is feature... 
+
 
 ## Control 
 
