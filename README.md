@@ -10,6 +10,13 @@ pip install pygame
 Please be aware this is an early stage development.
 There is no playable game right now, just a proof of concept and some art work with a lot of bugs. 
 
+
+## Donate
+Bitcoins: 1GqMSGseij18JnAoB9f3LHJRozNr1QeHkh
+
+Ethereum: 0x6788024D1D36641DDE7832ce9B0300eBbD7C4832
+
+
 ## Features
 
 + Pixel perfect collision detection
