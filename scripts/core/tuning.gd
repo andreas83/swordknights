@@ -77,10 +77,25 @@ static func max_jump_rise() -> float:
 	return full + apex_bonus
 
 
+## The tallest rise, in tiles, that a plain jump can land on top of.
+## The feet must clear the ledge, so this rounds DOWN.
 static func hop_tiles() -> int:
-	return int(floor(max_jump_rise() / TILE))
+	return floori(max_jump_rise() / TILE)
 
 
+## The tallest rise, in tiles, that a jump can still catch with a ledge grab,
+## measured from the floor the jump started on.
+##
+## At the apex the hand probe sits BODY_HEIGHT - GRAB_PROBE_Y below the feet.
+## That probe lands somewhere inside a tile row, and the ledge it catches is
+## that row's TOP edge — so unlike hop_tiles() the reachable rise rounds UP.
+## Using floor() here under-reports by a whole tile and quietly contradicts
+## both the hand-authored levels and the generator built on top of it.
 static func grab_tiles() -> int:
-	## A ledge grab adds the body height minus the hand offset to the reach.
-	return int(floor((max_jump_rise() + BODY_HEIGHT - GRAB_PROBE_Y) / TILE))
+	return ceili((max_jump_rise() + BODY_HEIGHT - GRAB_PROBE_Y) / TILE)
+
+
+## The rise that needs a one-way platform as an intermediate step: too tall to
+## hop onto, low enough that a grab is not required.
+static func platform_step_tiles() -> int:
+	return hop_tiles() + 1
