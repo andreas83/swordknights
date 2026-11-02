@@ -1,0 +1,153 @@
+name: Set up Godot
+description: >
+  Install a pinned Godot editor build (and optionally the matching export
+  templates) from the official GitHub release, verifying both against the
+  release's own SHA512-SUMS.txt, with each artefact cached between runs.
+
+inputs:
+  version:
+    description: >
+      Godot version, without the release suffix (e.g. "4.5.1"). Must match the
+      "4.5" entry in project.godot's config/features.
+    required: false
+    default: '4.5.1'
+  release-suffix:
+    description: 'Release channel suffix, e.g. "stable" or "rc1".'
+    required: false
+    default: 'stable'
+  templates:
+    description: >
+      Install the export templates as well ("true"/"false"). Only the export
+      jobs need them -- they are a 1.3 GB download, so lint and test jobs
+      should leave this off.
+    required: false
+    default: 'false'
+
+outputs:
+  godot-bin:
+    description: 'Absolute path to the Godot executable.'
+    value: ${{ steps.paths.outputs.godot-bin }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve paths
+      id: paths
+      shell: bash
+      run: |
+        set -euo pipefail
+        full="${{ inputs.version }}-${{ inputs.release-suffix }}"
+        echo "full-version=${full}" >> "$GITHUB_OUTPUT"
+        echo "install-dir=${HOME}/godot/${full}" >> "$GITHUB_OUTPUT"
+        echo "godot-bin=${HOME}/godot/${full}/godot" >> "$GITHUB_OUTPUT"
+        # Godot looks for templates under this exact, version-stamped path.
+        echo "templates-dir=${HOME}/.local/share/godot/export_templates/${full}" >> "$GITHUB_OUTPUT"
+        echo "base-url=https://github.com/godotengine/godot/releases/download/${full}" >> "$GITHUB_OUTPUT"
+
+    - name: Restore cached editor
+      id: cache-editor
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.paths.outputs.install-dir }}
+        key: godot-editor-${{ runner.os }}-${{ steps.paths.outputs.full-version }}
+
+    - name: Restore cached export templates
+      id: cache-templates
+      if: inputs.templates == 'true'
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.paths.outputs.templates-dir }}
+        key: godot-templates-${{ steps.paths.outputs.full-version }}
+
+    - name: Fetch release checksums
+      # Needed whenever we are about to download something. The release's own
+      # SHA512-SUMS.txt is the reference -- we never hard-code a digest here,
+      # so bumping the version stays a one-line change.
+      if: >
+        steps.cache-editor.outputs.cache-hit != 'true' ||
+        (inputs.templates == 'true' && steps.cache-templates.outputs.cache-hit != 'true')
+      shell: bash
+      run: |
+        set -euo pipefail
+        curl -fsSL --retry 3 --retry-delay 5 \
+          -o "${RUNNER_TEMP}/SHA512-SUMS.txt" \
+          "${{ steps.paths.outputs.base-url }}/SHA512-SUMS.txt"
+        echo "Fetched checksums for ${{ steps.paths.outputs.full-version }}."
+
+    - name: Download and verify editor
+      if: steps.cache-editor.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        archive="Godot_v${{ steps.paths.outputs.full-version }}_linux.x86_64.zip"
+        cd "${RUNNER_TEMP}"
+        curl -fsSL --retry 3 --retry-delay 5 -O "${{ steps.paths.outputs.base-url }}/${archive}"
+
+        # Fail loudly if the asset is not listed, rather than silently skipping
+        # verification on a typo'd filename.
+        grep -F "  ${archive}" SHA512-SUMS.txt > editor.sha512
+        sha512sum -c editor.sha512
+        echo "Editor checksum OK."
+
+        mkdir -p "${{ steps.paths.outputs.install-dir }}"
+        unzip -q -o "${archive}"
+        mv "Godot_v${{ steps.paths.outputs.full-version }}_linux.x86_64" \
+           "${{ steps.paths.outputs.godot-bin }}"
+        chmod +x "${{ steps.paths.outputs.godot-bin }}"
+
+    - name: Download and verify export templates
+      if: inputs.templates == 'true' && steps.cache-templates.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        archive="Godot_v${{ steps.paths.outputs.full-version }}_export_templates.tpz"
+        cd "${RUNNER_TEMP}"
+        curl -fsSL --retry 3 --retry-delay 5 -O "${{ steps.paths.outputs.base-url }}/${archive}"
+
+        grep -F "  ${archive}" SHA512-SUMS.txt > templates.sha512
+        sha512sum -c templates.sha512
+        echo "Templates checksum OK."
+
+        # The .tpz is a zip whose members all sit under a flat "templates/"
+        # prefix; Godot wants them directly in the version directory.
+        mkdir -p "${{ steps.paths.outputs.templates-dir }}"
+        unzip -q -o -j "${archive}" -d "${{ steps.paths.outputs.templates-dir }}"
+
+    - name: Expose godot on PATH and verify
+      shell: bash
+      run: |
+        set -euo pipefail
+        bin_dir="$(dirname "${{ steps.paths.outputs.godot-bin }}")"
+        echo "${bin_dir}" >> "$GITHUB_PATH"
+        echo "GODOT_BIN=${{ steps.paths.outputs.godot-bin }}" >> "$GITHUB_ENV"
+
+        reported="$("${{ steps.paths.outputs.godot-bin }}" --version)"
+        echo "godot --version: ${reported}"
+
+        # Guard against a cache entry from a different version being restored
+        # under the right key, which would otherwise silently build the wrong
+        # engine.
+        case "${reported}" in
+          ${{ inputs.version }}.${{ inputs.release-suffix }}*) ;;
+          *)
+            echo "::error::Expected Godot ${{ inputs.version }}.${{ inputs.release-suffix }}, got ${reported}"
+            exit 1
+            ;;
+        esac
+
+    - name: Verify templates match the editor
+      if: inputs.templates == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        version_file="${{ steps.paths.outputs.templates-dir }}/version.txt"
+        if [[ ! -f "${version_file}" ]]; then
+          echo "::error::Export templates missing at ${{ steps.paths.outputs.templates-dir }}"
+          exit 1
+        fi
+        installed="$(cat "${version_file}")"
+        echo "Installed templates: ${installed}"
+        if [[ "${installed}" != "${{ steps.paths.outputs.full-version }}" ]]; then
+          echo "::error::Template version ${installed} does not match editor ${{ steps.paths.outputs.full-version }}"
+          exit 1
+        fi

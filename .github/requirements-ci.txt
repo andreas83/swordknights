@@ -1,0 +1,15 @@
+# Python tooling for CI and for local checks.
+#
+# Install locally with:
+#   pip install -r .github/requirements-ci.txt
+#
+# Pinned exactly: gdtoolkit ships new lint rules in minor releases, and an
+# unpinned install would turn a green branch red without a commit touching it.
+# Bump deliberately, run `gdlint .` and fix what it finds in the same PR.
+#
+# Dependabot does not watch this file (there is no pip ecosystem entry in
+# .github/dependabot.yml), so this pin moves by hand.
+gdtoolkit==4.5.0
+
+# Used by .github/scripts/run_tests.sh to read GUT's JUnit report. Only the
+# standard library is needed for that, so there is nothing else to pin here.
