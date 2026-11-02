@@ -15,7 +15,16 @@ scenes/boot.tscn
                  ├─ player/player.gd ..... state machine on a CharacterBody2D
                  ├─ entities/* ........... relic, exit, torch, patrol
                  ├─ render/game_camera.gd  dead-zone follow
-                 └─ ui/hud.gd, ui/touch_controls.gd
+                 ├─ ui/hud.gd, ui/touch_controls.gd
+                 └─ audio/player_audio.gd  maps the character to sound
+```
+
+Plus two systems that stand beside the scene tree rather than inside it:
+
+```
+audio/audio_director.gd ... autoload: buses, voice pool, music, settings
+levels/generator.gd ....... seeded level generation, proved reachable
+                            by levels/reachability.gd before it is played
 ```
 
 The dependency direction is one-way. `player/`, `world/` and `entities/` never
@@ -109,6 +118,25 @@ tile and let the sky show through. Use the `over()` helper.
 The character is drawn as a posed cloak silhouette in
 `scripts/player/player_art.gd`, derived from state and `state_time`. Swapping
 in real sprites later means replacing that one file.
+
+## Audio
+
+No audio files either. `scripts/audio/synth.gd` builds every voice from four
+primitives — swept oscillators, resonant-filtered noise, Karplus-Strong
+plucks and envelopes — and bakes them into `AudioStreamWAV` held in memory at
+load time. Baking rather than streaming is cheaper on a phone, and
+synthesising rather than shipping samples keeps the download tiny and the
+licensing trivial.
+
+The baking costs a couple of seconds of GDScript, so it runs on a thread and
+`play()` no-ops for a voice that is not ready yet. If that ever shows on a
+low-end phone, the fix is caching the baked PCM to `user://` keyed by a
+synthesis version.
+
+Noise comes from a seeded generator rather than `randf()`, so a voice is
+byte-identical run to run and can be pinned by a test. Variation happens at
+playback — pitch and level — not at bake, so repeated footsteps do not
+machine-gun.
 
 ## Configuration as code
 

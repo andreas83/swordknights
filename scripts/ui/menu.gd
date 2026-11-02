@@ -38,14 +38,17 @@ func _process(delta: float) -> void:
 	if absf(axis) > 0.5 and is_zero_approx(_repeat):
 		_index = wrapi(_index + signi(int(signf(axis))), 0, _available.size())
 		_repeat = REPEAT_DELAY
+		AudioDirector.play("ui_move")
 	elif absf(axis) <= 0.5:
 		_repeat = 0.0
 
 	if Input.is_action_just_pressed("jump") or Input.is_action_just_pressed("attack"):
 		var scene: String = _available[_index]["scene"]
 		if ResourceLoader.exists(scene):
+			AudioDirector.play("ui_confirm")
 			get_tree().change_scene_to_file(scene)
 		else:
+			AudioDirector.play("ui_back")
 			push_error("mode '%s' points at a missing scene: %s"
 				% [_available[_index]["id"], scene])
 

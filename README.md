@@ -30,6 +30,7 @@ The engine binary is not vendored. Get 4.5.1 from the
 | Sword       | `J` / `E` / `Enter` | X / B         | **SWORD**                  |
 | Walk (slow) | `Shift`             | L1            | Small stick deflection     |
 | Pause       | `Esc` / `P`         | Start         | **II**                     |
+| Mute        | `M`                 | —             | —                          |
 
 Ledge grabs happen automatically when you fall past a grabbable corner while
 moving into it; press up (or jump) to mantle, down to let go. Hold down and
@@ -46,6 +47,8 @@ scripts/
   entities/  relic, exit door, torch, patrol guard
   render/    follow camera, procedural parallax skyline
   ui/        HUD, menu, touch controls
+  audio/     synthesis, mixer autoload, character sounds, music
+  levels/    segment grammar, generator, reachability verifier
 scenes/      boot, menu, game, player, touch controls
 levels/      ASCII level files
 assets/      generated tile atlas + TileSet
@@ -114,13 +117,15 @@ Working: tilemap world with solid, one-way, ladder and hazard tiles; the full
 ground/air/ledge character state machine with coyote time, jump buffering,
 variable jump height and apex float; sword and stomp attacks; relics, exits
 and patrol guards; dead-zone follow camera; procedural parallax skyline; HUD;
-keyboard, gamepad and touch input; mode menu; one complete level.
+keyboard, gamepad and touch input; mode menu; build, test and release
+pipeline; procedural level generation with a reachability proof; procedural
+audio — synthesised sound effects, an Andalusian music loop with an intensity
+parameter, and persisted volume and mute settings.
 
-In progress on feature branches: build and release pipeline, procedural level
-generation, and a two-player duel mode over the network.
+In progress on a feature branch: a two-player duel mode over the network.
 
-Not built yet: audio, more hand-authored levels, enemy AI beyond a patrol
-route, cutscenes.
+Not built yet: more hand-authored levels, enemy AI beyond a patrol route,
+cutscenes.
 
 ## History
 

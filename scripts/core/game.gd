@@ -64,8 +64,10 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("pause"):
 		if phase == Phase.PLAYING:
 			_set_phase(Phase.PAUSED)
+			AudioDirector.play("pause_in")
 		elif phase == Phase.PAUSED:
 			_set_phase(Phase.PLAYING)
+			AudioDirector.play("pause_out")
 
 	match phase:
 		Phase.PAUSED:
@@ -163,6 +165,7 @@ func _resolve_interactions() -> void:
 			var guard := node as Patrol
 			if has_attack and attack.intersects(guard.bounds()):
 				guard.hit(player.global_position.x)
+				AudioDirector.play("guard_hit")
 			elif body.intersects(guard.bounds()):
 				# A falling player lands on the guard instead of taking the hit.
 				var stomping := (
@@ -171,6 +174,7 @@ func _resolve_interactions() -> void:
 				)
 				if stomping:
 					guard.hit(player.global_position.x)
+					AudioDirector.play("guard_hit", {"pitch": 0.9})
 					player.velocity.y = -Tuning.JUMP_SPEED * 0.68
 				else:
 					player.damage(1, guard.global_position.x)
@@ -180,6 +184,7 @@ func _resolve_interactions() -> void:
 
 
 func _complete() -> void:
+	AudioDirector.play("level_complete")
 	_set_phase(Phase.COMPLETE)
 	level_completed.emit(elapsed, relics, relics_total)
 
@@ -197,6 +202,7 @@ func _restart() -> void:
 
 
 func _on_relic_collected() -> void:
+	AudioDirector.play("relic")
 	relics += 1
 	_update_hud()
 
