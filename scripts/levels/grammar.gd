@@ -87,48 +87,14 @@ static func grab_rise() -> int:
 	return Tuning.grab_tiles()
 
 
-## Seconds a jump spends off the ground before the feet come back to the height
-## they left from.
-##
-## Integrated frame by frame rather than solved in closed form, because the
-## game is a fixed 60 Hz simulation and the two do not agree: semi-implicit
-## Euler loses about 2 px of apex rise and 0.7 px of reach against the
-## continuous arc. The closed form would have the generator author a gap the
-## engine cannot actually cross, which is the same class of mistake as rounding
-## a grab reach the wrong way.
-static func jump_airtime() -> float:
-	var dt := 1.0 / 60.0
-	var velocity := -Tuning.JUMP_SPEED
-	var height := 0.0
-	var frames := 0
-	while frames < 600:
-		frames += 1
-		var near_apex := absf(velocity) < Tuning.APEX_THRESHOLD
-		var scale := Tuning.APEX_GRAVITY_SCALE if near_apex else 1.0
-		velocity = minf(velocity + Tuning.GRAVITY * scale * dt, Tuning.MAX_FALL_SPEED)
-		height += velocity * dt
-		if height >= 0.0:
-			break
-	return float(frames) * dt
-
-
-## Horizontal distance a full-speed running jump covers over that airtime.
-static func run_jump_reach() -> float:
-	return Tuning.RUN_SPEED * jump_airtime()
-
-
 ## The widest level gap a running jump can cross, in empty tiles.
 ##
-## Measured between the two positions the character can really occupy: it takes
-## off from the ledge lip — the tile boundary, with half the body still over
-## solid ground — and it lands as soon as the far edge of the body is over the
-## landing tile. Both allowances are geometry, not optimism; the verifier
-## reproduces the same two positions, and `LevelReachability.measure_reach()`
-## reports what the simulation actually achieves.
+## Delegates to Tuning: the airtime integration and the takeoff/landing
+## geometry are properties of the character, not of level generation, and two
+## copies of the same derivation is exactly how grab_tiles() drifted a tile
+## away from what the character could do.
 static func max_gap_tiles() -> int:
-	var takeoff := Tuning.TILE * 0.5
-	var landing := Tuning.TILE * 0.5 - Tuning.BODY_WIDTH * 0.5
-	return floori((run_jump_reach() + takeoff - landing) / Tuning.TILE)
+	return Tuning.gap_tiles()
 
 
 ## The widest gap the generator authors unprompted. One tile inside the

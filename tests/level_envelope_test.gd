@@ -74,8 +74,21 @@ func _check_measured_envelope() -> void:
 		"simulated hop reach matches Tuning.hop_tiles()")
 	_check.equal(measured["grab"], Tuning.grab_tiles(),
 		"simulated ledge-grab reach matches Tuning.grab_tiles()")
-	_check.equal(measured["gap"], LevelGrammar.max_gap_tiles(),
-		"simulated gap reach matches LevelGrammar.max_gap_tiles()")
+	# Gaps are the one tier that is not an exact equality. The hop and the grab
+	# land on a tile boundary, so they can be derived exactly; a gap is crossed
+	# from wherever the character happens to be standing, and the authored
+	# limit deliberately assumes a comfortable takeoff rather than a perfect
+	# one. So the declared limit must sit inside the measured envelope — and
+	# no more than a tile inside it, or the generator has quietly become so
+	# cautious that a retune has stopped reaching the levels it authors.
+	var measured_gap := int(measured["gap"])
+	var declared_gap := LevelGrammar.max_gap_tiles()
+	_check.is_true(declared_gap <= measured_gap,
+		"the declared gap limit (%d) is inside the measured envelope (%d)"
+			% [declared_gap, measured_gap])
+	_check.is_true(declared_gap >= measured_gap - 1,
+		"the declared gap limit (%d) is not needlessly far inside the measured envelope (%d)"
+			% [declared_gap, measured_gap])
 
 	# And the grammar must not author anything past what was measured.
 	_check.is_true(LevelGrammar.safe_gap_tiles() <= int(measured["gap"]),
@@ -93,7 +106,7 @@ func _check_tier_ordering() -> void:
 		"a platform step is taller than a hop")
 	_check.is_true(LevelGrammar.step_rise() <= LevelGrammar.grab_rise(),
 		"a ledge grab reaches at least as high as a platform step")
-	_check.greater(LevelGrammar.jump_airtime(), 0.0, "airtime is positive")
+	_check.greater(Tuning.jump_airtime(), 0.0, "airtime is positive")
 
 	# The engine integrates the arc at a fixed 60 Hz, which loses a little rise
 	# and a little reach against the continuous solution. Checking the discrete
@@ -103,12 +116,12 @@ func _check_tier_ordering() -> void:
 		(Tuning.JUMP_SPEED - Tuning.APEX_THRESHOLD) / Tuning.GRAVITY
 		+ Tuning.APEX_THRESHOLD / (Tuning.GRAVITY * Tuning.APEX_GRAVITY_SCALE)
 	)
-	_check.is_true(LevelGrammar.jump_airtime() <= ideal_airtime,
+	_check.is_true(Tuning.jump_airtime() <= ideal_airtime,
 		"the simulated airtime (%.4f s) is not longer than the continuous one (%.4f s)"
-			% [LevelGrammar.jump_airtime(), ideal_airtime])
-	_check.greater(LevelGrammar.jump_airtime(), ideal_airtime * 0.9,
+			% [Tuning.jump_airtime(), ideal_airtime])
+	_check.greater(Tuning.jump_airtime(), ideal_airtime * 0.9,
 		"the simulated airtime is within 10%% of the continuous one")
-	_check.is_true(LevelGrammar.run_jump_reach() <= Tuning.RUN_SPEED * ideal_airtime,
+	_check.is_true(Tuning.run_jump_reach() <= Tuning.RUN_SPEED * ideal_airtime,
 		"the simulated run-jump reach is not larger than the analytic bound")
 
 

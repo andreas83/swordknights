@@ -99,7 +99,7 @@ static func envelope() -> Dictionary:
 		"platform_step_tiles": Tuning.platform_step_tiles(),
 		"grab_tiles": Tuning.grab_tiles(),
 		"max_jump_rise_px": Tuning.max_jump_rise(),
-		"jump_airtime_s": LevelGrammar.jump_airtime(),
+		"jump_airtime_s": Tuning.jump_airtime(),
 		"max_gap_tiles": LevelGrammar.max_gap_tiles(),
 		"authored_gap_tiles": LevelGrammar.safe_gap_tiles(),
 	}

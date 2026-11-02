@@ -185,7 +185,8 @@ class Bot:
 					return true
 		return false
 
-	## No floor under the next step, but floor again three tiles on: a gap to	## cross rather than a ledge to walk off.
+	## No floor under the next step, but floor again three tiles on: a gap to
+	## cross rather than a ledge to walk off.
 	func _gap_ahead(feet: Vector2) -> bool:
 		if level.is_solid_at(Vector2(feet.x + 6.0, feet.y + 4.0)):
 			return false

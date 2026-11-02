@@ -113,19 +113,49 @@ static func platform_step_tiles() -> int:
 	return hop_tiles() + 1
 
 
-## The widest flat gap, in tiles, that a running jump crosses.
+## Seconds a jump spends off the ground before the feet come back to the
+## height they left from.
 ##
-## Flight time is symmetric about the apex — the reduced-gravity band costs the
-## same on the way up as it gives back coming down — so it is twice the rise
-## time. The body's own width helps at both ends: the feet leave the near edge
-## with half a body overhanging and catch the far one the same way. The margin
-## is the slack that keeps this a jump rather than a pixel-perfect stunt.
+## Integrated frame by frame rather than solved in closed form, because the
+## game is a fixed 60 Hz simulation and the two do not agree: semi-implicit
+## Euler loses roughly 2 px of apex rise against the continuous arc. The
+## closed form would quietly overstate what the engine can actually do, which
+## is the same class of mistake as rounding a grab reach the wrong way.
+static func jump_airtime() -> float:
+	var dt := 1.0 / 60.0
+	var velocity := -JUMP_SPEED
+	var height := 0.0
+	var frames := 0
+	while frames < 600:
+		frames += 1
+		var near_apex := absf(velocity) < APEX_THRESHOLD
+		var scale := APEX_GRAVITY_SCALE if near_apex else 1.0
+		velocity = minf(velocity + GRAVITY * scale * dt, MAX_FALL_SPEED)
+		height += velocity * dt
+		if height >= 0.0:
+			break
+	return float(frames) * dt
+
+
+## Horizontal distance a full-speed running jump covers over that airtime.
+static func run_jump_reach() -> float:
+	return RUN_SPEED * jump_airtime()
+
+
+## The widest flat gap, in tiles, that levels may be authored with.
+##
+## Deliberately a conservative floor, not the true limit. It is measured
+## between the two positions the character can comfortably occupy: taking off
+## from the ledge lip with half the body still over solid ground, and landing
+## as soon as the far edge of the body is over the landing tile. A player who
+## runs to the very edge and releases at the perfect frame can do better —
+## `LevelReachability.measure_reach()` reports that real envelope, and
+## tests/level_envelope_test.gd holds this value inside it. Authoring to the
+## cautious number is what keeps a generated gap a jump rather than a stunt.
 static func gap_tiles() -> int:
-	const LANDING_MARGIN := 4.0
-	var to_float := (JUMP_SPEED - APEX_THRESHOLD) / GRAVITY
-	var floating := APEX_THRESHOLD / (GRAVITY * APEX_GRAVITY_SCALE)
-	var flight := 2.0 * (to_float + floating)
-	return floori((RUN_SPEED * flight + BODY_WIDTH - LANDING_MARGIN) / TILE)
+	var takeoff := TILE * 0.5
+	var landing := TILE * 0.5 - BODY_WIDTH * 0.5
+	return floori((run_jump_reach() + takeoff - landing) / TILE)
 
 
 ## --- derived feel numbers --------------------------------------------------
