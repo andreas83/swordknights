@@ -1,0 +1,80 @@
+; The Mirror Court
+;
+; A duelling arena, not a platforming level. 40x16 tiles (640x256 px).
+;
+; Legend (see scripts/world/tiles.gd):
+;   #  solid        =  one-way platform    H  ladder
+;   ^  spikes       ~  water               :  background niche
+;   @  spawn        *  relic               D  exit door
+;   t  torch        p  patrol guard        space/. empty
+;
+; SYMMETRY
+; Every tile mirrors about the line between column 19 and column 20: tile i
+; equals tile 39-i. There is exactly ONE spawn mark, on the left; the duel
+; mirrors it to place the second duellist (scripts/duel/duel.gd). That way the
+; two seats cannot drift apart, and neither player can be handed the better
+; corner by an authoring slip. tests/duel_arena.gd asserts both.
+;
+; TIERS — the vertical grammar comes out of scripts/core/tuning.gd:
+; a 2-tile rise is a plain hop, 3 tiles needs a ledge grab, 4 tiles needs a
+; ladder or a platform step. So no tier is ever more than 2 hops from another.
+;
+;   ground  (row 20 surface)  <- spawns, the long running floor
+;   mid     (row 16 surface)  <- the main fighting stage
+;   top     (row 12 surface)  <- two separate balconies, no way across up there
+;
+; ROUTES — every tier has two ways up, on opposite flanks, so nothing can be
+; held by standing in one doorway:
+;   ground -> mid : outer ladder (col 1) ......... inner platform step (row 18)
+;   mid    -> top : outer ladder (col 3) ......... inner platform step (row 14)
+;
+; THE CENTRE is where the duel wants the fight to happen: a four-tile spike pit
+; at columns 18-21, with a two-tile one-way stepping stone hanging over the
+; middle of it at row 19, and the bridge above that at row 17.
+;
+; The pit is four tiles wide and not three or two for a reason. A duellist who
+; walks off a ledge is still falling slowly a few pixels later, and the ledge
+; grab in scripts/player/player.gd probes ahead of the hands every frame — so
+; across a two-tile gap they simply catch the far wall and mantle up, and the
+; pit has no teeth at all. Four tiles puts the far wall out of reach: by the
+; time you are over it you are well below its lip, and the grab finds solid
+; rock above the probe rather than a corner.
+;
+; So the low crossing is two deliberate hops, up onto the stone and down the
+; other side. The stone is a one-way platform, which is also not an accident:
+; platforms are not solid, so you cannot grab the stone's edge to save yourself.
+; Miss the hop and you land on the spikes.
+;
+; NO CAMPING: the top balconies are not connected to each other, so retreating
+; upward is a dead end rather than a lap of the map; both balconies are open
+; from below through the one-way platforms as well as the ladder.
+;
+; The blank lines below are sky, and there are a lot of them on purpose. The
+; duel camera frames both duellists at once, so when they run to opposite ends
+; it zooms out until the whole 640x368 arena is on screen; for that to be a
+; legal view the arena has to be at least as tall as the viewport's aspect
+; allows (320x180 at half zoom is 640x360). The sky is also jump headroom off
+; the top balconies. AsciiLevel keeps leading blank rows.
+
+
+
+
+
+
+
+
+
+
+
+   H  t                          t  H
+   H##########            ##########H
+   H##########            ##########H
+   H          ===      ===          H
+   H    t                      t    H
+ H############            ############H
+ H###::#######    ====    #######::###H
+ H             ===    ===             H
+ H   @      t      ==      t          H
+##################    ##################
+##################    ##################
+##################^^^^##################

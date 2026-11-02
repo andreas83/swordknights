@@ -58,7 +58,11 @@ sub-class-name: '_?([A-Z][a-z0-9]*)+'
 signal-name: '[a-z][a-z0-9]*(_[a-z0-9]+)*'
 class-variable-name: '_?[a-z][a-z0-9]*(_[a-z0-9]+)*'
 class-load-variable-name: '(([A-Z][a-z0-9]*)+|_?[a-z][a-z0-9]*(_[a-z0-9]+)*)'
-function-variable-name: '[a-z][a-z0-9]*(_[a-z0-9]+)*'
+# Allows a leading underscore, matching function-argument-name above. gdlint's
+# own defaults are inconsistent here: '_unused' is accepted as a parameter name
+# but rejected as a local, although the convention means the same thing in both
+# places -- "read for its side effect, the value is deliberately dropped".
+function-variable-name: '_?[a-z][a-z0-9]*(_[a-z0-9]+)*'
 function-preload-variable-name: '([A-Z][a-z0-9]*)+'
 function-argument-name: '_?[a-z][a-z0-9]*(_[a-z0-9]+)*'
 loop-variable-name: '_?[a-z][a-z0-9]*(_[a-z0-9]+)*'

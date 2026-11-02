@@ -278,8 +278,11 @@ func _draw_leg(knee: Vector2, foot: Vector2, color: Color) -> void:
 	_limb(_hip, knee, 2.1, 1.7, color)
 	_limb(knee, foot, 1.7, 1.5, color)
 	# A boot, so the leg ends in something rather than tapering into the floor.
+	# Every x offset is mirrored by _f, not just the toe: mirroring half a quad
+	# turns it into a bowtie the moment the character faces left, and Godot
+	# refuses to triangulate a self-intersecting polygon.
 	draw_colored_polygon(PackedVector2Array([
-		foot + Vector2(-1.1, -1.4), foot + Vector2(1.1, -1.4),
+		foot + Vector2(-1.1 * _f, -1.4), foot + Vector2(1.1 * _f, -1.4),
 		foot + Vector2(1.5 * _f, 0.0), foot + Vector2(-1.3 * _f, 0.0),
 	]), color)
 

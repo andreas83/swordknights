@@ -96,9 +96,20 @@ Vertical spacing is a design language, not a free choice:
 | 3 tiles   | needs a one-way platform   |
 | 4 tiles   | needs a ledge grab         |
 
-Those numbers come out of the jump arc in `scripts/core/tuning.gd` — see
-`Tuning.hop_tiles()` and `Tuning.grab_tiles()`. Retune the character and the
-grammar moves with it.
+Horizontally, `Tuning.gap_tiles()` is the widest flat gap a running jump
+crosses.
+
+All four numbers come out of the jump arc in `scripts/core/tuning.gd`. Retune
+the character and the grammar moves with it; `tests/tuning_grammar_test.gd`
+and `tests/level_envelope_test.gd` fail if a level's geometry stops matching
+what the character can do.
+
+**A hazard narrower than grab reach is not a hazard.** The ledge-grab probe
+runs every frame while falling, so a 2-tile spike pit is free passage: you
+drop in, catch the far wall and mantle out. A pit has to be wider than
+`Tuning.grab_tiles()` to cost anything — or be roofed, or have nothing
+grabbable on the far side. This caught out the duelling arena, where both
+fighters simply walked across the spikes.
 
 ## Screenshots without a screen
 

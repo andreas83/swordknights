@@ -5,6 +5,9 @@
 [ext_resource type="Script" path="res://scripts/audio/player_audio.gd" id="3_audio"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+; Per-instance: _set_crouched() mutates this shape, so a shared one would
+; have one duellist crouch the other one's hitbox.
+resource_local_to_scene = true
 size = Vector2(9, 22)
 
 [node name="Player" type="CharacterBody2D"]

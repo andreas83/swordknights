@@ -1,0 +1,30 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/duel/duel_local.gd" id="1_local"]
+[ext_resource type="Script" path="res://scripts/render/parallax_sky.gd" id="2_sky"]
+[ext_resource type="Script" path="res://scripts/duel/duel.gd" id="3_duel"]
+[ext_resource type="Script" path="res://scripts/duel/duel_camera.gd" id="4_camera"]
+[ext_resource type="Script" path="res://scripts/duel/duel_hud.gd" id="5_hud"]
+
+[node name="DuelLocal" type="Node2D"]
+script = ExtResource("1_local")
+
+[node name="Sky" type="CanvasLayer" parent="."]
+layer = -10
+
+[node name="ParallaxSky" type="Node2D" parent="Sky"]
+script = ExtResource("2_sky")
+
+[node name="Duel" type="Node2D" parent="."]
+script = ExtResource("3_duel")
+
+[node name="Camera" type="Camera2D" parent="."]
+script = ExtResource("4_camera")
+
+[node name="HudLayer" type="CanvasLayer" parent="."]
+
+[node name="Hud" type="Control" parent="HudLayer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("5_hud")
