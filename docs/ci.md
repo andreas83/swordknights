@@ -43,8 +43,8 @@ invokes. Run them from the repository root.
 | ---- | ------- |
 | Import (builds `.godot/`, registers global classes) | `godot --headless --path . --import` |
 | Lint | `gdlint .` |
-| Format check (tests only; see [below](#gdformat-is-advisory-outside-tests)) | `gdformat --check tests` |
-| Format everything, in place | `gdformat .` |
+| Format check (advisory; see [below](#gdformat-is-advisory-everywhere)) | `gdformat --check scripts tools tests` |
+| Format our code, in place | `gdformat scripts tools tests` |
 | GDScript parse check | `.github/scripts/check_scripts.sh` |
 | Boot smoke test | `.github/scripts/smoke_boot.sh` |
 | Test suite | `.github/scripts/run_tests.sh` |
@@ -53,7 +53,11 @@ invokes. Run them from the repository root.
 
 > `gdlint` resolves `.gdlintrc` from the **current working directory**
 > upwards, so it only picks up this project's configuration when run from the
-> repository root. The same is true of `gdformat`.
+> repository root.
+>
+> `gdformat` takes explicit paths because, unlike `gdlint`, it has no
+> `excluded_directories` setting — a bare `gdformat .` would also rewrite
+> vendored GUT under `addons/` and the prototypes under `legacy/`.
 
 Run the import at least once before the test suite: GUT's test scripts
 `extends GutTest`, and that class name only resolves once the global class
@@ -66,12 +70,12 @@ registry in `.godot/` exists.
 The harness is **GUT (Godot Unit Test) 9.6.1**, vendored at
 `addons/gut/`.
 
-### Conventions
+### Conventions — write new tests this way
 
 | | |
 | --- | --- |
 | Where tests live | `tests/`, in subdirectories by kind — `tests/unit/` today |
-| File name | `test_*.gd` — the `test_` prefix is how GUT finds them |
+| File name | **`test_*.gd`** — the `test_` prefix is how GUT finds them |
 | Base class | `extends GutTest` |
 | Test function name | `func test_*() -> void:` |
 | Run them | `.github/scripts/run_tests.sh` |
@@ -79,6 +83,36 @@ The harness is **GUT (Godot Unit Test) 9.6.1**, vendored at
 Subdirectories of `tests/` are searched recursively, so you can add
 `tests/gameplay/`, `tests/levels/` and so on without touching any
 configuration.
+
+### The other kind: standalone `*_test.gd` scripts
+
+`tests/` also holds a test written before this harness existed —
+`tests/tuning_grammar_test.gd`. It `extends SceneTree`, asserts for itself and
+`quit()`s with a status, and is run directly:
+
+```bash
+godot --headless --path . --script res://tests/tuning_grammar_test.gd
+```
+
+GUT cannot collect those: they do not extend `GutTest` and they do not match
+its `test_*` prefix. So `run_tests.sh` runs them as an explicit **second
+phase** after the GUT suite, discovering them by the mirrored naming
+convention:
+
+| Suffix `*_test.gd` | standalone `SceneTree` script, run directly |
+| ------------------ | ------------------------------------------- |
+| **Prefix `test_*.gd`** | **GUT test, collected into the suite** |
+
+This is a bridge, not a second supported harness. Without it a standalone test
+would be silently skipped, which is the worst outcome available: the coverage
+is gone *and* the build is green. Both phases fail the build, so nothing is
+silent either way.
+
+**New tests should be GUT.** Porting `tuning_grammar_test.gd` is a small job —
+`extends GutTest`, rename to `tests/unit/test_tuning_grammar.gd`, and swap its
+`_equal`/`_true` helpers for `assert_eq`/`assert_true`, which already report
+far better failure messages. Once `tests/` holds no `*_test.gd` files, phase
+two becomes a no-op and the block in `run_tests.sh` can go.
 
 Selection is configured once, in `.gutconfig.json` at the repository root, so
 the script, the raw runner and the editor panel all agree on what the suite is.
@@ -146,7 +180,7 @@ Two jobs, run in parallel.
 1. `gdlint .` — blocking.
 2. `gdformat --check tests` — blocking.
 3. `gdformat --check scripts tools` — advisory, see
-   [below](#gdformat-is-advisory-outside-tests).
+   [below](#gdformat-is-advisory-everywhere).
 
 **`check`** — Godot 4.5.1, no export templates (they are a 1.3 GB download and
 nothing in this job exports).
@@ -396,37 +430,82 @@ point of it.
 
 ## Decisions worth knowing about
 
-### `gdformat` is advisory outside `tests/`
+### Two gdlint rules are disabled, and why
 
-`gdlint` is a hard gate everywhere, and it passes clean on the whole project
-today with no rules switched off — `.gdlintrc` is gdlint's own default rule
-set plus the directories that are not ours (`legacy/`, `addons/`, `.godot/`,
-`build/`).
+`gdlint` is a hard gate everywhere. `.gdlintrc` is gdlint's own default rule
+set with the directories that are not ours excluded (`legacy/`, `addons/`,
+`.godot/`, `build/`) and exactly two rules turned off, both because they
+misfire on idiomatic GDScript rather than because they found something
+inconvenient:
 
-`gdformat` is a hard gate on `tests/` and advisory on `scripts/` and `tools/`.
-This is a deliberate, temporary split. Run against
-`tools/configure_project.gd`, `gdformat` currently:
+- **`class-definitions-order`** — gdlint wants plain `var` before
+  `@onready var`, and `const` before both. This codebase consistently does the
+  opposite and puts the node references at the top of the class
+  (`scripts/core/game.gd`, `scripts/player/player_input.gd`,
+  `scripts/render/parallax_sky.gd`). That is the common Godot idiom and it puts
+  the scene wiring where you look for it. The rule encodes one ordering
+  opinion; the codebase has a different, consistent one.
+- **`max-returns`** — counts every returning arm of a `match` as a separate
+  return. `AsciiLevel.atlas_for()` (8 arms, tile kind → atlas coordinates) and
+  `PlayerArt._posture()` (14 arms, state → pose) are dispatch tables, which is
+  the clearest form GDScript offers. On this codebase the rule is almost
+  entirely false positives.
 
-- strips the blank lines that group the settings dictionary into commented
-  sections, running four labelled groups together into one wall; and
-- rewrites a readable `print("..." % [...])` into a doubly-parenthesised block.
+Nothing else is switched off. In particular `unused-argument` stays on — see
+[the open finding](#one-open-lint-finding) below.
 
-Both make the file worse, and that file is deliberately formatted the way it
-is. Adopting a formatter repo-wide is a project decision that wants its own
-commit — not something a build-pipeline change should force through, especially
-with gameplay work in flight.
+### `gdformat` is advisory everywhere
 
-**To adopt it properly**, once the current round of gameplay work has landed:
-run `gdformat .`, review the diff, commit it alone, then change the advisory
-step in `ci.yml` to a blocking `gdformat --check .`.
+It is run on every CI run and reported, but it fails nothing. The repository
+has never been through it: `gdformat --check scripts tools tests` currently
+wants to rewrite 19 of 28 files. Some of that is harmless line-joining, but
+some loses information — in `tools/configure_project.gd` it strips the blank
+lines that group the settings dictionary into four commented sections and
+double-parenthesises a `print()`.
 
-### `.import` and `.uid` files are not committed
+Making it a gate would mean reformatting most of the gameplay code, which is
+under active development by two other workstreams. Adopting a formatter is a
+project decision that wants its own commit, not something a build-pipeline
+change should force through.
 
-Godot regenerates them on `--import`, which every workflow does before anything
-else, so CI does not need them. Committing them repo-wide is nonetheless the
-practice Godot recommends — it makes a fresh clone's first import
-deterministic. It is a repo-wide call that touches `scripts/`, `scenes/` and
-`icon.svg`, so it was left to you rather than folded into this change.
+**To adopt it properly**, once the gameplay work has settled:
+
+1. `gdformat scripts tools tests`, review the diff, commit it on its own.
+2. In `ci.yml`, drop `continue-on-error: true` from the `gdformat` step.
+
+### `.import` and `.uid` files **are** committed
+
+This is the convention `main` settled on — every `scripts/**/*.gd.uid`,
+`icon.svg.import` and `assets/tiles.png.import` is tracked — and it matches
+Godot's own recommendation: committing them makes a fresh clone's first import
+deterministic and keeps resource UIDs stable across machines.
+
+This pipeline adds no such files of its own beyond those shipped inside
+`addons/gut/`. The `.uid` files for anything added under `tests/` are
+generated on the next import; commit them along with the test.
+
+### One open lint finding
+
+`gdlint` reports exactly one real problem against `main` as merged:
+
+```
+scripts/player/player.gd:355: Error: unused function argument 'delta' (unused-argument)
+```
+
+`_update_ladder(delta: float)` does not use `delta`. It is one of a family of
+`_update_*(delta)` state handlers dispatched uniformly, so the signature is
+right to keep — the fix is to mark the argument intentionally unused, which is
+a one-character change gdlint's `function-argument-name` rule already allows:
+
+```gdscript
+func _update_ladder(_delta: float) -> void:
+```
+
+This was deliberately **not** fixed here: `scripts/` belongs to the gameplay
+workstreams and a build-pipeline change has no business editing a 448-line file
+someone else has open. The rule was left enabled rather than silenced, so CI
+will stay red on this one line until it is fixed — which is the pipeline doing
+its job, not a defect in it.
 
 ### The GUT editor panel is not enabled
 

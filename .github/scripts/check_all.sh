@@ -46,10 +46,18 @@ echo "gdlint: $(gdlint --version)"
 # makes GutTest resolvable in the test scripts.
 step "import"        "$GODOT" --headless --path . --import
 step "gdlint"        gdlint .
-step "gdformat"      gdformat --check tests
 step "parse-check"   ./.github/scripts/check_scripts.sh
 step "boot smoke"    ./.github/scripts/smoke_boot.sh 60
 step "tests"         ./.github/scripts/run_tests.sh
+
+# Advisory, exactly as in CI: reported, never fatal. See docs/ci.md for why
+# gdformat is not yet a gate, and for the two steps to make it one.
+printf '\n\033[1m==> gdformat (advisory)\033[0m\n'
+if gdformat --check scripts tools tests; then
+	printf '\033[32m    clean\033[0m\n'
+else
+	printf '\033[33m    would reformat -- advisory only, not a failure\033[0m\n'
+fi
 
 printf '\n'
 if [[ ${#failed[@]} -gt 0 ]]; then

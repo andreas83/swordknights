@@ -76,4 +76,63 @@ if [[ $status -ne 0 ]]; then
 	exit "$status"
 fi
 
-echo "Test suite passed: ${total} test(s)."
+echo "GUT suite passed: ${total} test(s)."
+
+# ---------------------------------------------------------------------------
+# Phase 2: standalone SceneTree tests.
+#
+# GUT is the convention for new tests (see docs/ci.md). But the repository also
+# contains hand-rolled tests written before the harness existed: a script that
+# `extends SceneTree`, asserts for itself and quit()s with a status. GUT does
+# not and cannot collect those -- they do not extend GutTest and they do not
+# match its test_* prefix -- so without this phase they would be silently
+# skipped, which is the worst of both worlds: the coverage is gone and the
+# build is green.
+#
+# Convention: tests/**/*_test.gd (suffix) is standalone; tests/**/test_*.gd
+# (prefix) is GUT. These are being migrated to GUT; this phase is the bridge.
+# ---------------------------------------------------------------------------
+
+mapfile -t standalone < <(
+	find tests -type f -name '*_test.gd' 2>/dev/null |
+		# A GUT file would be named test_*.gd; never run one of those this way.
+		grep -vE '(^|/)test_[^/]*\.gd$' |
+		sort
+)
+
+if [[ ${#standalone[@]} -eq 0 ]]; then
+	echo "No standalone SceneTree tests found."
+	echo "All tests passed."
+	exit 0
+fi
+
+echo
+echo "Running ${#standalone[@]} standalone SceneTree test(s)..."
+standalone_failed=()
+
+for script in "${standalone[@]}"; do
+	echo
+	echo "  --- ${script}"
+	if "$GODOT" --headless --path . --script "res://${script}" 2>&1 |
+		grep -vE '^\[|DONE|^Godot Engine v|^Free and open source|^\s*$' |
+		sed 's/^/      /'; then
+		: # pipeline status is grep's; the real status comes from PIPESTATUS
+	fi
+	if [[ "${PIPESTATUS[0]}" -ne 0 ]]; then
+		echo "      FAILED"
+		standalone_failed+=("$script")
+	else
+		echo "      ok"
+	fi
+done
+
+echo
+if [[ ${#standalone_failed[@]} -gt 0 ]]; then
+	echo "FAILED: ${#standalone_failed[@]} standalone test(s) failed:" >&2
+	for script in "${standalone_failed[@]}"; do
+		echo "  - $script" >&2
+	done
+	exit 1
+fi
+
+echo "All tests passed: ${total} GUT test(s), ${#standalone[@]} standalone script(s)."
