@@ -82,6 +82,40 @@ func _action_names() -> Dictionary:
 		"walk": [[KEY_SHIFT], [JOY_BUTTON_LEFT_SHOULDER]],
 		"pause": [[KEY_ESCAPE, KEY_P], [JOY_BUTTON_START]],
 		"ui_confirm_action": [[KEY_SPACE, KEY_ENTER], [JOY_BUTTON_A]],
+
+		# --- duel: raise the sword to block --------------------------------
+		# The eighth and last input bit. Shared by the adventure (where nothing
+		# reads it yet) and by the online duel, whose local seat drives the
+		# unsuffixed actions so the gamepad and the touch controls keep working.
+		"guard": [[KEY_Q, KEY_L], [JOY_BUTTON_RIGHT_SHOULDER]],
+
+		# --- duel: two seats on one keyboard -------------------------------
+		# A second binding set cannot simply be added next to the first: the
+		# shared actions already claim BOTH the arrows and WASD, so on a local
+		# duel one key would move both duellists. Hence two complete,
+		# non-overlapping sets, and the local duel reads only these. Seat one
+		# takes the left of the keyboard, seat two the right and the numpad.
+		#
+		# Keyboard only, deliberately: a Godot action cannot tell one gamepad
+		# from another without per-device events, so a pad bound here would
+		# drive both seats at once. See docs/netplay.md.
+		"move_left_p1": [[KEY_A], []],
+		"move_right_p1": [[KEY_D], []],
+		"move_up_p1": [[KEY_W], []],
+		"move_down_p1": [[KEY_S], []],
+		"jump_p1": [[KEY_SPACE, KEY_V], []],
+		"attack_p1": [[KEY_F], []],
+		"guard_p1": [[KEY_G], []],
+		"walk_p1": [[KEY_SHIFT], []],
+
+		"move_left_p2": [[KEY_LEFT, KEY_KP_4], []],
+		"move_right_p2": [[KEY_RIGHT, KEY_KP_6], []],
+		"move_up_p2": [[KEY_UP, KEY_KP_8], []],
+		"move_down_p2": [[KEY_DOWN, KEY_KP_5], []],
+		"jump_p2": [[KEY_K, KEY_KP_0], []],
+		"attack_p2": [[KEY_J, KEY_KP_1], []],
+		"guard_p2": [[KEY_L, KEY_KP_2], []],
+		"walk_p2": [[KEY_SEMICOLON, KEY_KP_3], []],
 	}
 
 

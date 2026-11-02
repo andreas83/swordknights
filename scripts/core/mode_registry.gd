@@ -20,6 +20,8 @@ static func modes() -> Array[Dictionary]:
 			"scene": "res://scenes/game.tscn",
 			"available": true,
 		},
+		{"id": "duel", "title": "Duel", "subtitle": "Two swords, one keyboard", "scene": "res://scenes/duel_local.tscn", "available": true},
+		{"id": "duel_online", "title": "Duel Online", "subtitle": "Host or join by room code", "scene": "res://scenes/duel_online.tscn", "available": true},
 	]
 
 
