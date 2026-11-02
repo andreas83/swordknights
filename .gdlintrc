@@ -37,9 +37,13 @@ disable:
 #   addons/  - vendored dependencies; addons/gut is GUT 9.6.1 as released
 #   .godot/  - engine import cache, generated
 #   build/   - export output, generated
+#   .claude/ - agent worktrees; each is a full copy of this project, so
+#              without this a finding is reported once per worktree and
+#              every fix looks like it failed to apply
 excluded_directories:
   - .git
   - .godot
+  - .claude
   - addons
   - build
   - legacy

@@ -30,11 +30,15 @@ fi
 #   addons/  vendored third-party code, shipped as released
 #   .godot/  generated import cache
 #   build/   generated export output
+#   .claude/ agent worktrees -- each is a full copy of this project, so
+#            scanning them checks every file several times over and reports
+#            stale copies of findings that have already been fixed here
 mapfile -t scripts < <(
 	find . \
 		-type d \( \
 		-name .git -o \
 		-name .godot -o \
+		-name .claude -o \
 		-name addons -o \
 		-name build -o \
 		-name legacy \

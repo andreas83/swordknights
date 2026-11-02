@@ -352,7 +352,7 @@ func _update_climb_up(delta: float) -> void:
 
 ## --- ladders ---------------------------------------------------------------
 
-func _update_ladder(delta: float) -> void:
+func _update_ladder(_delta: float) -> void:
 	if level == null or not level.rect_is_climbable(body_rect()):
 		_enter(State.FALL)
 		return
