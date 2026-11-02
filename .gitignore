@@ -1,15 +1,25 @@
-node_modules/
-dist/
-dist-ssr/
-.vite/
-coverage/
-*.local
-.DS_Store
-.idea/
-.vscode/
-# Capacitor native projects are generated via `npx cap add`
-android/
-ios/
+# Godot
+.godot/
+/export/
+/build/
+*.translation
+
+# Godot export output and native toolchain leftovers
+*.apk
+*.aab
+*.ipa
+*.keystore
+*.jks
+
+# Legacy web prototype (kept as source only)
+legacy/prototype-web/node_modules/
+legacy/prototype-web/dist/
+
 # Python prototype leftovers
 *.pyc
 __pycache__/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
