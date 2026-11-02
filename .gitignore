@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dist-ssr/
+.vite/
+coverage/
+*.local
+.DS_Store
+.idea/
+.vscode/
+# Capacitor native projects are generated via `npx cap add`
+android/
+ios/
+# Python prototype leftovers
+*.pyc
+__pycache__/

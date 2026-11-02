@@ -1,0 +1,30 @@
+{
+  "name": "swordknights",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Swordknights - a mobile-first cinematic platformer in the spirit of Prince of Persia.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cap:sync": "npm run build && cap sync",
+    "android": "npm run cap:sync && cap open android",
+    "ios": "npm run cap:sync && cap open ios"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/ios": "^6.2.0"
+  }
+}
