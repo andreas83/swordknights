@@ -3,9 +3,14 @@ extends RefCounted
 ## Parses an ASCII level into a tile grid plus entity spawn marks.
 ##
 ## The format stays human-editable on purpose: a level is reviewable in a diff
-## and a generator can emit one without touching the engine. Lines starting
-## with '#' at column 0 followed by a space, or with ';', are comments — note
-## that a bare '#' is a solid tile, so the comment marker is '# ' or ';'.
+## and a generator can emit one without touching the engine.
+##
+## Comments start with ';' and nothing else. '#' is deliberately NOT a comment
+## marker even though it reads like one: '#' is a solid tile, so a grid row
+## whose first tile is solid and whose second is blank ("#  ###") would be
+## swallowed as a comment and every row below it would silently shift up by
+## one. That is invisible in a diff and moves the floor out from under the
+## player, so the ambiguity is removed rather than documented.
 
 var cols: int = 0
 var rows: int = 0
@@ -33,16 +38,28 @@ static func from_file(path: String) -> AsciiLevel:
 	return level
 
 
+const COMMENT_MARKER := ";"
+
+
 static func is_comment(line: String) -> bool:
-	return line.begins_with(";") or line.begins_with("# ") or line == "#"
+	return line.begins_with(COMMENT_MARKER)
 
 
 func parse(text: String) -> void:
 	var lines: Array[String] = []
 	for raw: String in text.split("\n", true):
 		var line := raw.trim_suffix("\r")
+
+		# Catch files still using the old '#' header. Tested by content rather
+		# than by position: "#  ###" is a legitimate first row, while
+		# "# The Sun Terrace" contains glyphs no tile uses.
+		if line.begins_with("#") and _has_unknown_glyphs(line):
+			push_warning(
+				"'#' is a solid tile, not a comment — use ';' for headers: %s" % line
+			)
+
 		if is_comment(line):
-			var stripped := line.lstrip("#; ").strip_edges()
+			var stripped := line.lstrip("; ").strip_edges()
 			if name == "Untitled" and stripped != "":
 				name = stripped
 			continue
@@ -77,6 +94,16 @@ func parse(text: String) -> void:
 
 			if Tiles.LEGEND.has(glyph):
 				_grid[y * cols + x] = Tiles.LEGEND[glyph]
+
+
+## True if the line contains a character that is neither a tile nor an entity
+## mark — i.e. it is prose rather than level geometry.
+static func _has_unknown_glyphs(line: String) -> bool:
+	for i: int in line.length():
+		var glyph := line[i]
+		if not (Tiles.LEGEND.has(glyph) or Tiles.ENTITY_LEGEND.has(glyph)):
+			return true
+	return false
 
 
 func kind_at(x: int, y: int) -> Tiles.Kind:

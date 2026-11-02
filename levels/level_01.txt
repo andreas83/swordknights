@@ -1,25 +1,25 @@
-# The Sun Terrace
-#
-# Legend (see scripts/world/tiles.gd):
-#   #  solid        =  one-way platform    H  ladder
-#   ^  spikes       ~  water               :  background niche
-#   @  spawn        *  relic               D  exit door
-#   t  torch        p  patrol guard        space/. empty
-#
-# Vertical spacing is a design language, not a free choice:
-#   2-tile rise -> plain hop
-#   3-tile rise -> needs a one-way platform step
-#   4-tile rise -> needs a ledge grab
-# Those distances come out of scripts/core/tuning.gd and are pinned by tests.
-#
-# Beat sheet, left to right:
-#   1. open terrace            - run and jump
-#   2. cistern with a ladder   - a safe failure that teaches climbing
-#   3. one-way step            - optional relic off the main path
-#   4. spike gap + 4-tile wall - the ledge-grab lesson
-#   5. upper terrace + guard   - the sword
-#   6. water basin             - a committed running jump
-#   7. platform stair          - second ledge grab, up to the exit
+; The Sun Terrace
+;
+; Legend (see scripts/world/tiles.gd):
+;   #  solid        =  one-way platform    H  ladder
+;   ^  spikes       ~  water               :  background niche
+;   @  spawn        *  relic               D  exit door
+;   t  torch        p  patrol guard        space/. empty
+;
+; Vertical spacing is a design language, not a free choice:
+;   2-tile rise -> plain hop
+;   3-tile rise -> needs a one-way platform step
+;   4-tile rise -> needs a ledge grab
+; Those distances come out of scripts/core/tuning.gd and are pinned by tests.
+;
+; Beat sheet, left to right:
+;   1. open terrace            - run and jump
+;   2. cistern with a ladder   - a safe failure that teaches climbing
+;   3. one-way step            - optional relic off the main path
+;   4. spike gap + 4-tile wall - the ledge-grab lesson
+;   5. upper terrace + guard   - the sword
+;   6. water basin             - a committed running jump
+;   7. platform stair          - second ledge grab, up to the exit
 
 
 

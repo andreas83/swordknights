@@ -20,7 +20,13 @@ static func modes() -> Array[Dictionary]:
 			"scene": "res://scenes/game.tscn",
 			"available": true,
 		},
-		{"id": "endless", "title": "Endless", "subtitle": "A new ruin every run", "scene": "res://scenes/generated_game.tscn", "available": true},
+		{
+			"id": "endless",
+			"title": "Endless",
+			"subtitle": "A new ruin every run",
+			"scene": "res://scenes/generated_game.tscn",
+			"available": true,
+		},
 	]
 
 
