@@ -16,6 +16,7 @@ const BASE_HEIGHT := 180
 func _initialize() -> void:
 	_apply_settings()
 	_apply_input_map()
+	_apply_audio() # audio branch — see the marked section at the end of the file
 
 	var err := ProjectSettings.save()
 	if err != OK:
@@ -121,3 +122,30 @@ func _axis_for(action: String) -> InputEventJoypadMotion:
 	event.axis = axes[action][0]
 	event.axis_value = axes[action][1]
 	return event
+
+
+## --- AUDIO ------------------------------------------------------------------
+## Everything the audio system needs from project.godot lives in this one
+## function, on purpose: it is the only part of this file the audio branch
+## touches, so it cannot collide with input actions being added elsewhere.
+##
+## There is no default_bus_layout.tres and there is no audio importer config,
+## because there are no audio files. AudioDirector builds the Master / Music /
+## SFX buses from code at startup and synthesises every sample it plays.
+func _apply_audio() -> void:
+	# One autoload. It owns the buses, the player pool and the music, and it is
+	# the only global the audio system adds.
+	ProjectSettings.set_setting(
+		"autoload/AudioDirector", "*res://scripts/audio/audio_director.gd"
+	)
+
+	# A mute toggle. Deliberately not in _action_names(): that table is shared
+	# with the other branches, and this action has no gamepad or touch binding
+	# yet — the menu is the place for those, and the menu is not ours.
+	var mute := InputEventKey.new()
+	mute.physical_keycode = KEY_M
+	var events: Array[InputEvent] = [mute]
+	ProjectSettings.set_setting("input/audio_mute", {"deadzone": 0.4, "events": events})
+
+	print("audio — AudioDirector autoload, audio_mute bound to M")
+## --- END AUDIO --------------------------------------------------------------

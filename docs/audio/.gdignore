@@ -1,0 +1,3 @@
+# Listenable previews only. Godot must not import these .wav files: they are
+# documentation for a human ear, not build inputs. The game synthesises every
+# sound at load time from scripts/audio/, and nothing loads anything in here.
