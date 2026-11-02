@@ -504,7 +504,7 @@ func _grounded() -> bool:
 		Player.State.CROUCH, Player.State.LAND, Player.State.ATTACK:
 			return true
 		_:
-			return _player.is_on_floor()
+			return _player.is_grounded()
 
 
 ## --- the pose vocabulary ---------------------------------------------------

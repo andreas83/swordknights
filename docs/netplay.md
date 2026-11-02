@@ -96,6 +96,38 @@ coordinates, and 2D physics is single-precision, so the same body at y=8192
 resolves collisions on a coarser grid than at y=192 and the two disagree within
 a couple of hundred frames. `tests/duel_support.gd` has the scar tissue.)
 
+### The duel does not use `move_and_slide()`
+
+This is the one thing in the design that looks like an eccentricity and is not.
+
+`CharacterBody2D.move_and_slide()` is not a function of the body's transform,
+velocity and shape. It carries state inside the engine that GDScript can
+neither read nor write, and that state survives a snapshot restore. Two bodies
+handed byte-identical state and byte-identical input therefore step to positions
+a few thousandths of a pixel apart — measured at 0.0036 px, which is enough to
+land on either side of the checksum's rounding.
+
+The consequence is not cosmetic: a client cannot reproduce the host's frame
+however correct both of them are, and the desync detector says so, truthfully
+and uselessly. Everything else checks out — the snapshot restores every field
+bit-exactly, the flags match, the collision shape matches, and a single
+`move_and_collide()` query from that state returns bit-identical travel,
+remainder, normal and depth. It is only the slide loop inside the engine that
+differs.
+
+So the duel runs that loop itself, in `Player._move()`, over
+`move_and_collide()`, which has no such memory. The collision mathematics is
+still the engine's, so the character moves and feels exactly as it did; only the
+bookkeeping between the queries moved into the file. The adventure is untouched
+and still calls `move_and_slide()`.
+
+Two things follow. `Player.is_grounded()` replaces `is_on_floor()` for anything
+asking about a player's footing, because in a duel the engine's flag is never
+set and the real answer is one this file owns and the snapshot carries. And a
+duel is now genuinely reproducible frame-for-frame from its serialised state,
+which is what `scripts/net/session.gd` always claimed and what makes the desync
+detector worth having.
+
 The checksum itself is FNV-1a over the quantised state — 1/256 of a pixel and of
 a second, which is far finer than anything visible and still absorbs last-bit
 float noise.
@@ -147,7 +179,7 @@ guest                         host
   |  INPUT (first_frame, bits[6])     every frame, a redundant window
   |--------------------------->|
   |      SNAPSHOT (frame, checksum, applied input, state)
-  |<---------------------------|      every 2 frames, ~230 bytes
+  |<---------------------------|      every 2 frames, 436 bytes
   |                            |
   |  PING / PONG               |      every 20 frames, both ways
   |<-------------------------->|
@@ -155,10 +187,21 @@ guest                         host
   |<-------------------------->|
 ```
 
-Bandwidth: roughly **7 kB/s** from host to client and **0.7 kB/s** back. The
-snapshot is large because it is *exact* — every private timer the character
-state machine reads is in there, including the input's press-edge memory, so a
-replayed frame cannot re-fire a jump that was already held.
+Bandwidth: roughly **13 kB/s** from host to client and **0.7 kB/s** back.
+
+The snapshot is large because it is *exact*. Every private timer the character
+state machine reads is in it, including the input's press-edge memory, so a
+replayed frame cannot re-fire a jump that was already held — and the values are
+**doubles, not floats**. Half of them are GDScript floats that the simulation
+compares against thresholds (`state_time` against the length of a swing,
+`_land_timer` against zero), and rounding those to 32 bits moves a transition by
+a whole frame often enough to matter: in a duel that is the difference between a
+sword landing and missing.
+
+Halving this is available and not taken: positions and velocities are `Vector2`
+and therefore already 32-bit, so they lose nothing in a float, and a mixed
+layout would bring the snapshot back to about 250 bytes. That is not worth the
+chance of write and read drifting apart, over 13 kB/s on a two-player duel.
 
 The client runs ahead of the newest snapshot by the measured one-way latency
 plus two frames of slack, so its input reaches the host before the host needs
@@ -322,7 +365,13 @@ Honestly, and in roughly the order I would fix them.
   `tools/configure_project.gd`.
 - **The desync detector cannot localise.** It says *that* frame N diverged, not
   which field. A per-field checksum would make a real platform difference much
-  faster to chase.
+  faster to chase; finding the `move_and_slide()` problem above took a long
+  session of bisecting by hand that a localising checksum would have shortened.
+- **`Player._move()` does no floor snapping.** `move_and_slide()` glues a body
+  to the ground over small steps and seams; the duel's loop relies on gravity
+  pulling it down each frame instead. On the arena's flat, axis-aligned tiles
+  the two agree, and the tests say so, but a sloped or stepped arena would want
+  snapping put back — deterministically, inside `_move()`.
 - **No bandwidth adaptation.** The snapshot rate is a constant.
 - **The clock sync is crude.** One-way latency is taken as half the round trip,
   which is wrong on an asymmetric connection.
