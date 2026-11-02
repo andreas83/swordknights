@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+; Endless mode. The scene is deliberately a single node: it instantiates
+; res://scenes/game.tscn at runtime so this mode and Adventure always run the
+; exact same playable scene. See scripts/levels/generated_game.gd.
+
+[ext_resource type="Script" path="res://scripts/levels/generated_game.gd" id="1_generated"]
+
+[node name="GeneratedGame" type="Node2D"]
+script = ExtResource("1_generated")
