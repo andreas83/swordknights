@@ -20,6 +20,7 @@ static func modes() -> Array[Dictionary]:
 			"scene": "res://scenes/game.tscn",
 			"available": true,
 		},
+		{"id": "feel_lab", "title": "Feel Lab", "subtitle": "Tuning Bench", "scene": "res://scenes/feel_lab.tscn", "available": true},
 	]
 
 
