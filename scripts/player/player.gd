@@ -74,6 +74,9 @@ var kill_on_lethal_hit := false
 ## it on the way in) from a plain block (standing there holding it).
 var guard_time: float = 0.0
 var _stagger_timer: float = 0.0
+## Whether the feet are on something, as this file worked it out rather than as
+## the engine remembers it. Only meaningful while duel_driven; see _move().
+var _duel_grounded := false
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 
@@ -159,7 +162,7 @@ func simulate(delta: float) -> void:
 	match state:
 		State.DEAD:
 			_apply_gravity(delta)
-			move_and_slide()
+			_move(delta)
 		State.HANG:
 			_update_hang()
 		State.CLIMB_UP:
@@ -177,7 +180,7 @@ func simulate(delta: float) -> void:
 ## --- main locomotion -------------------------------------------------------
 
 func _update_free(delta: float) -> void:
-	var grounded := is_on_floor()
+	var grounded := is_grounded()
 	var want_x := input.axis_x
 	var walking := input.walk
 
@@ -232,9 +235,9 @@ func _update_free(delta: float) -> void:
 
 	var falling_speed := velocity.y
 	var was_airborne := not grounded
-	move_and_slide()
+	_move(delta)
 
-	if was_airborne and is_on_floor():
+	if was_airborne and is_grounded():
 		_on_touch_ground(falling_speed)
 	_resolve_air_state()
 
@@ -294,7 +297,7 @@ func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) ->
 
 func _apply_gravity(delta: float) -> void:
 	# Reduced gravity near the apex keeps mid-air steering readable.
-	var near_apex := absf(velocity.y) < Tuning.APEX_THRESHOLD and not is_on_floor()
+	var near_apex := absf(velocity.y) < Tuning.APEX_THRESHOLD and not is_grounded()
 	var scale := Tuning.APEX_GRAVITY_SCALE if near_apex else 1.0
 	velocity.y = minf(velocity.y + Tuning.GRAVITY * scale * delta, Tuning.MAX_FALL_SPEED)
 
@@ -313,7 +316,7 @@ func _on_touch_ground(impact: float) -> void:
 
 
 func _resolve_air_state() -> void:
-	if is_on_floor() or state == State.ATTACK or state == State.HURT:
+	if is_grounded() or state == State.ATTACK or state == State.HURT:
 		return
 	if velocity.y > 0.0:
 		if state != State.FALL:
@@ -405,7 +408,7 @@ func _update_climb_up(delta: float) -> void:
 
 ## --- ladders ---------------------------------------------------------------
 
-func _update_ladder(_delta: float) -> void:
+func _update_ladder(delta: float) -> void:
 	if level == null or not level.rect_is_climbable(body_rect()):
 		_enter(State.FALL)
 		return
@@ -413,7 +416,7 @@ func _update_ladder(_delta: float) -> void:
 	velocity = Vector2(input.axis_x * Tuning.WALK_SPEED * 0.5, input.axis_y * Tuning.LADDER_SPEED)
 	if input.axis_x != 0:
 		facing = input.axis_x
-	move_and_slide()
+	_move(delta)
 
 	if _jump_buffer > 0.0:
 		_jump_buffer = 0.0
@@ -428,9 +431,9 @@ func _update_hurt(delta: float) -> void:
 	_hurt_timer -= delta
 	velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * 0.5 * delta)
 	_apply_gravity(delta)
-	move_and_slide()
+	_move(delta)
 	if _hurt_timer <= 0.0:
-		_enter(State.IDLE if is_on_floor() else State.FALL)
+		_enter(State.IDLE if is_grounded() else State.FALL)
 
 
 func damage(amount: int = 1, from_x: float = NAN) -> bool:
@@ -499,6 +502,73 @@ func _enter(next: State) -> void:
 		return
 	state = next
 	state_time = 0.0
+
+
+## --- movement --------------------------------------------------------------
+
+## How many surfaces one frame of motion may slide along before giving up.
+const DUEL_MAX_SLIDES := 4
+## cos(45 degrees) — the steepest normal still counted as floor, matching
+## CharacterBody2D's default floor_max_angle.
+const DUEL_FLOOR_DOT := 0.7071067811865476
+
+
+## Whether the feet are on something.
+##
+## Ask this rather than is_on_floor(). For the adventure the two are the same
+## thing; in a duel they are not, because a duel does its own moving and the
+## engine's flag is never set — see _move().
+func is_grounded() -> bool:
+	return _duel_grounded if duel_driven else is_on_floor()
+
+
+## One frame of motion.
+##
+## The adventure path is unchanged: move_and_slide(), as it always was.
+##
+## --- duel (additive) --- A duel does not use move_and_slide, and this is the
+## load-bearing line of the whole netplay design.
+##
+## move_and_slide() is not a function of the body's transform, velocity and
+## shape. It carries state inside the engine that GDScript can neither read nor
+## write, and that state outlives a snapshot restore. Two bodies handed
+## byte-identical state and byte-identical input therefore land a few
+## thousandths of a pixel apart — measured at 0.0036 px, which is enough to
+## cross a checksum boundary. A client then cannot reproduce the host's frame
+## no matter how correct both of them are, and the desync detector rightly says
+## so. That is not a detector that needs loosening; it is a simulation that
+## needs to stop depending on something it cannot see.
+##
+## move_and_collide() has no such memory: the same query, from the same
+## transform, with the same motion, returns bit-identical travel, remainder,
+## normal and depth on any body with any history. Running the slide loop here
+## rather than letting the engine run it makes a duel frame a true function of
+## the duel's state — which is what scripts/net/session.gd claims and what
+## tests/duel_determinism_test.gd asserts.
+##
+## The collision maths is still the engine's, so the character moves and feels
+## exactly as it did; only the bookkeeping between the queries moves in here.
+func _move(delta: float) -> void:
+	if not duel_driven:
+		move_and_slide()
+		return
+
+	_duel_grounded = false
+	var motion := velocity * delta
+	for _slide: int in DUEL_MAX_SLIDES:
+		if motion == Vector2.ZERO:
+			return
+		var hit := move_and_collide(motion)
+		if hit == null:
+			return
+		var normal := hit.get_normal()
+		if normal.dot(up_direction) >= DUEL_FLOOR_DOT:
+			_duel_grounded = true
+		# Slide what is left of the frame's motion along the surface, and take
+		# the same component out of the velocity, which is what
+		# move_and_slide does between its own iterations.
+		velocity = velocity.slide(normal)
+		motion = hit.get_remainder().slide(normal)
 
 
 ## --- duel (additive) ======================================================
@@ -602,14 +672,6 @@ func duel_reset(at: Vector2, face: int) -> void:
 	input.clear()
 
 
-## player.tscn declares the body shape as a sub-resource, which Godot shares
-## between instances of the scene. Two duellists therefore crouch each other's
-## hitbox unless each gets its own copy.
-func duel_isolate_shape() -> void:
-	if _shape != null and _shape.shape != null:
-		_shape.shape = _shape.shape.duplicate()
-
-
 func _update_guard(delta: float, want_x: int, grounded: bool) -> void:
 	guard_time += delta
 	velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * delta)
@@ -627,9 +689,9 @@ func _update_stagger(delta: float) -> void:
 	_stagger_timer -= delta
 	velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * 0.7 * delta)
 	_apply_gravity(delta)
-	move_and_slide()
+	_move(delta)
 	if _stagger_timer <= 0.0:
-		_enter(State.IDLE if is_on_floor() else State.FALL)
+		_enter(State.IDLE if is_grounded() else State.FALL)
 
 
 func _duel_force_crouched(crouched: bool) -> void:
@@ -654,12 +716,21 @@ func _duel_force_crouched(crouched: bool) -> void:
 ## frame would re-fire a press that already happened, or forget a coyote
 ## window, and the client would never converge on the host.
 ##
-## 26 floats, written in a fixed order. Keep write and read in step.
+## 26 values, written in a fixed order. Keep write and read in step.
+##
+## They are doubles, and the wire carries doubles, because half of them are
+## GDScript floats (64-bit) that the simulation compares against thresholds:
+## state_time against the length of a swing, _land_timer against zero, and so
+## on. Rounding those to 32 bits can move a transition by a whole frame, which
+## in a duel is the difference between a sword landing and missing. Positions
+## and velocities are Vector2, already 32-bit, and lose nothing either way —
+## they are written as doubles only so the layout stays uniform and the cost of
+## getting it wrong stays zero. See docs/netplay.md for what it costs.
 
 const DUEL_STATE_FLOATS := 26
 
 
-func duel_write_state(into: PackedFloat32Array, at: int) -> void:
+func duel_write_state(into: PackedFloat64Array, at: int) -> void:
 	into[at + 0] = position.x
 	into[at + 1] = position.y
 	into[at + 2] = velocity.x
@@ -685,13 +756,12 @@ func duel_write_state(into: PackedFloat32Array, at: int) -> void:
 	into[at + 22] = guard_time
 	into[at + 23] = _stagger_timer
 	into[at + 24] = float(input.previous_bits())
-	# is_on_floor() is a leftover of the last move_and_slide, and simulate()
-	# reads it before it moves. It cannot be assigned, so it has to be carried
-	# in the snapshot and put back by hand — see _duel_force_floor_flag.
-	into[at + 25] = 1.0 if is_on_floor() else 0.0
+	# Whether the feet were on something. simulate() reads this before it
+	# moves, so it has to travel with the snapshot.
+	into[at + 25] = 1.0 if is_grounded() else 0.0
 
 
-func duel_read_state(from: PackedFloat32Array, at: int) -> void:
+func duel_read_state(from: PackedFloat64Array, at: int) -> void:
 	position = Vector2(from[at + 0], from[at + 1])
 	velocity = Vector2(from[at + 2], from[at + 3])
 	state = int(from[at + 4]) as State
@@ -713,25 +783,5 @@ func duel_read_state(from: PackedFloat32Array, at: int) -> void:
 	guard_time = from[at + 22]
 	_stagger_timer = from[at + 23]
 	input.restore_previous_bits(int(from[at + 24]))
-	_duel_force_floor_flag(from[at + 25] > 0.5)
+	_duel_grounded = from[at + 25] > 0.5
 
-
-## Puts is_on_floor() back to what the snapshot recorded.
-##
-## There is no setter for it, so both directions are done with the two
-## primitives that exist. Neither moves a body that is already resting exactly
-## on the floor, which is why a save/load round trip keeps its checksum.
-func _duel_force_floor_flag(grounded: bool) -> void:
-	if grounded == is_on_floor():
-		return
-	if grounded:
-		apply_floor_snap()
-		return
-	# Clear it by moving a hair upwards — nothing can be standing on the floor
-	# while it rises — then put the body back exactly where it was.
-	var keep_position := position
-	var keep_velocity := velocity
-	velocity = Vector2(0.0, -1.0)
-	move_and_slide()
-	position = keep_position
-	velocity = keep_velocity

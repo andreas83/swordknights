@@ -102,6 +102,7 @@ func _check_snapshot_round_trip() -> void:
 		duel.step(pair.x, pair.y)
 
 	var before := duel.checksum()
+	var before_raw := _raw_state(duel)
 	var blob := duel.write_state()
 	_s.equal(blob.size(), Duel.SNAPSHOT_BYTES, "a snapshot is a fixed size")
 	_s.equal(before, _record[SNAPSHOT_AT - 1], "the snapshot duel is on the recorded path")
@@ -114,6 +115,22 @@ func _check_snapshot_round_trip() -> void:
 	_s.check(duel.read_state(blob), "a snapshot reads back")
 	_s.equal(duel.checksum(), before, "write_state/read_state is lossless")
 
+	# Checksums are quantised, so matching ones prove less than they look. A
+	# snapshot that rounded a timer would sail through the line above and then
+	# move a state transition by a frame somewhere downstream, which is exactly
+	# the kind of thing the desync detector would later report as a divergence.
+	# Compare the raw values.
+	var after_raw := _raw_state(duel)
+	var lossy := 0
+	var first := ""
+	for key: String in before_raw:
+		if before_raw[key] != after_raw[key]:
+			lossy += 1
+			if first == "":
+				first = " (%s: %.17f -> %.17f)" % [
+					key, before_raw[key], after_raw[key]]
+	_s.equal(lossy, 0, "a snapshot round trip is exact to the last bit%s" % first)
+
 	# And a restored duel must carry on down the recorded path, not merely look
 	# right for one frame — that is what reconciliation actually needs.
 	for i: int in 40:
@@ -124,6 +141,19 @@ func _check_snapshot_round_trip() -> void:
 		"a duel restored from a snapshot keeps simulating the same future"
 	)
 	duel.free()
+
+
+## Every value a frame of simulation reads, at full precision — not through the
+## checksum, which rounds.
+func _raw_state(duel: Duel) -> Dictionary:
+	var out := {"phase_time": duel.phase_time}
+	var buf := PackedFloat64Array()
+	buf.resize(Player.DUEL_STATE_FLOATS)
+	for slot: int in 2:
+		duel.players[slot].duel_write_state(buf, 0)
+		for i: int in Player.DUEL_STATE_FLOATS:
+			out["p%d.%d" % [slot, i]] = buf[i]
+	return out
 
 
 static func _first_mismatch(a: PackedInt64Array, b: PackedInt64Array) -> int:
@@ -144,8 +174,8 @@ func _diff() -> String:
 	for i: int in _cursor + 1:
 		var pair := _stream[i]
 		fresh.step(pair.x, pair.y)
-	var mine := PackedFloat32Array()
-	var theirs := PackedFloat32Array()
+	var mine := PackedFloat64Array()
+	var theirs := PackedFloat64Array()
 	mine.resize(Player.DUEL_STATE_FLOATS)
 	theirs.resize(Player.DUEL_STATE_FLOATS)
 	for slot: int in 2:

@@ -130,7 +130,7 @@ func _step_particles(delta: float) -> void:
 func _step_scuffs(delta: float) -> void:
 	if _player == null:
 		return
-	var running := _player.state == Player.State.RUN and _player.is_on_floor()
+	var running := _player.state == Player.State.RUN and _player.is_grounded()
 	if not running:
 		_scuff_timer = SCUFF_INTERVAL * 0.5
 		return

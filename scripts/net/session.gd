@@ -295,6 +295,12 @@ func _apply_snapshot(snapshot: Dictionary) -> void:
 	if at <= _auth_frame:
 		return
 
+	# Where our prediction had got to. Read it BEFORE verifying: the verifier
+	# rewinds the duel to do its replay, so asking afterwards would always say
+	# "the snapshot's frame" and the client would throw away its lead on every
+	# snapshot and then have to sprint to catch up.
+	var predicted_to := duel.frame
+
 	_verify_against_authority(at, checksum)
 
 	var predicted_here: int = int(_predicted.get(at, -1))
@@ -302,7 +308,7 @@ func _apply_snapshot(snapshot: Dictionary) -> void:
 		corrections += 1
 
 	# Land exactly on the host's state, then replay everything since.
-	var resume_at := maxi(duel.frame, at)
+	var resume_at := maxi(predicted_to, at)
 	if not duel.read_state(state):
 		_fail("a snapshot would not read back")
 		return

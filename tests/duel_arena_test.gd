@@ -209,7 +209,7 @@ func _the_centre_can_still_be_crossed() -> void:
 		# twice: onto the stone, and off it again. Hold the button through the
 		# rise — letting go early triggers the jump cut in Player, which is
 		# exactly how a real hop gets fumbled into the pit.
-		if runner.is_on_floor():
+		if runner.is_grounded():
 			holding_jump = _needs_a_hop(duel, runner)
 		elif runner.velocity.y >= 0.0:
 			holding_jump = false
@@ -220,7 +220,7 @@ func _the_centre_can_still_be_crossed() -> void:
 		duel.step(bits, 0)
 		if not runner.is_alive():
 			break
-		if runner.position.x > middle + 2.0 * 16.0 and runner.is_on_floor():
+		if runner.position.x > middle + 2.0 * 16.0 and runner.is_grounded():
 			crossed = true
 			break
 
@@ -234,7 +234,7 @@ func _the_centre_can_still_be_crossed() -> void:
 
 ## True when there is nothing solid just ahead of and just below the feet.
 func _needs_a_hop(duel: Duel, runner: Player) -> bool:
-	if not runner.is_on_floor():
+	if not runner.is_grounded():
 		return false
 	var ahead := runner.position + Vector2(float(runner.facing) * 12.0, 2.0)
 	return not _is_footing(duel, ahead)

@@ -63,7 +63,7 @@ var level: Level
 
 var _arena: AsciiLevel
 var _spawns: Array[Vector2] = []
-var _scratch := PackedFloat32Array()
+var _scratch := PackedFloat64Array()
 
 
 ## --- construction ----------------------------------------------------------
@@ -106,7 +106,6 @@ func setup(arena: AsciiLevel, rounds: int = DuelRules.ROUNDS_TO_WIN) -> void:
 		# last applied, whether those came from a keyboard or off the wire.
 		duellist.input = PlayerInput.new()
 		add_child(duellist)
-		duellist.duel_isolate_shape()
 		players.append(duellist)
 
 	reset_match()
@@ -302,8 +301,8 @@ func _set_phase(next: Phase) -> void:
 ## timers and its input's press-edge memory too: a replayed frame that forgot
 ## the coyote window or re-fired a press would never converge on the host.
 
-const HEADER_BYTES := 16
-const SNAPSHOT_BYTES := HEADER_BYTES + 2 * Player.DUEL_STATE_FLOATS * 4
+const HEADER_BYTES := 20
+const SNAPSHOT_BYTES := HEADER_BYTES + 2 * Player.DUEL_STATE_FLOATS * 8
 
 
 func write_state() -> PackedByteArray:
@@ -318,11 +317,11 @@ func write_state() -> PackedByteArray:
 	buf.put_8(match_winner)
 	buf.put_u8(rounds_to_win)
 	buf.put_u8(0) # padding, keeps the float block 4-byte aligned
-	buf.put_float(phase_time)
+	buf.put_double(phase_time)
 	for slot: int in 2:
 		players[slot].duel_write_state(_scratch, 0)
 		for i: int in Player.DUEL_STATE_FLOATS:
-			buf.put_float(_scratch[i])
+			buf.put_double(_scratch[i])
 	return buf.data_array
 
 
@@ -343,10 +342,10 @@ func read_state(bytes: PackedByteArray) -> bool:
 	match_winner = buf.get_8()
 	rounds_to_win = buf.get_u8()
 	buf.get_u8()
-	phase_time = buf.get_float()
+	phase_time = buf.get_double()
 	for slot: int in 2:
 		for i: int in Player.DUEL_STATE_FLOATS:
-			_scratch[i] = buf.get_float()
+			_scratch[i] = buf.get_double()
 		players[slot].duel_read_state(_scratch, 0)
 	return true
 
