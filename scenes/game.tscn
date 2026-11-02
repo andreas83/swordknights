@@ -1,0 +1,36 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/game.gd" id="1_game"]
+[ext_resource type="Script" path="res://scripts/render/parallax_sky.gd" id="2_sky"]
+[ext_resource type="Script" path="res://scripts/world/level.gd" id="3_level"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="4_player"]
+[ext_resource type="Script" path="res://scripts/render/game_camera.gd" id="5_camera"]
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="6_hud"]
+[ext_resource type="PackedScene" path="res://scenes/touch_controls.tscn" id="7_touch"]
+
+[node name="Game" type="Node2D"]
+script = ExtResource("1_game")
+
+[node name="Sky" type="CanvasLayer" parent="."]
+layer = -10
+
+[node name="ParallaxSky" type="Node2D" parent="Sky"]
+script = ExtResource("2_sky")
+
+[node name="Level" type="Node2D" parent="."]
+script = ExtResource("3_level")
+
+[node name="Player" parent="." instance=ExtResource("4_player")]
+
+[node name="Camera" type="Camera2D" parent="."]
+script = ExtResource("5_camera")
+
+[node name="HudLayer" type="CanvasLayer" parent="."]
+
+[node name="Hud" type="Control" parent="HudLayer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("6_hud")
+
+[node name="TouchControls" parent="." instance=ExtResource("7_touch")]

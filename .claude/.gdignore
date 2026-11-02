@@ -1,0 +1,3 @@
+Claude Code agent worktrees live here. Each one is a full copy of this
+project, so without this marker the engine would import them as part of the
+main project and every class_name would collide with itself.

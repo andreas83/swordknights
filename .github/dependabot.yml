@@ -1,0 +1,31 @@
+version: 2
+
+updates:
+  # Keeps the action versions in .github/workflows/** and the composite action
+  # in .github/actions/** current. Nothing else in this repository has a
+  # dependency manifest Dependabot understands: Godot and its export templates
+  # are pinned by version string in the workflows, GUT is vendored under
+  # addons/, and gdtoolkit is pinned in ci.yml -- all three are bumped by hand
+  # (see docs/ci.md).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'ci'
+      include: scope
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      # One PR for the routine first-party bumps instead of five.
+      actions-minor:
+        patterns:
+          - 'actions/*'
+        update-types:
+          - minor
+          - patch

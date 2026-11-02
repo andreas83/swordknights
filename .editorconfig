@@ -1,0 +1,65 @@
+# https://editorconfig.org
+#
+# GDScript is tab-indented: that is the engine's own convention, what the Godot
+# script editor produces, and what gdlint's tab-characters rule enforces. The
+# rest of the file follows suit so that an editor configured from here does not
+# fight either tool.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = tab
+indent_size = 4
+
+# gdlint's max-line-length (see .gdlintrc). Editors that read this will wrap
+# and warn at the same column CI fails at.
+max_line_length = 100
+
+[*.gd]
+indent_style = tab
+indent_size = 4
+
+# Godot's own resource and config formats are tab-indented too, and the engine
+# rewrites these files -- matching it keeps diffs free of whitespace churn.
+[*.{tscn,tres,godot,cfg,import}]
+indent_style = tab
+indent_size = 4
+
+# YAML cannot be indented with tabs at all.
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+[*.{json,md}]
+indent_style = space
+indent_size = 2
+
+[*.sh]
+indent_style = tab
+indent_size = 4
+
+# Keep Markdown's two-space hard line break meaningful.
+[*.md]
+trim_trailing_whitespace = false
+
+# Vendored third-party code: do not let an editor reformat it on save.
+[addons/**]
+trim_trailing_whitespace = false
+insert_final_newline = false
+
+# Reference prototypes, preserved as they were. The Python one is PEP 8, spaces.
+[legacy/**]
+trim_trailing_whitespace = false
+insert_final_newline = false
+
+[legacy/**.py]
+indent_style = space
+indent_size = 4
+
+[legacy/**.{ts,js,json}]
+indent_style = space
+indent_size = 2

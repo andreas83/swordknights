@@ -1,0 +1,94 @@
+# gdtoolkit / gdlint configuration for Swordknights.
+#
+# gdlint's default rule set, with two rules disabled because they misfire on
+# idiomatic GDScript (each is argued for below) and the directories that are
+# not ours to lint excluded. Nothing is switched off to paper over a real
+# finding. If you are tempted to silence a third rule to make a build go
+# green, fix the code instead.
+#
+# Run it with:  gdlint .
+#
+# gdlint resolves this file from the CURRENT WORKING DIRECTORY upwards, so it
+# must be run from the repository root to take effect.
+
+disable:
+  # gdlint wants plain `var` before `@onready var`, and `const` before both.
+  # This project consistently does the opposite and puts the node references
+  # at the top of the class -- scripts/core/game.gd, scripts/player/
+  # player_input.gd and scripts/render/parallax_sky.gd all read that way --
+  # which is the common Godot idiom and puts the scene wiring where you look
+  # for it. The rule encodes one ordering opinion; the codebase has a
+  # different and consistent one, so the rule loses.
+  - class-definitions-order
+
+  # Counts every arm of a `match` that returns as a separate return
+  # statement. GDScript's clearest form for a dispatch or lookup function is
+  # exactly that -- see AsciiLevel.atlas_for() (8 arms, tile kind -> atlas
+  # coordinates) and PlayerArt._posture() (14 arms, state -> pose) -- so on
+  # this codebase the rule is almost entirely false positives. Genuinely
+  # tangled control flow is a code-review concern, not something a return
+  # count detects.
+  - max-returns
+
+# Third-party and historical code. Nothing in here is edited by this project,
+# so linting it would only produce noise we cannot act on.
+#   legacy/  - the Python and TypeScript prototypes, reference material only
+#              (it also carries a .gdignore so the engine skips it)
+#   addons/  - vendored dependencies; addons/gut is GUT 9.6.1 as released
+#   .godot/  - engine import cache, generated
+#   build/   - export output, generated
+#   .claude/ - agent worktrees; each is a full copy of this project, so
+#              without this a finding is reported once per worktree and
+#              every fix looks like it failed to apply
+excluded_directories:
+  - .git
+  - .godot
+  - .claude
+  - addons
+  - build
+  - legacy
+
+# Everything below is gdlint's default, restated so that a future change to the
+# tool's defaults is a visible decision here rather than a silent drift in CI.
+#
+# Naming
+function-name: '(_on_([A-Z][a-z0-9]*)+(_[a-z0-9]+)*|_?[a-z][a-z0-9]*(_[a-z0-9]+)*)'
+class-name: '([A-Z][a-z0-9]*)+'
+sub-class-name: '_?([A-Z][a-z0-9]*)+'
+signal-name: '[a-z][a-z0-9]*(_[a-z0-9]+)*'
+class-variable-name: '_?[a-z][a-z0-9]*(_[a-z0-9]+)*'
+class-load-variable-name: '(([A-Z][a-z0-9]*)+|_?[a-z][a-z0-9]*(_[a-z0-9]+)*)'
+function-variable-name: '[a-z][a-z0-9]*(_[a-z0-9]+)*'
+function-preload-variable-name: '([A-Z][a-z0-9]*)+'
+function-argument-name: '_?[a-z][a-z0-9]*(_[a-z0-9]+)*'
+loop-variable-name: '_?[a-z][a-z0-9]*(_[a-z0-9]+)*'
+enum-name: '([A-Z][a-z0-9]*)+'
+enum-element-name: '[A-Z][A-Z0-9]*(_[A-Z0-9]+)*'
+constant-name: '_?[A-Z][A-Z0-9]*(_[A-Z0-9]+)*'
+load-constant-name: '(([A-Z][a-z0-9]*)+|_?[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)'
+
+# Shape
+# max-public-methods applies to GUT test scripts too: every `test_*` function
+# counts. Twenty tests in one script is the point at which that script is
+# covering more than one thing -- split it rather than raising this number.
+max-public-methods: 20
+function-arguments-number: 10
+max-file-lines: 1000
+max-line-length: 100
+tab-characters: 1
+
+class-definitions-order:
+  - tools
+  - classnames
+  - extends
+  - docstrings
+  - signals
+  - enums
+  - consts
+  - staticvars
+  - exports
+  - pubvars
+  - prvvars
+  - onreadypubvars
+  - onreadyprvvars
+  - others
