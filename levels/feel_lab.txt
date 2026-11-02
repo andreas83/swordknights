@@ -1,0 +1,41 @@
+; Feel Lab
+;
+; Every canonical obstacle in the traversal grammar, side by side, in the order
+; the grammar introduces them. This is the A/B bench: change scripts/core/
+; tuning.gd, run here, and you can see in one screen which distances still
+; work. It is also the regression check a retune owes the next person — if a
+; change makes any station below unclearable, the grammar moved.
+;
+;   1  open run-up            reach top speed, feel the acceleration
+;   2  2-tile hop             Tuning.hop_tiles()
+;   3  3-tile step            Tuning.platform_step_tiles(), via the one-way
+;   4  4-tile wall            Tuning.grab_tiles(), via a ledge grab + mantle
+;   5  long gap               a committed running jump; 3 tiles is the limit
+;   6  drop                   four tiles off the wall: a soft landing
+;   7  ladder + big drop      seven tiles: a hard landing, and camera shake
+;   8  one-way platform       hop up through it, press down+jump to fall through
+;
+; Legend (see scripts/world/tiles.gd):
+;   #  solid        =  one-way platform    H  ladder
+;   @  spawn        *  relic               D  exit door      t  torch
+
+
+
+
+
+
+
+
+
+                                                         H    t   *
+                                                         H###########
+                                                         H###########
+                                    t           *        H###########
+                        *        ########   #########    H###########
+                    ########     ########   #########    H###########
+          #####  == ########     ########   #########    H###########    =====
+  @  t    #####     ########     ########   #########    H###########              t  D
+############################################################################################
+############################################################################################
+############################################################################################
+############################################################################################
