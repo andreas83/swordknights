@@ -1,0 +1,103 @@
+name: Deploy web build to Pages
+
+on:
+  push:
+    branches: [main]
+  # Lets you redeploy the current main without an empty commit.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  # Required by actions/deploy-pages for its OIDC exchange.
+  id-token: write
+
+# One deployment at a time. Not cancel-in-progress: cancelling midway through
+# a Pages deployment can leave the site on a half-published state.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: '4.5.1'
+
+jobs:
+  build:
+    name: Export Web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Godot ${{ env.GODOT_VERSION }}
+        uses: ./.github/actions/setup-godot
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          templates: 'true'
+
+      - name: Import project
+        run: godot --headless --path . --import
+
+      - name: Export Web (release)
+        run: |
+          set -euo pipefail
+          # The target directory must exist; Godot will not create it.
+          mkdir -p build/web
+          godot --headless --path . --export-release "Web" build/web/index.html
+
+      - name: Verify the export produced a loadable build
+        run: |
+          set -euo pipefail
+          cd build/web
+          for f in index.html index.js index.wasm index.pck; do
+            if [[ ! -s "$f" ]]; then
+              echo "::error::Web export is missing or empty: $f"
+              exit 1
+            fi
+            printf '  %-12s %s bytes\n' "$f" "$(stat -c%s "$f")"
+          done
+
+          # The Web preset sets variant/thread_support=false, which makes Godot
+          # link the *_nothreads template. That build never touches
+          # SharedArrayBuffer, so it needs no Cross-Origin-Opener-Policy or
+          # Cross-Origin-Embedder-Policy response headers -- which is the whole
+          # reason it can live on GitHub Pages, where headers are not
+          # configurable. The threaded template ships an extra worker file; if
+          # one ever appears here, the preset was changed and the deployment
+          # would silently break at runtime with a cross-origin isolation
+          # error. Fail now instead.
+          if [[ "$(find . -maxdepth 1 -name '*.worker.js' | wc -l)" -ne 0 ]]; then
+            echo "::error::Found a *.worker.js: the threaded web template was used."
+            echo "::error::GitHub Pages cannot send COOP/COEP headers, so this build would not boot."
+            echo "::error::Either set variant/thread_support=false in export_presets.cfg,"
+            echo "::error::or host the build somewhere headers can be configured."
+            exit 1
+          fi
+          echo "Single-threaded web build confirmed (no worker file)."
+
+      # Pages serves through Jekyll by default, which drops files and folders
+      # whose names begin with an underscore. Godot's output does not use any
+      # today, but one upstream change to the shell would break the site
+      # silently, so opt out for good.
+      - name: Disable Jekyll processing
+        run: touch build/web/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
