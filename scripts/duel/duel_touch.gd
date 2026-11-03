@@ -1,6 +1,7 @@
 class_name DuelTouchGuard
 extends Control
-## One more on-screen button: GUARD in the round duel, THROW in the match.
+## One more on-screen button: THROW, in the match. It was GUARD in the round
+## duel this file was first written for, hence its class name.
 ##
 ## scripts/ui/touch_controls.gd puts a stick on the left and JUMP and SWORD on
 ## the right, and knows nothing about blocking. A duel on a phone with no block

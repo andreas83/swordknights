@@ -23,8 +23,6 @@ enum State {
 	JUMP, FALL, LAND,
 	HANG, CLIMB_UP, LADDER,
 	ATTACK, HURT, DEAD,
-	## --- duel (additive) --- appended so no existing ordinal shifts.
-	GUARD, STAGGER,
 }
 
 const TILE := 16.0
@@ -53,30 +51,6 @@ var _climb_from := Vector2.ZERO
 var _climb_to := Vector2.ZERO
 var _climb_progress: float = 0.0
 var _crouched := false
-
-## --- duel (additive) ------------------------------------------------------
-##
-## Three opt-in fields. All three are inert unless something sets them, so the
-## adventure mode behaves exactly as before.
-##
-## `duel_driven`  — the owner steps the character itself by calling simulate();
-##                  _physics_process becomes a no-op. The duel needs this so one
-##                  frame is a function it calls, not something the engine does
-##                  behind its back (and so a mispredicted frame can be replayed).
-## `guard_enabled`— unlocks the GUARD and STAGGER states and the block button.
-## `kill_on_lethal_hit` — a duel is first-blood: one clean cut ends the round,
-##                  rather than taking one of three hearts.
-var duel_driven := false
-var guard_enabled := false
-var kill_on_lethal_hit := false
-
-## How long the guard has been raised, which is what separates a parry (caught
-## it on the way in) from a plain block (standing there holding it).
-var guard_time: float = 0.0
-var _stagger_timer: float = 0.0
-## Whether the feet are on something, as this file worked it out rather than as
-## the engine remembers it. Only meaningful while duel_driven; see _move().
-var _duel_grounded := false
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 
@@ -130,21 +104,7 @@ func attack_rect() -> Rect2:
 
 
 func _physics_process(delta: float) -> void:
-	# --- duel (additive) --- a duel calls simulate() itself, exactly once per
-	# frame, and may call it again to replay a frame it mispredicted. The engine
-	# must not also be stepping the character behind its back.
-	if duel_driven:
-		return
 	input.poll()
-	simulate(delta)
-
-
-## One frame of character simulation.
-##
-## --- duel (additive) --- this is the former body of _physics_process, moved
-## out verbatim so a caller other than the engine can advance the character.
-## Everything below this line is as it was, apart from the two new states.
-func simulate(delta: float) -> void:
 	state_time += delta
 	invulnerable = maxf(0.0, invulnerable - delta)
 	_jump_buffer = maxf(0.0, _jump_buffer - delta)
@@ -171,8 +131,6 @@ func simulate(delta: float) -> void:
 			_update_ladder(delta)
 		State.HURT:
 			_update_hurt(delta)
-		State.STAGGER: # --- duel (additive) ---
-			_update_stagger(delta)
 		_:
 			_update_free(delta)
 
@@ -208,18 +166,13 @@ func _update_free(delta: float) -> void:
 					_enter(State.IDLE)
 				else:
 					_enter(State.WALK if walking else State.RUN)
-		State.GUARD: # --- duel (additive) ---
-			_update_guard(delta, want_x, grounded)
 		_:
 			_free_movement(delta, want_x, walking, grounded)
 
 	_apply_gravity(delta)
 
 	# Coyote time plus a buffered press means both a late and an early tap work.
-	var can_jump := (
-		_coyote > 0.0 and state != State.ATTACK and state != State.CROUCH
-		and state != State.GUARD # --- duel (additive) --- the guard roots you
-	)
+	var can_jump := _coyote > 0.0 and state != State.ATTACK and state != State.CROUCH
 	if can_jump and _jump_buffer > 0.0:
 		_jump_buffer = 0.0
 		_coyote = 0.0
@@ -246,15 +199,6 @@ func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) ->
 	if grounded and input.just_pressed_attack:
 		_enter(State.ATTACK)
 		attacked.emit()
-		return
-
-	# --- duel (additive) --- raising the guard is a commitment: it roots the
-	# character, which is what makes choosing to block a real decision.
-	if guard_enabled and grounded and input.guard:
-		guard_time = 0.0
-		velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * delta)
-		_set_crouched(false)
-		_enter(State.GUARD)
 		return
 
 	if (input.up or input.down) and level != null and level.rect_is_climbable(body_rect()):
@@ -506,282 +450,15 @@ func _enter(next: State) -> void:
 
 ## --- movement --------------------------------------------------------------
 
-## How many surfaces one frame of motion may slide along before giving up.
-const DUEL_MAX_SLIDES := 4
-## cos(45 degrees) — the steepest normal still counted as floor, matching
-## CharacterBody2D's default floor_max_angle.
-const DUEL_FLOOR_DOT := 0.7071067811865476
-
-
-## Whether the feet are on something.
-##
-## Ask this rather than is_on_floor(). For the adventure the two are the same
-## thing; in a duel they are not, because a duel does its own moving and the
-## engine's flag is never set — see _move().
+## Whether the feet are on something. The art and the camera ask this rather
+## than is_on_floor(), so a body that does its own moving can answer for itself
+## (the duel fighter, scripts/duel/fighter.gd, does).
 func is_grounded() -> bool:
-	return _duel_grounded if duel_driven else is_on_floor()
+	return is_on_floor()
 
 
-## One frame of motion.
-##
-## The adventure path is unchanged: move_and_slide(), as it always was.
-##
-## --- duel (additive) --- A duel does not use move_and_slide, and this is the
-## load-bearing line of the whole netplay design.
-##
-## move_and_slide() is not a function of the body's transform, velocity and
-## shape. It carries state inside the engine that GDScript can neither read nor
-## write, and that state outlives a snapshot restore. Two bodies handed
-## byte-identical state and byte-identical input therefore land a few
-## thousandths of a pixel apart — measured at 0.0036 px, which is enough to
-## cross a checksum boundary. A client then cannot reproduce the host's frame
-## no matter how correct both of them are, and the desync detector rightly says
-## so. That is not a detector that needs loosening; it is a simulation that
-## needs to stop depending on something it cannot see.
-##
-## move_and_collide() has no such memory: the same query, from the same
-## transform, with the same motion, returns bit-identical travel, remainder,
-## normal and depth on any body with any history. Running the slide loop here
-## rather than letting the engine run it makes a duel frame a true function of
-## the duel's state — which is what scripts/net/session.gd claims and what
-## tests/duel_determinism_test.gd asserts.
-##
-## The collision maths is still the engine's, so the character moves and feels
-## exactly as it did; only the bookkeeping between the queries moves in here.
-func _move(delta: float) -> void:
-	if not duel_driven:
-		move_and_slide()
-		return
-
-	_duel_grounded = false
-	var motion := velocity * delta
-	for _slide: int in DUEL_MAX_SLIDES:
-		if motion == Vector2.ZERO:
-			return
-		var hit := move_and_collide(motion)
-		if hit == null:
-			return
-		var normal := hit.get_normal()
-		if normal.dot(up_direction) >= DUEL_FLOOR_DOT:
-			_duel_grounded = true
-		# Slide what is left of the frame's motion along the surface, and take
-		# the same component out of the velocity, which is what
-		# move_and_slide does between its own iterations.
-		velocity = velocity.slide(normal)
-		motion = hit.get_remainder().slide(normal)
-
-
-## --- duel (additive) ======================================================
-##
-## Everything below this line exists for scripts/duel and is inert in the
-## adventure mode: nothing above calls into it, and the three opt-in flags
-## near the top default to false.
-
-signal blocked(parried: bool)
-signal staggered()
-
-## Press the guard within this window of the sword landing and it is a parry
-## rather than a block — a much longer opening on the attacker.
-const PARRY_WINDOW := 0.13
-const BLOCK_STAGGER := 0.30
-const PARRY_STAGGER := 0.62
-const CLASH_STAGGER := 0.24
-const BLOCK_PUSH := 44.0
-const STAGGER_PUSH := 96.0
-
-
-func is_guarding() -> bool:
-	return state == State.GUARD
-
-
-func is_staggered() -> bool:
-	return state == State.STAGGER
-
-
-## The sword is only dangerous in the middle of the swing; attack_rect() already
-## returns an empty rect outside that window, so this is just a readable alias.
-func is_swinging() -> bool:
-	return state == State.ATTACK and attack_rect().size.x > 0.0
-
-
-## True when the raised guard faces `from_x` — you cannot block what is behind you.
-func guard_covers(from_x: float) -> bool:
-	if not is_guarding():
-		return false
-	var toward := signf(from_x - position.x)
-	return is_zero_approx(toward) or int(toward) == facing
-
-
-## Knocked out of the swing. Used for a blocked hit, a parry and a clash.
-func stagger(duration: float, from_x: float) -> void:
-	var away := -facing if is_nan(from_x) else int(signf(position.x - from_x))
-	if away == 0:
-		away = -facing
-	_stagger_timer = duration
-	velocity = Vector2(away * STAGGER_PUSH, -STAGGER_PUSH * 0.28)
-	_set_crouched(false)
-	_enter(State.STAGGER)
-	staggered.emit()
-
-
-## Shoved back for holding the line, but still standing and still guarding.
-func absorb_block(from_x: float, parried: bool) -> void:
-	var away := int(signf(position.x - from_x))
-	if away == 0:
-		away = -facing
-	velocity.x = away * BLOCK_PUSH
-	blocked.emit(parried)
-
-
-## A hit that was not blocked. First blood in a duel, one of three hearts
-## everywhere else.
-func take_lethal_hit(from_x: float) -> bool:
-	if not kill_on_lethal_hit:
-		return damage(1, from_x)
-	if state == State.DEAD:
-		return false
-	health = 0
-	var away := int(signf(position.x - from_x))
-	if away == 0:
-		away = -facing
-	velocity = Vector2(away * Tuning.KNOCKBACK_X, -Tuning.KNOCKBACK_Y)
-	_set_crouched(false)
-	_enter(State.DEAD)
-	died.emit()
-	return true
-
-
-## Puts the character back on its mark with every timer cleared. respawn() does
-## most of it; this also clears the duel-only state and the input edge memory,
-## so a fresh round cannot inherit a half-finished swing or a held button.
-func duel_reset(at: Vector2, face: int) -> void:
-	respawn(at)
-	facing = face
-	health = 1 if kill_on_lethal_hit else Tuning.MAX_HEALTH
-	last_impact = 0.0
-	guard_time = 0.0
-	_stagger_timer = 0.0
-	_turn_timer = 0.0
-	_land_timer = 0.0
-	_hurt_timer = 0.0
-	_drop_through = 0.0
-	_climb_from = Vector2.ZERO
-	_climb_to = Vector2.ZERO
-	_climb_progress = 0.0
-	_duel_force_crouched(false)
-	input.clear()
-
-
-func _update_guard(delta: float, want_x: int, grounded: bool) -> void:
-	guard_time += delta
-	velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * delta)
-	# Turning on the spot is allowed: facing the attack is the whole skill.
-	if want_x != 0:
-		facing = want_x
-	if input.just_pressed_attack:
-		_enter(State.ATTACK)
-		attacked.emit()
-	elif not input.guard or not grounded:
-		_enter(State.IDLE if grounded else State.FALL)
-
-
-func _update_stagger(delta: float) -> void:
-	_stagger_timer -= delta
-	velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * 0.7 * delta)
-	_apply_gravity(delta)
-	_move(delta)
-	if _stagger_timer <= 0.0:
-		_enter(State.IDLE if is_grounded() else State.FALL)
-
-
-func _duel_force_crouched(crouched: bool) -> void:
-	# _set_crouched refuses to stand up into a ceiling and short-circuits when
-	# nothing changed. Restoring a saved frame has to be unconditional.
-	_crouched = crouched
-	if _shape == null:
-		return
-	var h := _height()
-	var rect := _shape.shape as RectangleShape2D
-	if rect == null:
-		rect = RectangleShape2D.new()
-		_shape.shape = rect
-	rect.size = Vector2(Tuning.BODY_WIDTH, h)
-	_shape.position = Vector2(0.0, -h * 0.5)
-
-
-## --- duel state, for snapshots and for replaying a mispredicted frame -----
-##
-## Everything a frame of simulate() reads has to be in here, including the
-## private timers and the input's press-edge memory — otherwise a replayed
-## frame would re-fire a press that already happened, or forget a coyote
-## window, and the client would never converge on the host.
-##
-## 26 values, written in a fixed order. Keep write and read in step.
-##
-## They are doubles, and the wire carries doubles, because half of them are
-## GDScript floats (64-bit) that the simulation compares against thresholds:
-## state_time against the length of a swing, _land_timer against zero, and so
-## on. Rounding those to 32 bits can move a transition by a whole frame, which
-## in a duel is the difference between a sword landing and missing. Positions
-## and velocities are Vector2, already 32-bit, and lose nothing either way —
-## they are written as doubles only so the layout stays uniform and the cost of
-## getting it wrong stays zero. See docs/netplay.md for what it costs.
-
-const DUEL_STATE_FLOATS := 26
-
-
-func duel_write_state(into: PackedFloat64Array, at: int) -> void:
-	into[at + 0] = position.x
-	into[at + 1] = position.y
-	into[at + 2] = velocity.x
-	into[at + 3] = velocity.y
-	into[at + 4] = float(state)
-	into[at + 5] = state_time
-	into[at + 6] = float(facing)
-	into[at + 7] = float(health)
-	into[at + 8] = invulnerable
-	into[at + 9] = last_impact
-	into[at + 10] = _coyote
-	into[at + 11] = _jump_buffer
-	into[at + 12] = _turn_timer
-	into[at + 13] = _land_timer
-	into[at + 14] = _hurt_timer
-	into[at + 15] = _drop_through
-	into[at + 16] = _climb_from.x
-	into[at + 17] = _climb_from.y
-	into[at + 18] = _climb_to.x
-	into[at + 19] = _climb_to.y
-	into[at + 20] = _climb_progress
-	into[at + 21] = 1.0 if _crouched else 0.0
-	into[at + 22] = guard_time
-	into[at + 23] = _stagger_timer
-	into[at + 24] = float(input.previous_bits())
-	# Whether the feet were on something. simulate() reads this before it
-	# moves, so it has to travel with the snapshot.
-	into[at + 25] = 1.0 if is_grounded() else 0.0
-
-
-func duel_read_state(from: PackedFloat64Array, at: int) -> void:
-	position = Vector2(from[at + 0], from[at + 1])
-	velocity = Vector2(from[at + 2], from[at + 3])
-	state = int(from[at + 4]) as State
-	state_time = from[at + 5]
-	facing = int(from[at + 6])
-	health = int(from[at + 7])
-	invulnerable = from[at + 8]
-	last_impact = from[at + 9]
-	_coyote = from[at + 10]
-	_jump_buffer = from[at + 11]
-	_turn_timer = from[at + 12]
-	_land_timer = from[at + 13]
-	_hurt_timer = from[at + 14]
-	_drop_through = from[at + 15]
-	_climb_from = Vector2(from[at + 16], from[at + 17])
-	_climb_to = Vector2(from[at + 18], from[at + 19])
-	_climb_progress = from[at + 20]
-	_duel_force_crouched(from[at + 21] > 0.5)
-	guard_time = from[at + 22]
-	_stagger_timer = from[at + 23]
-	input.restore_previous_bits(int(from[at + 24]))
-	_duel_grounded = from[at + 25] > 0.5
-
+## One frame of motion. The adventure is not simulated over a network, so the
+## engine's slide loop is fine here; the duel fighter runs its own over
+## move_and_collide(), for the reason docs/netplay.md gives.
+func _move(_delta: float) -> void:
+	move_and_slide()

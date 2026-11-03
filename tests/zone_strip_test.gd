@@ -10,7 +10,7 @@ extends SceneTree
 ##    which is written in screen widths.
 ## 2. The strip is mirror-symmetric about the centre of the middle zone, cell
 ##    for cell. Neither seat can be handed the better route, which is the same
-##    argument levels/arena_01.txt makes about its single spawn mark.
+##    argument levels/zone_03.txt makes about its single spawn mark.
 ## 3. Both gates exist, in the first and last zones, and mirror each other.
 ## 4. Open ground — the predicate the pacifist line rests on — exists densely
 ##    enough that the respawn algorithm can always place a fighter.

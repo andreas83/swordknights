@@ -151,7 +151,7 @@ func _check_a_wall_does_not_comb_itself() -> void:
 ## in shade, the world reads black). Neither errors; both are obvious on
 ## screen and invisible to a test that only checks the thing ran.
 func _check_shipping_levels_are_neither_blank_nor_black() -> void:
-	for path: String in ["res://levels/level_01.txt", "res://levels/arena_01.txt",
+	for path: String in ["res://levels/level_01.txt", "res://levels/zone_02.txt",
 			"res://levels/feel_lab.txt"]:
 		var level := AsciiLevel.from_file(path)
 		if level == null:

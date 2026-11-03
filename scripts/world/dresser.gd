@@ -81,8 +81,8 @@ static func dress(level: AsciiLevel) -> Dictionary:
 	var props := {}
 	_dress_rooms(level, mid, fore, props, reserved)
 
-	# A duelling arena is mirror-symmetric on purpose (levels/arena_01.txt
-	# explains why, and tests/duel_arena_test.gd pins it). Decoration carries
+	# A duelling arena is mirror-symmetric on purpose (levels/zone_03.txt
+	# explains why, and tests/zone_strip_test.gd pins it). Decoration carries
 	# no collision so it cannot make a match unfair, but a foreground column
 	# standing over one seat and not the other looks unfair, which is nearly
 	# as bad. So where the terrain is a mirror, the dressing is too. The SUN

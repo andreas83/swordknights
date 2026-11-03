@@ -180,11 +180,11 @@ func _room_codes_are_unambiguous() -> void:
 
 
 func _the_arena_hash_identifies_the_arena() -> void:
-	var arena := Support.load_arena()
-	var again := Support.load_arena()
+	var arena := AsciiLevel.from_file("res://levels/zone_03.txt")
+	var again := AsciiLevel.from_file("res://levels/zone_03.txt")
 	_s.equal(
 		NetProtocol.arena_hash(arena), NetProtocol.arena_hash(again),
-		"the same arena file hashes the same twice"
+		"the same level file hashes the same twice"
 	)
 
 	var other := AsciiLevel.new()

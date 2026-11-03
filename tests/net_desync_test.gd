@@ -1,16 +1,21 @@
 extends SceneTree
-## Prediction, reconciliation, and the divergence detector.
+## Prediction, reconciliation, and the divergence detector, on the match.
 ##
-##     godot --headless --script tests/net_desync_test.gd
+##     godot --headless --path . --script tests/net_desync_test.gd
 ##
 ## HOW A HOST IS FAKED WITHOUT A SECOND PROCESS
-## Two duels cannot coexist in one world — see tests/duel_support.gd for why —
-## so the host is recorded rather than run alongside. Pass one steps a single
-## duel through a scripted input stream and writes down the exact SNAPSHOT
-## messages a host would have sent. That duel is then freed, a client duel is
+## The host is recorded rather than run alongside. Pass one steps a single
+## match through a scripted input stream and writes down the exact SNAPSHOT
+## messages a host would have sent. That match is then freed, a client match is
 ## built in its place, and the recorded snapshots are played back to a real
 ## NetSession over a LoopbackTransport. The client is therefore talking to a
-## genuine, self-consistent host; it just happens to be a recording.
+## genuine, self-consistent host; it just happens to be a recording -- and a
+## recording is what lets claim 2 put a lie in the host's mouth.
+## tests/match_net_test.gd is the other half: two live sessions, no lies.
+##
+## Written against the round duel first, and moved onto the tug-of-war match
+## (scripts/duel/match.gd, on the real fighter) when the round duel was retired.
+## The four claims did not change.
 ##
 ## FOUR CLAIMS
 ## 1. A client that mispredicts converges anyway, and reports no desync. This is
@@ -20,7 +25,7 @@ extends SceneTree
 ## 2. The detector fires when the host asserts a frame the client cannot
 ##    reproduce from authoritative state and authoritative input — which is what
 ##    nondeterministic physics across two platforms would look like.
-## 3. Losing snapshots is survivable: no false desync, and the duel still
+## 3. Losing snapshots is survivable: no false desync, and the match still
 ##    tracks the host.
 ## 4. Latency and jitter do not break it either.
 
@@ -35,6 +40,7 @@ const TAMPER_INDEX := 40
 enum Stage { RECORD, CLEAN, TAMPERED, LOSSY, LAGGY, DONE }
 
 var _s := Support.new()
+var _strip: ZoneStrip
 var _stream: Array[Vector2i]
 var _snapshots: Array[Dictionary] = [] # {frame, bytes, checksum}
 var _host_checksums := PackedInt64Array()
@@ -44,6 +50,7 @@ var _run: Dictionary = {}
 
 
 func _initialize() -> void:
+	_strip = Support.load_strip()
 	_stream = Support.input_stream(FRAMES, 0xd0d9e)
 
 
@@ -144,28 +151,30 @@ func _physics_process(_delta: float) -> bool:
 
 ## --- recording the host -----------------------------------------------------
 
-## Steps one duel through the stream and writes down the SNAPSHOT messages a
+## Steps one match through the stream and writes down the SNAPSHOT messages a
 ## host would have sent, with the same cadence NetSession uses.
 func _record_a_host() -> void:
-	var duel := Support.spawn_duel(root)
+	var fight := Support.spawn_match(root, _strip)
+	if not _s.check(fight != null, "the host's match builds"):
+		return
 	var since: Array[Vector2i] = []
 	_snapshots.clear()
 	_host_checksums = PackedInt64Array()
 
 	for pair: Vector2i in _stream:
 		since.append(pair)
-		duel.step(pair.x, pair.y)
-		_host_checksums.append(duel.checksum())
-		if duel.frame % NetSession.SNAPSHOT_INTERVAL == 0:
+		fight.step(pair.x, pair.y)
+		_host_checksums.append(fight.checksum())
+		if fight.frame % NetSession.SNAPSHOT_INTERVAL == 0:
 			_snapshots.append({
-				"frame": duel.frame,
-				"checksum": duel.checksum(),
-				"state": duel.write_state(),
+				"frame": fight.frame,
+				"checksum": fight.checksum(),
+				"state": fight.write_state(),
 				"pairs": since.duplicate(),
 			})
 			since = []
 
-	duel.free()
+	fight.free()
 	_s.check(_snapshots.size() > TAMPER_INDEX + 10, "enough snapshots were recorded")
 	_s.equal(
 		_host_checksums.size(), FRAMES, "a host checksum was recorded for every frame"
@@ -201,7 +210,7 @@ func _drive(
 		return false
 
 	var session: NetSession = _run["session"]
-	var duel: Duel = _run["duel"]
+	var fight: DuelMatch = _run["fight"]
 	var host_end: LoopbackTransport = _run["host_end"]
 	var queue: Array[Dictionary] = _run["snapshots"]
 	var cursor: int = _run["cursor"]
@@ -212,7 +221,7 @@ func _drive(
 	# One snapshot of slack, so the very first one is released while the client
 	# is still on frame 0 and has nothing to predict from yet.
 	while cursor < queue.size() \
-			and int(queue[cursor]["frame"]) <= duel.frame + NetSession.SNAPSHOT_INTERVAL:
+			and int(queue[cursor]["frame"]) <= fight.frame + NetSession.SNAPSHOT_INTERVAL:
 		var snapshot: Dictionary = queue[cursor]
 		host_end.send(NetProtocol.snapshot(
 			int(snapshot["frame"]), int(snapshot["checksum"]),
@@ -225,18 +234,18 @@ func _drive(
 	_run["ticks"] = int(_run["ticks"]) + 1
 	if int(_run["ticks"]) % 150 == 0:
 		print("    %s tick=%d frame=%d cursor=%d/%d stage=%d snaps=%d" % [
-			label, _run["ticks"], duel.frame, cursor, queue.size(),
+			label, _run["ticks"], fight.frame, cursor, queue.size(),
 			session.stage, session.snapshots_received,
 		])
 
-	var done := cursor >= queue.size() and duel.frame >= int(queue[queue.size() - 1]["frame"])
+	var done := cursor >= queue.size() and fight.frame >= int(queue[queue.size() - 1]["frame"])
 	if not done and int(_run["ticks"]) < FRAMES * 4:
 		return false
 
-	_run["final_frame"] = duel.frame
-	_run["final_checksum"] = duel.checksum()
+	_run["final_frame"] = fight.frame
+	_run["final_checksum"] = fight.checksum()
 	_s.check(
-		duel.frame >= int(queue[queue.size() - 1]["frame"]),
+		fight.frame >= int(queue[queue.size() - 1]["frame"]),
 		"%s: the client reached the host's last snapshot frame" % label
 	)
 	return true
@@ -255,7 +264,7 @@ func _begin_run(
 	client_end.latency_frames = latency
 	client_end.jitter_frames = jitter
 
-	var duel := Support.spawn_duel(root)
+	var fight := Support.spawn_match(root, _strip)
 	var session := NetSession.new()
 
 	# The client's own input is the one the recorded host applied for its seat,
@@ -263,7 +272,7 @@ func _begin_run(
 	# only thing a client can actually get wrong.
 	var stream := _stream
 	session.local_input = func() -> int:
-		var at: int = duel.frame
+		var at: int = fight.frame
 		if at < 0 or at >= stream.size():
 			return 0
 		return (stream[at] as Vector2i)[DuelRules.SLOT_B]
@@ -279,22 +288,24 @@ func _begin_run(
 				signalled[1] = frame
 	)
 
-	# Stand in for the host's side of the handshake.
-	var arena_hash := NetProtocol.arena_hash(duel.level.data)
+	# Stand in for the host's side of the handshake: the strip's identity and
+	# its zone count, which is what a match host dictates.
+	var arena_hash := fight.arena_identity()
+	var length := fight.match_length()
 	host_end.received.connect(func(bytes: PackedByteArray) -> void:
 		var message := NetProtocol.decode(bytes)
 		if message.has("error"):
 			return
 		if int(message["type"]) == NetProtocol.Type.HELLO:
 			host_end.send(NetProtocol.welcome(
-				DuelRules.SLOT_B, DuelRules.ROUNDS_TO_WIN, arena_hash
+				DuelRules.SLOT_B, length, arena_hash
 			))
 	)
 
-	session.start(client_end, duel, false)
+	session.start(client_end, fight, false)
 
 	_run = {
-		"label": label, "session": session, "duel": duel,
+		"label": label, "session": session, "fight": fight,
 		"host_end": host_end, "client_end": client_end,
 		"snapshots": snapshots, "cursor": 0, "ticks": 0,
 		"desync_signalled_box": signalled,
@@ -303,11 +314,11 @@ func _begin_run(
 
 func _finish_run() -> void:
 	var session: NetSession = _run["session"]
-	var duel: Duel = _run["duel"]
+	var fight: DuelMatch = _run["fight"]
 	print("  %-9s frame=%d snapshots=%d corrections=%d verifications=%d desync=%d" % [
-		_run["label"], duel.frame, session.snapshots_received,
+		_run["label"], fight.frame, session.snapshots_received,
 		session.corrections, session.verifications, session.desync_count,
 	])
 	session.shutdown()
-	duel.free()
+	fight.free()
 	_run = {}

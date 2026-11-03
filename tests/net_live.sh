@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A real networked duel between two operating-system processes, over localhost.
+# A real networked match between two operating-system processes, over localhost.
 #
 #     bash tests/net_live.sh
 #
@@ -36,7 +36,7 @@ trap cleanup EXIT
 peer() {  # peer <report-name> <args...>
   local name="$1"; shift
   "$GODOT" --headless --path "$ROOT" --script tests/net_live.gd -- \
-    --sim "${SIM:-match}" --frames "$FRAMES" --report "$WORK/$name.txt" "$@" \
+    --frames "$FRAMES" --report "$WORK/$name.txt" "$@" \
     > "$WORK/$name.log" 2>&1
 }
 

@@ -83,10 +83,10 @@ scripts/
   ui/        HUD, menu, touch controls
   audio/     synthesis, mixer autoload, character sounds, music
   levels/    segment grammar, generator, reachability verifier
-  duel/      two-player duel: rules, camera, HUD, art, local and online hosts
+  duel/      the tug-of-war duel: fighter, combat, zones, match, camera, HUD
   net/       transport, protocol, session, lobby, rendezvous server
 scenes/      boot, menu, game, player, duel, rendezvous, touch controls
-levels/      ASCII level and arena files
+levels/      ASCII levels, and the duel's zone files
 assets/      generated tile atlas + TileSet
 tools/       project configuration, asset generation, screenshots
 tests/       headless test scripts
@@ -144,8 +144,8 @@ what the character can do.
 runs every frame while falling, so a 2-tile spike pit is free passage: you
 drop in, catch the far wall and mantle out. A pit has to be wider than
 `Tuning.grab_tiles()` to cost anything — or be roofed, or have nothing
-grabbable on the far side. This caught out the duelling arena, where both
-fighters simply walked across the spikes.
+grabbable on the far side. This caught out the first duelling arena, where
+both fighters simply walked across the spikes.
 
 ## Screenshots without a screen
 
@@ -189,13 +189,14 @@ and patrol guards; dead-zone follow camera; procedural parallax skyline; HUD;
 keyboard, gamepad and touch input; mode menu; build, test and release
 pipeline; procedural level generation with a reachability proof; procedural
 audio — synthesised sound effects, an Andalusian music loop with an intensity
-parameter, and persisted volume and mute settings; a two-player duel, both on
-one keyboard and over the network, with host-authoritative prediction,
-reconciliation and a desync test.
+parameter, and persisted volume and mute settings; a two-player duel on the
+*Nidhogg* model — one hit kills, three sword stances that clash or kill,
+disarm, sword throw, and a tug-of-war over a chain of zones — both on one
+keyboard and over the network, with host-authoritative prediction,
+reconciliation and a desync test. The round-based duel it replaced is retired.
 
-In progress: rebuilding the duel on the *Nidhogg* model — one hit kills, three
-sword stances that clash or kill, disarm, sword throw, and a tug-of-war over a
-chain of zones instead of rounds and health bars. The specification and the
+In progress: the duel's open items, listed under *Status* in
+[`docs/duel-match.md`](docs/duel-match.md). The specification and the
 objections to it are in [`docs/duel-spec.md`](docs/duel-spec.md).
 
 Not built yet: more hand-authored levels, enemy AI beyond a patrol route,

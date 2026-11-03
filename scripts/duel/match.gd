@@ -2,8 +2,9 @@ class_name DuelMatch
 extends DuelSim
 ## The tug-of-war: initiative, a strip of zones, respawns, and the two gates.
 ##
-## This replaces the round state machine in scripts/duel/duel.gd. A duel is no
-## longer first-to-three on one screen; it is a rope. Kill the other fighter and
+## This replaced the round state machine the duel started as, which has since
+## been retired. A duel is no longer first-to-three on one screen; it is a
+## rope. Kill the other fighter and
 ## the screen starts moving your way. Die and it stops, and then it starts
 ## moving theirs. Reach your own gate and the city takes you.
 ##

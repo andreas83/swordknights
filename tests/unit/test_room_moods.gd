@@ -8,7 +8,9 @@ extends GutTest
 ## top of that, the reason it exists: neighbouring rooms must not look alike.
 
 const LEVEL := "res://levels/level_01.txt"
-const ARENA := "res://levels/arena_01.txt"
+## The duel's Mirror Court: the one level symmetric about its own centre now
+## that the round duel's arena is retired.
+const ARENA := "res://levels/zone_03.txt"
 ## Props that stand on a floor and must have one under them.
 const STANDING := ["urn", "jars", "rubble", "grass", "palm_pot"]
 ## Props that lie over a wall face.

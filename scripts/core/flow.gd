@@ -287,7 +287,7 @@ func _ready() -> void:
 
 ## The wipe runs on the simulation clock, not the display clock.
 ##
-## A wipe looks like pure presentation and `DuelCamera` makes the opposite
+## A wipe looks like pure presentation and `MatchCamera` makes the opposite
 ## choice for exactly that reason — but this one fires the caller's work at
 ## full cover, and that work is a respawn or a scene change. CLAUDE.md:
 ## *nothing gameplay-relevant may depend on `_process` or on `delta` varying*.
@@ -295,7 +295,7 @@ func _ready() -> void:
 ## gameplay depending on the display, so the whole state machine runs here
 ## with the hitstop clock instead.
 ##
-## The reason `DuelCamera` avoids the physics clock — a client reconciling a
+## The reason `MatchCamera` avoids the physics clock — a client reconciling a
 ## duel may step it twice in one frame — cannot reach this file: `Flow` is
 ## installed by `Game._ready()` and a duel never runs `Game`.
 func _physics_process(delta: float) -> void:

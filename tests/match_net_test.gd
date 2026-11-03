@@ -1,8 +1,8 @@
 extends SceneTree
 ## The tug-of-war match, played between two real NetSessions.
 ##
-## NetSession was built and tested against the round duel; the match is what
-## the online duel now runs. This puts a host session and a client session, each
+## NetSession was built and tested against the round duel, since retired; the
+## match is what the online duel runs. This puts a host session and a client session, each
 ## with its own DuelMatch on the real fighter, on the two ends of a loopback
 ## transport and plays random input for both seats -- with and without latency,
 ## jitter and dropped snapshots -- and asks the questions netplay rests on:
@@ -10,9 +10,9 @@ extends SceneTree
 ## does the detector stay quiet while it does.
 ##
 ## Unlike tests/net_desync_test.gd, the host here is live rather than recorded.
-## Two round duels cannot share a physics world because their players collide;
-## two matches can, because a fighter collides with the ground and never with
-## another fighter, and both matches build the same ground in the same place.
+## Two matches can share a physics world because a fighter collides with the
+## ground and never with another fighter, and both matches build the same
+## ground in the same place.
 ##
 ##     godot --headless --path . --script res://tests/match_net_test.gd
 

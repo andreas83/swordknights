@@ -2,11 +2,12 @@ class_name DuelSim
 extends Node2D
 ## The surface a networked duel is driven through, and nothing else.
 ##
-## `scripts/net/session.gd` does not care whether it is reconciling a
-## round-based duel (`scripts/duel/duel.gd`) or the tug-of-war match
-## (`scripts/duel/match.gd`). It needs exactly six things, and they are the six
-## below. Pulling them out into a base class is what lets the two simulations
-## coexist during the changeover instead of one of them having to win first.
+## `scripts/net/session.gd` reconciles the tug-of-war match
+## (`scripts/duel/match.gd`), and needs exactly six things from it, the six
+## below. They were pulled out into a base class so the round duel the session
+## was first written for and the match could coexist during the changeover;
+## the round duel is retired, and the seam is kept because it is the whole of
+## what the session is allowed to know about a duel.
 ##
 ## THE CONTRACT, which every subclass owes the session
 ##
@@ -89,7 +90,7 @@ func set_match_length(_length: int) -> bool:
 
 ## FNV-1a over the little-endian bytes of each word. Chosen for being four
 ## lines long and identical on every platform, not for its collision behaviour.
-## Lives here so both simulations and NetProtocol.arena_hash share one.
+## Lives here so the match, the strip and NetProtocol.arena_hash share one.
 static func fnv1a(words: PackedInt32Array) -> int:
 	var hash_value := 0x811c9dc5
 	for word: int in words:

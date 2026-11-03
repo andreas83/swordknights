@@ -9,8 +9,8 @@ extends "res://scripts/duel/match_scene.gd"
 ##
 ## Everything the match looks like -- zones, fighters, gore, the dusk over the
 ## last rooms, the camera -- is the parent scene's. This file only adds the
-## lobby, the transport and the session, in the shape scripts/duel/
-## duel_online.gd has always used for the round duel.
+## lobby, the transport and the session, in the shape the retired round duel's
+## online scene first used.
 ##
 ## WHO STEPS THE MATCH
 ##   in the lobby   nobody: the fighters stand on their marks

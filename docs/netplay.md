@@ -62,12 +62,14 @@ So one peer is the host and its simulation is the truth:
   was told about. When a snapshot arrives it discards its prediction, loads the
   host's state, and replays the frames since.
 
-That replay is exact, which is the whole trick: `Duel.step(bits_a, bits_b)` is a
-pure function of the duel's state and two bytes. `tests/duel_determinism_test.gd`
-asserts that running a stream of frames as a burst inside one physics frame
-gives byte-identical checksums to pacing it out one frame per physics frame. If
-that were not true, the client would drift away from the host on every
-correction.
+That replay is exact, which is the whole trick: `DuelMatch.step(bits_a, bits_b)`
+(`scripts/duel/match.gd`) is a pure function of the match's state and two bytes.
+`tests/duel_determinism_test.gd` asserts that running a stream of frames as a
+burst inside one physics frame gives the same match as pacing it out one frame
+per physics frame. If that were not true, the client would drift away from the
+host on every correction. On the real fighter "the same" means every discrete
+field identical and every position within the checksum's quantum, not bit for
+bit — see the last item under *Not handled yet*.
 
 Keeping the step pure also buys local two-player, replays, headless tests — and
 leaves rollback possible later without rewriting anything.
@@ -115,18 +117,19 @@ bit-exactly, the flags match, the collision shape matches, and a single
 remainder, normal and depth. It is only the slide loop inside the engine that
 differs.
 
-So the duel runs that loop itself, in `Player._move()`, over
-`move_and_collide()`, which has no such memory. The collision mathematics is
-still the engine's, so the character moves and feels exactly as it did; only the
-bookkeeping between the queries moved into the file. The adventure is untouched
-and still calls `move_and_slide()`.
+So the duel runs that loop itself, in `Fighter._move()`
+(`scripts/duel/fighter.gd`), over `move_and_collide()`, which has no such
+memory. The collision mathematics is still the engine's; only the bookkeeping
+between the queries lives in the file. The adventure is not simulated over a
+network and still calls `move_and_slide()`.
 
-Two things follow. `Player.is_grounded()` replaces `is_on_floor()` for anything
-asking about a player's footing, because in a duel the engine's flag is never
-set and the real answer is one this file owns and the snapshot carries. And a
-duel is now genuinely reproducible frame-for-frame from its serialised state,
-which is what `scripts/net/session.gd` always claimed and what makes the desync
-detector worth having.
+Two things follow. The fighter's `grounded` is its own answer, not the engine's
+`is_on_floor()` — the engine's flag is never set — and it travels in the
+snapshot. And a duel is genuinely reproducible from its serialised state, which
+is what `scripts/net/session.gd` always claimed and what makes the desync
+detector worth having. (This was found, and first fixed, on the round duel the
+game started with, which ran the prince himself; the round duel has since been
+retired for the tug-of-war match.)
 
 The checksum itself is FNV-1a over the quantised state — 1/256 of a pixel and of
 a second, which is far finer than anything visible and still absorbs last-bit
@@ -138,15 +141,17 @@ float noise.
 
 ```
 scripts/duel/
-  duel.gd            the simulation: two duellists, an arena, rounds, and
+  match_sim.gd       DuelSim: the six things the session may know about a duel
+  match.gd           the simulation: initiative, the strip, respawns, gates, and
                      step(bits_a, bits_b) — the one function that matters
-  duel_rules.gd      rounds, countdown, time limit
-  duel_camera.gd     frames both duellists, zooms to fit
-  duel_art.gd        seat colours and the guard / stagger tells
-  duel_hud.gd        score, countdown, results, network status
-  duel_touch.gd      the GUARD button the shared touch controls lack
-  duel_local.gd      two seats, one keyboard
-  duel_online.gd     lobby, connection, and the same duel with a session
+  match_seat.gd      one fighter as the match sees it, and the referee
+  fighter.gd         the fighter; its own slide loop over move_and_collide()
+  zones.gd           the strip of zones, read as one world
+  duel_rules.gd      the step, the countdown, the seat names
+  match_scene.gd     two seats, one keyboard
+  match_online.gd    lobby, connection, and the same match with a session
+  match_hud.gd       the rope, results, network status
+  duel_touch.gd      the THROW button the shared touch controls lack
 scripts/net/
   protocol.gd        versioned messages, encode and decode
   transport.gd       the interface
@@ -155,11 +160,11 @@ scripts/net/
   session.gd         handshake, prediction, reconciliation, desync detection
   rendezvous.gd      the relay
   lobby.gd           the lobby screen
-levels/arena_01.txt  the arena (and its design notes)
+levels/duel_zones.txt  the strip (and the zone files it names)
 ```
 
-`scripts/player/player.gd` and `scripts/player/player_input.gd` carry small
-additive changes, each marked `--- duel (additive) ---`.
+`scripts/player/player_input.gd` is the 8-bit wire frame both seats are
+driven through. [`duel-match.md`](duel-match.md) is the match itself.
 
 ---
 
@@ -167,19 +172,19 @@ additive changes, each marked `--- duel (additive) ---`.
 
 Every message is `[u8 version][u8 type][payload]`, little-endian. The version is
 checked on arrival: two mismatched builds say so in the lobby instead of
-desyncing in the third round.
+desyncing in the third zone.
 
 ```
 guest                         host
   |  HELLO (build, name)       |      repeated every 30 frames until answered
   |--------------------------->|
-  |      WELCOME (seat, rounds, arena hash)
-  |<---------------------------|      a mismatched arena is refused here
+  |      WELCOME (seat, zones, strip hash)
+  |<---------------------------|      a mismatched strip is refused here
   |                            |
   |  INPUT (first_frame, bits[6])     every frame, a redundant window
   |--------------------------->|
   |      SNAPSHOT (frame, checksum, applied input, state)
-  |<---------------------------|      every 2 frames, 436 bytes
+  |<---------------------------|      every 2 frames, about 260 bytes
   |                            |
   |  PING / PONG               |      every 20 frames, both ways
   |<-------------------------->|
@@ -187,21 +192,16 @@ guest                         host
   |<-------------------------->|
 ```
 
-Bandwidth: roughly **13 kB/s** from host to client and **0.7 kB/s** back.
+Bandwidth: roughly **8 kB/s** from host to client and **0.7 kB/s** back.
 
-The snapshot is large because it is *exact*. Every private timer the character
-state machine reads is in it, including the input's press-edge memory, so a
-replayed frame cannot re-fire a jump that was already held — and the values are
-**doubles, not floats**. Half of them are GDScript floats that the simulation
-compares against thresholds (`state_time` against the length of a swing,
-`_land_timer` against zero), and rounding those to 32 bits moves a transition by
-a whole frame often enough to matter: in a duel that is the difference between a
-sword landing and missing.
-
-Halving this is available and not taken: positions and velocities are `Vector2`
-and therefore already 32-bit, so they lose nothing in a float, and a mixed
-layout would bring the snapshot back to about 250 bytes. That is not worth the
-chance of write and read drifting apart, over 13 kB/s on a two-player duel.
+The snapshot is *exact*. A 44-byte match header (frame, phase, initiative,
+zone, kills, and the timers and scroll as doubles) and a 100-byte block per
+fighter: position and velocity as doubles, then the discrete state — state,
+frame count, facing, stance, the input's press-edge memory — as 32-bit
+integers, then the fighter's sword. A replayed frame cannot re-fire a jump that
+was already held, and nothing the simulation compares against a threshold is
+rounded on the way: rounding a timer to 32 bits moves a transition by a whole
+frame often enough to matter, and in a duel that is a sword landing or missing.
 
 The client runs ahead of the newest snapshot by the measured one-way latency
 plus two frames of slack, so its input reaches the host before the host needs
@@ -308,16 +308,19 @@ not silently drift, and it does not pretend to be fine.
 
 ## Testing
 
-Every test is a standalone headless script. There is no framework yet.
+The netplay tests are standalone headless scripts rather than GUT tests,
+because the match has to be stepped from inside a physics frame
+(`tests/duel_support.gd` says why). The CI test runner runs them all; one at a
+time:
 
 ```bash
-godot --headless --script tests/duel_input_bits_test.gd     # the 8-bit wire frame
-godot --headless --script tests/duel_determinism_test.gd    # the step is a function
-godot --headless --script tests/duel_combat_test.gd         # the duelling rules
-godot --headless --script tests/duel_arena_test.gd          # the arena's claims
-godot --headless --script tests/net_protocol_test.gd        # encode, decode, refuse
-godot --headless --script tests/net_desync_test.gd          # predict, reconcile, detect
-bash  tests/net_live.sh                                # two real processes
+godot --headless --path . --script tests/duel_input_bits_test.gd   # the 8-bit wire frame
+godot --headless --path . --script tests/duel_determinism_test.gd  # the step is a function
+godot --headless --path . --script tests/match_fighter_test.gd     # the match on the fighter
+godot --headless --path . --script tests/net_protocol_test.gd      # encode, decode, refuse
+godot --headless --path . --script tests/net_desync_test.gd        # predict, reconcile, detect
+godot --headless --path . --script tests/match_net_test.gd         # two live sessions
+bash  tests/net_live.sh                                  # two real processes
 ```
 
 Each exits non-zero on failure. Add `--fixed-fps 600` to any of the `.gd` ones
@@ -346,9 +349,10 @@ Honestly, and in roughly the order I would fix them.
 - **No ENet transport.** The interface is there and `ws_transport.gd` is the
   only thing behind it. Native builds pay TCP's head-of-line blocking for no
   reason.
-- **Round and match state are not separately authoritative.** They ride along
-  inside the snapshot, which is correct but means a client that has not heard
-  from the host in a while may show a stale score for a few frames.
+- **Match state is not separately authoritative.** Initiative, kills and the
+  window ride along inside the snapshot, which is correct but means a client
+  that has not heard from the host in a while may show a stale rope for a few
+  frames.
 - **No reconnect.** A dropped connection ends the match; there is no grace
   period and no resume.
 - **No spectators, no more than two players.** The transport interface is
@@ -367,11 +371,23 @@ Honestly, and in roughly the order I would fix them.
   which field. A per-field checksum would make a real platform difference much
   faster to chase; finding the `move_and_slide()` problem above took a long
   session of bisecting by hand that a localising checksum would have shortened.
-- **`Player._move()` does no floor snapping.** `move_and_slide()` glues a body
+- **`Fighter._move()` does no floor snapping.** `move_and_slide()` glues a body
   to the ground over small steps and seams; the duel's loop relies on gravity
-  pulling it down each frame instead. On the arena's flat, axis-aligned tiles
-  the two agree, and the tests say so, but a sloped or stepped arena would want
+  pulling it down each frame instead. On the strip's flat, axis-aligned tiles
+  the two agree, and the tests say so, but a sloped or stepped zone would want
   snapping put back — deterministically, inside `_move()`.
 - **No bandwidth adaptation.** The snapshot rate is a constant.
 - **The clock sync is crude.** One-way latency is taken as half the round trip,
   which is wrong on an asymmetric connection.
+- **A burst and a paced run are not bit-identical on the real fighter.** Two
+  paced runs agree exactly, and so do two bursts, but a burst and a paced run
+  of the same inputs part in the last bits of a standing fighter's y — about
+  1e-4 px, two hundred frames in, under 4e-4 px across the run in
+  `tests/duel_determinism_test.gd`, which prints the numbers every time. Which
+  bits move depends on what the physics space held before, so it reads as the
+  engine's collision recovery visiting the ground's tile shapes in a different
+  order. The round duel this was first tested on was bit-exact. The checksum's
+  1/256 quantum absorbs it unless a value sits on a rounding boundary, where a
+  reconciling client would report a false desync; none has been seen in
+  `tests/net_live.sh`. Fixing it is a change to the fighter's movement or to
+  the ground's collision, both of which are the owner's open decisions.

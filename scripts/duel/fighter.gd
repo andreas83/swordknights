@@ -654,7 +654,7 @@ func _sync_shape() -> void:
 ## One frame of motion, over move_and_collide() rather than move_and_slide().
 ##
 ## This is not an eccentricity, it is the load-bearing line of the netplay
-## design, and it is here for the same reason Player._move() is: move_and_slide
+## design, and it is here for the reason docs/netplay.md gives: move_and_slide
 ## carries state inside the engine that GDScript can neither read nor write,
 ## and that state survives a snapshot restore. Two bodies handed byte-identical
 ## state and byte-identical input step to positions thousandths of a pixel

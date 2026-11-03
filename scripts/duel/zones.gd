@@ -69,7 +69,7 @@ var zone_rows: int = 0
 ## [west, east]; west is player one's goal, east is player two's.
 var gates: Array[Vector2i] = [Vector2i.ZERO, Vector2i.ZERO]
 ## The two marks the match starts from, in strip cells. Authored as one mark in
-## the middle zone and mirrored, exactly as levels/arena_01.txt argues for.
+## the middle zone and mirrored, exactly as levels/zone_03.txt argues for.
 var start_cells: Array[Vector2i] = [Vector2i.ZERO, Vector2i.ZERO]
 ## Torches and other decoration, in strip cells: { kind, cell }.
 var props: Array[Dictionary] = []

@@ -120,7 +120,7 @@ func _clear_forgets_the_previous_frame() -> void:
 	_s.check(not input.just_pressed_attack, "clear leaves no pending press")
 
 	# A fresh round must not inherit a held button as a press, and must see the
-	# next genuine press. This is what Player.duel_reset relies on.
+	# next genuine press. This is what Fighter.respawn_at relies on.
 	input.apply_bits(PlayerInput.BIT_ATTACK)
 	_s.check(input.just_pressed_attack, "after clear, a held button presses afresh")
 

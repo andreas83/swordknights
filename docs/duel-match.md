@@ -17,7 +17,7 @@ Rings are respawn timers, the track at the top is zone and initiative.*
 | File | Owns |
 |---|---|
 | `scripts/duel/match.gd` (`DuelMatch`) | initiative, scroll, respawn timers, win condition, snapshot, checksum |
-| `scripts/duel/match_sim.gd` (`DuelSim`) | the surface the network session drives; both duels implement it |
+| `scripts/duel/match_sim.gd` (`DuelSim`) | the surface the network session drives; the match implements it |
 | `scripts/duel/match_seat.gd` (`DuelSeat`) | the **only** place that touches a fighter |
 | `scripts/duel/zones.gd` (`ZoneStrip`) | the zones as data, and every collision question |
 | `scripts/duel/zones_view.gd` | streams tilemap cells near the camera |
@@ -146,11 +146,23 @@ byte for byte. Each of those checks was seen to fail with its fix removed.
 The match's own suites still run on the placeholder in `match_stub_fighter.gd`,
 on purpose: they test the rope, and do not need a physics space.
 
-Both menu entries run the match. The round duel in `scripts/duel/duel.gd` is
-no longer reachable from the menu; it still implements `DuelSim` and still has
-its own tests.
+Both menu entries run the match, and **the round duel is retired**: its
+simulation, scenes, camera, HUD and art are gone, and so is the duel-only code
+it needed in `scripts/player/player.gd` (guard, stagger, first-blood and its own
+slide loop — the prince is the adventure's again). What its tests proved about
+netplay now runs on the match: `tests/net_desync_test.gd` (a recorded host,
+prediction, reconciliation, a detector that fires on a tampered snapshot and
+stays quiet through loss and lag) and `tests/duel_determinism_test.gd` (two
+sims agree, a snapshot round trip is exact, and a burst equals a paced run).
+`tests/net_live.sh` plays the match between two processes. The tests of the
+round duel's own rules and arena went with it.
 
-Open before the match replaces the round duel:
+Moving the paced-run check onto the real fighter found one thing the round
+duel did not have: a burst and a paced run part by about 1e-4 px. It is inside
+the checksum's quantum, and the test now holds it there and prints it; see
+the last item in [`netplay.md`](netplay.md#not-handled-yet).
+
+The five items that stood between the match and replacing the round duel:
 
 1. ~~Zone width.~~ **Decided: a fighter stands 8–9% of the screen's height**,
    and the strip follows from that. The camera scales by height

@@ -2,9 +2,9 @@ class_name MatchCamera
 extends Camera2D
 ## The tug-of-war camera. One zone wide, and it decides nothing.
 ##
-## NOT scripts/duel/duel_camera.gd, and nothing to do with
-## scripts/render/game_camera.gd. The round duel's camera frames a pair in a
-## fixed arena and zooms to fit them; the adventure's follows a protagonist.
+## Nothing to do with scripts/render/game_camera.gd, which follows the
+## adventure's protagonist. The retired round duel had a camera that framed a
+## pair in a fixed arena and zoomed to fit them.
 ## This mode has neither shape. It has a rope, and the rope is simulation state.
 ##
 ## WHY THERE IS ALMOST NOTHING HERE, AND WHY THAT IS THE POINT

@@ -26,7 +26,7 @@ extends Node2D
 ##
 ## CRIMSON AND TEAL
 ## Seat one bleeds crimson and seat two bleeds teal, the same two colours
-## scripts/duel/duel_art.gd dresses them in. After a few exchanges the floor is
+## scripts/duel/fighter_art.gd dresses them in. After a few exchanges the floor is
 ## a record of who died where — which is the point of keeping it.
 
 ## Decals per zone. Far more than a match produces: six per kill is thirty-two

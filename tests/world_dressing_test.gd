@@ -15,8 +15,9 @@ extends SceneTree
 
 const LEVELS := [
 	"res://levels/level_01.txt",
-	"res://levels/arena_01.txt",
 	"res://levels/feel_lab.txt",
+	"res://levels/zone_02.txt",
+	"res://levels/zone_03.txt",
 ]
 
 var _failures := 0
@@ -140,10 +141,12 @@ func _carved(coords: Vector2i) -> bool:
 	return id.begins_with("arch_") or id == "niche" or id == "frieze"
 
 
+## The Mirror Court is the one duel zone symmetric about its own centre, and the
+## one both fighters start in.
 func _check_a_symmetric_level_is_dressed_symmetrically() -> void:
-	var arena := AsciiLevel.from_file("res://levels/arena_01.txt")
+	var arena := AsciiLevel.from_file("res://levels/zone_03.txt")
 	if arena == null:
-		_fail("could not load the arena")
+		_fail("could not load the Mirror Court")
 		return
 	var dressing := WorldDresser.dress(arena)
 	for plane_name: String in ["mid", "fore"]:

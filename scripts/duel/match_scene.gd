@@ -1,16 +1,11 @@
 extends Node2D
 ## The tug-of-war, playable: two seats on one keyboard, five zones, two gates.
 ##
-## The shape is the same as scripts/duel/duel_local.gd's and for the same
-## reason: build the world, read two bytes of input, step. Everything that is
-## the mode — initiative, the window, respawns, the gates — is in
-## scripts/duel/match.gd, because the networked version has to get exactly the
-## same rules out of exactly the same code. What is here is wiring and
-## reactions.
-##
-## This scene is not yet in scripts/core/mode_registry.gd: the fighter it fights
-## with is still the placeholder, so the mode is not something to put in front
-## of a player yet. The report says which two lines add it.
+## Build the world, read two bytes of input, step. Everything that is the mode
+## — initiative, the window, respawns, the gates — is in scripts/duel/match.gd,
+## because the networked version (scripts/duel/match_online.gd, which extends
+## this) has to get exactly the same rules out of exactly the same code. What is
+## here is wiring and reactions. The menu's Duel entry is this scene.
 ##
 ## CONTROLS (written by tools/configure_project.gd)
 ##   seat one   A D   W S   SPACE jump   F sword   G guard   SHIFT walk

@@ -155,7 +155,7 @@ holds still in a held frame, in the single-player modes where frames are ever
 held, and the branch is simply never taken in a duel.
 
 If a duel ever wants impact, it must be **presentational only**: shake, a
-flash, a camera settle. Nothing that changes how many times `Duel.step()`
+flash, a camera settle. Nothing that changes how many times `DuelMatch.step()`
 runs, and nothing that changes what it is given. `docs/duel-spec.md` draws the
 same line from the other side — "gore, dust and camera do not [go in the
 snapshot]" — and notes that one field hiding outside the snapshot is what
@@ -200,11 +200,11 @@ The hold exists because `change_scene_to_file` is deferred: without it the
 shadow would start to lift off a scene that is still being built.
 
 The whole state machine runs in `_physics_process`, not `_process`. A wipe
-looks like pure presentation — `DuelCamera` reaches the opposite conclusion
+looks like pure presentation — `MatchCamera` reaches the opposite conclusion
 for that reason — but this one fires the caller's work at full cover, and that
 work is a respawn or a scene change. A retry landing on frame 23 at 60 fps and
 frame 11 at 30 fps is gameplay depending on the display, which `CLAUDE.md`
-rules out. The reason `DuelCamera` avoids the physics clock — a reconciling
+rules out. The reason `MatchCamera` avoids the physics clock — a reconciling
 client may step it twice in one frame — cannot reach `Flow`, because a duel
 never runs `Game` and so never installs one.
 
