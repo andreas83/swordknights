@@ -4,7 +4,7 @@ extends GutTest
 ##
 ## The handshake is all that is driven here, so the duel is a stub: the looks
 ## must arrive before anyone is seated, and they must arrive whatever the other
-## side is -- this build, an older build that sends none, or a peer sending a
+## side is -- this build, a peer of this version that sends none, or one sending a
 ## look that will not read, which must not stall the handshake it rides on.
 ## That the looks leave the simulation alone is tests/match_net_test.gd's
 ## question, asked with the real match: two different looks, no desync.
@@ -38,12 +38,14 @@ class StubSim:
 
 const POLLS := 20
 
-## The literal bytes an older build's guest says hello with; see
+## The literal bytes a guest that sends no look says hello with; see
 ## tests/unit/test_net_look_wire.gd for how they are spelled.
-const V1_HELLO := [1, 1, 1, 0, 0, 0, 1, 0x78]
-## And an older host's welcome: seat 1, a match length of 1, arena hash 0,
+const V1_HELLO := [NetProtocol.VERSION, 1, 1, 0, 0, 0, 1, 0x78]
+## And a lookless host's welcome: seat 1, a match length of 1, arena hash 0,
 ## which is what StubSim answers to.
-const V1_WELCOME := [1, 2, 1, 1, 0, 0, 0, 0]
+const V1_WELCOME := [NetProtocol.VERSION, 2, 1, 1, 0, 0, 0, 0]
+## A build from before the sword catch: protocol 1.
+const PRE_CATCH_HELLO := [1, 1, 1, 0, 0, 0, 1, 0x78]
 
 var _host_look := {"figure": "heroine", "outfit": "saffron", "accent": "pale",
 	"hair": "gold", "skin": "sand"}
@@ -101,7 +103,7 @@ func test_each_side_gets_the_others_look_before_it_is_seated() -> void:
 	guest.shutdown()
 
 
-func test_an_older_guest_is_seated_and_shown_as_the_default() -> void:
+func test_a_lookless_guest_is_seated_and_shown_as_the_default() -> void:
 	var ends := LoopbackTransport.pair()
 	var old_guest: LoopbackTransport = ends[1]
 	var heard := _record(old_guest)
@@ -118,11 +120,11 @@ func test_an_older_guest_is_seated_and_shown_as_the_default() -> void:
 
 	var welcomes := heard.filter(
 		func(m: Dictionary) -> bool: return m.get("type") == NetProtocol.Type.WELCOME)
-	assert_gt(welcomes.size(), 0, "the older guest was welcomed")
+	assert_gt(welcomes.size(), 0, "the lookless guest was welcomed")
 	host.shutdown()
 
 
-func test_an_older_host_seats_the_guest_and_is_shown_as_the_default() -> void:
+func test_a_lookless_host_seats_the_guest_and_is_shown_as_the_default() -> void:
 	var ends := LoopbackTransport.pair()
 	var old_host: LoopbackTransport = ends[0]
 	var heard := _record(old_host)
@@ -139,6 +141,20 @@ func test_an_older_host_seats_the_guest_and_is_shown_as_the_default() -> void:
 	assert_eq(guest.local_slot, 1, "in the seat it was given")
 	assert_eq(guest.remote_look, {}, "and draws the host as the default")
 	guest.shutdown()
+
+
+## A protocol-1 guest would step an empty hand's THROW differently. The host
+## must refuse it in the lobby rather than seat it and desync later.
+func test_a_guest_from_before_the_catch_is_refused() -> void:
+	var ends := LoopbackTransport.pair()
+	var old_guest: LoopbackTransport = ends[1]
+	var host := _session(_host_look)
+	host.start(ends[0], _sim(), true)
+	old_guest.send(PackedByteArray(PRE_CATCH_HELLO))
+	_poll([host], [old_guest])
+	assert_false(host.is_running(), "the host does not seat a protocol-1 guest")
+	assert_string_contains(host.status_detail, "different build")
+	host.shutdown()
 
 
 func test_a_look_that_will_not_read_does_not_stall_the_handshake() -> void:

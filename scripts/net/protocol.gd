@@ -18,17 +18,18 @@ extends RefCounted
 ##   SNAPSHOT  ~230 bytes  host -> client, every SNAPSHOT_INTERVAL frames
 ##   look      ~45 bytes   both ways, once, on the end of HELLO and WELCOME
 ##
-## VERSION is still 1 although HELLO and WELCOME grew a look. That is the one
-## kind of change that does not need a bump: the look is an optional block on
-## the END of a message, and a version-1 decoder reads HELLO and WELCOME up to
-## their last fixed field and never asks whether bytes follow. So an older
-## build reads a newer HELLO exactly as it always did and plays on, showing
-## its opponent in the seat's default; a newer build reads an older HELLO as
-## one with no look, which is the same answer. A bump would have refused that
-## match in the lobby, to protect a field neither side needs to duel. Anything
-## that changes a field the duel does depend on still bumps VERSION.
+## VERSION 2: the sword catch. An empty hand's THROW used to do nothing and now
+## opens the hands, so two builds either side of it step the same inputs into
+## different matches. They must not be seated together; the lobby says so
+## instead of the desync detector saying it in the second zone.
+##
+## The look on the end of HELLO and WELCOME did NOT need a bump of its own: it
+## is an optional block after the last fixed field, and a decoder of the same
+## version reads a message without one as "no look". So a lookless peer of this
+## version plays on and is drawn in its seat's default. Anything that changes a
+## field the duel depends on -- or, as here, what an input does -- bumps VERSION.
 
-const VERSION := 1
+const VERSION := 2
 
 enum Type {
 	## --- the duel ---

@@ -2,9 +2,10 @@ extends GutTest
 ## A player's look on the wire: the block HELLO and WELCOME may end with
 ## (scripts/net/protocol.gd, "a player's look").
 ##
-## Three things are held here. Every look there is crosses intact. An older
-## build's HELLO and WELCOME, which carry no look, still read -- as the
-## default -- and a newer one's still read the way an older build reads it.
+## Three things are held here. Every look there is crosses intact. A HELLO
+## and WELCOME that carry no look still read -- as the default -- and one with
+## a look begins with exactly the lookless bytes. A build before the sword
+## catch speaks protocol 1 and is refused outright (VERSION, protocol.gd).
 ## And nothing a peer can put in the block -- cut short, too long, too many
 ## fields, the wrong format, bytes that are not an id, plain noise -- fails the
 ## message it rides on, reaches past the buffer, or comes out as anything but
@@ -13,13 +14,15 @@ extends GutTest
 const BUILD := 1
 const NAME := "challenger"
 
-## A version-1 HELLO, written out by hand rather than by NetProtocol, so that
-## the encoder changing shape cannot quietly change this too: version 1, type
+## A lookless HELLO, written out by hand rather than by NetProtocol, so that
+## the encoder changing shape cannot quietly change this too: the version, type
 ## HELLO, build 1 as a little-endian u32, then the name as one length byte and
-## its bytes. This is what every build before the look sent.
-const V1_HELLO_HEAD := [1, 1, 1, 0, 0, 0, 10]
-## A version-1 WELCOME: seat 1, five zones, arena hash 0x04030201.
-const V1_WELCOME := [1, 2, 1, 5, 1, 2, 3, 4]
+## its bytes. This is what a peer that sends no look says.
+const V1_HELLO_HEAD := [NetProtocol.VERSION, 1, 1, 0, 0, 0, 10]
+## A lookless WELCOME: seat 1, five zones, arena hash 0x04030201.
+const V1_WELCOME := [NetProtocol.VERSION, 2, 1, 5, 1, 2, 3, 4]
+## What every build before the sword catch said hello with: protocol 1.
+const PRE_CATCH_HELLO := [1, 1, 1, 0, 0, 0, 1, 0x78]
 
 
 func _v1_hello() -> PackedByteArray:
@@ -104,37 +107,44 @@ func test_a_look_is_tens_of_bytes() -> void:
 	assert_lt(widest, 64, "the longest look is %d bytes, sent once" % widest)
 
 
-## --- an older peer, without the field ----------------------------------------
+## --- a peer without the field, and a build before the catch -----------------
 
-func test_without_a_look_hello_is_byte_for_byte_version_one() -> void:
+func test_without_a_look_hello_is_byte_for_byte_the_lookless_message() -> void:
 	assert_eq(NetProtocol.hello(BUILD, NAME), _v1_hello(), "no look, no block")
 	assert_eq(NetProtocol.welcome(1, 5, 0x04030201), PackedByteArray(V1_WELCOME),
 		"and WELCOME likewise")
-	assert_eq(NetProtocol.VERSION, 1,
-		"the version is unchanged, so an older build does not refuse the match")
 
 
-## A version-1 decoder reads HELLO and WELCOME up to their last fixed field and
-## no further. A newer message has to begin with exactly those bytes, so an
-## older build sees what it always saw and plays on, showing defaults.
-func test_a_look_rides_after_everything_an_older_build_reads() -> void:
+## The catch changed what an empty hand's THROW does, so a protocol-1 build
+## would step the same inputs into a different match. It must be refused.
+func test_a_build_from_before_the_catch_is_refused() -> void:
+	assert_eq(NetProtocol.VERSION, 2, "the catch bumped the protocol")
+	var hello := NetProtocol.decode(PackedByteArray(PRE_CATCH_HELLO))
+	assert_true(hello.has("error"), "a protocol-1 HELLO does not read")
+	assert_eq(hello.get("version"), 1, "and says which version it was")
+
+
+## A decoder reads HELLO and WELCOME up to their last fixed field and only
+## then asks whether a look follows. A message with a look has to begin with
+## exactly the lookless bytes, so the look stays an optional tail.
+func test_a_look_rides_after_everything_a_lookless_message_holds() -> void:
 	var hello := NetProtocol.hello(BUILD, NAME, _chosen().to_ids())
 	var welcome := NetProtocol.welcome(1, 5, 0x04030201, _chosen().to_ids())
 	assert_gt(hello.size(), _v1_hello().size(), "the HELLO carries more")
 	assert_eq(hello.slice(0, _v1_hello().size()), _v1_hello(),
-		"and begins with a version-1 HELLO")
+		"and begins with the lookless HELLO")
 	assert_gt(welcome.size(), V1_WELCOME.size(), "the WELCOME carries more")
 	assert_eq(welcome.slice(0, V1_WELCOME.size()), PackedByteArray(V1_WELCOME),
-		"and begins with a version-1 WELCOME")
+		"and begins with the lookless WELCOME")
 
 
-func test_an_older_peers_messages_read_as_the_default_look() -> void:
+func test_a_lookless_peers_messages_read_as_the_default_look() -> void:
 	var hello := NetProtocol.decode(_v1_hello())
-	assert_false(hello.has("error"), "an older HELLO still reads")
+	assert_false(hello.has("error"), "a lookless HELLO still reads")
 	assert_false(hello.has("look_error"), "and is not a bad look, just none")
 	assert_eq(hello.get("look"), {}, "with no look")
 	var welcome := NetProtocol.decode(PackedByteArray(V1_WELCOME))
-	assert_false(welcome.has("error"), "an older WELCOME still reads")
+	assert_false(welcome.has("error"), "a lookless WELCOME still reads")
 	assert_eq(welcome.get("look"), {}, "with no look")
 	assert_true(CharacterLook.from_ids(hello["look"]).equals(CharacterLook.new()),
 		"which is the prince")
@@ -154,7 +164,7 @@ func test_a_truncated_look_drops_the_look_and_keeps_the_message() -> void:
 		if cut < fixed:
 			leaked += 0 if message.has("error") else 1
 		elif cut == fixed:
-			assert_eq(message.get("look"), {}, "cut at the look: an older HELLO")
+			assert_eq(message.get("look"), {}, "cut at the look: a lookless HELLO")
 		else:
 			assert_false(message.has("error"), "cut at %d still a HELLO" % cut)
 			assert_eq(message.get("look"), {}, "cut at %d drops the whole look" % cut)

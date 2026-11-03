@@ -263,31 +263,22 @@ file by (`scripts/net/protocol.gd`, `_get_look`):
   able to do with it. The reason is kept in `remote_look_error` and logged.
 - Once seated, later `HELLO`s cannot change the look.
 
-**Versions.** The protocol version stays **1**. A version-1 decoder reads
-`HELLO` and `WELCOME` up to their last fixed field and never asks whether bytes
-follow, and a message without a look is byte for byte a version-1 message. So
-the look is the one kind of change that needs no bump: an older build reads a
-newer `HELLO` or `WELCOME` exactly as it always did and plays on, showing its
-opponent as the seat's default; a newer build reads an older one as a message
-with no look, which is the same answer. Bumping would have refused that match
-in the lobby to protect a field neither side needs to duel. Anything that
-changes a field the duel depends on still bumps the version. A future change to
-the look itself bumps the look's own format byte, which an older build reads as
-"no look".
+**Versions.** The protocol version is **2**, bumped for the sword catch. The
+catch changed what an empty hand's THROW does without changing a byte on the
+wire, so a protocol-1 build and this one would seat each other and diverge the
+first time an empty hand pressed throw. Now the HELLO is refused and the lobby
+says the other phone runs a different build.
 
-The catch did not bump the version either, and that is a gap rather than an
-argument. Its snapshot has the same shape, so nothing in the handshake tells a
-build that has the catch from one that does not. Two such builds would agree
-until an empty hand pressed throw, and then the desync detector would say so,
-mid-match. The catch changes what the duel does with the bytes it already
-sends, which by the rule above is a bump. It was left out of the catch's change
-only because `scripts/net/` was being changed in parallel; it is listed under
-*Not handled yet*.
+The look on the end of `HELLO` and `WELCOME` needed no bump of its own: it is an
+optional block after the last fixed field, and a message without one reads as
+"no look". A lookless peer of the same version plays on and is drawn in its
+seat's default. A future change to the look itself bumps the look's own format
+byte, which this build reads as "no look".
 
 `tests/unit/test_net_look_wire.gd` holds the encoding — every look round-trips,
-an older build's bytes, truncation at every length, noise —
-`tests/unit/test_net_look_session.gd` the handshake against an older peer and a
-bad look, `tests/unit/test_duel_seats_distinct.gd` the seat colour on every
+lookless bytes, a protocol-1 HELLO refused, truncation at every length, noise —
+`tests/unit/test_net_look_session.gd` the handshake against a lookless peer, a
+pre-catch guest and a bad look, `tests/unit/test_duel_seats_distinct.gd` the seat colour on every
 received look, and `tests/net_live.sh` checks that a chosen look crosses a real
 socket and the relay, and that a guest sending none is seated as the default.
 
@@ -416,7 +407,7 @@ duel through real sockets, direct and relayed, then judges what they wrote. It
 is the only check that the transport, the relay, the room codes and the
 handshake work as a system rather than individually. Each peer sends a
 different look and must report the other's arriving intact, and a third round
-seats a guest that sends no look at all, as an older build does.
+seats a guest that sends no look at all.
 
 The looks' own tests are GUT tests, because nothing in them steps a match:
 `tests/unit/test_net_look_wire.gd` and `tests/unit/test_net_look_session.gd`.
@@ -464,11 +455,6 @@ Honestly, and in roughly the order I would fix them.
   pulling it down each frame instead. On the strip's flat, axis-aligned tiles
   the two agree, and the tests say so, but a sloped or stepped zone would want
   snapping put back — deterministically, inside `_move()`.
-- **A change of rules is not refused in the lobby.** The handshake compares the
-  protocol version and the strip, and nothing else. A build with the catch and
-  one without it will seat each other and diverge the first time an empty hand
-  presses throw. Bumping `NetProtocol.VERSION`, or sending a rules revision in
-  `HELLO`, is the fix (see *Versions* above).
 - **Replayed frames ring their presentation again.** `NetSession` re-steps
   corrected frames without setting the match's `replaying`, so a corrected kill
   or catch fires its signal twice. The catch guards itself in `match_scene.gd`

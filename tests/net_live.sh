@@ -13,8 +13,8 @@
 #   1. DIRECT    one peer listens on a port, the other dials it
 #   2. RELAY     both peers dial the relay; one opens a room, the other joins
 #                by the four-letter code the first one printed
-#   3. OLDER     direct again, with a guest that sends no look -- byte for byte
-#                the HELLO of a build from before the looks
+#   3. LOOKLESS  direct again, with a guest that sends no look -- byte for byte
+#                the HELLO this build sends when it has no look to send
 #
 # In the first two, each peer sends a different chosen look in the handshake,
 # and each must report the other's arriving intact: over a socket, and through
@@ -175,7 +175,7 @@ sed -n 's/^/       /p' "$WORK/relay.log" | grep -E "room|peer" | head -8
 
 echo
 if [ "$fail" -eq 0 ]; then
-  echo "PASS  net_live  (two processes: direct, relayed, and an older guest)"
+  echo "PASS  net_live  (two processes: direct, relayed, and a lookless guest)"
 else
   echo "FAIL  net_live"
   for n in direct_host direct_guest room_host room_guest old_host old_guest; do
