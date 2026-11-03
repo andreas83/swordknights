@@ -201,6 +201,7 @@ route, round it yourself.
 | Settings | `scripts/ui/settings_panel.gd` |
 | Wardrobe | `scripts/ui/wardrobe_screen.gd`, `scripts/ui/figure_preview.gd`, `scenes/wardrobe.tscn` |
 | Level HUD, title and chapter cards, pause/complete overlay | `scripts/ui/hud.gd` |
+| The dawn's words | `scripts/campaign/ending_card.gd`, over `scripts/campaign/dawn_frame.gd` |
 | Touch controls | `scripts/ui/touch_controls.gd`, `scripts/ui/touch_surface.gd` |
 | Duel HUD | `scripts/duel/match_hud.gd` |
 
@@ -424,10 +425,16 @@ the caption out of SWORD's reach — SWORD sits 110 units in from the right and
 against — so no tap on a row is also a tap on a button. Seven rows at 14
 units leave room for the two captions above the rail at 180 units tall.
 
-The ending card (`scripts/campaign/ending_card.gd`) is DAWN over THE SUN
-REMEMBERS, set in the reserved band like a level card. It holds for a second
-and a half before jump, sword or a tap returns to the chapter select: a card a
-held jump skips is a card nobody saw.
+After the last entry comes the dawn: one still lit from the east
+(`DawnFrame`, `docs/world.md`, "The dawn"), held, with DAWN over THE SUN
+REMEMBERS set on it in the reserved band like a chapter card
+(`scripts/campaign/ending_card.gd`). The picture is seen alone first; the
+title comes up at `EndingCard.WORDS_AT` (1.2 s) and the epigraph a second
+later, and their cast shadow falls down and to the **left**, the one place
+in the interface it does, because the light does. There is no scrim: the
+picture is the point. It holds for `EndingCard.HOLD` (3.4 s) before jump,
+sword or a tap returns to the chapter select: a card a held jump skips is a
+card nobody saw, and this one is the last.
 
 ### Wardrobe
 

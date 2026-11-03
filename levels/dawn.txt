@@ -1,0 +1,39 @@
+; Dawn
+;
+; The one frame of The Last Light lit from the east (docs/campaign.md,
+; "Decided by the owner"): the still after the Eclipse, under DAWN and THE
+; SUN REMEMBERS. Not a level to play -- nothing here is reachable or meant
+; to be -- but a level file all the same, so the frame is dressed, cast and
+; shaded by exactly the renderer that draws every chapter.
+;
+; IT IS WRITTEN MIRRORED. The rows below are the frame as the shadow solve
+; sees it, with the sun where the solve always has it, in the west; DawnFrame
+; shows it reflected, which puts the sun in the east. The atlas and the
+; prince are drawn lit from the west too, so reflecting the whole frame is
+; what lets one solve, one atlas and one figure agree that the light comes
+; from the right -- a mask mirrored on its own would light the stones from
+; one side and throw their shadows from the other. Read a row right to left
+; to see it as the player will.
+;
+; Dressed by its author alone (`;! dress authored`): the rules would put a
+; colonnade and a foreground archway into a picture whose subject is one
+; figure on an empty floor. The doorway in the west wall is the one he came
+; up out of, the Vault's door to the dawn.
+;
+; No `;! time`: the reach is the afternoon's three tiles, and the grade is
+; the dawn's own (DawnFrame).
+;! dress authored
+                        ####      
+                        ####      
+                        ####      
+                        ####      
+                        ####      
+                        ####      
+                        ####      
+                        ####      
+                        #  #      
+                        #  #      
+      bbbbb    @        #A #      
+      ############################
+##################################
+##################################

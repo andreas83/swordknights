@@ -16,7 +16,8 @@ extends Node2D
 ##   player has pressed anything, so quitting from the complete screen keeps
 ##   the clear.
 ## - **Jump goes on.** `Game.advance` plays the next entry behind the wipe,
-##   JUMP TO CONTINUE; after the last it is JUMP TO DAWN and the ending card;
+##   JUMP TO CONTINUE; after the last it is JUMP TO DAWN and the dawn's frame
+##   with the ending's words over it (DawnFrame, EndingCard);
 ##   and when the next entry is not built yet, JUMP TO CHAPTERS returns to the
 ##   chapter select, where it waits marked "still being built".
 ## - **Each chapter opens on its card**: numeral, name and epigraph from the
@@ -39,6 +40,7 @@ var progress: CampaignProgress
 
 var _game: Game
 var _ending: EndingCard
+var _dawn: DawnFrame
 
 
 func _ready() -> void:
@@ -54,6 +56,11 @@ func game() -> Game:
 
 func ending() -> EndingCard:
 	return _ending
+
+
+## The dawn's frame, while it is shown; null otherwise.
+func dawn() -> DawnFrame:
+	return _dawn
 
 
 func _build() -> void:
@@ -109,17 +116,14 @@ func _advance() -> void:
 		_leave()
 
 
+## The dawn: the one frame lit from the east, with the ending's words over
+## it (DawnFrame), and from it back to the chapter select.
 func _show_ending() -> void:
-	var layer := CanvasLayer.new()
-	layer.name = "Ending"
-	var sky := ParallaxSky.new()
-	sky.seed_value = 0xa17e5
-	sky.dusk = 0.0
-	layer.add_child(sky)
-	_ending = EndingCard.new()
+	_dawn = DawnFrame.new()
+	_dawn.name = "Dawn"
+	add_child(_dawn)
+	_ending = _dawn.card
 	_ending.done.connect(_leave)
-	layer.add_child(_ending)
-	add_child(layer)
 
 
 func _clear_game() -> void:

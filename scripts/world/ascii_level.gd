@@ -44,7 +44,9 @@ const DIRECTIVE_MARKER := ";!"
 ## Directive names something reads. A name not here is reported, so a typo in
 ## a header is a problem and not silently nothing. Add a name when you add its
 ## reader.
-const DIRECTIVES: Array[String] = ["mark", "time", "channel", "horizon", "checkpoints"]
+const DIRECTIVES: Array[String] = [
+	"mark", "time", "channel", "horizon", "checkpoints", "dress",
+]
 ## The modes a channel can be given (ChannelBus).
 const CHANNEL_MODES: Array[String] = ["momentary", "latch", "hold", "beat"]
 
@@ -268,6 +270,9 @@ func _read_directive(line: String, number: int) -> void:
 		"checkpoints":
 			if args.size() != 1 or not args[0] in ["x", "route"]:
 				problems.append("line %d: checkpoints are ordered by 'x' or 'route'" % number)
+		"dress":
+			if args.size() != 1 or args[0] != "authored":
+				problems.append("line %d: a level is dressed 'authored' or by the rules" % number)
 		"time":
 			if args.size() != 1:
 				problems.append("line %d: a time is one stop or one number" % number)

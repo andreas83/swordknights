@@ -86,6 +86,12 @@ a tell drawn in `LIGHT` that dims at dusk is a death that cannot be read, so
 the grade falls on the city and not on what you fight. An afternoon level gets
 no `WorldGrade` at all — the game as it always looked.
 
+The campaign's sky carries one landmark the hour reaches like every other
+building: the Mirror Tower (`ParallaxSky.tower`, `docs/campaign.md`, "The
+presentation, as built"). Its tone is taken from the band behind its crown —
+a step toward ink while that band has light in it, a step up out of the ink
+once it has none — because any fixed tone matches some hour's sky exactly.
+
 `tools/screenshot.gd --level <file> --time <stop>` plays any level at any hour
 without editing it, which is how a chapter is judged at its stop:
 
@@ -93,6 +99,46 @@ without editing it, which is how a chapter is judged at its stop:
 xvfb-run -a godot --path . --rendering-driver opengl3 --script tools/screenshot.gd -- \
   --level res://levels/level_01.txt --time dusk --out /tmp/dusk --shots 3,5.5 --hold move_right
 ```
+
+## The dawn: one frame lit from the east
+
+The owner decided that the frame after the Eclipse is the one time in the
+game the sun is in the east, "with a mirrored shadow solve made once"
+(`docs/campaign.md`, "Decided by the owner"). It is `DawnFrame`
+(`scripts/campaign/dawn_frame.gd`) over `levels/dawn.txt`.
+
+**What is mirrored is the whole frame, not the mask.** The atlas is drawn lit
+from the west — gold down the west edge of every column, the west reveal of
+every arch — and so is the prince (`PlayerArt`: "the lit plane is always the
+world-left side of the body"). A mask solved from the east over that art
+would throw every shadow one way from stones lit the other, and the frame
+would read as wrong without anyone being able to say why. So:
+
+1. `levels/dawn.txt` is written **mirrored**: its rows are the frame as the
+   solve sees it, sun in the west. Its header says so; read a row right to
+   left to see it as the player will.
+2. `Level` builds and dresses it, and `SunShadow` solves it **once**, at load,
+   exactly as it solves every chapter. Nothing in the solve changed.
+3. The world node is reflected (`scale.x = -1`), and the shader is told by
+   giving it a negative width (`level_px.x = -width`, `mask_origin.x` the
+   reflected edge): `x` on screen is `width − x` in the mask, and the shader
+   itself is untouched.
+
+On screen every shadow then falls down and to the **left**, every column
+carries its gold on its east edge, and the swordknight — standing at the
+spawn mark, facing west in the file — faces the sunrise with his lit side
+toward it. His long shadow along the floor is the one thing drawn by hand: a
+body 22 px tall on the sun's lane of two across for one down casts 44 px, and
+it is drawn as the floor's cap going to its shade twin, which is what the
+solve does to a floor under any standing caster. The sky is in its own
+`CanvasLayer` and is not reflected; `ParallaxSky.east` mirrors the disc (and
+the Mirror Tower) about the middle of the view instead. Even the words cast
+their shadow to the left (`EndingCard.light_from_east`).
+
+`tests/unit/test_dawn_frame.gd` reads the mask back through the reflection
+and finds the floor west of the doorway wall shaded and the floor east of it
+lit, and — so that it cannot pass by reading a mask with no shade in it —
+solves the same stone unreflected and finds the opposite.
 
 ## Shade twins
 
@@ -330,6 +376,13 @@ comment. `;` stays the only comment marker; `#` is still a solid tile.
 | `checkpoints x\|route` | what "further on" means for a torch | `Game`'s forward-only rule |
 | `channel <name> <mode> …` | what a wire does (below) | `ChannelBus`, the reach model |
 | `mark <glyph> <kind> [key=value …]` | `glyph` places an entity of `kind` here, with these parameters | `AsciiLevel` |
+| `dress authored` | dressed with the level's own marks and nothing else: no rule adds a colonnade, an arcade, a foreground piece or a room mood | `WorldDresser` |
+
+`dress authored` is for a frame composed shot by shot rather than a level
+played through. The rules exist because nobody composes every screen of a
+170-column ruin; a still that *is* one composition — the dawn's — would have
+them put a colonnade and a foreground archway into a picture whose subject is
+one figure on an empty floor (*The dawn*, below).
 
 `AsciiLevel.DIRECTIVES` lists the names something reads. A name that is not
 there is a *problem*, like a malformed line or a glyph in no legend; problems
@@ -534,5 +587,12 @@ no mechanism is proved exactly as it always was.
   symmetric level is dressed symmetrically.
 - `tests/unit/test_room_moods.gd` — the props plane: where a prop may sit,
   that rooms differ, determinism, and mirrored arenas.
+- `tests/unit/test_dawn_frame.gd` — the dawn: shade west of what casts it,
+  the disc in the east, the swordknight facing it, the frame dressed by its
+  author alone.
+- `tests/unit/test_mirror_tower.gd` — the Mirror Tower in the campaign's sky:
+  only ever nearer, reached at Chapter IV, a tone apart from the sky behind
+  its crown at every hour and every distance; `tests/unit/test_duel_sky.gd` —
+  none of it in the duel's sky or any other scene's.
 - `tools/world_debug.gd` — not a test. Dumps a level's dressing and shadow mask
   for inspection.

@@ -1,19 +1,29 @@
 class_name EndingCard
 extends Control
-## The card after the last entry of The Last Light: DAWN, and under it THE SUN
-## REMEMBERS (Campaign.ENDING), in the level card's own place and cuts -- the
-## reserved band, a display line, a rule, a line of micro (docs/ui.md).
+## The words after the last entry of The Last Light: DAWN, and under it THE
+## SUN REMEMBERS (Campaign.ENDING), in the level card's own place and cuts --
+## the reserved band, a display line, a rule, a line of text (docs/ui.md).
 ##
-## Only the words. The dawn itself -- the kept sun rising out of the Well and
-## the one frame lit from the right -- is the epilogue's, and lands in front
-## of this card when it is built. Jump, sword or a tap returns to the chapter
-## select, but not before HOLD: a card that a held jump skips is a card
-## nobody saw.
+## Only the words; the picture under them is DawnFrame's. They come up after
+## the picture has been seen on its own (WORDS_AT), the epigraph a beat after
+## the title, as a chapter card's does (Hud.show_card()). Jump, sword or a tap
+## returns to the chapter select, but not before HOLD: a card that a held
+## jump skips is a card nobody saw, and this one is the last.
 
 signal done()
 
-## Seconds before anything dismisses it.
-const HOLD := 1.5
+## Seconds the picture is held alone before the title is set on it.
+const WORDS_AT := 1.2
+## And the epigraph after the title.
+const EPIGRAPH_AT := 2.2
+const FADE := 0.6
+## Seconds before anything dismisses it: the epigraph has come up and been
+## read.
+const HOLD := 3.4
+
+## The dawn's light is from the east, so the words cast their shadow to the
+## left, as everything else in the frame does (docs/ui.md, "The light").
+var light_from_east := false
 
 var _time := 0.0
 var _left := false
@@ -56,22 +66,36 @@ func _draw() -> void:
 	var view := get_viewport_rect().size
 	if view.x <= 0.0:
 		return
-	draw_rect(Rect2(Vector2.ZERO, view), Palette.with_alpha(Palette.INK, 0.35))
 	var band := UiLayout.banner(view)
-	var cx := band.position.x + band.size.x * 0.5
-	var fade := clampf(_time / 0.6, 0.0, 1.0)
+	var cx := roundf(band.position.x + band.size.x * 0.5)
+	var title := clampf((_time - WORDS_AT) / FADE, 0.0, 1.0)
+	var line := clampf((_time - EPIGRAPH_AT) / FADE, 0.0, 1.0)
 	var top := band.position.y + 6.0
-	UiFont.draw_text(self, String(Campaign.ENDING["title"]).to_upper(), Vector2(cx, top),
-		UiFont.Cut.DISPLAY, Palette.with_alpha(Palette.PAPER, fade), UiFont.Align.CENTER, 0.85)
-	var rule_y := top + UiFont.cap(UiFont.Cut.DISPLAY) + 6.0
-	UiMarks.rule(self, Vector2(cx, rule_y), minf(band.size.x * 0.3, 64.0),
-		Palette.with_alpha(Palette.LIGHT_SOFT, 0.8 * fade))
-	UiFont.draw_text(self, String(Campaign.ENDING["epigraph"]).to_upper(),
-		Vector2(cx, rule_y + 7.0), UiFont.Cut.MICRO,
-		Palette.with_alpha(Palette.LIGHT, fade), UiFont.Align.CENTER, 0.6)
+	_text(String(Campaign.ENDING["title"]).to_upper(), Vector2(cx, top), UiFont.Cut.DISPLAY,
+		Palette.with_alpha(Palette.PAPER, title), 0.75 * title)
+	var rule_y := top + UiFont.cap(UiFont.Cut.DISPLAY) + 8.0
+	var open := clampf((_time - WORDS_AT) / 0.15, 0.0, 1.0)
+	UiMarks.rule(self, Vector2(cx, rule_y), roundf(minf(band.size.x * 0.3, 64.0) * open),
+		Palette.with_alpha(Palette.LIGHT_SOFT, 0.8 * title))
+	_text(String(Campaign.ENDING["epigraph"]).to_upper(), Vector2(cx, rule_y + 10.0),
+		UiFont.Cut.TEXT, Palette.with_alpha(Palette.PAPER, 0.92 * line), 0.8 * line)
 	if can_leave():
 		var hint := UiFont.fit(PackedStringArray([
 			"JUMP TO RETURN TO THE CHAPTERS", "JUMP TO RETURN",
 		]), UiLayout.content(view).size.x, UiFont.Cut.MICRO)
-		UiFont.draw_text(self, hint, Vector2(cx, UiLayout.rail(view) + 1.0), UiFont.Cut.MICRO,
-			Palette.with_alpha(Palette.PAPER, 0.66), UiFont.Align.CENTER)
+		_text(hint, Vector2(cx, UiLayout.rail(view) + 1.0), UiFont.Cut.MICRO,
+			Palette.with_alpha(Palette.PAPER, 0.66), 0.6)
+
+
+## Centred type with its cast: down and to the right under the afternoon's
+## sun, as UiFont.draw_text casts it, and down and to the left at dawn.
+func _text(text: String, at: Vector2, cut: UiFont.Cut, colour: Color, shadow: float) -> void:
+	if colour.a <= 0.0:
+		return
+	if not light_from_east:
+		UiFont.draw_text(self, text, at, cut, colour, UiFont.Align.CENTER, shadow)
+		return
+	var cast := Vector2(-UiMarks.CAST.x, UiMarks.CAST.y)
+	UiFont.draw_text(self, text, at + cast, cut, Palette.with_alpha(Palette.INK, shadow),
+		UiFont.Align.CENTER)
+	UiFont.draw_text(self, text, at, cut, colour, UiFont.Align.CENTER)

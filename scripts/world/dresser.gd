@@ -51,6 +51,16 @@ static func dress(level: AsciiLevel) -> Dictionary:
 	var reserved := _reserved_cells(level)
 
 	_place_authored(level, mid, fore)
+	# A frame composed by hand says so with `;! dress authored`, and is
+	# dressed with its own marks and nothing else. The rules are for levels
+	# nobody composed shot by shot; a still that is a single composition --
+	# the dawn's (levels/dawn.txt) -- would have them put a colonnade and a
+	# foreground archway into a picture whose subject is one figure on an
+	# empty floor.
+	if dressed_by_author(level):
+		_resolve_runs(mid, "column_shaft", "column_cap", "column_base")
+		_resolve_runs(fore, "fore_cloth", "fore_cloth", "fore_cloth_tail")
+		return {"mid": mid, "fore": fore, "props": {}}
 	# Authored marks are the floor plan; the rules fill in around them.
 	# The two planes keep separate books, which is the point of having two:
 	# a foreground column is supposed to stand in front of a balustrade.
@@ -93,6 +103,12 @@ static func dress(level: AsciiLevel) -> Dictionary:
 		_mirror_plane(fore, level.cols)
 		_mirror_plane(props, level.cols)
 	return {"mid": mid, "fore": fore, "props": props}
+
+
+## Whether `level` asks to be dressed with its own marks only.
+static func dressed_by_author(level: AsciiLevel) -> bool:
+	var args: PackedStringArray = level.directive("dress").get("args", PackedStringArray())
+	return args.size() == 1 and args[0] == "authored"
 
 
 static func _is_mirror_symmetric(level: AsciiLevel) -> bool:
