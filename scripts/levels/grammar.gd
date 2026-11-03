@@ -37,6 +37,8 @@ const WATER := "~"
 const LADDER := "H"
 const BACKDROP := ":"
 const EMPTY := " "
+const SEAL_FALSE := "%"
+const SEAL_CRACKED := "&"
 
 const SPAWN := "@"
 const RELIC := "*"

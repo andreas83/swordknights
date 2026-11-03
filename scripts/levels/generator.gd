@@ -63,11 +63,21 @@ static func build(seed_value: int, length: int, difficulty: float) -> Dictionary
 	var reasons := PackedStringArray()
 
 	for attempt: int in MAX_ATTEMPTS:
-		var composed := _compose(sub_seed(seed_value, attempt), target, diff, seed_value)
+		var stream := sub_seed(seed_value, attempt)
+		var composed := _compose(stream, target, diff, seed_value)
 		var level := AsciiLevel.new()
 		level.parse(String(composed["text"]))
 
 		var report := LevelReachability.verify(level)
+		# A secret has its own proof (LevelReachability.audit_secrets): never
+		# the way, never a trap. One that fails it is left out rather than
+		# costing the level, which was sound before the secret was carved.
+		if bool(report["ok"]) and not level.secrets.is_empty() \
+				and not bool(LevelReachability.audit_secrets(level)["ok"]):
+			composed = _compose(stream, target, diff, seed_value, false)
+			level = AsciiLevel.new()
+			level.parse(String(composed["text"]))
+			report = LevelReachability.verify(level)
 		if bool(report["ok"]):
 			return {
 				"ok": true,
@@ -112,7 +122,7 @@ static func sub_seed(seed_value: int, attempt: int) -> int:
 ## --- composition -----------------------------------------------------------
 
 static func _compose(stream_seed: int, target: int, difficulty: float,
-		display_seed: int) -> Dictionary:
+		display_seed: int, with_secret: bool = true) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = stream_seed
 
@@ -131,6 +141,7 @@ static func _compose(stream_seed: int, target: int, difficulty: float,
 		x += int(spec["width"])
 
 	var placed := _place_entities(canvas, beats, marks, rng, difficulty)
+	placed["secrets"] = _place_secret(canvas, beats, placed, stream_seed) if with_secret else 0
 	# Two words and no seed: Hud.show_title draws this across a 320 px
 	# viewport at 15 px with letter spacing, and a ten-digit seed on the end
 	# runs off both sides of the screen. The seed is on screen for the whole
@@ -306,6 +317,98 @@ static func _place_entities(canvas: LevelGrammar.Canvas, beats: Array[Dictionary
 	return {"spawn": spawn, "exit": exit, "entities": placed, "counts": counts}
 
 
+## --- secrets ---------------------------------------------------------------
+##
+## Roughly one ruin in three or four hides a secret room. The place for it is
+## one the grammar already makes: a terrace that steps down by three or more
+## leaves a sheer face over the lower floor, solid all the way back under the
+## terrace it fell from. The room is carved into that solid at the lower floor's
+## height, with its doorway in the face.
+##
+## That spot is chosen because it is behind the player. Walking off the upper
+## terrace, nobody turns to press into the wall they just dropped past — the
+## way on is ahead — so the doorway is found by someone who looked back and
+## saw the bricked-up arch, not by someone running for the exit. And because
+## the ground under a terrace is solid to the bedrock, a room cut into it has
+## stone on every side by construction.
+##
+## The pass draws from its own rng, seeded off the attempt's stream: a level
+## without a secret is byte for byte the level it was before secrets existed,
+## so every seed in docs/level-generation.md still builds what it describes.
+## Placement is checked against the canvas cell by cell rather than trusted
+## from the beat's numbers, and LevelReachability.audit_secrets() has the last
+## word in build().
+
+## Chance that a ruin with somewhere to put a secret gets one.
+const SECRET_CHANCE := 0.8
+## Interior columns behind the doorway, at most. Two is the least that holds a
+## relic with the character beside it.
+const SECRET_ROOM := 3
+## How far the face must drop: the room is two rows tall and needs a row of
+## ceiling under the terrace it is cut beneath.
+const SECRET_DROP := 3
+
+
+## Carves at most one secret into `canvas`. Returns how many it carved.
+static func _place_secret(canvas: LevelGrammar.Canvas, beats: Array[Dictionary],
+		placed: Dictionary, stream_seed: int) -> int:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([stream_seed, "secret"])
+	var spots: Array[Dictionary] = []
+	for spec: Dictionary in beats:
+		var spot := _secret_spot(canvas, spec)
+		if not spot.is_empty():
+			spots.append(spot)
+	if spots.is_empty() or rng.randf() > SECRET_CHANCE:
+		return 0
+	var spot: Dictionary = spots[rng.randi_range(0, spots.size() - 1)]
+	var seal := LevelGrammar.SEAL_FALSE if rng.randf() < 0.5 else LevelGrammar.SEAL_CRACKED
+	var face: int = spot["face"]
+	var floor_row: int = spot["row"]
+	var width: int = spot["width"]
+	for y: int in [floor_row - 1, floor_row]:
+		canvas.set_cell(face, y, seal)
+		for x: int in range(face - width, face):
+			canvas.set_cell(x, y, LevelGrammar.BACKDROP)
+	var prize := Vector2i(face - width, floor_row)
+	canvas.set_cell(prize.x, prize.y, LevelGrammar.RELIC)
+	(placed["entities"] as Array).append({"kind": "relic", "cell": prize})
+	var counts: Dictionary = placed["counts"]
+	counts["relic"] = int(counts["relic"]) + 1
+	return 1
+
+
+## Where a secret could go in this beat, or `{}`: `{face, row, width}`, with
+## `face` the doorway's column and `row` the room's floor-level row.
+static func _secret_spot(canvas: LevelGrammar.Canvas, spec: Dictionary) -> Dictionary:
+	if String(spec["id"]) != "terrace":
+		return {}
+	var entry: int = spec["entry"]
+	var exit: int = spec["exit"]
+	if entry - exit < SECRET_DROP:
+		return {}
+	var x0: int = spec["x"]
+	var width: int = spec["width"]
+	var tail: int = clampi(int(spec["params"]["tail"]), 1, width - 1)
+	var face := x0 + width - tail - 1
+	var row := LevelGrammar.stand_row(exit)
+	var room := mini(SECRET_ROOM, face - x0)
+	if room < 2:
+		return {}
+	# Carved only out of solid: the doorway, the room, a wall behind it, a
+	# floor under it and a ceiling over it.
+	for y: int in range(row - 2, row + 2):
+		for x: int in range(face - room - 1, face + 1):
+			if canvas.get_cell(x, y) != LevelGrammar.SOLID:
+				return {}
+	# And a floor in front of the doorway to stand on, with headroom.
+	if canvas.get_cell(face + 1, row) != LevelGrammar.EMPTY \
+			or canvas.get_cell(face + 1, row - 1) != LevelGrammar.EMPTY \
+			or canvas.get_cell(face + 1, row + 1) != LevelGrammar.SOLID:
+		return {}
+	return {"face": face, "row": row, "width": room}
+
+
 static func _glyph_for(kind: String) -> String:
 	match kind:
 		"relic":
@@ -353,6 +456,7 @@ static func _render(canvas: LevelGrammar.Canvas, beats: Array[Dictionary],
 	lines.append(";   ^  spikes       ~  water               :  background niche")
 	lines.append(";   @  spawn        *  relic               D  exit door")
 	lines.append(";   t  torch        p  patrol guard        space/. empty")
+	lines.append(";   %  false wall   &  cracked wall        (seals of a secret room)")
 	lines.append(";")
 	lines.append("; Vertical spacing comes out of scripts/core/tuning.gd:")
 	lines.append(";   %d-tile rise -> plain hop" % LevelGrammar.hop_rise())
@@ -362,9 +466,9 @@ static func _render(canvas: LevelGrammar.Canvas, beats: Array[Dictionary],
 		% LevelGrammar.max_gap_tiles())
 	lines.append(";")
 	var counts: Dictionary = placed["counts"]
-	lines.append("; %d columns, %d beats, relics %d, guards %d, difficulty %.2f."
+	lines.append("; %d columns, %d beats, relics %d, guards %d, secrets %d, difficulty %.2f."
 		% [canvas.cols, beats.size(), int(counts["relic"]), int(counts["patrol"]),
-			difficulty])
+			int(placed.get("secrets", 0)), difficulty])
 	lines.append("; Verified solvable by scripts/levels/reachability.gd before it")
 	lines.append("; was written out — spawn to exit over walks, jumps, falls, ledge")
 	lines.append("; grabs, ladders and drop-throughs.")

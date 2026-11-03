@@ -264,6 +264,37 @@ about 200 ms on a 170-column ruin. None of the shipping or generated levels
 has a stranded cell today, so the shut level is only searched cell by cell
 when an open one turns one up.
 
+### Where Endless hides one
+
+After the beats are stamped and the entities placed, `_place_secret()` looks
+for a terrace that steps down by `SECRET_DROP` (3) or more: the step leaves a
+sheer face over the lower floor, solid all the way back under the terrace.
+The room is carved into that solid at the lower floor's height — two rows,
+up to `SECRET_ROOM` (3) columns back, a relic at the far end — with the seal,
+false or cracked at even odds, in the face. Every cell is checked on the
+canvas: the carve is all solid, there is a wall behind it, a floor under it, a
+ceiling over it, and an open floor with headroom in front of the doorway.
+
+The doorway is behind the player: walking off the upper terrace, the way on
+is ahead, so the face is found by someone who looked back.
+
+Three properties hold it together:
+
+- **Its own rng.** The pass draws from `hash([stream_seed, "secret"])`, so a
+  ruin with a secret is, cell for cell, the ruin the seed built before secrets
+  existed, and every seed in the table below still means what it says.
+- **The proof has the last word.** `build()` runs `audit_secrets()` on a
+  verified candidate with a secret; one that fails is recomposed without it
+  rather than costing the level.
+- **Sometimes.** With `SECRET_CHANCE` at 0.8, about 29% of ruins hide one
+  (35 of 120 across 40 seeds at three difficulties when it was tuned), cracked
+  and false in roughly equal measure.
+
+`tests/unit/test_secret_generator.gd` pins all of it: some ruins hide one and
+none hides two, every one passes the proof, the doorway is in a face over the
+lower floor with the room behind it and a relic in it, nothing outside the
+secret moved, and the same seed hides the same secret.
+
 ## The 60 Hz detail
 
 Worth knowing about, because it bit this code and will bite the next change.
@@ -366,6 +397,7 @@ godot --headless --path . --script tests/level_solvability_test.gd
 | `level_difficulty_test` | the vocabulary gate, hazard and guard density, gap and rise sizes, both ends of the dial playable |
 | `level_solvability_test` | 240 seeds across four lengths and six difficulties, independently re-verified |
 | `unit/test_secret_proof.gd` | the secret audit on the Sun Terrace, and one broken level per clause |
+| `unit/test_secret_generator.gd` | where Endless hides a secret, and that it moves nothing else |
 
 `tests/level_asserts.gd` is the shared helper. It is `preload`ed rather than
 registered with `class_name`, so it cannot collide with a real test framework

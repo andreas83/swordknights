@@ -95,8 +95,8 @@ The city keeps **secret rooms** behind bricked-up doorways. Look for the
 outline of an arch filled in with smaller stones: air moving through its
 joints means you can walk through it; a crack shedding grit means your sword
 can open it, and a cracked floor gives under a plunge. The Sun Terrace hides
-three and the complete screen counts them. None is ever the way to the door,
-and none can trap you.
+three, the complete screen counts them, and some Endless ruins hide one. None
+is ever the way to the door, and none can trap you.
 
 **Endless** is a descent: each ruin you escape leads down into a new one, a
 step harder, from a gentle first ruin up to the generator's hardest. The ruin
