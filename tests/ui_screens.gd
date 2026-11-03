@@ -65,6 +65,7 @@ func _catalogue() -> Array[Dictionary]:
 	var all: Array[Dictionary] = [
 		{"name": "menu", "scene": "res://scenes/menu.tscn", "pose": ""},
 		{"name": "menu_touch", "scene": "res://scenes/menu.tscn", "pose": "touch"},
+		{"name": "menu_update", "scene": "res://scenes/menu.tscn", "pose": "update"},
 		{"name": "settings", "scene": "res://scenes/menu.tscn", "pose": "settings"},
 		{"name": "hud_title", "scene": "res://scenes/game.tscn", "pose": "title"},
 		{"name": "hud_hurt", "scene": "res://scenes/game.tscn", "pose": "hurt"},
@@ -100,6 +101,17 @@ func _pose(shot: Dictionary) -> void:
 			var surface := _stage.get_node_or_null(^"TouchControls/Surface")
 			if surface != null:
 				surface.visible = true
+		"update":
+			# A dev build that has been superseded, with the thumbs up so the
+			# plaque is seen next to the pause and mute buttons it must clear.
+			var thumbs := _stage.get_node_or_null(^"TouchControls/Surface")
+			if thumbs != null:
+				thumbs.visible = true
+			if _stage.has_method("offer_update"):
+				_stage.offer_update({
+					"code": 158, "name": "0.1.0-dev+4f2c9e1", "sha": "4f2c9e1",
+					"date": "", "apk_url": "https://example.invalid/swordknights-dev.apk",
+				})
 		"settings":
 			var panel := _stage.get_node_or_null(^"SettingsPanel")
 			if panel != null:

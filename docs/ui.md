@@ -219,6 +219,26 @@ settings page). When the on-screen stick is up, a sword button covers the right
 end of that rail, so the hint moves to the left end and says less — the buttons
 are lettered and are the instruction at that point.
 
+**The update plaque.** A development build (and only one: see
+[`docs/ci.md`](ci.md#the-dev-channel-one-tap-updates-on-the-phone)) asks the
+dev channel's `version.json` whether it has been superseded. If it has, a
+plaque hangs from the centre of the lintel reading `UPDATE AVAILABLE · BUILD n`
+in MICRO, in the light colour, between two lozenges. It sits there because the
+top centre is the only place on this screen that is neither the list nor a
+touch button, and the only place wide enough for the whole phrase at 320 units;
+`MenuScene.PLAQUE_CLEARANCE` keeps it clear of the pause and mute buttons, and
+`UiFont.fit()` shortens it to `UPDATE · BUILD n` or `BUILD n` if a screen is
+too narrow. It is hung from the architecture rather than floated as a toast,
+so it reads as part of the place.
+
+It is the one thing on the title screen that is **touched** rather than chosen
+with the stick: it is not a way into the game and does not belong in the list
+the stick walks. Its touch target reaches `PLAQUE_TOUCH` (24) units below the
+top of the safe area — about 9 mm on a phone held sideways — and overlaps the
+top of the title, which is not touchable, rather than shrinking. Only the touch
+event counts, not the mouse click Godot emulates from it, so one tap opens the
+browser once. `tests/unit/test_menu_update.gd` holds both properties.
+
 ### The HUD answers
 
 A count that silently changes in the corner is a count nobody saw change. So
@@ -265,6 +285,11 @@ touch mute button — is on screen immediately.
 The panel takes its director through an injected `audio` property rather than
 reaching for the global, so `tests/ui_layout_test.gd` can drive it with a stub
 and not touch the real mixer or write to `user://`.
+
+Under the list, small and dim, is the running build: its version name, build
+number and commit (`0.1.0-DEV+4F2C9E1 · BUILD 57`; a build nobody stamped says
+`LOCAL`). It is on this page and not the title screen because only someone
+reporting a bug needs it, and they will look for it where the settings are.
 
 Volume is a ten-cell gauge, and a step snaps to the grid. Driven by the same
 four actions as the menu: up/down to choose, left/right to set, jump to

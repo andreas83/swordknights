@@ -16,8 +16,16 @@ extends Control
 ## Driven by the same four actions as the menu, so a keyboard, a gamepad and
 ## the on-screen stick all work: up/down to choose, left/right to set, jump to
 ## confirm, sword to go back.
+##
+## Under the list, small and dim, the build that is running: its name, build
+## number and commit. Here rather than on the title screen because only the
+## person reporting a bug needs it, and they will look for it where the
+## settings are; the title screen's lintel is kept for the one notice that
+## needs to be seen, a newer build.
 
 signal closed()
+
+const BuildStamp := preload("res://scripts/core/build_stamp.gd")
 
 const REPEAT_DELAY := 0.22
 const REPEAT_FIRST := 0.42
@@ -60,6 +68,11 @@ func _ready() -> void:
 
 func rows() -> Array[Dictionary]:
 	return _rows
+
+
+## The running build, as this page prints it.
+func build_line() -> String:
+	return DevUpdate.running_label(BuildStamp.NAME, BuildStamp.CODE, BuildStamp.SHA)
 
 
 func index() -> int:
@@ -201,6 +214,12 @@ func _draw() -> void:
 	var list_top := top + 40.0
 	for i: int in _rows.size():
 		_draw_row(_rows[i], column, list_top + i * ROW_HEIGHT, i == _index)
+
+	var build := UiFont.fit(PackedStringArray([
+		build_line(), "BUILD %d" % BuildStamp.CODE,
+	]), content.size.x, UiFont.Cut.MICRO)
+	UiFont.draw_text(self, build, Vector2(cx, list_top + _rows.size() * ROW_HEIGHT + 4.0),
+		UiFont.Cut.MICRO, Palette.with_alpha(Palette.PAPER, 0.42), UiFont.Align.CENTER, 0.5)
 
 	# On the same course of stone the title screen cuts its hint into.
 	var hint := UiFont.fit(PackedStringArray([
