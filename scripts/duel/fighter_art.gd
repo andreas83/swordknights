@@ -5,8 +5,8 @@ extends Node2D
 ## Deliberately literal: the body is the hurtbox, the sword is the blade rect,
 ## a dropped sword is the loose blade rect. A duel is decided by where those
 ## three rectangles are, so the art that shows them is the art that teaches the
-## game — and it means a filmstrip of a clash (docs/duel-combat.png) is a
-## picture of the simulation rather than an illustration of it.
+## game — and it means a filmstrip of a clash would be a picture of the
+## simulation rather than an illustration of it.
 ##
 ## Flat polygons from scripts/core/palette.gd, no image assets, parent origin
 ## at the feet, exactly as scripts/player/player_art.gd works.

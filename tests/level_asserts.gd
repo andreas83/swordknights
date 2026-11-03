@@ -80,6 +80,10 @@ func _fail(message: String) -> void:
 
 ## True when the suite passed. Prints the one line a CI log should carry.
 func report() -> bool:
+	# A suite that checked nothing has measured nothing; it must not pass.
+	if checks == 0:
+		printerr("%s: no checks ran" % _suite)
+		return false
 	if failures > 0:
 		printerr("%s: %d failure(s) in %d checks" % [_suite, failures, checks])
 		return false

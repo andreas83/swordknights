@@ -28,7 +28,7 @@ extends RefCounted
 
 
 ## --- the ASCII legend, mirrored from scripts/world/tiles.gd ----------------
-## tests/level_grammar_test.gd asserts these still mean what we think they do.
+## tests/level_envelope_test.gd asserts these still mean what we think they do.
 
 const SOLID := "#"
 const PLATFORM := "="

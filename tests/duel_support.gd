@@ -113,6 +113,11 @@ func equal(actual: Variant, expected: Variant, what: String) -> bool:
 
 ## Returns the process exit code and prints the verdict.
 func report(suite: String) -> int:
+	# A suite that checked nothing has measured nothing. That is the failure
+	# CLAUDE.md names, and it must not print PASS.
+	if checks == 0:
+		print("FAIL  %s  (no checks ran)" % suite)
+		return 1
 	if failures.is_empty():
 		print("PASS  %s  (%d checks)" % [suite, checks])
 		return 0

@@ -91,12 +91,20 @@ harness (`net_live.gd`), and renderers for documentation images
 (`character_poses.gd`, `feel_frames.gd`, `ui_screens.gd`). A new file that is
 none of those and matches neither convention is a test nobody runs.
 
-A green suite is not evidence on its own. This repository has produced three
-distinct "silently green" failures (GUT exiting 0 with zero tests; a script
-failing to load so assertions never ran; suites named so the runner never found
-them). Each is now a guard in `run_tests.sh` or in the test itself. **When you
-find a fourth, add a guard — do not just fix the symptom.** A test that
-measures nothing must fail.
+A green suite is not evidence on its own. This repository has produced five
+distinct ways of being green while testing nothing, and each is now a guard:
+
+| Failure | Guard |
+| --- | --- |
+| GUT exits 0 having run zero tests | `run_tests.sh` requires a JUnit report with tests in it |
+| A script fails to load, so a scene runs without it | `run_tests.sh` fails on `SCRIPT ERROR`; `test_audio_front_door.gd` |
+| A suite is named so the runner never finds it | the two naming conventions above |
+| Every check in a suite is skipped, and it prints PASS | `report()` in the support files fails on zero checks |
+| A comment names a test or doc that does not exist | `test_references_resolve.gd` |
+
+**When you find a sixth, add a guard — do not just fix the symptom.** A test
+that measures nothing must fail, and a guard is only trusted once it has been
+seen to fail: break the thing on purpose and watch it go red.
 
 ## Style
 
@@ -118,11 +126,13 @@ match that.
 | --- | --- |
 | `docs/architecture.md` | layers, timestep, collision, the input seam |
 | `docs/art-direction.md` | the look-and-feel thesis every visual change answers to |
+| `docs/world.md` | cast shadows, shade twins, architecture dressed onto terrain |
 | `docs/character.md` | pose vocabulary, secondary motion, the feel lab |
 | `docs/feel.md` | camera beats, hitstop, the wipe, haptics |
 | `docs/ui.md` | the Alcazar typeface, safe areas, variable width |
 | `docs/duel-spec.md` | the Nidhogg duel spec, plus three engineering objections to it |
 | `docs/duel-combat.md` | how a duel frame resolves: matrix, clash, parry, disarm window |
+| `docs/duel-match.md` | the tug-of-war: initiative, zones, respawn, gore, open items |
 | `docs/level-generation.md` | segment grammar, reachability proof |
 | `docs/netplay.md` | host-authoritative prediction and reconciliation over WebSocket |
 | `docs/audio.md` | synthesis, buses, adding a voice |
