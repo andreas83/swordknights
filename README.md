@@ -147,7 +147,10 @@ xvfb-run -a godot --path . --rendering-driver opengl3 \
 | [`docs/architecture.md`](docs/architecture.md) | layers, fixed timestep, collision, the input seam |
 | [`docs/art-direction.md`](docs/art-direction.md) | the look-and-feel thesis: one low sun, cast shadows, hard edges |
 | [`docs/character.md`](docs/character.md) | pose vocabulary, secondary motion, the feel lab |
+| [`docs/feel.md`](docs/feel.md) | camera beats, hitstop, the wipe, haptics |
+| [`docs/ui.md`](docs/ui.md) | the Alcazar typeface, safe areas, variable width |
 | [`docs/duel-spec.md`](docs/duel-spec.md) | the Nidhogg duel specification, with three engineering objections |
+| [`docs/duel-combat.md`](docs/duel-combat.md) | how a duel frame resolves: matrix, clash, parry, disarm window |
 | [`docs/level-generation.md`](docs/level-generation.md) | segment grammar and the reachability proof |
 | [`docs/netplay.md`](docs/netplay.md) | host-authoritative prediction and reconciliation |
 | [`docs/audio.md`](docs/audio.md) | synthesis, buses, adding a voice |

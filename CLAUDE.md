@@ -85,8 +85,11 @@ far side.
 
 **New tests should be GUT.** Both naming conventions are load-bearing: a file
 matching neither is silently skipped, which loses the coverage *and* leaves the
-build green. `tests/net_live.gd`, `tests/duel_support.gd`, `tests/level_asserts.gd`
-and `tests/character_poses.gd` are helpers, deliberately not matching either.
+build green. These match neither on purpose — support libraries
+(`duel_support.gd`, `fighter_support.gd`, `level_asserts.gd`), a live network
+harness (`net_live.gd`), and renderers for documentation images
+(`character_poses.gd`, `feel_frames.gd`, `ui_screens.gd`). A new file that is
+none of those and matches neither convention is a test nobody runs.
 
 A green suite is not evidence on its own. This repository has produced three
 distinct "silently green" failures (GUT exiting 0 with zero tests; a script
@@ -116,7 +119,10 @@ match that.
 | `docs/architecture.md` | layers, timestep, collision, the input seam |
 | `docs/art-direction.md` | the look-and-feel thesis every visual change answers to |
 | `docs/character.md` | pose vocabulary, secondary motion, the feel lab |
+| `docs/feel.md` | camera beats, hitstop, the wipe, haptics |
+| `docs/ui.md` | the Alcazar typeface, safe areas, variable width |
 | `docs/duel-spec.md` | the Nidhogg duel spec, plus three engineering objections to it |
+| `docs/duel-combat.md` | how a duel frame resolves: matrix, clash, parry, disarm window |
 | `docs/level-generation.md` | segment grammar, reachability proof |
 | `docs/netplay.md` | host-authoritative prediction and reconciliation over WebSocket |
 | `docs/audio.md` | synthesis, buses, adding a voice |
