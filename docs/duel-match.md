@@ -295,8 +295,8 @@ Headless, on the real fighter, at most three minutes a match:
 | --- | --- |
 | the closing bot of `tests/match_net_test.gd`, made to run for its gate when it leads; 20 seeds a level | EASY won 7, MEDIUM 17, HARD 20 |
 | the same in the suite, 10 seeds a level | EASY 5, MEDIUM 8, HARD 10 |
-| itself, 10 seeds a pairing | every match finished: EASY–EASY in 1,004 frames on average, MEDIUM–MEDIUM in 2,398 (longest 6,207), HARD–HARD in 3,197 (longest 8,917); HARD beat EASY 10 times in 10 and MEDIUM 8 |
-| a scripted human (the determinism suites' input stream), 12 seeds a level | the computer won every match; the hands killed EASY 6 times, MEDIUM 6, HARD 2 |
+| itself, 10 seeds a pairing | every match finished: EASY–EASY in 1,004 frames on average, MEDIUM–MEDIUM in 2,057 (longest 4,988), HARD–HARD in 3,145 (longest 8,917); HARD beat EASY 10 times in 10 and MEDIUM 8 |
+| a scripted human (the determinism suites' input stream), 12 seeds a level | the computer won every match; the hands killed EASY 6 times, MEDIUM 8, HARD 2 |
 | the ground, across all of the above | no deaths |
 
 The suite holds HARD to eight wins in ten against the bot, EASY to losing some

@@ -184,8 +184,9 @@ static func safe_to_commit(strip: ZoneStrip, tuning: DuelTuning, me: DuelView.Bo
 
 
 ## Whether anything between `me` and `x`, along the floor, would kill a fighter
-## who walked it: the moat or the pit between two fighters is a reason to let
-## the other one do the crossing.
+## who walked it. The moat or the pit between two fighters is a reason to let
+## the other one do the crossing; one inside a roll's length is a reason not to
+## roll, since a roll cannot be steered and falls off whatever it reaches.
 static func gap_between(strip: ZoneStrip, me: DuelView.Body, x: float) -> bool:
 	var tile := float(ZoneStrip.TILE)
 	var row := _feet_row(me.position.y)

@@ -30,10 +30,12 @@ extends RefCounted
 ##   then, low by preference so the throw cannot be caught. Empty-handed it
 ##   snatches a throw out of the air, fetches a sword, or sweeps and stamps.
 ## - With the initiative it runs for its gate and does not fight: a respawn in
-##   its path is vaulted (a jump against a low blade, a roll under a high or
-##   middle one). Without it, it stands between the runner and their gate and
-##   waits for them on the open ground a respawn puts it on, thrusts low at a
-##   roller, and chases and throws at a runner who got past.
+##   its path is vaulted (a jump against a low blade, mostly a roll under a
+##   high or middle one), a chaser left inside its reach is out-rolled, and it
+##   stops short of a respawn about to appear in front of the gate. Without
+##   it, it stands between the runner and their gate and waits for them on the
+##   open ground a respawn puts it on, thrusts low at a roller, chases and
+##   throws at a runner who got past, and goes and gets one who stops coming.
 ## - Every step goes through DuelFeet, which knows the moat and the spikes.
 ##
 ## Fun rather than perfect: the levels differ in how late it sees, how much it
@@ -134,8 +136,8 @@ var _sword_seen := false
 var _seen := PackedInt32Array([1, 1, 1])
 ## Frames spent waiting for a runner who is not coming.
 var _waited := 0
-## Frames spent within reach of a living opponent without anyone dying. Patience
-## running out is what ends a standoff between two careful fighters.
+## Frames spent within ENGAGE of a living opponent without anyone dying.
+## Patience running out is what ends a standoff between two careful fighters.
 var _standoff := 0
 
 
@@ -162,6 +164,7 @@ func reset(seed_value: int) -> void:
 	_dodging = 0
 	_sword_seen = false
 	_seen = PackedInt32Array([1, 1, 1])
+	_waited = 0
 	_standoff = 0
 
 
@@ -500,8 +503,8 @@ func _dodge(view: DuelView, want: Want) -> bool:
 func _roll_room(view: DuelView) -> bool:
 	var me := view.me
 	var travel := view.tuning.roll_speed * DT * float(view.tuning.roll_frames)
-	var ahead := DuelFeet.scan(view.strip, view.tuning, me, me.facing)
-	return me.grounded and float(ahead["distance"]) > travel
+	var end := me.position.x + float(me.facing) * (travel + view.tuning.body_width)
+	return me.grounded and not DuelFeet.gap_between(view.strip, me, end)
 
 
 ## --- empty-handed ------------------------------------------------------------
@@ -552,10 +555,8 @@ func _fetch(view: DuelView, want: Want) -> void:
 func _stamp(view: DuelView, want: Want, dx: float) -> void:
 	var me := view.me
 	if me.grounded:
-		if absf(dx) > 24.0:
-			want.dir = _sign(dx, me.facing)
-		else:
-			want.dir = _sign(dx, me.facing)
+		want.dir = _sign(dx, me.facing)
+		if absf(dx) <= 24.0:
 			want.jump = DuelFeet.HOLD
 		return
 	want.dir = _sign(dx, 0) if absf(dx) > 3.0 else 0
@@ -633,8 +634,9 @@ func _respawning_ahead(view: DuelView, dir: int) -> bool:
 	return ahead > 0.0 and ahead < VAULT_LOOK + 10.0
 
 
-## Over a low blade, under a high or middle one, decided once per approach and
-## re-decided if the blade moves to the height that makes the choice wrong.
+## Over a low blade; under a high or middle one, mostly, and over it the rest of
+## the time, so the vault is not a certainty to wait for. Decided once per
+## approach, and re-decided if the blade drops to the height a roll dies to.
 func _vault_over(view: DuelView, want: Want, dir: int, d: float) -> void:
 	var them := view.them
 	var tuning := view.tuning
@@ -695,7 +697,7 @@ func _intercept(view: DuelView, want: Want) -> void:
 			return
 		_fence(view, want, coming)
 		return
-	# They got past. After them, and the sword after them first.
+	# They got past: after them, with a throw at their back if they are running.
 	_attack = -1
 	want.dir = toward
 	want.stance = _guard
