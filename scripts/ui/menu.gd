@@ -22,12 +22,18 @@ extends Control
 ## stick, because it is not a way into the game and should not sit in the list
 ## the stick walks. A release build never asks, so never shows it.
 
-const ROW_HEIGHT := 13.0
+## Twelve, not thirteen, since WARDROBE made it seven rows: at thirteen the
+## caption under the list landed on the rail. The selection band stays 13 tall
+## and overlaps its neighbours' gaps, which is invisible with one band drawn.
+const ROW_HEIGHT := 12.0
 const COLUMN_WIDTH := 104.0
 const REPEAT_DELAY := 0.26
 ## Depth of the lintel across the top, before its scalloped fringe.
 const LINTEL_HEIGHT := 9.0
 const SETTINGS_ID := "settings"
+## The figure editor. Like SOUND it is not a mode -- nothing is played there --
+## so it is a row of this menu rather than an entry in ModeRegistry.
+const WARDROBE_SCENE := "res://scenes/wardrobe.tscn"
 ## Horizontal room for the plaque's text either side of it. The touch pause and
 ## mute buttons, with their hit padding, take the top-right 52 units; the same
 ## is kept clear on the left so the plaque stays centred over the title.
@@ -111,6 +117,13 @@ func _build_rows() -> Array[Dictionary]:
 			"scene": String(mode["scene"]),
 			"enabled": bool(mode.get("available", true)),
 		})
+	out.append({
+		"id": "wardrobe",
+		"title": "WARDROBE",
+		"subtitle": "PRINCE OR HEROINE, AND WHAT THEY WEAR",
+		"scene": WARDROBE_SCENE,
+		"enabled": true,
+	})
 	out.append({
 		"id": SETTINGS_ID,
 		"title": "SOUND",
@@ -263,7 +276,7 @@ func _draw() -> void:
 	UiMarks.rule(self, Vector2(cx, title_top + UiFont.cap(UiFont.Cut.DISPLAY) + 7.0),
 		minf(view.x * 0.26, 76.0), Palette.with_alpha(Palette.LIGHT_SOFT, 0.8))
 
-	var list_top := title_top + 32.0
+	var list_top := title_top + 29.0
 	for i: int in _rows.size():
 		_draw_row(_rows[i], column, list_top + i * ROW_HEIGHT, i == _index)
 
@@ -369,27 +382,12 @@ func _draw_plaque(safe: Rect2, lintel: float, cx: float) -> void:
 		maxf(plate.end.y + 8.0, safe.position.y + PLAQUE_TOUCH))
 
 
-## The terrace rail you are standing behind. The nearest plane in the picture
-## and the only piece of foreground occlusion on this screen — which, per the
-## art direction, is worth more than any amount of ornament. Returns the y of
-## the rail's face, where the hint line is cut.
+## The terrace rail you are standing behind (UiMarks.balustrade). The nearest
+## plane in the picture and the only piece of foreground occlusion on this
+## screen — which, per the art direction, is worth more than any amount of
+## ornament. Returns the y of the rail's face, where the hint line is cut.
 func _draw_balustrade(view: Vector2) -> float:
-	var ink := Palette.with_alpha(Palette.INK, 0.9)
-	var top := UiLayout.rail(view) - 2.0
-	var rail := Rect2(0.0, top, view.x, 8.0)
-	draw_rect(rail, ink)
-	draw_rect(Rect2(rail.position, Vector2(view.x, 1.0)),
-		Palette.with_alpha(Palette.LIGHT_WARM, 0.55))
-
-	# Balusters, with the sky between them.
-	var step := 9.0
-	var x := roundf(fposmod(view.x * 0.5, step))
-	while x < view.x:
-		draw_rect(Rect2(x, rail.end.y, 4.0, view.y - rail.end.y), ink)
-		draw_rect(Rect2(x - 1.0, rail.end.y, 6.0, 2.0), ink)
-		x += step
-	draw_rect(Rect2(0.0, view.y - 4.0, view.x, 4.0), ink)
-	return rail.position.y + 2.0
+	return UiMarks.balustrade(self, view)
 
 
 func _draw_row(row: Dictionary, column: Rect2, y: float, selected: bool) -> void:

@@ -17,6 +17,9 @@ extends SceneTree
 ## try to run this as an assertion suite. tests/ui_layout_test.gd is the suite.
 
 const SETTLE_FRAMES := 6
+## Where the wardrobe shots keep their looks: never the real save, so a shot
+## does not change what someone plays as, nor depend on it.
+const WARDROBE_STORE := "user://ui_screens_wardrobe.cfg"
 
 var _out_dir := "user://ui"
 var _only := ""
@@ -73,6 +76,11 @@ func _catalogue() -> Array[Dictionary]:
 		{"name": "match", "scene": "res://scenes/duel_match.tscn", "pose": ""},
 		{"name": "match_flash", "scene": "res://scenes/duel_match.tscn", "pose": "flash"},
 		{"name": "match_over", "scene": "res://scenes/duel_match.tscn", "pose": "over"},
+		{"name": "wardrobe", "scene": "res://scenes/wardrobe.tscn", "pose": "prince"},
+		{"name": "wardrobe_heroine", "scene": "res://scenes/wardrobe.tscn",
+			"pose": "heroine"},
+		{"name": "wardrobe_two", "scene": "res://scenes/wardrobe.tscn", "pose": "two"},
+		{"name": "wardrobe_touch", "scene": "res://scenes/wardrobe.tscn", "pose": "touch"},
 	]
 	if _only == "":
 		return all
@@ -90,6 +98,9 @@ func _build(shot: Dictionary) -> void:
 		_index = _shots.size()
 		return
 	_stage = packed.instantiate()
+	if _stage is WardrobeScreen:
+		_stock_wardrobe(String(shot["pose"]))
+		(_stage as WardrobeScreen).store_path = WARDROBE_STORE
 	root.add_child(_stage)
 
 
@@ -112,6 +123,15 @@ func _pose(shot: Dictionary) -> void:
 					"code": 158, "name": "0.1.0-dev+4f2c9e1", "sha": "4f2c9e1",
 					"date": "", "apk_url": "https://example.invalid/swordknights-dev.apk",
 				})
+		"heroine":
+			var screen := _stage as WardrobeScreen
+			if screen != null and screen.index() == 0:
+				screen.move(1)
+				screen.move(1)
+		"two":
+			var screen := _stage as WardrobeScreen
+			if screen != null and screen.player() == Wardrobe.PLAYER_ONE:
+				screen.adjust(1)
 		"settings":
 			var panel := _stage.get_node_or_null(^"SettingsPanel")
 			if panel != null:
@@ -142,6 +162,20 @@ func _pose(shot: Dictionary) -> void:
 				hud.queue_redraw()
 		_:
 			pass
+
+
+## Writes the looks a wardrobe shot opens on: the heroine in a non-default dress
+## for player one, and the heroine for player two in the sea-green seat.
+func _stock_wardrobe(pose: String) -> void:
+	var wardrobe := Wardrobe.open(WARDROBE_STORE)
+	var one := CharacterLook.new()
+	if pose != "prince":
+		one.take_ids({"figure": "heroine", "accent": "gold", "hair": "raven", "skin": "amber"})
+	wardrobe.set_look(Wardrobe.PLAYER_ONE, one)
+	var two := CharacterLook.new()
+	two.take_ids({"figure": "heroine", "accent": "pale", "hair": "henna", "skin": "copper"})
+	wardrobe.set_look(Wardrobe.PLAYER_TWO, two)
+	wardrobe.save()
 
 
 func _capture(name: String) -> void:

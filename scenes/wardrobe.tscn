@@ -1,0 +1,23 @@
+[gd_scene load_steps=4 format=3]
+
+; The figure editor, reached from the title screen's WARDROBE row. The same sky
+; and touch controls as the menu, so the two read as one place; the previews
+; are added by scripts/ui/wardrobe_screen.gd.
+
+[ext_resource type="Script" path="res://scripts/ui/wardrobe_screen.gd" id="1_wardrobe"]
+[ext_resource type="Script" path="res://scripts/render/parallax_sky.gd" id="2_sky"]
+[ext_resource type="PackedScene" path="res://scenes/touch_controls.tscn" id="3_touch"]
+
+[node name="Wardrobe" type="Control"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_wardrobe")
+
+[node name="Sky" type="CanvasLayer" parent="."]
+layer = -10
+
+[node name="ParallaxSky" type="Node2D" parent="Sky"]
+script = ExtResource("2_sky")
+
+[node name="TouchControls" parent="." instance=ExtResource("3_touch")]

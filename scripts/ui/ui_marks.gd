@@ -156,3 +156,25 @@ static func gauge(into: CanvasItem, at: Vector2, cells: int, cell: Vector2,
 			continue
 		var body := Rect2(box.position + Vector2.ONE, box.size - Vector2(2.0, 2.0))
 		into.draw_rect(body, colour if active else Palette.with_alpha(colour, 0.55))
+
+
+## The terrace rail across the foot of a menu page, with balusters below it
+## and the sky between them. Shared by the title screen and the wardrobe, so
+## the two pages stand on the same stone and cut their hints into the same
+## course. Returns the y of the rail's face, where a hint line is cut.
+static func balustrade(into: CanvasItem, view: Vector2) -> float:
+	var ink := Palette.with_alpha(Palette.INK, 0.9)
+	var top := UiLayout.rail(view) - 2.0
+	var rail := Rect2(0.0, top, view.x, 8.0)
+	into.draw_rect(rail, ink)
+	into.draw_rect(Rect2(rail.position, Vector2(view.x, 1.0)),
+		Palette.with_alpha(Palette.LIGHT_WARM, 0.55))
+
+	var step := 9.0
+	var x := roundf(fposmod(view.x * 0.5, step))
+	while x < view.x:
+		into.draw_rect(Rect2(x, rail.end.y, 4.0, view.y - rail.end.y), ink)
+		into.draw_rect(Rect2(x - 1.0, rail.end.y, 6.0, 2.0), ink)
+		x += step
+	into.draw_rect(Rect2(0.0, view.y - 4.0, view.x, 4.0), ink)
+	return rail.position.y + 2.0

@@ -199,6 +199,7 @@ route, round it yourself.
 | --- | --- |
 | Title screen | `scripts/ui/menu.gd`, `scenes/menu.tscn` |
 | Settings | `scripts/ui/settings_panel.gd` |
+| Wardrobe | `scripts/ui/wardrobe_screen.gd`, `scripts/ui/figure_preview.gd`, `scenes/wardrobe.tscn` |
 | Level HUD, title card, pause/complete overlay | `scripts/ui/hud.gd` |
 | Touch controls | `scripts/ui/touch_controls.gd`, `scripts/ui/touch_surface.gd` |
 | Duel HUD | `scripts/duel/match_hud.gd` |
@@ -211,7 +212,7 @@ standing behind. The balustrade is the only piece of foreground occlusion on
 any screen and it is what makes the menu a place rather than a background.
 
 Only the selected mode shows its subtitle, in a fixed slot below the list, so
-moving the selection does not reflow anything. Five modes each with a caption
+moving the selection does not reflow anything. Seven rows each with a caption
 is a wall of small type.
 
 The hint line is cut into the rail (`UiLayout.rail(view)`, shared with the
@@ -308,6 +309,73 @@ Volume is a ten-cell gauge, and a step snaps to the grid. Driven by the same
 four actions as the menu: up/down to choose, left/right to set, jump to
 confirm, sword to go back.
 
+### Wardrobe
+
+`scripts/ui/wardrobe_screen.gd`, `scenes/wardrobe.tscn`: choose the figure each
+player plays — the prince or the heroine — and what it wears. Like SOUND it is
+not a mode, so it is a row of the title screen (`WARDROBE`) and not an entry in
+`ModeRegistry`; unlike SOUND it is its own scene, because it carries two live
+figures and the title screen should not.
+
+![the wardrobe at 320 units (player one, the heroine) and at 440 (player two, the sea-green seat)](wardrobe.png)
+
+Six rows on the left, the figure on the right:
+
+| Row | Choices | Notes |
+| --- | --- | --- |
+| FOR | PLAYER ONE, PLAYER TWO | one is the adventure, Endless, the feel lab and the crimson duel seat; two is the sea-green seat |
+| FIGURE | PRINCE, HEROINE | same body, same hitbox; only the look changes |
+| ROBE | CRIMSON, EMBER, SAFFRON, WINE | the adventure's; locked to SEA-GREEN for player two |
+| SASH | GOLD, PALE, FIRE, INK | sash and hood crest, or headband, belt and ribbon |
+| HAIR | RAVEN, CHESTNUT, HENNA, GOLD | the heroine's; HOODED for the prince |
+| SKIN | SAND, AMBER, COPPER, UMBER | the heroine's face; HOODED for the prince |
+
+Every option is a ramp of `Palette` steps, never a free colour: the figure
+has to keep its four tones against gold and crimson terrain, and a skin or
+hair tone from outside the palette would be the one thing in the frame not lit
+by the same sun (`CharacterLook`'s docstring argues it in full).
+
+**Rows that change nothing are shown dimmed and skipped**, not hidden, so the
+list does not reflow when the figure changes and the dimmed value says why the
+row is not there to change.
+
+**The preview** is the real figure — `FigurePreview` is a `PlayerArt` driven
+through the same body seam as `FighterArt`, posed by a clock instead of a
+`Player`, so it has no physics, no footstep audio and no dust — standing in a
+horseshoe arch with the parallax sky behind it. It cycles idle, run, jump,
+fall, land, swing and hang, at three times its size (a whole multiple, so the
+edges stay hard) and again at its true size on the sill outside the arch,
+because that is the size that has to read.
+
+**Touch.** Driven by the same four actions as every page — up/down to choose,
+left/right to change, jump to step forward, sword or pause to go back — so the
+stick works. Rows can also be tapped: the left half of a value steps it back,
+the right half forward. The list is on the **left** because the JUMP and SWORD
+buttons own the bottom right; `tests/unit/test_wardrobe_screen.gd` asserts no
+row's hit rectangle reaches a thumb button's. A tap holds the stick off for a
+moment, since the same thumb has just started a stick. With the thumbs up, the
+caption under the list keeps to the list's width, clear of JUMP.
+
+**Saving.** Every change is written at once to `user://wardrobe.cfg`
+(`scripts/player/wardrobe.gd`), as ids rather than positions. A missing file,
+a file that does not parse, an unknown id or a value of the wrong type falls
+back to the default for exactly what is missing — the prince, as the game drew
+him before there was a wardrobe. `tests/unit/test_wardrobe_save.gd` holds the
+round trip and each of those fallbacks. The page takes its file through an
+injected `store_path`, so tests and `tests/ui_screens.gd` never touch the real
+one.
+
+**The duel's seats stay apart.** In a duel the robe's three planes are always
+the seat's team colour, put on after the look (`FighterArt.dress`) and again
+when the art binds to its fighter; and no choosable colour belongs to either
+team, so seat one can never carry teal and seat two never crimson.
+`tests/unit/test_duel_seats_distinct.gd` walks all 512 looks for both seats.
+Online, each phone shows its own seat in player one's look and the other seat
+in the default (`docs/netplay.md`).
+
+The title screen's row pitch went from 13 to 12 units to make room for the
+seventh row: at 13 the caption under the list landed on the rail.
+
 ### Touch
 
 `scripts/ui/touch_controls.gd` lays its buttons out against `UiLayout.safe()`.
@@ -327,9 +395,16 @@ different typeface.
 
 ```sh
 # One frame per interface state, including the ones you cannot reach by
-# playing: pause, settings, a finished match.
+# playing: pause, settings, a finished match, the wardrobe as the heroine
+# and as player two (wardrobe_heroine, wardrobe_two, wardrobe_touch).
 xvfb-run -a godot --path . --rendering-driver opengl3 \
   --script tests/ui_screens.gd -- --out /tmp/ui/after --window 1280x720
+
+# The wardrobe live, as it opens on the saved look (`--resolution 1760x720`
+# for 440 units wide).
+xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1280x720 \
+  --script tools/screenshot.gd -- --scene res://scenes/wardrobe.tscn \
+  --out /tmp/wardrobe --shots 0.8,2.4
 
 # The same at a wide-phone aspect: a 440x180 canvas.
 xvfb-run -a godot --path . --rendering-driver opengl3 \

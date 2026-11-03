@@ -124,6 +124,22 @@ with JUMP, SWORD and THROW on the right. On a desktop the online duel uses the
 single-player keys above, with `Q` / `L` or R1 to throw. A relay room joins
 players on different networks; see [`docs/netplay.md`](docs/netplay.md).
 
+## The prince, the heroine and the wardrobe
+
+Two figures are playable: the hooded prince and the heroine — bare-headed,
+with a braid, a belted knee-length tunic and two sash ribbons where he has a
+cloak. They are the same body: the same moves, the same hitbox, the same
+reach. **WARDROBE** on the title screen chooses the figure and a few palette
+colours (robe, sash, hair, skin) for player one, who is the adventure, Endless
+and the crimson duel seat, and for player two, the sea-green seat. The choice
+is saved on the device. In a duel the robe always takes the seat's colour, so
+the two seats stay crimson and sea-green whatever either player wears. Online,
+each phone shows its own player in their look and the opponent in their
+seat's default. See [`docs/character.md`](docs/character.md) and
+[`docs/ui.md`](docs/ui.md).
+
+![The wardrobe: the heroine for player one, and player two in the sea-green seat](docs/wardrobe.png)
+
 ## Project layout
 
 ```
@@ -131,10 +147,11 @@ project.godot          written by tools/configure_project.gd, not by hand
 scripts/
   core/      palette, tuning, boot, game controller, mode registry
   world/     ASCII level parser, tilemap level node
-  player/    character state machine, input seam, character art
+  player/    character state machine, input seam, character art, the
+             heroine's costume, saved looks
   entities/  relic, exit door, torch, patrol guard
   render/    follow camera, procedural parallax skyline
-  ui/        HUD, menu, touch controls
+  ui/        HUD, menu, wardrobe, touch controls
   audio/     synthesis, mixer autoload, character sounds, music
   levels/    segment grammar, generator, reachability verifier
   duel/      the tug-of-war duel: fighter, combat, zones, match, camera, HUD
@@ -219,7 +236,7 @@ xvfb-run -a godot --path . --rendering-driver opengl3 \
 | [`docs/architecture.md`](docs/architecture.md) | layers, fixed timestep, collision, the input seam |
 | [`docs/art-direction.md`](docs/art-direction.md) | the look-and-feel thesis: one low sun, cast shadows, hard edges |
 | [`docs/world.md`](docs/world.md) | cast shadows, shade twins, architecture dressed onto terrain |
-| [`docs/character.md`](docs/character.md) | pose vocabulary, secondary motion, the feel lab |
+| [`docs/character.md`](docs/character.md) | pose vocabulary, secondary motion, the heroine's costume, the feel lab |
 | [`docs/feel.md`](docs/feel.md) | camera beats, hitstop, the wipe, haptics |
 | [`docs/ui.md`](docs/ui.md) | the Alcazar typeface, safe areas, variable width |
 | [`docs/duel-spec.md`](docs/duel-spec.md) | the Nidhogg duel specification, with three engineering objections |
@@ -240,8 +257,9 @@ Working: tilemap world with solid, one-way, ladder and hazard tiles; the full
 ground/air/ledge character state machine with coyote time, jump buffering,
 variable jump height and apex float; sword and stomp attacks; relics, exits
 and patrol guards; dead-zone follow camera; procedural parallax skyline; HUD;
-keyboard, gamepad and touch input; mode menu; build, test and release
-pipeline; procedural level generation with a reachability proof; procedural
+keyboard, gamepad and touch input; mode menu; two playable figures (the
+prince and the heroine) with a wardrobe that saves each player's look; build,
+test and release pipeline; procedural level generation with a reachability proof; procedural
 audio — synthesised sound effects, an Andalusian music loop with an intensity
 parameter, and persisted volume and mute settings; a two-player duel on the
 *Nidhogg* model — one hit kills, three sword stances that clash or kill,
