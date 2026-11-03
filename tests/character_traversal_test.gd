@@ -54,6 +54,13 @@ func _initialize() -> void:
 		_finish()
 		return
 	_game = packed.instantiate() as Game
+	if _game == null:
+		# An instantiate() that returns the wrong type almost always means the
+		# scene's script failed to compile, in which case the scene comes up
+		# without it and every property below would read as null.
+		_fail("%s instantiated without its Game script — did a dependency fail to compile?" % LAB)
+		_finish()
+		return
 	root.add_child(_game)
 
 
@@ -61,6 +68,9 @@ func _initialize() -> void:
 ## so the bot is installed on the first tick instead. One frame of the default
 ## input before it takes over does nothing: the character starts at rest.
 func _setup() -> bool:
+	if _game == null:
+		_fail("the lab scene was never instantiated")
+		return false
 	_player = _game.player
 	_level = _game.level
 	if _player == null or _level == null:
@@ -123,8 +133,16 @@ func _report() -> void:
 		_fail("the bot never reached the exit")
 
 
+## A traversal test that measured nothing must not pass. The bot needs real
+## seconds of simulation to clear eight stations, so an elapsed time near zero
+## means the run never started — which is a failure, not a fast success.
+const MIN_PLAY_SECONDS := 2.0
+
+
 func _finish() -> void:
 	_done = true
+	if _elapsed < MIN_PLAY_SECONDS:
+		_fail("only %.2fs of play — the run never started" % _elapsed)
 	if _failures > 0:
 		printerr("character_traversal_test: %d failure(s)" % _failures)
 		quit(1)

@@ -110,16 +110,32 @@ echo
 echo "Running ${#standalone[@]} standalone SceneTree test(s)..."
 standalone_failed=()
 
+# A test's own exit status is not enough to trust it. A script that fails to
+# COMPILE still runs: Godot instantiates the scene without its script, every
+# property reads as null, the assertions never execute and the test quit(0)s
+# reporting success. character_traversal_test did exactly that -- it claimed
+# to drive the character through the feel lab for a day without ever loading
+# it, because an autoload name is not resolvable at compile time under
+# `--script`.
+#
+# So a compile or load failure is a test failure regardless of exit status.
+# Verified that no passing test in this repository emits these lines.
+FATAL_OUTPUT='SCRIPT ERROR|Failed to load script|Compile Error|Parse Error'
+
 for script in "${standalone[@]}"; do
 	echo
 	echo "  --- ${script}"
-	if "$GODOT" --headless --path . --script "res://${script}" 2>&1 |
+	output="$("$GODOT" --headless --path . --script "res://${script}" 2>&1)"
+	status=$?
+	printf '%s\n' "$output" |
 		grep -vE '^\[|DONE|^Godot Engine v|^Free and open source|^\s*$' |
-		sed 's/^/      /'; then
-		: # pipeline status is grep's; the real status comes from PIPESTATUS
-	fi
-	if [[ "${PIPESTATUS[0]}" -ne 0 ]]; then
+		sed 's/^/      /'
+
+	if [[ $status -ne 0 ]]; then
 		echo "      FAILED"
+		standalone_failed+=("$script")
+	elif grep -qE "$FATAL_OUTPUT" <<<"$output"; then
+		echo "      FAILED (reported success, but the engine could not load a script)"
 		standalone_failed+=("$script")
 	else
 		echo "      ok"
