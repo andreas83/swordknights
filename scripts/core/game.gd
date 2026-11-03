@@ -67,6 +67,9 @@ var _guards_down: Dictionary = {}
 # Guards the current swing has already wounded, by instance id. Cleared when a
 # new swing starts. See _resolve_guard().
 var _struck: Dictionary = {}
+# --- secrets --- the level's secret rooms: what opens them, what is in them,
+# how many are found. See scripts/world/secret_keeper.gd.
+var secrets := SecretKeeper.new()
 
 
 func _ready() -> void:
@@ -94,6 +97,10 @@ func _ready() -> void:
 	player.healed.connect(func(_h: int) -> void: _update_hud())
 	player.died.connect(_on_died)
 	player.plunge_landed.connect(_on_plunge_landed)
+	# --- secrets ---
+	secrets.setup(level, player)
+	secrets.furnish(_entities)
+	secrets.found.connect(_on_secret_found)
 
 	camera.setup(player, level.world_size())
 	sky.camera = camera
@@ -196,6 +203,12 @@ func _overlay_subtitle() -> String:
 			return "PAUSE TO RESUME  ·  SWORD TO QUIT"
 		Phase.COMPLETE:
 			var next := "DESCEND" if advance.is_valid() else "REPLAY"
+			# --- secrets --- counted only where there are any to count, and
+			# then the prompt takes a line of its own: all four will not fit
+			# across a phone held in landscape.
+			if secrets.total > 0:
+				return "%d/%d RELICS  ·  SECRETS %d/%d  ·  %.1fs\nJUMP TO %s" % [
+					relics, relics_total, secrets.count, secrets.total, elapsed, next]
 			return "%d/%d RELICS  ·  %.1fs  ·  JUMP TO %s" % [
 				relics, relics_total, elapsed, next]
 		_:
@@ -255,6 +268,7 @@ func _resolve_interactions() -> void:
 
 	var attack := player.attack_rect()
 	var has_attack := attack.size.x > 0.0
+	secrets.resolve(player) # --- secrets ---
 
 	for node: Node in _entities.get_children():
 		if node is Relic and body.intersects((node as Relic).bounds()):
@@ -360,7 +374,9 @@ func _restart() -> void:
 	for node: Node in _entities.get_children():
 		node.queue_free()
 	_guards_down.clear()
+	secrets.reseal() # --- secrets --- behind the wipe, like the rest
 	_spawn_entities(level.data)
+	secrets.furnish(_entities)
 	checkpoint = level.spawn_world_position()
 	deaths = 0
 	player.respawn(checkpoint)
@@ -370,6 +386,21 @@ func _restart() -> void:
 	_impact_cooldown = 0.0 # --- feel/flow (additive) ---
 	_set_phase(Phase.PLAYING)
 	_update_hud(true)
+
+
+## --- secrets --- the found beat. A chime that answers the relic's struck
+## brass, the banner with the count, and for a cracked wall the blow landing:
+## the sword's own impact, or under a plunge just the shake, since the point
+## goes on down into the cellar and lands there with its own beat.
+func _on_secret_found(_index: int, kind: String, at: Vector2) -> void:
+	GameAudio.cue("secret")
+	if kind == "cracked":
+		GameAudio.cue("masonry")
+		if player.is_plunging():
+			camera.shake(2.0, 0.24)
+		else:
+			_impact(at, Flow.HIT_FRAMES, 2.2, 0.6)
+	hud.show_secret(secrets.count, secrets.total)
 
 
 ## A relic is a heart as well as a shard: the level's optional objective pays

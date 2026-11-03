@@ -31,7 +31,7 @@ from PIL import Image
 
 TILE = 16
 COLUMNS = 16
-LIT_ROWS = 3
+LIT_ROWS = 4
 SHADE_ROW_OFFSET = LIT_ROWS
 ROWS = LIT_ROWS * 2
 
@@ -856,6 +856,133 @@ def balustrade_rug(_unused=None) -> Patch:
     return p
 
 
+# --- secrets: the masonry that is hiding something --------------------------
+#
+# Row three of the atlas, and every tile on it is an OVERLAY drawn over a
+# buried or capped solid tile (scripts/world/secret_view.gd), so the coursing
+# of the real wall shows through everywhere the tell does not.
+#
+# The tell is a mason's, because architecture is the subject: a doorway that
+# was bricked up. Coursed ashlar never lets a vertical joint run through two
+# courses; an opening filled in afterwards always does, down both jambs, and
+# the fill is laid in smaller stones whose beds do not line up with the wall's.
+# Nobody needs to be told that. They need to have seen it once, and the first
+# secret in the Sun Terrace sits where the player is already looking.
+#
+# Cracked fill (the kind a sword opens) adds a stepped crack along the fill's
+# own joints, which is how a real infill fails. The tones are the wall's own:
+# a straight joint is INK like every bed joint, the fill's lips are the wall's
+# lip colour, and nothing here is brighter than the stone around it.
+
+SEAL_JAMB_L = 1
+SEAL_JAMB_R = 14
+SEAL_CROWN_CX = 7.5
+SEAL_CROWN_CY = 8.0
+SEAL_CROWN_R = 7.2
+
+
+def _seal_inside(x: int, y: int, top: bool) -> bool:
+    """True for a pixel of the filled opening, jambs excluded."""
+    if not (SEAL_JAMB_L < x < SEAL_JAMB_R):
+        return False
+    if not top or y + 0.5 >= SEAL_CROWN_CY:
+        return True
+    dx = x + 0.5 - SEAL_CROWN_CX
+    dy = y + 0.5 - SEAL_CROWN_CY
+    return dx * dx + dy * dy <= (SEAL_CROWN_R - 0.6) ** 2
+
+
+def _seal_fill(p: Patch, top: bool) -> None:
+    """The fill: courses half the wall's height, offset so no bed lines up,
+    framed by straight joints down both jambs and, on the upper cell, a
+    round crown where the old arch was."""
+    for y in range(TILE):
+        for x in range(TILE):
+            if not _seal_inside(x, y, top):
+                continue
+            # Courses of five against the wall's eight, so a bed of the fill
+            # only meets a bed of the wall once in forty rows.
+            row = (y + 3) % 5
+            course = (y + 3) // 5
+            if row == 4:
+                p.set(x, y, SHADOW_PIT)
+            elif row == 0:
+                p.set(x, y, SHADOW)
+            elif x in ((4, 9) if course % 2 == 0 else (6, 11)):
+                p.set(x, y, SHADOW_PIT)
+            else:
+                p.set(x, y, SHADOW_DEEP)
+    for y in range(TILE):
+        for x in range(TILE):
+            if _seal_inside(x, y, top):
+                continue
+            # The joint that frames the fill: any pixel touching it.
+            if any(_seal_inside(x + dx, y + dy, top)
+                   for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                p.set(x, y, INK)
+
+
+# The crack in the frame of the whole doorway: the upper cell is rows 0-15,
+# the lower one 16-31. It starts under the crown and steps down the fill's
+# own joints, which is how a real infill fails.
+SEAL_CRACK = [(6, 6), (6, 7), (7, 8), (7, 9), (7, 10), (8, 11), (8, 12),
+              (8, 13), (9, 14), (9, 15), (8, 16), (8, 17), (8, 18), (9, 19),
+              (9, 20), (9, 21), (8, 22), (8, 23), (7, 24), (7, 25), (8, 26),
+              (8, 27), (9, 28), (9, 29), (10, 30), (10, 31)]
+
+
+def _seal_crack(p: Patch, first_row: int) -> None:
+    """The part of SEAL_CRACK that falls in this cell, its lower-right lip
+    catching the sun."""
+    points = [(x, y - first_row) for x, y in SEAL_CRACK
+              if first_row <= y < first_row + TILE]
+    for x, y in points:
+        p.set(x, y, INK)
+    for x, y in points:
+        if (x + 1, y) not in points:
+            p.set(x + 1, y, SHADOW)
+
+
+def seal_top(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    _seal_fill(p, True)
+    return p
+
+
+def seal_foot(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    _seal_fill(p, False)
+    return p
+
+
+def crack_top(_unused=None) -> Patch:
+    p = seal_top()
+    _seal_crack(p, 0)
+    return p
+
+
+def crack_foot(_unused=None) -> Patch:
+    p = seal_foot()
+    _seal_crack(p, TILE)
+    return p
+
+
+def crack_cap(_unused=None) -> Patch:
+    """A floor that will not take a fall: a hairline across the gold cap, one
+    tone down rather than black. It enters and leaves at the same height on
+    both edges, so a cracked floor two cells wide reads as one seam rather than
+    a stamp repeated, and it drops through the bevel in one place, where the
+    slab has settled a pixel. From above it is a seam in the light."""
+    p = Patch(TILE, TILE)
+    path = [(0, 1), (1, 1), (2, 1), (3, 2), (4, 2), (5, 1), (6, 1), (7, 2),
+            (8, 2), (9, 3), (10, 2), (11, 2), (12, 1), (13, 1), (14, 1), (15, 1)]
+    for x, y in path:
+        p.set(x, y, MID)
+    p.set(9, CAP_LIGHT + 1, SHADOW_DEEP)
+    p.set(9, CAP_LIGHT + 2, INK)
+    return p
+
+
 # --- atlas layout ---------------------------------------------------------
 # Keep in sync with scripts/world/tiles.gd.
 
@@ -875,6 +1002,9 @@ NAMES = [
     "ivy_end", "moss", "window", "urn",
     "jars", "rubble", "grass", "planter_bloom",
     "palm_top", "palm_pot", "lantern", "balustrade_rug",
+    # row 3 -- the tells of a secret: a bricked-up doorway, whole and cracked
+    "seal_top", "seal_foot", "crack_top", "crack_foot",
+    "crack_cap",
 ]
 
 
@@ -926,6 +1056,11 @@ def build_patches() -> dict:
         "palm_pot": palm.sub(0, TILE, TILE, TILE),
         "lantern": lantern(),
         "balustrade_rug": balustrade_rug(),
+        "seal_top": seal_top(),
+        "seal_foot": seal_foot(),
+        "crack_top": crack_top(),
+        "crack_foot": crack_foot(),
+        "crack_cap": crack_cap(),
     }
     for i, part in enumerate(("arch_top_l", "arch_top_r", "arch_mid_l",
                               "arch_mid_r", "arch_leg_l", "arch_leg_r")):

@@ -10,6 +10,7 @@ any of them being rewritten.
 | Cast shadows | `scripts/render/sun_shadow.gd`, `assets/world_shadow.gdshader` |
 | Shade twins in the atlas | `tools/generate_tiles_png.py`, `scripts/world/tiles.gd` |
 | Architecture from terrain | `scripts/world/dresser.gd` |
+| Secret rooms | `scripts/world/secret_view.gd`, `scripts/world/secret_keeper.gd` |
 
 The docstrings in those files carry the full argument. This page is the map,
 plus the facts that do not belong to any one file.
@@ -59,9 +60,9 @@ A surface going into shadow is not that surface darkened. It is the next tone
 down the duotone ramp, which is the art direction's central idea.
 
 The atlas is two halves in register. Every tile has a shade twin
-`Tiles.SHADE_ROW_OFFSET` (3) rows below it. The shader reads the mask and, where
+`Tiles.SHADE_ROW_OFFSET` (4) rows below it. The shader reads the mask and, where
 it says shadow, samples the twin instead: one extra texture fetch, and no second
-pass over the tilemap. The current atlas is 256 × 96 px — 48 tiles and 48 twins.
+pass over the tilemap. The current atlas is 256 × 128 px — 53 tiles and 53 twins.
 
 The atlas and the TileSet are generated:
 
@@ -199,8 +200,76 @@ The room moods are **not** run on the duel's zones: `ZoneView` draws the
 architecture and the foreground the dresser returns and leaves its `props`
 plane out, as the art pass intended for the duelling ground.
 
+## Secrets
+
+A secret room is a seal and the room behind it. The ASCII marks only the seal
+(`Tiles.SEAL_LEGEND`); the room is the `:` masonry a flood from the seal
+reaches, with the entity marks inside it, so it is drawn the way a niche is
+drawn and cannot be forgotten. `AsciiLevel._find_secrets()` does the flood.
+
+| Seal | In play | Opens to | Tell |
+| --- | --- | --- | --- |
+| `%` false | `BACKDROP`: there is no wall | the body walking into it | a bricked-up doorway, air drifting out of its joints |
+| `&` cracked | `SOLID`: a wall, a ledge, a floor | the sword: a swing, an air slash, or a plunge onto a cracked floor | the same doorway with a crack, shedding grit; on a floor, a hairline across the cap |
+
+A fall does not open a cracked floor, however hard: luck is not looking.
+
+### The tell is architecture
+
+The tell is the mason's one, because architecture is the subject: a doorway
+that was filled in. Coursed ashlar never lets a vertical joint run through two
+courses; an opening bricked up afterwards always does, down both jambs, and
+the fill is laid in smaller stones whose beds never meet the wall's. The fill
+is drawn in the wall's own tones, so the doorway is there for whoever looks
+and nothing to whoever runs. The motion — a mote, a grain — is the half that
+catches the corner of the eye, one pixel at a time. Ruin rooms crack walls
+too, so the doorway's shape is the part that cannot be confused, and the
+dresser's marks are cleared off every secret and the cells in front of it.
+
+### Drawing a lie, and taking it back
+
+`Level.build()` paints the terrain as it really is and takes everything that
+decides the *look* — caps, lit edges, dressing, the shadow — from the facade
+(`AsciiLevel.facade()`), the level with every unfound room solid. Over each
+room `SecretView` lays a cover of the facade's own tiles. Finding one:
+
+- repaints the terrain around it from the level as it now is, which is also
+  what removes a cracked seal's collision (at once: a plunge that opened a
+  floor this frame falls through it this frame);
+- drops the cover out in an ordered dither spreading from the point of entry
+  (`dissolve` in `assets/world_shadow.gdshader`) — hard pixels the whole way;
+- swaps in the room's light. The shadow is solved twice at build, sealed and
+  with every room open; each differing mask pixel belongs to its nearest
+  secret, and finding it copies those pixels into the live mask. A found room
+  is in its own shade with a shaft through the doorway, and nothing is solved
+  in play. The second solve costs what the first does, behind the same wipe,
+  and only in a level that has secrets.
+
+What a room holds is hidden until it is found; found secrets stay found
+through deaths, and a restart seals them all again (`SecretKeeper`).
+
+### Never required, never a trap
+
+`LevelReachability.audit_secrets()` proves it for every combination of found
+and unfound secrets; `docs/level-generation.md` has the details.
+`tests/unit/test_secret_proof.gd` runs it on the Sun Terrace and refuses one
+broken level per clause.
+
+### The Sun Terrace's three
+
+| | Where | Seal | Prize |
+| --- | --- | --- | --- |
+| A | the cistern's far wall, at the bottom of the pit | false | a relic |
+| B | the high block's face, over the basin's run-up | cracked | a relic, and an inscription |
+| C | the guard's floor, under the low platform | cracked floor | a relic, in a cellar you climb out of by a ledge grab |
+
+One per act, each teaching the next: walk through, cut through, plunge
+through.
+
 ## Tests
 
+- `tests/unit/test_secret_walls.gd`, `tests/unit/test_secret_count.gd` — the
+  seals played through the real game scene, and the count.
 - `tests/unit/test_zone_dressing.gd` — the duel's zones: the stitched strip is
   the strip, every zone is dressed, the dressing mirrors, each zone's shadow
   matches the whole strip's, and none of it reaches the simulation.

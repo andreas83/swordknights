@@ -19,6 +19,7 @@ const MAX_SECONDS := {
 	"land_hard": 0.6, "sword_hit": 0.6, "pause_in": 0.5, "pause_out": 0.5,
 	"ui_confirm": 0.5, "ui_back": 0.5, "relic": 0.9, "exit": 1.5,
 	"die": 2.0, "level_complete": 2.5, "wind": 6.0,
+	"secret": 1.4, "masonry": 1.0,
 }
 
 ## Nothing shorter than this is a sound; it is a click.

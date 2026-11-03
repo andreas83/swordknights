@@ -113,6 +113,14 @@ static func specs() -> Dictionary:
 			"peak": 0.86, "seed": 1303, "pitch_jitter": 0.0, "gain_jitter": 0.0,
 			"min_gap": 1.0, "duck": 8.0,
 		},
+		"secret": {
+			"peak": 0.74, "seed": 1304, "pitch_jitter": 0.0, "gain_jitter": 0.0,
+			"min_gap": 0.6, "duck": 5.0,
+		},
+		"masonry": {
+			"peak": 0.88, "seed": 1305, "pitch_jitter": 0.06, "gain_jitter": 1.0,
+			"min_gap": 0.2, "duck": 4.0,
+		},
 
 		# --- interface ---
 		"ui_move": {
@@ -264,6 +272,8 @@ static func _render(name: String, rate: int, seed_value: int) -> PackedFloat32Ar
 		"relic": return _relic(rate, seed_value)
 		"exit": return _exit(rate, seed_value)
 		"level_complete": return _level_complete(rate, seed_value)
+		"secret": return _secret(rate, seed_value)
+		"masonry": return _masonry(rate, seed_value)
 		"ui_move": return _ui_move(rate, seed_value)
 		"ui_confirm": return _ui_arpeggio(rate, seed_value, true)
 		"ui_back": return _ui_arpeggio(rate, seed_value, false)
@@ -600,6 +610,52 @@ static func _level_complete(rate: int, seed_value: int) -> PackedFloat32Array:
 		"rate": rate, "start": 0.56, "len": 0.2, "freq": 92.0, "freq_end": 58.0,
 		"decay": 0.18, "curve": 2.2, "amp": 0.2,
 	})
+	return buf
+
+
+## A secret found: the relic's brass, rising. Four plucks up the D chord a
+## sixteenth apart, the last held, over a bell partial two octaves up that
+## rings on after them. It is the relic's instrument because a secret is a
+## relic's kind of news, and it climbs because finding is going somewhere.
+static func _secret(rate: int, seed_value: int) -> PackedFloat32Array:
+	var buf := Synth.buffer(1.2, rate)
+	var notes := [587.33, 739.99, 880.0, 1174.66]
+	for i: int in notes.size():
+		var start := float(i) * 0.075
+		Synth.add_pluck(buf, {
+			"rate": rate, "start": start, "len": 1.15 - start,
+			"freq": float(notes[i]), "decay": 0.35 if i < 3 else 0.9,
+			"brightness": 0.9, "amp": 0.3 if i < 3 else 0.36, "seed": seed_value + i,
+			"release": 0.2,
+		})
+	Synth.add_tone(buf, {
+		"rate": rate, "start": 0.22, "len": 0.95, "freq": 2349.3, "freq_end": 2340.0,
+		"attack": 0.004, "decay": 0.9, "curve": 2.6, "amp": 0.1,
+	})
+	return buf
+
+
+## Cracked masonry giving way: a dull blow, the fill dropping out of the
+## doorway as a falling band of noise, and the last few stones landing. Low
+## and dry like everything stone in this game; no tail.
+static func _masonry(rate: int, seed_value: int) -> PackedFloat32Array:
+	var buf := Synth.buffer(0.8, rate)
+	Synth.add_tone(buf, {
+		"rate": rate, "len": 0.24, "freq": 92.0, "freq_end": 48.0,
+		"attack": 0.002, "decay": 0.22, "curve": 2.2, "amp": 0.5,
+	})
+	Synth.add_noise(buf, {
+		"rate": rate, "len": 0.5, "cutoff": 1400.0, "cutoff_end": 260.0,
+		"q": 0.9, "attack": 0.004, "decay": 0.46, "curve": 2.0, "amp": 0.5,
+		"seed": seed_value,
+	})
+	for i: int in 4:
+		var start := 0.22 + float(i) * 0.11 + float(i % 2) * 0.03
+		Synth.add_noise(buf, {
+			"rate": rate, "start": start, "len": 0.06, "cutoff": 1800.0 - 250.0 * i,
+			"q": 1.2, "attack": 0.002, "decay": 0.05, "curve": 2.0,
+			"amp": 0.32 - 0.05 * i, "seed": seed_value + 7 * (i + 1),
+		})
 	return buf
 
 

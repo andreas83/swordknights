@@ -23,6 +23,12 @@ extends Node2D
 ## The logical queries read the tilemap's custom "kind" data, so a level hand
 ## edited in the Godot editor works exactly like a parsed or generated one.
 ##
+## Secret rooms (docs/world.md, "Secrets") are drawn by a SecretView child:
+## everything here paints the level as it really is, except that the picture
+## — terrain caps, dressing, the sealed shadow — is taken from the facade, the
+## level as it looks before anything is found. The view lays the stone over
+## each room and lifts it again.
+##
 ## The duel's zones are drawn by this same path, a zone at a time: the layers,
 ## the paint and the sun's material are the static helpers below, and
 ## scripts/duel/zones_view.gd calls them rather than keeping a second copy.
@@ -42,6 +48,8 @@ var props_map: TileMapLayer
 var foreground_map: TileMapLayer
 ## Dust in the light and falling leaves; scripts/render/ambience.gd.
 var ambience: LevelAmbience
+## The secret rooms' covers, tells and reveals; null in a level without any.
+var secret_view: SecretView
 ## Milliseconds the last shadow solve took. Read by tests and docs/world.md.
 var shadow_build_ms: float = 0.0
 
@@ -71,26 +79,42 @@ func build(level: AsciiLevel) -> void:
 
 	for layer: TileMapLayer in [tilemap, decor_map, props_map, foreground_map]:
 		layer.clear()
+	if secret_view != null:
+		remove_child(secret_view)
+		secret_view.queue_free()
+		secret_view = null
 
+	# What is drawn is the facade; what is under a secret's cover is the truth.
+	var seen := data.facade() if not data.secrets.is_empty() else data
 	for y: int in data.rows:
 		for x: int in data.cols:
-			var coords := data.atlas_for(x, y)
+			var hidden := seen.secret_at(Vector2i(x, y)) >= 0 and not data.is_solid(x, y)
+			var coords := (data if hidden else seen).atlas_for(x, y)
 			if coords.x >= 0:
 				tilemap.set_cell(Vector2i(x, y), 0, coords)
 
-	var dressing := WorldDresser.dress(data)
+	var dressing := WorldDresser.dress(seen)
+	SecretView.clear_dressing(data, dressing)
 	paint(decor_map, dressing["mid"])
 	paint(props_map, dressing["props"])
 	paint(foreground_map, dressing["fore"])
 
-	_apply_sun(dressing["mid"], dressing["props"])
+	_apply_sun(seen, dressing["mid"], dressing["props"])
+	if not data.secrets.is_empty():
+		secret_view = SecretView.new()
+		secret_view.name = "Secrets"
+		add_child(secret_view)
+		var texture := tilemap.material.get_shader_parameter("shadow_mask") as ImageTexture \
+			if tilemap.material != null else null
+		secret_view.setup(self, data, seen, dressing, SunShadow.last_mask, texture,
+			atlas_image())
 
 	# The air last: it needs the solved shadow to know where the light is.
 	if ambience == null:
 		ambience = LevelAmbience.new()
 		ambience.name = "Ambience"
 		add_child(ambience)
-	ambience.setup(data, dressing["props"], SunShadow.last_mask, TILE)
+	ambience.setup(seen, dressing["props"], SunShadow.last_mask, TILE)
 	level_built.emit(data)
 
 
@@ -122,13 +146,13 @@ static func paint(layer: TileMapLayer, cells: Dictionary) -> void:
 
 ## Solves the cast shadow and hands the mask to the two planes that receive
 ## it. Everything here happens once per level build and nothing re-runs it.
-func _apply_sun(mid_decor: Dictionary, props: Dictionary) -> void:
+func _apply_sun(seen: AsciiLevel, mid_decor: Dictionary, props: Dictionary) -> void:
 	var atlas := atlas_image()
 	if atlas == null:
 		return
 
 	var started := Time.get_ticks_usec()
-	var mask := SunShadow.build(data, mid_decor, TILE, atlas, props)
+	var mask := SunShadow.build(seen, mid_decor, TILE, atlas, props)
 	shadow_build_ms = float(Time.get_ticks_usec() - started) / 1000.0
 
 	var material := sun_material(mask, Rect2(Vector2.ZERO, world_size()))
@@ -165,6 +189,17 @@ static func sun_material(mask: Texture2D, covers: Rect2) -> ShaderMaterial:
 	return material
 
 
+## Finds secret `index` in play, from `from` in world pixels: the data opens,
+## and the view repaints the terrain around it — which is also what takes a
+## cracked seal's collision away — and lifts the cover.
+func open_secret(index: int, from: Vector2) -> void:
+	if data == null or data.opened.has(index):
+		return
+	data.open_secret(index)
+	if secret_view != null:
+		secret_view.reveal(index, from)
+
+
 ## --- geometry queries ------------------------------------------------------
 
 func world_size() -> Vector2:
@@ -189,6 +224,16 @@ func is_solid_cell(cell: Vector2i) -> bool:
 
 func is_solid_at(world_position: Vector2) -> bool:
 	return is_solid_cell(cell_of(world_position))
+
+
+## Solid, or part of a secret nobody has found yet: what the level looks like
+## rather than what it is. For the guards, never for the character.
+func looks_solid_at(world_position: Vector2) -> bool:
+	var cell := cell_of(world_position)
+	if is_solid_cell(cell):
+		return true
+	var index := data.secret_at(cell)
+	return index >= 0 and not data.opened.has(index)
 
 
 ## True if any tile of one of `kinds` overlaps the rect.

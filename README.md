@@ -91,6 +91,13 @@ Every torch you reach on foot is a checkpoint: the flame flares, and a death
 sends you back there rather than to the start. Relics you picked up and guards
 you cut down stay that way; the clock keeps running.
 
+The city keeps **secret rooms** behind bricked-up doorways. Look for the
+outline of an arch filled in with smaller stones: air moving through its
+joints means you can walk through it; a crack shedding grit means your sword
+can open it, and a cracked floor gives under a plunge. The Sun Terrace hides
+three and the complete screen counts them. None is ever the way to the door,
+and none can trap you.
+
 **Endless** is a descent: each ruin you escape leads down into a new one, a
 step harder, from a gentle first ruin up to the generator's hardest. The ruin
 number and its seed sit bottom-left, and the first seed replays the whole run.
@@ -146,10 +153,10 @@ seat's default. See [`docs/character.md`](docs/character.md) and
 project.godot          written by tools/configure_project.gd, not by hand
 scripts/
   core/      palette, tuning, boot, game controller, mode registry
-  world/     ASCII level parser, tilemap level node
+  world/     ASCII level parser, tilemap level node, secret rooms
   player/    character state machine, input seam, character art, the
              heroine's costume, saved looks
-  entities/  relic, exit door, torch, patrol guard
+  entities/  relic, exit door, torch, patrol guard, inscription
   render/    follow camera, procedural parallax skyline
   ui/        HUD, menu, wardrobe, touch controls
   audio/     synthesis, mixer autoload, character sounds, music
@@ -193,7 +200,11 @@ Levels are ASCII art. `levels/level_01.txt` is the worked example.
  ^  spikes             ~  water                :  background niche
  @  player spawn       *  relic                D  exit door
  t  torch (decor)      p  patrol guard         .  or space — empty
+ %  false wall         &  cracked wall         L  inscription
 ```
+
+`%` and `&` seal a secret room; the room is the `:` masonry behind the seal,
+with whatever it holds. `docs/world.md` has the rules.
 
 Vertical spacing is a design language, not a free choice:
 

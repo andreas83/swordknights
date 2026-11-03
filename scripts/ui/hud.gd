@@ -17,6 +17,10 @@ extends Control
 
 const TITLE_HOLD := 2.6
 const TITLE_FADE := 0.9
+## The secret banner is quicker than the title: it interrupts play rather than
+## opening it, so it says its piece and gets out of the way of the room.
+const SECRET_HOLD := 1.5
+const SECRET_FADE := 0.5
 ## How long the corner answers a change: a relic count that pops, a health
 ## mark that burns white and then goes dark, or one that burns white and then
 ## stays lit. A number that silently changes in the corner is a number nobody
@@ -39,6 +43,9 @@ var _overlay_subtitle: String = ""
 var _relic_pulse: float = 0.0
 var _hurt_pulse: float = 0.0
 var _heal_pulse: float = 0.0
+# --- secrets --- the found banner: which one of how many, and how long ago.
+var _secret_text: String = ""
+var _secret_time: float = 999.0
 
 
 func _ready() -> void:
@@ -75,6 +82,15 @@ func show_title(level_name: String) -> void:
 	_title_time = 0.0
 
 
+## --- secrets --- "SECRET FOUND" over the count, in the reserved band. It
+## takes the band from the title card, which by the time anyone has found a
+## secret has long faded, and gives it back to an overlay, which stops play.
+func show_secret(found: int, total: int) -> void:
+	_secret_text = "%d OF %d" % [found, total]
+	_secret_time = 0.0
+	queue_redraw()
+
+
 func set_overlay(title: String, subtitle: String) -> void:
 	_overlay_title = title
 	_overlay_subtitle = subtitle
@@ -84,6 +100,9 @@ func set_overlay(title: String, subtitle: String) -> void:
 func _process(delta: float) -> void:
 	if _title_time <= TITLE_HOLD + TITLE_FADE:
 		_title_time += delta
+		queue_redraw()
+	if _secret_time <= SECRET_HOLD + SECRET_FADE:
+		_secret_time += delta
 		queue_redraw()
 	if _relic_pulse > 0.0 or _hurt_pulse > 0.0 or _heal_pulse > 0.0:
 		_relic_pulse = maxf(0.0, _relic_pulse - delta)
@@ -102,6 +121,8 @@ func _draw() -> void:
 	# them is ever on it. The overlay wins: the game is stopped.
 	if _overlay_title != "":
 		_draw_overlay(view)
+	elif _secret_text != "" and _secret_time <= SECRET_HOLD + SECRET_FADE:
+		_draw_secret(UiLayout.banner(view))
 	elif _title != "" and _title_time <= TITLE_HOLD + TITLE_FADE:
 		var alpha := clampf(1.0 - (_title_time - TITLE_HOLD) / TITLE_FADE, 0.0, 1.0)
 		_draw_title_card(UiLayout.banner(view), alpha)
@@ -156,6 +177,26 @@ static func _blink_on(pulse: float) -> bool:
 	return int(pulse * 16.0) % 2 == 0
 
 
+## --- secrets --- The banner opens from the middle: the rule draws out to
+## its full width in a tenth of a second and the words are set on it, so the
+## beat lands on the frame the stone gives way rather than fading up after it.
+func _draw_secret(band: Rect2) -> void:
+	var alpha := clampf(1.0 - (_secret_time - SECRET_HOLD) / SECRET_FADE, 0.0, 1.0)
+	var open := clampf(_secret_time / 0.1, 0.0, 1.0)
+	var cx := band.position.x + band.size.x * 0.5
+	var top := band.position.y + (band.size.y - UiFont.cap(UiFont.Cut.TEXT)) * 0.5 - 6.0
+	var wide := UiFont.width("SECRET FOUND", UiFont.Cut.TEXT)
+	UiMarks.rule(self, Vector2(cx, top - 5.0), roundf(maxf(12.0, wide * 0.6) * open),
+		Palette.with_alpha(Palette.LIGHT_SOFT, alpha * 0.8))
+	if open < 1.0:
+		return
+	UiFont.draw_text(self, "SECRET FOUND", Vector2(cx, top), UiFont.Cut.TEXT,
+		Palette.with_alpha(Palette.PAPER, alpha), UiFont.Align.CENTER, alpha * 0.75)
+	UiFont.draw_text(self, _secret_text,
+		Vector2(cx, top + UiFont.line(UiFont.Cut.TEXT) + 2.0), UiFont.Cut.MICRO,
+		Palette.with_alpha(Palette.LIGHT_SOFT, alpha), UiFont.Align.CENTER, alpha * 0.6)
+
+
 ## The level name, in the reserved band, over the picture rather than in a box.
 func _draw_title_card(band: Rect2, alpha: float) -> void:
 	var cx := band.position.x + band.size.x * 0.5
@@ -179,7 +220,11 @@ func _draw_overlay(view: Vector2) -> void:
 		Palette.with_alpha(Palette.LIGHT_WARM, 0.5))
 
 	var cx := band.position.x + band.size.x * 0.5
-	var top := band.position.y + 9.0
+	# --- secrets --- a subtitle may carry a second line (the complete screen
+	# of a level with secrets); the block rises by half a line per extra line
+	# so it stays centred in the band.
+	var lines := _overlay_subtitle.split("\n", false)
+	var top := band.position.y + 9.0 - 4.0 * float(maxi(0, lines.size() - 1))
 	UiFont.draw_text(self, _overlay_title, Vector2(cx, top), UiFont.Cut.DISPLAY,
 		Palette.PAPER, UiFont.Align.CENTER, 0.8)
 
@@ -187,8 +232,8 @@ func _draw_overlay(view: Vector2) -> void:
 	UiMarks.rule(self, Vector2(cx, rule_y), minf(band.size.x * 0.36, 60.0),
 		Palette.with_alpha(Palette.LIGHT_SOFT, 0.55))
 
-	if _overlay_subtitle == "":
-		return
-	UiFont.draw_text(self, _overlay_subtitle, Vector2(cx, rule_y + 8.0),
-		UiFont.Cut.MICRO, Palette.with_alpha(Palette.PAPER, 0.85),
-		UiFont.Align.CENTER, 0.6)
+	for i: int in lines.size():
+		UiFont.draw_text(self, lines[i],
+			Vector2(cx, rule_y + 8.0 + float(i) * UiFont.line(UiFont.Cut.MICRO)),
+			UiFont.Cut.MICRO, Palette.with_alpha(Palette.PAPER, 0.85),
+			UiFont.Align.CENTER, 0.6)

@@ -7,7 +7,7 @@ extends RefCounted
 ## coordinates here too means tools/build_tileset.gd and the level builder can
 ## never drift apart.
 ##
-## There are three kinds of glyph:
+## There are four kinds of glyph:
 ##
 ##   LEGEND         terrain — fills the cell, may collide, is queried by the
 ##                  character (solid, platform, spikes, water, ladder).
@@ -15,6 +15,9 @@ extends RefCounted
 ##   DECOR_LEGEND   architecture — a cornice, an arch, a railing. Never
 ##                  collides and is never queried, so a level's difficulty
 ##                  cannot change by decorating it. The cell stays empty.
+##   SEAL_LEGEND    masonry hiding a secret room (docs/world.md, "Secrets").
+##                  The cell is terrain like any other; the value says what
+##                  it does until the secret is found.
 ##
 ## The atlas has a lit half and a shade half in register: the shade twin of a
 ## tile is SHADE_ROW_OFFSET rows below it, which is how the world shader picks
@@ -48,6 +51,31 @@ const ENTITY_LEGEND := {
 	"D": "exit",
 	"t": "torch",
 	"p": "patrol",
+	"L": "inscription", ## words cut into a wall; spawned by SecretKeeper
+}
+
+## Masonry that seals a secret room. The cell parses to the Kind it has in
+## play until the secret is found, and is remembered as a seal of this kind:
+##
+##   %  false    looks like the wall and is not there: BACKDROP. Walk into it
+##               and it dissolves around you. The tell is a bricked-up doorway
+##               with air moving through its joints.
+##   &  cracked  a wall that is really there until a sword finds it: SOLID, so
+##               it holds a guard, a ledge grab and the character's feet
+##               exactly as stone does, and a swing or a plunge opens it. The
+##               tell is the same doorway with a crack down it, shedding grit.
+##
+## Behind a seal, the room is the BACKDROP (and the entity marks) a flood from
+## the seal reaches; AsciiLevel finds it. It is drawn as stone until found.
+const SEAL_LEGEND := {
+	"%": "false",
+	"&": "cracked",
+}
+
+## What a seal of each kind is, in play, until its secret is found.
+const SEAL_KIND := {
+	"false": Kind.BACKDROP,
+	"cracked": Kind.SOLID,
 }
 
 ## Architecture marks. The value is the decoration id WorldDresser plants.
@@ -94,7 +122,7 @@ const FOREGROUND_DECOR := [
 
 const ATLAS_COLUMNS := 16
 ## The shade twin of a tile is this many rows further down the atlas.
-const SHADE_ROW_OFFSET := 3
+const SHADE_ROW_OFFSET := 4
 
 const ATLAS_SOLID_CAPPED := Vector2i(0, 0)
 const ATLAS_SOLID_CAPPED_LIT := Vector2i(1, 0)
@@ -149,6 +177,13 @@ const DECOR_ATLAS := {
 	"palm_pot": Vector2i(13, 2),
 	"lantern": Vector2i(14, 2),
 	"balustrade_rug": Vector2i(15, 2),
+	# The tells of a secret, drawn over the seal's own stone by
+	# scripts/world/secret_view.gd and nowhere else.
+	"seal_top": Vector2i(0, 3),
+	"seal_foot": Vector2i(1, 3),
+	"crack_top": Vector2i(2, 3),
+	"crack_foot": Vector2i(3, 3),
+	"crack_cap": Vector2i(4, 3),
 }
 
 ## Decorations that have a handed twin. Mirroring a level's dressing has to

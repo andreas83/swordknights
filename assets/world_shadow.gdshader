@@ -23,6 +23,19 @@ uniform vec2 mask_origin = vec2(0.0, 0.0);
 // Atlas rows to the shade half, as a fraction of the texture height.
 uniform float shade_v = 0.5;
 
+// A secret's stone going away (scripts/world/secret_view.gd). 0 is whole and
+// is what every other layer leaves it at, so for them this is one untaken
+// branch. Pixels drop out in an ordered dither, nearest `dissolve_from` first:
+// hard pixels the whole way, no alpha ever, which is the art direction's rule
+// for edges applied to time.
+uniform float dissolve = 0.0;
+uniform vec2 dissolve_from = vec2(0.0, 0.0);
+uniform float dissolve_reach = 64.0;
+
+const float BAYER[16] = float[16](
+	0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0,
+	3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+
 varying vec2 world_px;
 
 void vertex() {
@@ -30,6 +43,15 @@ void vertex() {
 }
 
 void fragment() {
+	if (dissolve > 0.0) {
+		vec2 px = floor(world_px);
+		int index = int(mod(px.x, 4.0)) + int(mod(px.y, 4.0)) * 4;
+		float order = (BAYER[index] + 0.5) / 16.0;
+		float near = clamp(length(px - dissolve_from) / dissolve_reach, 0.0, 1.0);
+		if (order + near * 0.75 < dissolve * 1.75) {
+			discard;
+		}
+	}
 	vec4 lit = texture(TEXTURE, UV);
 	vec4 shade = texture(TEXTURE, UV + vec2(0.0, shade_v));
 	// Hard edge. No smoothstep here, ever: the line between lit and unlit is

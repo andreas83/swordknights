@@ -100,6 +100,153 @@ static func verify_from(level: AsciiLevel, start: Vector2i,
 	return report
 
 
+## --- secrets ---------------------------------------------------------------
+##
+## A secret room (docs/world.md, "Secrets") is only a gift if it is never the
+## way and never a hole. `audit_secrets()` proves both, over every combination
+## of found and unfound secrets, because the player can be anywhere in that
+## lattice — found the first, walked past the second:
+##
+## - **Never required.** With every seal shut (false walls included: the
+##   hypothesis is a player who never noticed one), the exit is reachable.
+## - **Actually secret.** With every seal shut, every room is walled in: each
+##   cell of it touches only its own room, its own seal or stone. The search
+##   moves a body that collides per axis against solid cells, so nothing it
+##   does can put any part of the character inside a walled room; checking the
+##   walls is the same claim as flooding the level, at none of the cost. A
+##   room the main line can already reach is a niche, not a secret.
+## - **Findable.** With its own seal open, each room has a cell the character
+##   can stand in. A prize nobody can reach is a promise broken.
+## - **Never a trap.** For every subset of opened secrets, no cell the
+##   character can reach is stranded — cut off from the exit — unless it was
+##   already reachable and already stranded with every seal shut. Opening a
+##   secret may not add a single dead end, which covers a room with no way
+##   out, a broken floor that was the only bridge and a hole over a pit alike.
+##
+## The last is why the survey below is a flood rather than the greedy search:
+## "every reachable state can still reach the door" is a question about all of
+## them at once, answered by walking the explored edges backwards from the
+## door — one pass however many cells there are. The shut level is only
+## surveyed cell by cell, for a stranded cell an open one turns up: none of
+## the shipping or generated levels has one, so the usual cost is one flood
+## per subset and a greedy search, which is what lets the generator run this
+## on every ruin it carves a secret into.
+##
+## With up to MAX_SUBSETS_FOR secrets every subset is played; past that, each
+## secret alone and all of them together.
+const MAX_SUBSETS_FOR := 4
+
+
+## `{ok, reason, secrets, states}`; `ok` with no secrets is trivially true.
+static func audit_secrets(level: AsciiLevel) -> Dictionary:
+	if level == null:
+		return _fail("no level data", 0)
+	var count := level.secrets.size()
+	if count == 0:
+		return {"ok": true, "reason": "no secrets", "secrets": 0, "states": 0}
+
+	var shut := level.with_secrets({})
+	var base := verify(shut)
+	if not bool(base["ok"]):
+		return _fail("with every secret shut the exit is out of reach (%s): a secret "
+			% String(base["reason"]) + "may never be the way", 0)
+	var states := int(base.get("states", 0))
+
+	for index: int in count:
+		var breach := _breach(shut, level.secrets[index])
+		if breach.x >= 0:
+			return _fail("secret %d's room opens onto %s without its seal: it is not "
+				% [index, str(breach)] + "hidden", states)
+
+	for open: Dictionary in _openings(count):
+		var played := survey(level.with_secrets(open))
+		states += int(played["states"])
+		var which := str(open.keys())
+		if not bool(played["ok"]):
+			return _fail("opening secrets %s cuts the way to the exit (%s)"
+				% [which, String(played["reason"])], states)
+		var stranded: Dictionary = played["stranded"]
+		for cell: Vector2i in stranded:
+			if not _stranded_anyway(shut, cell):
+				return _fail("with secrets %s open, standing at %s the exit is gone"
+					% [which, str(cell)], states)
+		if open.size() == 1:
+			var index: int = open.keys()[0]
+			var reached: Dictionary = played["reached"]
+			var inside := false
+			for cell: Vector2i in level.secrets[index]["room"]:
+				inside = inside or reached.has(cell)
+			if not inside:
+				return _fail("secret %d's room cannot be stood in even once it is open"
+					% index, states)
+
+	return {"ok": true, "reason": "%d secret(s): never required, never a trap" % count,
+		"secrets": count, "states": states}
+
+
+## The first cell outside `secret` that one of its room cells touches and that
+## is not stone in `shut`, or (-1, -1) when the room is walled in.
+static func _breach(shut: AsciiLevel, secret: Dictionary) -> Vector2i:
+	var own := {}
+	for cell: Vector2i in secret["cells"]:
+		own[cell] = true
+	for cell: Vector2i in secret["room"]:
+		for step: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var next := cell + step
+			if not own.has(next) and not shut.is_solid(next.x, next.y):
+				return next
+	return Vector2i(-1, -1)
+
+
+## True when `cell` was a dead end before any secret was opened: reachable with
+## every seal shut, and no way from it to the exit even then.
+static func _stranded_anyway(shut: AsciiLevel, cell: Vector2i) -> bool:
+	var goals: Array[Vector2i] = [cell]
+	if not bool(reaches(shut, goals)["ok"]):
+		return false
+	return not bool(verify_from(shut, cell)["ok"])
+
+
+## The subsets of `count` secrets the audit plays, each as index -> true.
+static func _openings(count: int) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if count <= MAX_SUBSETS_FOR:
+		for mask: int in range(1, 1 << count):
+			var open := {}
+			for index: int in count:
+				if mask & (1 << index) != 0:
+					open[index] = true
+			out.append(open)
+		return out
+	var every := {}
+	for index: int in count:
+		out.append({index: true})
+		every[index] = true
+	out.append(every)
+	return out
+
+
+## Every standing cell reachable from the spawn, and which of them can no
+## longer reach the exit. `{ok, reason, reached, stranded, states}`, where
+## `reached` and `stranded` map a cell to true and `ok` says the exit itself
+## was reached.
+static func survey(level: AsciiLevel) -> Dictionary:
+	var empty := {"reached": {}, "stranded": {}, "states": 0}
+	if level == null:
+		return _fail("no level data", 0).merged(empty)
+	var goals: Array[Vector2i] = []
+	for mark: Dictionary in level.entities:
+		if String(mark["kind"]) == "exit":
+			goals.append(mark["cell"])
+			goals.append(mark["cell"] + Vector2i.UP)
+	if goals.is_empty():
+		return _fail("level has no exit door", 0).merged(empty)
+	var solver := Solver.new(level)
+	if not solver.is_stand(level.spawn_point.x, level.spawn_point.y):
+		return _fail("spawn is not standing on clear solid ground", 0).merged(empty)
+	return solver.survey(level.spawn_point, goals)
+
+
 ## Runs the same search toward arbitrary goal cells. Used by `measure_reach()`
 ## and handy for diagnosing a level by hand.
 static func reaches(level: AsciiLevel, goals: Array[Vector2i]) -> Dictionary:
@@ -385,6 +532,70 @@ class Solver extends RefCounted:
 			"reason": "exit is not reachable from the spawn",
 			"explored": explored,
 			"states": visited.size(),
+		}
+
+	## Floods every state reachable from `start`, keeping each edge, then walks
+	## the edges backwards from the goal states. A stand state the backward walk
+	## never reaches is stranded: the character can get there and not out.
+	func survey(start: Vector2i, goals: Array[Vector2i]) -> Dictionary:
+		var goal_keys := {}
+		for cell: Vector2i in goals:
+			goal_keys[_key(MODE_STAND, cell.x, cell.y)] = true
+			goal_keys[_key(MODE_LADDER, cell.x, cell.y)] = true
+
+		var start_key := _key(MODE_STAND, start.x, start.y)
+		var incoming := {start_key: []}
+		var queue: Array[int] = [start_key]
+		var head := 0
+		var neighbours: Array[int] = []
+		while head < queue.size():
+			var key: int = queue[head]
+			head += 1
+			if head > MAX_STATES:
+				return {"ok": false, "reason": "search budget of %d states exhausted"
+					% MAX_STATES, "reached": {}, "stranded": {}, "states": head}
+			var index := key >> 1
+			neighbours.clear()
+			if key & 1 == MODE_STAND:
+				_expand_stand(index % cols, index / cols, neighbours)
+			else:
+				_expand_ladder(index % cols, index / cols, neighbours)
+			for next: int in neighbours:
+				if not incoming.has(next):
+					incoming[next] = []
+					queue.append(next)
+				(incoming[next] as Array).append(key)
+
+		var home := {}
+		var back: Array[int] = []
+		for key: int in queue:
+			if goal_keys.has(key):
+				home[key] = true
+				back.append(key)
+		var cursor := 0
+		while cursor < back.size():
+			for previous: int in incoming[back[cursor]]:
+				if not home.has(previous):
+					home[previous] = true
+					back.append(previous)
+			cursor += 1
+
+		var reached := {}
+		var stranded := {}
+		for key: int in queue:
+			if key & 1 != MODE_STAND:
+				continue
+			var cell := Vector2i((key >> 1) % cols, (key >> 1) / cols)
+			reached[cell] = true
+			if not home.has(key):
+				stranded[cell] = true
+		var ok := not back.is_empty()
+		return {
+			"ok": ok,
+			"reason": "exit reached" if ok else "exit is not reachable from the spawn",
+			"reached": reached,
+			"stranded": stranded,
+			"states": queue.size(),
 		}
 
 	func _priority(x: int, y: int, goals: Array[Vector2i], span: int) -> int:

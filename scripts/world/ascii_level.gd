@@ -22,8 +22,19 @@ var entities: Array[Dictionary] = []
 ## a level can be decorated, left alone, or anything in between.
 var decorations: Array[Dictionary] = []
 var name: String = "Untitled"
+## Cell -> "false" | "cracked": the seals of secret rooms (Tiles.SEAL_LEGEND).
+## The grid holds what each seal is in play; this remembers that it is one.
+var seals: Dictionary = {}
+## The secret rooms, left to right. Each is
+## `{kind, seal: Array[Vector2i], room: Array[Vector2i], cells: Array[Vector2i]}`
+## where `cells` is seal and room together: everything drawn as stone until
+## the secret is found. See _find_secrets().
+var secrets: Array[Dictionary] = []
+## Index of a secret -> true once it has been opened in play.
+var opened: Dictionary = {}
 
 var _grid: PackedInt32Array = PackedInt32Array()
+var _secret_of: Dictionary = {}
 
 
 static func from_file(path: String) -> AsciiLevel:
@@ -83,6 +94,7 @@ func parse(text: String) -> void:
 	_grid.fill(Tiles.Kind.EMPTY)
 	entities.clear()
 	decorations.clear()
+	seals.clear()
 
 	for y: int in rows:
 		var line: String = lines[y]
@@ -106,8 +118,16 @@ func parse(text: String) -> void:
 				})
 				continue
 
+			if Tiles.SEAL_LEGEND.has(glyph):
+				var seal := String(Tiles.SEAL_LEGEND[glyph])
+				seals[Vector2i(x, y)] = seal
+				_grid[y * cols + x] = Tiles.SEAL_KIND[seal]
+				continue
+
 			if Tiles.LEGEND.has(glyph):
 				_grid[y * cols + x] = Tiles.LEGEND[glyph]
+
+	_find_secrets()
 
 
 ## True if the line contains a character that is neither a tile nor an entity
@@ -117,9 +137,137 @@ static func _has_unknown_glyphs(line: String) -> bool:
 		var glyph := line[i]
 		if not (Tiles.LEGEND.has(glyph)
 				or Tiles.ENTITY_LEGEND.has(glyph)
-				or Tiles.DECOR_LEGEND.has(glyph)):
+				or Tiles.DECOR_LEGEND.has(glyph)
+				or Tiles.SEAL_LEGEND.has(glyph)):
 			return true
 	return false
+
+
+## --- secrets ----------------------------------------------------------------
+##
+## A secret is a seal and the room behind it, and the ASCII only marks the
+## seal. The room is found by flooding out from the seal through BACKDROP and
+## entity marks, never through open air: a room is drawn as background masonry
+## with its prize in it, exactly as an author would draw a niche, and the
+## flood stops at the stone around it. That keeps the format to two new glyphs
+## and makes a room impossible to forget to mark.
+##
+## Seals that touch, or share a room, are one secret: a wall two cells tall is
+## one door, and a room with two ways in is still one room. The entity cells a
+## room swallows become BACKDROP so its back wall is unbroken behind the prize.
+func _find_secrets() -> void:
+	secrets.clear()
+	opened.clear()
+	_secret_of.clear()
+	var marked := {}
+	for mark: Dictionary in entities:
+		marked[mark["cell"]] = true
+
+	var starts: Array = seals.keys()
+	starts.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return a.x < b.x or (a.x == b.x and a.y < b.y))
+	for start: Vector2i in starts:
+		if _secret_of.has(start):
+			continue
+		var index := secrets.size()
+		var seal: Array[Vector2i] = []
+		var room: Array[Vector2i] = []
+		var queue: Array[Vector2i] = [start]
+		_secret_of[start] = index
+		while not queue.is_empty():
+			var cell: Vector2i = queue.pop_back()
+			if seals.has(cell):
+				seal.append(cell)
+			else:
+				room.append(cell)
+				if marked.has(cell):
+					_grid[cell.y * cols + cell.x] = Tiles.Kind.BACKDROP
+			for step: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+				var next := cell + step
+				if _secret_of.has(next) or not _in_room(next, marked):
+					continue
+				_secret_of[next] = index
+				queue.append(next)
+		var kind := "false"
+		for cell: Vector2i in seal:
+			if String(seals[cell]) == "cracked":
+				kind = "cracked"
+		var cells: Array[Vector2i] = seal.duplicate()
+		cells.append_array(room)
+		secrets.append({"kind": kind, "seal": seal, "room": room, "cells": cells})
+
+
+func _in_room(cell: Vector2i, marked: Dictionary) -> bool:
+	if cell.x < 0 or cell.y < 0 or cell.x >= cols or cell.y >= rows:
+		return false
+	if seals.has(cell):
+		return true
+	var kind := kind_at(cell.x, cell.y)
+	return kind == Tiles.Kind.BACKDROP or (kind == Tiles.Kind.EMPTY and marked.has(cell))
+
+
+## The secret a cell belongs to, seal or room, or -1.
+func secret_at(cell: Vector2i) -> int:
+	return int(_secret_of.get(cell, -1))
+
+
+## Opens a secret in play: a cracked seal stops being stone. A false one was
+## never stone, so for it this only records that it has been found.
+func open_secret(index: int) -> void:
+	if index < 0 or index >= secrets.size() or opened.has(index):
+		return
+	opened[index] = true
+	for cell: Vector2i in secrets[index]["seal"]:
+		set_kind(cell.x, cell.y, Tiles.Kind.BACKDROP)
+
+
+## A copy with every secret either opened (its seal gone) or shut (its seal
+## solid stone, false or not). `open` maps secret index -> true. This is the
+## hypothetical the reachability proof plays: the level as it is for someone
+## who has found exactly these secrets and walked past the rest.
+func with_secrets(open: Dictionary) -> AsciiLevel:
+	var out := copy()
+	for index: int in secrets.size():
+		for cell: Vector2i in secrets[index]["seal"]:
+			out.set_kind(cell.x, cell.y,
+				Tiles.Kind.BACKDROP if open.has(index) else Tiles.Kind.SOLID)
+	return out
+
+
+## A copy that looks the way the level does before anything is found: every
+## secret not yet opened is solid stone, seal and room alike. The renderer
+## builds the picture from this, so a wall with a room in it is drawn — and
+## dressed, and casts its shadow — as the wall it pretends to be.
+func facade() -> AsciiLevel:
+	var out := copy()
+	for index: int in secrets.size():
+		if opened.has(index):
+			continue
+		for cell: Vector2i in secrets[index]["cells"]:
+			out.set_kind(cell.x, cell.y, Tiles.Kind.SOLID)
+	return out
+
+
+func copy() -> AsciiLevel:
+	var out := AsciiLevel.new()
+	out.cols = cols
+	out.rows = rows
+	out.spawn_point = spawn_point
+	out.entities = entities.duplicate(true)
+	out.decorations = decorations.duplicate(true)
+	out.name = name
+	out.seals = seals.duplicate()
+	out.secrets = secrets.duplicate(true)
+	out.opened = opened.duplicate()
+	out._grid = _grid.duplicate()
+	out._secret_of = _secret_of.duplicate()
+	return out
+
+
+func set_kind(x: int, y: int, kind: Tiles.Kind) -> void:
+	if x < 0 or y < 0 or x >= cols or y >= rows:
+		return
+	_grid[y * cols + x] = kind
 
 
 func kind_at(x: int, y: int) -> Tiles.Kind:
@@ -181,13 +329,19 @@ func to_text() -> String:
 		if glyph_of_id.has(id):
 			decor_glyph[mark["cell"]] = glyph_of_id[id]
 
+	var seal_glyph := {}
+	for glyph: String in Tiles.SEAL_LEGEND:
+		seal_glyph[String(Tiles.SEAL_LEGEND[glyph])] = glyph
+
 	var out := PackedStringArray()
 	for y: int in rows:
 		var line := ""
 		for x: int in cols:
 			var cell := Vector2i(x, y)
 			var k := kind_at(x, y)
-			if k == Tiles.Kind.EMPTY and decor_glyph.has(cell):
+			if seals.has(cell) and not opened.has(secret_at(cell)):
+				line += String(seal_glyph[seals[cell]])
+			elif k == Tiles.Kind.EMPTY and decor_glyph.has(cell):
 				line += String(decor_glyph[cell])
 			else:
 				line += " " if k == Tiles.Kind.EMPTY else String(glyph_for[k])

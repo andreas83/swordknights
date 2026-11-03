@@ -242,6 +242,28 @@ In practice the retry path is cold: across the 240 seeds in
 the grammar and the verifier agreeing, and the suite fails if more than a
 quarter of seeds ever need a retry.
 
+### Secrets
+
+`audit_secrets(level)` is the proof that a secret room (`docs/world.md`) is a
+gift and not a hazard. It plays every subset of opened secrets (up to
+`MAX_SUBSETS_FOR`, then each alone and all together), because a player can be
+anywhere in that lattice, and checks four things:
+
+| Clause | Means | How |
+| --- | --- | --- |
+| never required | with every seal shut, the exit is reachable | `verify()` on `with_secrets({})` — false walls are shut too: the hypothesis is a player who never noticed one |
+| actually secret | with every seal shut, no room can be entered | each room cell touches only its room, its seal or stone; the search moves a body that collides per axis, so a walled room is as unreachable as a flood would say, at none of the cost |
+| findable | with its seal open, each room has a cell to stand in | the survey's reached set |
+| never a trap | opening secrets adds no dead end | `survey()` on each subset; any stranded cell must have been reachable and stranded already with every seal shut |
+
+`survey(level)` is the flood the last clause needs. "Every reachable state can
+still reach the door" is a question about all states at once, so it floods
+every state from the spawn keeping each edge, then walks the edges backwards
+from the door: whatever the backward walk misses is stranded. One pass,
+about 200 ms on a 170-column ruin. None of the shipping or generated levels
+has a stranded cell today, so the shut level is only searched cell by cell
+when an open one turns one up.
+
 ## The 60 Hz detail
 
 Worth knowing about, because it bit this code and will bite the next change.
@@ -343,6 +365,7 @@ godot --headless --path . --script tests/level_solvability_test.gd
 | `level_placement_test` | spawn and exit on solid ground with headroom, no entity in a wall or a hazard or sharing a cell, and that the verifier refuses broken levels |
 | `level_difficulty_test` | the vocabulary gate, hazard and guard density, gap and rise sizes, both ends of the dial playable |
 | `level_solvability_test` | 240 seeds across four lengths and six difficulties, independently re-verified |
+| `unit/test_secret_proof.gd` | the secret audit on the Sun Terrace, and one broken level per clause |
 
 `tests/level_asserts.gd` is the shared helper. It is `preload`ed rather than
 registered with `class_name`, so it cannot collide with a real test framework

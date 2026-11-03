@@ -6,6 +6,11 @@
 ;   @  spawn        *  relic               D  exit door
 ;   t  torch        p  patrol guard        space/. empty
 ;
+; Secrets (docs/world.md). A seal is the only thing marked; the room behind
+; it is the background masonry and the marks it encloses.
+;   %  false wall: walk into it      &  cracked wall: a sword opens it
+;   L  an inscription cut into a secret room's back wall
+;
 ; Architecture (also scripts/world/tiles.gd). None of it collides and none of
 ; it is queried, so a mark here can never change what the character can reach
 ; — decorate freely. Every mark leaves its own cell empty, like an entity mark.
@@ -39,6 +44,11 @@
 ;   5. upper terrace + guard   - the sword
 ;   6. water basin             - a committed running jump
 ;   7. platform stair          - second ledge grab, up to the exit
+;
+; Three secrets, one per act, each teaching the next:
+;   A. the cistern's far wall   - a false doorway; walk through it
+;   B. the high block's face    - a cracked doorway; cut it open
+;   C. under the low platform   - a cracked floor; plunge through it
 
 
 
@@ -52,12 +62,12 @@
                                                                ################
                                   t   p  * V                == ################
   B:                           ##############                  ################
-  B:              |     *      ##############            ==    ################
-  ::A             |    ===     ##############        p *       ################
-  :@:: t      H   |  f    rr   ###################~~###########################
- ############ H  ############  ###################~~###########################
- ############ H  ############  ###################~~###########################
- ############ H  ############  ################################################
- ############ H  ############^^################################################
+  B:              |     *      #######::::::&            ==    ################
+  ::A             |    ===     #######*::L::&        p *       ################
+  :@:: t      H   |  f    rr   ###################~~#####&&####################
+ ############ H  ############  ###################~~##:::::::##################
+ ############ H  ############  ###################~~##:::::::##################
+ ############ H  %::::#######  #######################::::::*##################
+ ############ H  %:::*#######^^################################################
  ##############################################################################
  ##############################################################################

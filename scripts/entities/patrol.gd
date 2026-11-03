@@ -279,7 +279,9 @@ func _beat_ends(grounded: bool) -> bool:
 	if level == null or not grounded:
 		return false
 	var ahead_x := global_position.x + (BODY.x * 0.5 + 2.0) * facing
-	var wall := level.is_solid_at(Vector2(ahead_x, global_position.y - 4.0))
+	# A guard keeps the beat he was posted to, and an unfound secret's false
+	# wall was a wall when he was: he turns at it instead of walking into it.
+	var wall := level.looks_solid_at(Vector2(ahead_x, global_position.y - 4.0))
 	var ground_kind := level.kind_at_world(Vector2(ahead_x, global_position.y + 2.0))
 	var ground := ground_kind == Tiles.Kind.SOLID or ground_kind == Tiles.Kind.PLATFORM
 	return wall or not ground
