@@ -1,6 +1,11 @@
 class_name Duel
-extends Node2D
+extends DuelSim
 ## The duel simulation: two duellists, one arena, a round state machine.
+##
+## This is the ORIGINAL, round-based duel. The tug-of-war match that replaces it
+## lives in scripts/duel/match.gd; both are driven through the same
+## scripts/duel/match_sim.gd surface, which is the only reason they can coexist
+## while the fighter is rebuilt.
 ##
 ## The whole point of this file is `step(bits_a, bits_b)`. One call is one frame,
 ## and that frame is a function of nothing but the duel's own state and those
@@ -42,7 +47,6 @@ const DT := DuelRules.DT
 
 ## --- state: everything step() reads and everything a snapshot carries ------
 
-var frame: int = 0
 var phase: Phase = Phase.COUNTDOWN
 var phase_time: float = 0.0
 var round_index: int = 0
@@ -50,13 +54,6 @@ var scores := PackedInt32Array([0, 0])
 var rounds_to_win: int = DuelRules.ROUNDS_TO_WIN
 var last_round_winner: int = DuelRules.DRAW
 var match_winner: int = DuelRules.DRAW
-
-## Set while frames are being replayed after a correction, so the presentation
-## layer is not told about things it has already shown.
-var replaying := false
-
-## What happened during the last step(). Cleared at the top of every step.
-var events: Array[Dictionary] = []
 
 var players: Array[Player] = []
 var level: Level
@@ -119,6 +116,21 @@ func reset_match() -> void:
 	match_winner = DuelRules.DRAW
 	events.clear()
 	_begin_round()
+
+
+## --- the shared simulation surface -----------------------------------------
+
+func arena_identity() -> int:
+	return NetProtocol.arena_hash(level.data)
+
+
+func match_length() -> int:
+	return rounds_to_win
+
+
+func set_match_length(length: int) -> bool:
+	rounds_to_win = maxi(1, length)
+	return true
 
 
 func arena_size() -> Vector2:
@@ -360,7 +372,7 @@ func checksum() -> int:
 	var words := PackedInt32Array()
 	words.append(frame)
 	words.append(int(phase))
-	words.append(_quantise(phase_time))
+	words.append(quantise(phase_time))
 	words.append(round_index)
 	words.append(scores[DuelRules.SLOT_A])
 	words.append(scores[DuelRules.SLOT_B])
@@ -369,23 +381,5 @@ func checksum() -> int:
 	for slot: int in 2:
 		players[slot].duel_write_state(_scratch, 0)
 		for i: int in Player.DUEL_STATE_FLOATS:
-			words.append(_quantise(_scratch[i]))
+			words.append(quantise(_scratch[i]))
 	return fnv1a(words)
-
-
-const QUANTISE := 256.0
-
-
-static func _quantise(value: float) -> int:
-	return int(roundf(value * QUANTISE))
-
-
-## FNV-1a over the little-endian bytes of each word. Chosen for being four
-## lines long and identical on every platform, not for its collision behaviour.
-static func fnv1a(words: PackedInt32Array) -> int:
-	var hash_value := 0x811c9dc5
-	for word: int in words:
-		for shift: int in [0, 8, 16, 24]:
-			hash_value ^= (word >> shift) & 0xff
-			hash_value = (hash_value * 16777619) & 0xffffffff
-	return hash_value

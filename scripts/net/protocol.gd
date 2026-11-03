@@ -364,4 +364,4 @@ static func arena_hash(arena: AsciiLevel) -> int:
 	for y: int in arena.rows:
 		for x: int in arena.cols:
 			words.append(int(arena.kind_at(x, y)))
-	return Duel.fnv1a(words)
+	return DuelSim.fnv1a(words)

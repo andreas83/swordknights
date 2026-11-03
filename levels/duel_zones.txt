@@ -1,0 +1,26 @@
+; The Tug of War
+;
+; The zone manifest for the duel: the zones of one strip, west to east, one file
+; name per line. Read by scripts/duel/zones.gd.
+;
+; Comments start with ';', exactly as in a level file, and the first comment
+; line is the strip's name. Paths are resolved against this file's own
+; directory, so a strip can be moved without editing it.
+;
+; WHY A MANIFEST AND NOT A LONGER GRID
+; A 200-column ASCII file is not reviewable: a diff of one shows a wall of
+; unchanged stone around the three cells that moved, and nobody can tell which
+; screen they are looking at. One file per zone keeps a change local to the
+; screen it changes, lets a zone be reordered or replaced by editing one line
+; here, and leaves scripts/world/ascii_level.gd exactly as it was -- the
+; parser still parses one grid, and the sequencing lives with the mode that
+; needs it.
+;
+; Three to five zones. Player one pushes west toward zone 1's gate, player two
+; pushes east toward the last zone's gate, and the match starts in the middle.
+
+zone_01.txt
+zone_02.txt
+zone_03.txt
+zone_04.txt
+zone_05.txt

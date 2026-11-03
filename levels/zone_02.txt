@@ -1,0 +1,32 @@
+; The Cistern Court
+;
+; Zone 2 of 5. The strip's one hazard: a four-tile cistern with a single
+; one-way stepping stone hanging over the middle of it. Four tiles wide and not
+; two for the reason levels/arena_01.txt sets out -- across a shorter gap the
+; ledge grab simply catches the far wall and the pit has no teeth.
+;
+; A respawn is never placed in or beside it: scripts/duel/zones.gd only spawns
+; on a flat floor with five clear rows over it.
+
+
+
+
+
+
+
+
+
+
+
+####                                t
+####                          ========
+####          t
+         H=======
+         H
+         H                    ====
+ ::      H
+ ::      H               ##
+ :: t    H         ==   ####
+##################    ##################
+##################    ##################
+##################^^^^##################

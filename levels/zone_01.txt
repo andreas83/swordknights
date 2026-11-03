@@ -1,0 +1,36 @@
+; The West Gate
+;
+; Zone 1 of 5. Player one's endpoint: the arch at the far left, its mouth in
+; shadow and the crowd beyond. Reaching it with the initiative wins the match.
+;
+; Legend (see scripts/world/tiles.gd):
+;   #  solid   =  one-way platform   H  ladder   :  background niche
+;   ^  spikes  t  torch              D  the gate (the endpoint)
+;
+; The gate's lintel sits at rows 13-14, so the five rows above the floor on the
+; approach are clear. That is not decoration: when the leader is pinned at the
+; final zone the opponent spawns right in front of the gate, and the leader has
+; to be able to go over the top of them rather than be forced to fight.
+
+
+
+
+
+
+
+
+
+
+##
+##
+##
+########              t
+########     H========
+:::::::      H
+:::::::      H          ======
+:::::::      H                  t   :::
+:::::::      H                 #### :::
+:D:::::  t   H                ######:::
+########################################
+########################################
+########################################
