@@ -1,163 +1,696 @@
 #!/usr/bin/env python3
 """Generate the tile atlas from the palette.
 
-There are no hand-drawn assets in this project: the terrain atlas is produced
-from the same duotone ramp the rest of the game uses, so re-lighting the world
-(night, interior, storm) is a palette edit plus a re-run of this script rather
-than an art pass.
+There are no hand-drawn assets in this project: the terrain and architecture
+atlas is produced from the same duotone ramp the rest of the game uses, so
+re-lighting the world (night, interior, storm) is a palette edit plus a re-run
+of this script rather than an art pass.
 
     python3 tools/generate_tiles_png.py
 
 Writes assets/tiles.png. Run tools/build_tileset.gd afterwards to rebuild the
 TileSet resource that references it.
+
+THE ATLAS HAS TWO HALVES.
+The top half is every tile as it looks in full sun. The bottom half is the
+SAME tile re-coloured one step down the ramp, as it looks inside a cast
+shadow. The halves are in register: the shade twin of a tile is exactly
+`SHADE_ROW_OFFSET` rows below it, which is what lets the world shader pick
+between them with a constant V offset and a single extra texture fetch (see
+assets/world_shadow.gdshader and docs/world.md).
+
+The shade half is never painted by hand. It is the lit half pushed through
+SHADE_MAP, so the two can never drift and so "re-light the world" stays one
+table edit. Every colour a painter uses must therefore have an entry in
+SHADE_MAP; main() fails loudly if one does not.
 """
 from __future__ import annotations
 
 import pathlib
-from PIL import Image, ImageDraw
+from PIL import Image
 
 TILE = 16
-COLUMNS = 8
-ROWS = 2
+COLUMNS = 16
+LIT_ROWS = 2
+SHADE_ROW_OFFSET = LIT_ROWS
+ROWS = LIT_ROWS * 2
+
+# --- the palette ----------------------------------------------------------
+# Mirrors scripts/core/palette.gd. Names say how a surface faces the light.
 
 INK = (0x2B, 0x0A, 0x14, 255)
 SHADOW_DEEP = (0x7A, 0x12, 0x30, 255)
 SHADOW = (0xB3, 0x21, 0x42, 255)
+SHADOW_WARM = (0xD8, 0x45, 0x2C, 255)
+MID = (0xE8, 0x70, 0x2A, 255)
 LIGHT_WARM = (0xF2, 0xA8, 0x29, 255)
 LIGHT = (0xF7, 0xCE, 0x2E, 255)
+LIGHT_SOFT = (0xFF, 0xE8, 0x73, 255)
+PAPER = (0xFF, 0xF4, 0xC2, 255)
+
 WATER = (0x46, 0xC7, 0xB0, 255)
 WATER_DEEP = (0x1F, 0x8F, 0x86, 255)
+WATER_INK = (0x14, 0x5A, 0x58, 255)
+FOLIAGE = (0x5F, 0xBF, 0x7A, 255)
+FOLIAGE_DARK = (0x2F, 0x7A, 0x4C, 255)
+CLOTH = (0xC6, 0x35, 0x4F, 255)
+CLOTH_DARK = (0x8E, 0x1F, 0x38, 255)
 STEEL = (0x8C, 0x8F, 0xA3, 255)
 STEEL_DARK = (0x5A, 0x5D, 0x70, 255)
+STEEL_INK = (0x39, 0x3B, 0x4A, 255)
+## One tone below SHADOW_DEEP, and the darkest a SURFACE is allowed to go.
+## Black is reserved for joints, voids and the foreground silhouette: a
+## shadowed wall that goes to INK stops being crimson and the duotone breaks.
+SHADOW_PIT = (0x4A, 0x0D, 0x1E, 255)
 CLEAR = (0, 0, 0, 0)
 
-# Overlay tints, applied with `over()`. PIL's `fill` REPLACES a pixel including
-# its alpha rather than compositing, so painting a translucent colour straight
-# onto the atlas would punch a hole in the tile and let the sky show through.
-JOINT_TINT = (0x2B, 0x0A, 0x14, 56)
-LEFT_LIGHT_TINT = (0xF2, 0xA8, 0x29, 82)
+# One step down the ramp. A surface in cast shadow is not "the same colour,
+# darker" -- it is the next tone down, which is what keeps the world duotone
+# instead of muddy. Nothing here brightens.
+SHADE_MAP = {
+    CLEAR: CLEAR,
+    PAPER: MID,
+    LIGHT_SOFT: SHADOW_WARM,
+    LIGHT: SHADOW,
+    LIGHT_WARM: SHADOW_DEEP,
+    MID: SHADOW_DEEP,
+    SHADOW_WARM: SHADOW_DEEP,
+    SHADOW: SHADOW_DEEP,
+    SHADOW_DEEP: SHADOW_PIT,
+    SHADOW_PIT: SHADOW_PIT,
+    INK: INK,
+    WATER: WATER_DEEP,
+    WATER_DEEP: WATER_INK,
+    WATER_INK: WATER_INK,
+    FOLIAGE: FOLIAGE_DARK,
+    FOLIAGE_DARK: FOLIAGE_DARK,
+    CLOTH: CLOTH_DARK,
+    CLOTH_DARK: INK,
+    STEEL: STEEL_DARK,
+    STEEL_DARK: STEEL_INK,
+    STEEL_INK: STEEL_INK,
+}
+
+# The sun. Low from the left: two pixels across for every one down, which is
+# the same vector scripts/render/sun_shadow.gd casts with. Surfaces whose
+# normal points into it are lit; surfaces facing away are not.
+SUN_TO_SURFACE = (2.0, 1.0)
 
 
-def over(tint: tuple[int, int, int, int], base: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
-    """Composite a translucent tint onto an opaque base, returning opaque RGBA."""
-    a = tint[3] / 255.0
-    return (
-        round(tint[0] * a + base[0] * (1 - a)),
-        round(tint[1] * a + base[1] * (1 - a)),
-        round(tint[2] * a + base[2] * (1 - a)),
-        255,
-    )
+# --- a 16x16 scratch tile -------------------------------------------------
 
-CAP_HEIGHT = 4
-BEVEL_HEIGHT = 2
+class Patch:
+    """A pixel buffer with the handful of primitives these tiles need.
 
-# Atlas layout. Keep in sync with scripts/world/tiles.gd.
+    Deliberately not PIL's ImageDraw: at 16 px every tile is placed pixel by
+    pixel, and ImageDraw's anti-aliasing-free-but-off-by-one rectangles cost
+    more time than they save.
+    """
+
+    def __init__(self, width: int, height: int, fill=CLEAR) -> None:
+        self.w = width
+        self.h = height
+        self.px = [[fill for _ in range(width)] for _ in range(height)]
+
+    def set(self, x: int, y: int, c) -> None:
+        if 0 <= x < self.w and 0 <= y < self.h:
+            self.px[y][x] = c
+
+    def get(self, x: int, y: int):
+        if 0 <= x < self.w and 0 <= y < self.h:
+            return self.px[y][x]
+        return CLEAR
+
+    def rect(self, x0: int, y0: int, x1: int, y1: int, c) -> None:
+        """Inclusive on both corners."""
+        for y in range(min(y0, y1), max(y0, y1) + 1):
+            for x in range(min(x0, x1), max(x0, x1) + 1):
+                self.set(x, y, c)
+
+    def hline(self, y: int, x0: int, x1: int, c) -> None:
+        self.rect(x0, y, x1, y, c)
+
+    def vline(self, x: int, y0: int, y1: int, c) -> None:
+        self.rect(x, y0, x, y1, c)
+
+    def fill(self, c) -> None:
+        self.rect(0, 0, self.w - 1, self.h - 1, c)
+
+    def mirror(self) -> "Patch":
+        out = Patch(self.w, self.h)
+        for y in range(self.h):
+            for x in range(self.w):
+                out.px[y][x] = self.px[y][self.w - 1 - x]
+        return out
+
+    def sub(self, x0: int, y0: int, w: int, h: int) -> "Patch":
+        out = Patch(w, h)
+        for y in range(h):
+            for x in range(w):
+                out.px[y][x] = self.get(x0 + x, y0 + y)
+        return out
+
+
+FACE_RAMP = (LIGHT, LIGHT_WARM, SHADOW, SHADOW_DEEP)
+## The arch ring sits on a SHADOW spandrel, so its unlit steps have to go
+## below that or the curve disappears into the wall behind it.
+RING_RAMP = (LIGHT, LIGHT_WARM, SHADOW_DEEP, INK)
+
+
+def lit_by_normal(nx: float, ny: float, ramp=FACE_RAMP):
+    """Pick a tone for a surface from the direction it faces."""
+    length = (nx * nx + ny * ny) ** 0.5 or 1.0
+    # Positive when the normal points back along the incoming ray.
+    d = -(nx * SUN_TO_SURFACE[0] + ny * SUN_TO_SURFACE[1]) / (length * 5.0 ** 0.5)
+    if d > 0.55:
+        return ramp[0]
+    if d > 0.15:
+        return ramp[1]
+    if d > -0.25:
+        return ramp[2]
+    return ramp[3]
+
+
+# --- masonry --------------------------------------------------------------
+
+COURSE = 8  # two courses to a tile
+
+
+def ashlar(p: Patch, body, top_course: int = 0) -> None:
+    """Coursed stone: a lit lip on the top of every course, a dark bed joint
+    under it, and staggered perpends. Three tones is enough to read as stone
+    at 16 px; a noise texture at this size reads as dirt."""
+    lip = MID if body is SHADOW else SHADOW
+    bed = INK if body is SHADOW_DEEP else SHADOW_DEEP
+    course = top_course
+    index = 0
+    while course < TILE:
+        if course >= 0:
+            p.hline(course, 0, TILE - 1, lip)
+        bottom = min(course + COURSE - 1, TILE - 1)
+        if bottom > course:
+            p.hline(bottom, 0, TILE - 1, bed)
+        # Perpends alternate so the courses interlock rather than grid up.
+        jx = 4 if index % 2 == 0 else 12
+        if course + 1 <= bottom - 1:
+            p.vline(jx, course + 1, bottom - 1, bed)
+        course += COURSE
+        index += 1
+
+
+CAP_LIGHT = 3   # gold top surface
+CAP_BEVEL = 1   # warm bevel under it
+CAP_LINE = 1    # the hard line where the top surface ends
+
+
+def solid(capped: bool, lit_left: bool) -> Patch:
+    p = Patch(TILE, TILE)
+    body = SHADOW if capped else SHADOW_DEEP
+    p.fill(body)
+    if capped:
+        top = CAP_LIGHT + CAP_BEVEL + CAP_LINE
+        ashlar(p, body, top_course=top)
+        p.rect(0, 0, TILE - 1, CAP_LIGHT - 1, LIGHT)
+        p.hline(CAP_LIGHT, 0, TILE - 1, LIGHT_WARM)
+        p.hline(CAP_LIGHT + CAP_BEVEL, 0, TILE - 1, SHADOW_WARM)
+    else:
+        ashlar(p, body)
+    if lit_left:
+        # A left-facing vertical face is square to a sun this low, so it is
+        # the brightest thing on a wall after the top surface itself.
+        start = (CAP_LIGHT + CAP_BEVEL + CAP_LINE) if capped else 0
+        p.vline(0, start, TILE - 1, LIGHT_WARM)
+        p.vline(1, start, TILE - 1, MID)
+    return p
+
+
+def platform(_unused=None) -> Patch:
+    """A one-way stone shelf. Corbels under it say 'you can stand here' from
+    a distance, which a plain slab does not."""
+    p = Patch(TILE, TILE)
+    p.rect(0, 0, TILE - 1, 2, LIGHT)
+    p.hline(3, 0, TILE - 1, LIGHT_WARM)
+    p.hline(4, 0, TILE - 1, SHADOW_WARM)
+    p.rect(0, 5, TILE - 1, 6, SHADOW_DEEP)
+    for cx in (2, 8):
+        p.rect(cx, 7, cx + 4, 8, SHADOW_DEEP)
+        p.set(cx, 7, SHADOW)
+    return p
+
+
+def spikes(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    base = TILE - 1
+    p.rect(0, base - 2, TILE - 1, base, SHADOW_DEEP)
+    p.hline(base - 2, 0, TILE - 1, SHADOW)
+    for i in range(4):
+        cx = i * 4 + 2
+        for k in range(11):
+            y = base - 3 - k
+            half = max(0, (10 - k) * 2 // 7)
+            p.rect(cx - half, y, cx + half, y, STEEL)
+            p.rect(cx - half, y, cx - 1, y, STEEL_DARK)
+    return p
+
+
+def water(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    p.rect(0, 2, TILE - 1, TILE - 1, WATER_DEEP)
+    p.hline(2, 0, TILE - 1, WATER)
+    p.hline(3, 0, TILE - 1, WATER)
+    for x in (1, 2, 9, 10):
+        p.set(x, 5, WATER)
+    p.rect(0, TILE - 3, TILE - 1, TILE - 1, WATER_INK)
+    return p
+
+
+def ladder(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    p.rect(3, 0, 4, TILE - 1, SHADOW_DEEP)
+    p.vline(3, 0, TILE - 1, SHADOW)
+    p.rect(TILE - 5, 0, TILE - 4, TILE - 1, SHADOW_DEEP)
+    p.vline(TILE - 5, 0, TILE - 1, SHADOW)
+    for i in range(3):
+        y = 2 + i * 5
+        p.rect(3, y, TILE - 4, y, LIGHT_WARM)
+        p.rect(3, y + 1, TILE - 4, y + 1, SHADOW_DEEP)
+    return p
+
+
+# --- the horseshoe arch ---------------------------------------------------
+#
+# Drawn once at 32x48 and then cut into six tiles, because the curve has to
+# run continuously across the seam. Two cells wide and three tall is the
+# smallest opening a 22 px character walks through without ducking.
+
+ARCH_W, ARCH_H = TILE * 2, TILE * 3
+ARCH_CX, ARCH_CY, ARCH_R = 16.0, 13.0, 12.0
+ARCH_SPRING = 20.0                      # below here the jambs run straight
+ARCH_JAMB = (ARCH_R ** 2 - (ARCH_SPRING - ARCH_CY) ** 2) ** 0.5
+RING = 3.0
+
+
+def _arch_void(x: float, y: float) -> bool:
+    if y <= ARCH_SPRING:
+        return (x - ARCH_CX) ** 2 + (y - ARCH_CY) ** 2 <= ARCH_R ** 2
+    return abs(x - ARCH_CX) <= ARCH_JAMB
+
+
+def _arch_ring(x: float, y: float) -> bool:
+    if _arch_void(x, y):
+        return False
+    if y <= ARCH_SPRING:
+        d = ((x - ARCH_CX) ** 2 + (y - ARCH_CY) ** 2) ** 0.5
+        return d <= ARCH_R + RING
+    return abs(x - ARCH_CX) <= ARCH_JAMB + RING
+
+
+def _arch_normal(x: float, y: float) -> tuple[float, float]:
+    if y <= ARCH_SPRING:
+        return (x - ARCH_CX, y - ARCH_CY)
+    return (1.0 if x > ARCH_CX else -1.0, 0.0)
+
+
+def arch_sheet() -> Patch:
+    p = Patch(ARCH_W, ARCH_H)
+    for y in range(ARCH_H):
+        for x in range(ARCH_W):
+            fx, fy = x + 0.5, y + 0.5
+            if _arch_void(fx, fy):
+                # The light that gets through the opening lands on the wall
+                # behind it, offset down-right along the sun vector. That
+                # patch is the arch's own shape, shifted.
+                through = _arch_void(fx - 7.0, fy - 3.5)
+                p.set(x, y, SHADOW_DEEP if through else INK)
+            elif _arch_ring(fx, fy):
+                nx, ny = _arch_normal(fx, fy)
+                p.set(x, y, lit_by_normal(nx, ny, RING_RAMP))
+            else:
+                p.set(x, y, SHADOW)
+                ashlar_pixel(p, x, y)
+    # A hard keystone so the crown is not just a smooth band.
+    p.rect(14, 0, 17, 2, LIGHT)
+    p.hline(3, 14, 17, LIGHT_WARM)
+    return p
+
+
+def ashlar_pixel(p: Patch, x: int, y: int) -> None:
+    """Coursing for the spandrels of the arch sheet, in sheet coordinates."""
+    if y % COURSE == 0:
+        p.set(x, y, MID)
+    elif y % COURSE == COURSE - 1:
+        p.set(x, y, SHADOW_DEEP)
+    elif x % 8 == (4 if (y // COURSE) % 2 == 0 else 0):
+        p.set(x, y, SHADOW_DEEP)
+
+
+# --- architecture and decoration -----------------------------------------
+
+def backdrop(_unused=None) -> Patch:
+    """Background masonry with a blind recess. Never collides; this is the
+    filler behind a colonnade."""
+    p = Patch(TILE, TILE)
+    p.fill(SHADOW_DEEP)
+    ashlar(p, SHADOW_DEEP)
+    for y in range(TILE):
+        for x in range(TILE):
+            fx, fy = x + 0.5, y + 0.5
+            if _recess(fx, fy, 8.0, 7.0, 5.2, 4.4):
+                # Light rakes in over the left lip and dies on the back wall.
+                p.set(x, y, SHADOW_DEEP if _recess(fx - 4.0, fy - 2.0, 8.0, 7.0, 5.2, 4.4) else INK)
+    _recess_lip(p, 8.0, 7.0, 5.2, 4.4)
+    return p
+
+
+def _recess(fx: float, fy: float, cx: float, cy: float, r: float, half: float) -> bool:
+    """A horseshoe-topped hole: a disc above the springline, straight below."""
+    if fy < cy:
+        return (fx - cx) ** 2 + (fy - cy) ** 2 <= r * r
+    return abs(fx - cx) <= half and fy < TILE
+
+
+def _recess_lip(p: Patch, cx: float, cy: float, r: float, half: float) -> None:
+    """One lit pixel along the sun-facing edge of a recess. Without it a
+    carved hole reads as a sticker rather than as depth."""
+    for y in range(TILE):
+        for x in range(TILE):
+            fx, fy = x + 0.5, y + 0.5
+            if _recess(fx, fy, cx, cy, r, half):
+                continue
+            if (_recess(fx + 1.0, fy, cx, cy, r, half)
+                    or _recess(fx, fy + 1.0, cx, cy, r, half)):
+                p.set(x, y, LIGHT_WARM)
+
+
+def cornice(_unused=None) -> Patch:
+    """A projecting moulding. Lives in the empty cell ABOVE a terrace lip, so
+    its underside is what you see from below and its top is the lit edge."""
+    p = Patch(TILE, TILE)
+    p.hline(9, 0, TILE - 1, SHADOW_WARM)
+    p.rect(0, 10, TILE - 1, 11, LIGHT)
+    p.hline(12, 0, TILE - 1, LIGHT_WARM)
+    p.rect(0, 13, TILE - 1, TILE - 1, SHADOW)
+    for x in range(1, TILE, 4):          # dentils
+        p.rect(x, 14, x + 1, TILE - 1, INK)
+    return p
+
+
+def balustrade(_unused=None) -> Patch:
+    """Posts and a rail, one cell tall, tiling horizontally. Posts are two
+    pixels wide on purpose -- see docs/world.md: a one-pixel caster lands on
+    only half the shadow lanes and casts a dotted shadow."""
+    p = Patch(TILE, TILE)
+    p.rect(0, 2, TILE - 1, 3, LIGHT)
+    p.hline(4, 0, TILE - 1, LIGHT_WARM)
+    p.hline(5, 0, TILE - 1, SHADOW_WARM)
+    for px0 in (1, 6, 11):
+        p.rect(px0, 6, px0 + 3, 12, SHADOW)
+        p.vline(px0, 6, 12, LIGHT_WARM)
+        p.vline(px0 + 3, 6, 12, INK)
+    p.rect(0, 13, TILE - 1, 13, LIGHT_WARM)
+    p.rect(0, 14, TILE - 1, TILE - 1, SHADOW_DEEP)
+    return p
+
+
+def _shaft(p: Patch, y0: int, y1: int) -> None:
+    p.rect(4, y0, 11, y1, SHADOW)
+    p.vline(4, y0, y1, LIGHT_WARM)
+    p.vline(5, y0, y1, MID)
+    p.vline(8, y0, y1, SHADOW_DEEP)
+    p.vline(11, y0, y1, INK)
+
+
+def column_shaft(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    _shaft(p, 0, TILE - 1)
+    return p
+
+
+def column_cap(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    _shaft(p, 7, TILE - 1)
+    p.rect(1, 0, TILE - 2, 1, LIGHT)              # abacus
+    p.hline(2, 1, TILE - 2, LIGHT_WARM)
+    for i in range(4):                            # flaring echinus
+        inset = 2 + i
+        p.rect(inset, 3 + i, TILE - 1 - inset, 3 + i, SHADOW)
+        p.set(inset, 3 + i, LIGHT_WARM)
+        p.set(TILE - 1 - inset, 3 + i, INK)
+    return p
+
+
+def column_base(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    _shaft(p, 0, 8)
+    for i in range(3):                            # flaring torus
+        inset = 3 - i
+        p.rect(inset, 9 + i, TILE - 1 - inset, 9 + i, SHADOW)
+        p.set(inset, 9 + i, LIGHT_WARM)
+        p.set(TILE - 1 - inset, 9 + i, INK)
+    p.hline(12, 0, TILE - 1, LIGHT)               # plinth, lit top
+    p.rect(0, 13, TILE - 1, TILE - 1, SHADOW_DEEP)
+    p.vline(0, 13, TILE - 1, MID)
+    return p
+
+
+def planter(_unused=None) -> Patch:
+    """Green is rationed to living things, so this is the only tile in the
+    terrain set that carries it."""
+    p = Patch(TILE, TILE)
+    for fx, h, lean in ((4, 8, -1), (8, 9, 0), (11, 7, 1)):
+        for k in range(h):
+            x = fx + round(lean * (k * k) / 24.0)
+            p.set(x, 8 - k, FOLIAGE)
+            p.set(x + 1, 8 - k, FOLIAGE_DARK)
+    p.hline(9, 2, TILE - 3, LIGHT)
+    p.hline(10, 2, TILE - 3, LIGHT_WARM)
+    p.rect(2, 11, TILE - 3, TILE - 1, SHADOW)
+    p.vline(2, 11, TILE - 1, LIGHT_WARM)
+    p.vline(TILE - 3, 11, TILE - 1, INK)
+    p.rect(5, 12, 10, 13, SHADOW_DEEP)
+    return p
+
+
+def niche(_unused=None) -> Patch:
+    """A blind recess carved into a wall face. Auto-dressed onto tall walls,
+    which is how a flat rectangle of masonry stops being a placeholder."""
+    p = Patch(TILE, TILE)
+    p.fill(SHADOW)
+    ashlar(p, SHADOW)
+    for y in range(TILE):
+        for x in range(TILE):
+            fx, fy = x + 0.5, y + 0.5
+            if _recess(fx, fy, 8.0, 8.0, 4.6, 3.8):
+                p.set(x, y, INK)
+    _recess_lip(p, 8.0, 8.0, 4.6, 3.8)
+    p.rect(6, 11, 9, 14, SHADOW_DEEP)             # an urn standing in it
+    p.vline(6, 11, 14, SHADOW)
+    p.hline(10, 5, 10, SHADOW_DEEP)
+    p.hline(11, 5, 10, SHADOW)
+    return p
+
+
+def frieze(_unused=None) -> Patch:
+    """A carved band: a row of tiny arches, the cheapest way to make a long
+    wall face read as built rather than poured."""
+    p = Patch(TILE, TILE)
+    p.fill(SHADOW_DEEP)
+    p.hline(0, 0, TILE - 1, LIGHT_WARM)
+    p.hline(1, 0, TILE - 1, MID)
+    for sx in (1, 6, 11):
+        for y in range(4, 12):
+            for x in range(sx, sx + 4):
+                fx, fy = x + 0.5, y + 0.5
+                cx = sx + 2.0
+                inside = abs(fx - cx) <= 1.8 if fy > 6.5 else (fx - cx) ** 2 + (fy - 6.5) ** 2 <= 3.6
+                if inside:
+                    p.set(x, y, INK)
+        p.vline(sx, 4, 11, MID)
+    p.hline(12, 0, TILE - 1, SHADOW)
+    p.hline(13, 0, TILE - 1, LIGHT_WARM)
+    p.rect(0, 14, TILE - 1, TILE - 1, SHADOW_DEEP)
+    return p
+
+
+def banner(_unused=None) -> Patch:
+    """Hanging cloth on the mid-ground. Crimson accent, rationed."""
+    p = Patch(TILE, TILE)
+    p.rect(3, 0, TILE - 4, TILE - 1, CLOTH)
+    p.vline(3, 0, TILE - 1, CLOTH_DARK)
+    p.vline(8, 0, TILE - 1, CLOTH_DARK)
+    p.vline(TILE - 4, 0, TILE - 1, CLOTH_DARK)
+    p.rect(3, 0, TILE - 4, 1, INK)
+    p.rect(4, 2, 7, 2, SHADOW_WARM)
+    return p
+
+
+def fountain_sheet() -> Patch:
+    """Two cells wide. Teal is water and player two and nothing else."""
+    p = Patch(TILE * 2, TILE)
+    p.rect(0, 5, TILE * 2 - 1, 6, LIGHT)          # lit rim
+    p.hline(7, 0, TILE * 2 - 1, LIGHT_WARM)
+    p.rect(0, 8, TILE * 2 - 1, TILE - 1, SHADOW)
+    p.rect(2, 8, TILE * 2 - 3, 10, WATER)
+    p.rect(2, 11, TILE * 2 - 3, TILE - 1, WATER_DEEP)
+    p.rect(4, 8, 6, 8, PAPER)                     # the one specular
+    p.rect(14, 0, 17, 4, WATER)                   # the jet
+    p.vline(14, 0, 4, PAPER)
+    p.rect(0, TILE - 2, TILE * 2 - 1, TILE - 1, SHADOW_DEEP)
+    p.vline(0, 5, TILE - 1, LIGHT_WARM)
+    p.vline(TILE * 2 - 1, 8, TILE - 1, INK)
+    return p
+
+
+# --- the foreground plane -------------------------------------------------
+#
+# Everything below is drawn in front of the player and never above SHADOW_DEEP
+# in tone. The art direction calls this near-silhouette: it is there to be
+# passed behind, not to be looked at.
+
+def fore_rail(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    p.rect(0, 1, TILE - 1, 3, INK)
+    p.hline(1, 0, TILE - 1, SHADOW_DEEP)
+    for px0 in (1, 6, 11):
+        p.rect(px0, 4, px0 + 3, TILE - 1, INK)
+        p.vline(px0, 4, TILE - 1, SHADOW_DEEP)
+    p.rect(0, 12, TILE - 1, 13, INK)
+    p.hline(12, 0, TILE - 1, SHADOW_DEEP)
+    return p
+
+
+def fore_column(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    p.rect(2, 0, TILE - 3, TILE - 1, INK)
+    p.vline(2, 0, TILE - 1, SHADOW_DEEP)
+    p.vline(3, 0, TILE - 1, SHADOW_DEEP)
+    p.vline(8, 0, TILE - 1, SHADOW_DEEP)
+    return p
+
+
+def fore_soffit() -> Patch:
+    """The inside corner of an arch passing in front of the camera. Drawn as
+    a pair; this is the left one."""
+    p = Patch(TILE, TILE)
+    for y in range(TILE):
+        for x in range(TILE):
+            d = ((x + 0.5 - TILE) ** 2 + (y + 0.5 - TILE) ** 2) ** 0.5
+            if d > TILE - 0.5:
+                p.set(x, y, INK)
+            elif d > TILE - 2.0:
+                p.set(x, y, SHADOW_DEEP)
+    return p
+
+
+def fore_cloth(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    p.rect(1, 0, TILE - 2, TILE - 1, CLOTH_DARK)
+    p.rect(1, 0, TILE - 2, 1, INK)
+    for x in (4, 8, 12):
+        p.vline(x, 2, TILE - 1, INK)
+    return p
+
+
+def fore_cloth_tail(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    p.rect(1, 0, TILE - 2, 9, CLOTH_DARK)
+    for x in (4, 8, 12):
+        p.vline(x, 0, 9, INK)
+    for i in range(5):                            # scalloped fringe
+        for x in range(1, TILE - 1):
+            if (x + i) % 5 < 5 - i:
+                p.set(x, 10 + i, CLOTH_DARK)
+    return p
+
+
+# --- atlas layout ---------------------------------------------------------
+# Keep in sync with scripts/world/tiles.gd.
+
 NAMES = [
+    # row 0 -- terrain the player touches, then the mid-ground architecture
     "solid_capped", "solid_capped_lit", "solid_buried", "solid_buried_lit",
     "platform", "spikes", "water", "ladder",
-    "backdrop",
+    "backdrop", "cornice", "balustrade", "column_shaft",
+    "column_cap", "column_base", "planter", "niche",
+    # row 1 -- the arch, the set pieces, then the foreground plane
+    "arch_top_l", "arch_top_r", "arch_mid_l", "arch_mid_r",
+    "arch_leg_l", "arch_leg_r", "fountain_l", "fountain_r",
+    "frieze", "banner", "fore_rail", "fore_column",
+    "fore_soffit_l", "fore_soffit_r", "fore_cloth", "fore_cloth_tail",
 ]
 
 
-def cell(draw: ImageDraw.ImageDraw, index: int) -> tuple[int, int]:
-    return (index % COLUMNS) * TILE, (index // COLUMNS) * TILE
-
-
-def masonry(draw: ImageDraw.ImageDraw, ox: int, oy: int, offset: int, body) -> None:
-    """One horizontal joint and one vertical joint reads as stone without noise."""
-    joint = over(JOINT_TINT, body)
-    joint_y = oy + TILE - 5
-    draw.rectangle([ox, joint_y, ox + TILE - 1, joint_y], fill=joint)
-    jx = ox + offset
-    draw.rectangle([jx, joint_y, jx, oy + TILE - 1], fill=joint)
-
-
-def solid(draw: ImageDraw.ImageDraw, ox: int, oy: int, capped: bool, lit_left: bool) -> None:
-    body = SHADOW if capped else SHADOW_DEEP
-    draw.rectangle([ox, oy, ox + TILE - 1, oy + TILE - 1], fill=body)
-    if capped:
-        draw.rectangle([ox, oy, ox + TILE - 1, oy + CAP_HEIGHT - 1], fill=LIGHT)
-        draw.rectangle(
-            [ox, oy + CAP_HEIGHT, ox + TILE - 1, oy + CAP_HEIGHT + BEVEL_HEIGHT - 2],
-            fill=LIGHT_WARM,
-        )
-    masonry(draw, ox, oy, TILE // 2 if capped else TILE // 4, body)
-    if lit_left:
-        top = oy + (CAP_HEIGHT if capped else 0)
-        draw.rectangle([ox, top, ox, oy + TILE - 1], fill=over(LEFT_LIGHT_TINT, body))
-
-
-def platform(draw: ImageDraw.ImageDraw, ox: int, oy: int) -> None:
-    draw.rectangle([ox, oy, ox + TILE - 1, oy + CAP_HEIGHT - 1], fill=LIGHT)
-    draw.rectangle(
-        [ox, oy + CAP_HEIGHT, ox + TILE - 1, oy + CAP_HEIGHT], fill=LIGHT_WARM
-    )
-
-
-def spikes(draw: ImageDraw.ImageDraw, ox: int, oy: int) -> None:
-    base = oy + TILE - 1
-    draw.rectangle([ox, base - 2, ox + TILE - 1, base], fill=SHADOW_DEEP)
-    count = 4
-    step = TILE // count
-    for i in range(count):
-        sx = ox + i * step
-        tip_y = base - int(TILE * 0.72)
-        draw.polygon(
-            [(sx + step / 2, tip_y), (sx + step - 1, base - 2), (sx, base - 2)],
-            fill=STEEL,
-        )
-        draw.polygon(
-            [(sx + step / 2, tip_y), (sx + step / 2, base - 2), (sx, base - 2)],
-            fill=STEEL_DARK,
-        )
-
-
-def water(draw: ImageDraw.ImageDraw, ox: int, oy: int) -> None:
-    draw.rectangle([ox, oy + 2, ox + TILE - 1, oy + TILE - 1], fill=WATER_DEEP)
-    draw.rectangle([ox, oy + 2, ox + TILE - 1, oy + 3], fill=WATER)
-
-
-def ladder(draw: ImageDraw.ImageDraw, ox: int, oy: int) -> None:
-    draw.rectangle([ox + 3, oy, ox + 4, oy + TILE - 1], fill=SHADOW_DEEP)
-    draw.rectangle([ox + TILE - 5, oy, ox + TILE - 4, oy + TILE - 1], fill=SHADOW_DEEP)
-    for i in range(3):
-        y = oy + 2 + i * 5
-        draw.rectangle([ox + 3, y, ox + TILE - 4, y + 1], fill=LIGHT_WARM)
-
-
-def backdrop(draw: ImageDraw.ImageDraw, ox: int, oy: int) -> None:
-    """A recessed arch niche: the Moorish motif that reads even at 16 px."""
-    draw.rectangle([ox, oy, ox + TILE - 1, oy + TILE - 1], fill=SHADOW_DEEP)
-    left, right = ox + 3, ox + TILE - 4
-    radius = (right - left) / 2
-    draw.rectangle([left, oy + 4 + radius, right, oy + TILE - 1], fill=INK)
-    draw.pieslice([left, oy + 4, right, oy + 4 + 2 * radius], 180, 360, fill=INK)
+def build_patches() -> dict:
+    sheet = arch_sheet()
+    basin = fountain_sheet()
+    soffit = fore_soffit()
+    out = {
+        "solid_capped": solid(True, False),
+        "solid_capped_lit": solid(True, True),
+        "solid_buried": solid(False, False),
+        "solid_buried_lit": solid(False, True),
+        "platform": platform(),
+        "spikes": spikes(),
+        "water": water(),
+        "ladder": ladder(),
+        "backdrop": backdrop(),
+        "cornice": cornice(),
+        "balustrade": balustrade(),
+        "column_shaft": column_shaft(),
+        "column_cap": column_cap(),
+        "column_base": column_base(),
+        "planter": planter(),
+        "niche": niche(),
+        "fountain_l": basin.sub(0, 0, TILE, TILE),
+        "fountain_r": basin.sub(TILE, 0, TILE, TILE),
+        "frieze": frieze(),
+        "banner": banner(),
+        "fore_rail": fore_rail(),
+        "fore_column": fore_column(),
+        "fore_soffit_l": soffit,
+        "fore_soffit_r": soffit.mirror(),
+        "fore_cloth": fore_cloth(),
+        "fore_cloth_tail": fore_cloth_tail(),
+    }
+    for i, part in enumerate(("arch_top_l", "arch_top_r", "arch_mid_l",
+                              "arch_mid_r", "arch_leg_l", "arch_leg_r")):
+        out[part] = sheet.sub((i % 2) * TILE, (i // 2) * TILE, TILE, TILE)
+    return out
 
 
 def main() -> None:
-    image = Image.new("RGBA", (COLUMNS * TILE, ROWS * TILE), CLEAR)
-    draw = ImageDraw.Draw(image)
+    patches = build_patches()
+    missing = [n for n in NAMES if n not in patches]
+    if missing:
+        raise SystemExit("no painter for %s" % ", ".join(missing))
 
-    painters = {
-        "solid_capped": lambda d, x, y: solid(d, x, y, True, False),
-        "solid_capped_lit": lambda d, x, y: solid(d, x, y, True, True),
-        "solid_buried": lambda d, x, y: solid(d, x, y, False, False),
-        "solid_buried_lit": lambda d, x, y: solid(d, x, y, False, True),
-        "platform": platform,
-        "spikes": spikes,
-        "water": water,
-        "ladder": ladder,
-        "backdrop": backdrop,
-    }
+    image = Image.new("RGBA", (COLUMNS * TILE, ROWS * TILE), CLEAR)
+    unknown = set()
 
     for index, name in enumerate(NAMES):
-        ox, oy = cell(draw, index)
-        painters[name](draw, ox, oy)
+        ox, oy = (index % COLUMNS) * TILE, (index // COLUMNS) * TILE
+        patch = patches[name]
+        for y in range(TILE):
+            for x in range(TILE):
+                c = patch.get(x, y)
+                image.putpixel((ox + x, oy + y), c)
+                shade = SHADE_MAP.get(c)
+                if shade is None:
+                    unknown.add(c)
+                    shade = c
+                image.putpixel((ox + x, oy + y + SHADE_ROW_OFFSET * TILE), shade)
+
+    if unknown:
+        raise SystemExit(
+            "colours with no SHADE_MAP entry (the shade half would be wrong): %s"
+            % ", ".join("#%02x%02x%02x" % c[:3] for c in sorted(unknown))
+        )
 
     out = pathlib.Path(__file__).resolve().parent.parent / "assets" / "tiles.png"
     out.parent.mkdir(parents=True, exist_ok=True)
     image.save(out)
-    print(f"wrote {out} ({image.width}x{image.height}, {len(NAMES)} tiles)")
+    print("wrote %s (%dx%d, %d tiles + %d shade twins)"
+          % (out, image.width, image.height, len(NAMES), len(NAMES)))
 
 
 if __name__ == "__main__":

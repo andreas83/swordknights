@@ -17,6 +17,10 @@ var rows: int = 0
 var spawn_point: Vector2i = Vector2i(2, 2)
 ## Array of { kind: String, cell: Vector2i }
 var entities: Array[Dictionary] = []
+## Array of { id: String, cell: Vector2i }. Architecture the author placed by
+## hand. WorldDresser merges these with the rules it applies automatically, so
+## a level can be decorated, left alone, or anything in between.
+var decorations: Array[Dictionary] = []
 var name: String = "Untitled"
 
 var _grid: PackedInt32Array = PackedInt32Array()
@@ -78,6 +82,7 @@ func parse(text: String) -> void:
 	_grid.resize(cols * rows)
 	_grid.fill(Tiles.Kind.EMPTY)
 	entities.clear()
+	decorations.clear()
 
 	for y: int in rows:
 		var line: String = lines[y]
@@ -92,6 +97,15 @@ func parse(text: String) -> void:
 					entities.append({"kind": kind, "cell": Vector2i(x, y)})
 				continue
 
+			# Architecture leaves the cell empty, exactly like an entity mark.
+			# That is the whole safety property: decorating a level cannot
+			# move a wall or close a gap.
+			if Tiles.DECOR_LEGEND.has(glyph):
+				decorations.append({
+					"id": String(Tiles.DECOR_LEGEND[glyph]), "cell": Vector2i(x, y),
+				})
+				continue
+
 			if Tiles.LEGEND.has(glyph):
 				_grid[y * cols + x] = Tiles.LEGEND[glyph]
 
@@ -101,7 +115,9 @@ func parse(text: String) -> void:
 static func _has_unknown_glyphs(line: String) -> bool:
 	for i: int in line.length():
 		var glyph := line[i]
-		if not (Tiles.LEGEND.has(glyph) or Tiles.ENTITY_LEGEND.has(glyph)):
+		if not (Tiles.LEGEND.has(glyph)
+				or Tiles.ENTITY_LEGEND.has(glyph)
+				or Tiles.DECOR_LEGEND.has(glyph)):
 			return true
 	return false
 
@@ -147,17 +163,33 @@ func atlas_for(x: int, y: int) -> Vector2i:
 
 func to_text() -> String:
 	## Round-trips the grid back to ASCII. Used by the level tools and tests.
+	## Decoration marks round-trip too: they sit in empty cells, so there is
+	## never a glyph to choose between terrain and architecture.
 	var glyph_for := {}
 	for glyph: String in Tiles.LEGEND:
 		var k: int = Tiles.LEGEND[glyph]
 		if k != Tiles.Kind.EMPTY and not glyph_for.has(k):
 			glyph_for[k] = glyph
 
+	var glyph_of_id := {}
+	for glyph: String in Tiles.DECOR_LEGEND:
+		glyph_of_id[String(Tiles.DECOR_LEGEND[glyph])] = glyph
+
+	var decor_glyph := {}
+	for mark: Dictionary in decorations:
+		var id := String(mark["id"])
+		if glyph_of_id.has(id):
+			decor_glyph[mark["cell"]] = glyph_of_id[id]
+
 	var out := PackedStringArray()
 	for y: int in rows:
 		var line := ""
 		for x: int in cols:
+			var cell := Vector2i(x, y)
 			var k := kind_at(x, y)
-			line += " " if k == Tiles.Kind.EMPTY else String(glyph_for[k])
+			if k == Tiles.Kind.EMPTY and decor_glyph.has(cell):
+				line += String(decor_glyph[cell])
+			else:
+				line += " " if k == Tiles.Kind.EMPTY else String(glyph_for[k])
 		out.append(line.rstrip(" "))
 	return "\n".join(out)

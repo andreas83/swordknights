@@ -6,6 +6,25 @@
 ;   @  spawn        *  relic               D  exit door
 ;   t  torch        p  patrol guard        space/. empty
 ;
+; Architecture (also scripts/world/tiles.gd). None of it collides and none of
+; it is queried, so a mark here can never change what the character can reach
+; — decorate freely. Every mark leaves its own cell empty, like an entity mark.
+;   A  horseshoe arch, anchored at the BOTTOM-LEFT of a 2x3 opening
+;   |  column (a vertical run grows a capital and a base)
+;   b  balustrade    _  cornice     F  frieze      n  niche
+;   V  planter       f  fountain (anchored at its LEFT cell)   B  banner
+;   r  foreground railing            I  foreground column
+;   S  s  foreground arch soffit, left and right
+;   c  foreground hanging cloth (a vertical run grows a fringe)
+;
+; Most of this level is NOT marked up, on purpose: scripts/world/dresser.gd
+; dresses terrain automatically — arcades into wall faces, cornices and
+; balustrades along terrace lips, a colonnade down a wide terrace, foreground
+; archways — and a level that had to be marked by hand would mean generated
+; levels could never look like this one. The marks below are the exceptions a
+; rule cannot guess: the arch framing the spawn, the fountain, the column and
+; railing on the cistern terrace, the banners, the planter on the high terrace.
+;
 ; Vertical spacing is a design language, not a free choice:
 ;   2-tile rise -> plain hop
 ;   3-tile rise -> needs a one-way platform step
@@ -31,11 +50,11 @@
                                                                ################
                                                                ################
                                                                ################
-                                  t   p  *                  == ################
-  ::::                         ##############                  ################
-  ::::                  *      ##############            ==    ################
-  ::::                 ===     ##############        p *       ################
-  :@:: t      H                ###################~~###########################
+                                  t   p  * V                == ################
+  B:                           ##############                  ################
+  B:              |     *      ##############            ==    ################
+  ::A             |    ===     ##############        p *       ################
+  :@:: t      H   |  f    rr   ###################~~###########################
  ############ H  ############  ###################~~###########################
  ############ H  ############  ###################~~###########################
  ############ H  ############  ################################################
