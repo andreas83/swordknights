@@ -142,6 +142,7 @@ match that.
 | `docs/duel-combat.md` | how a duel frame resolves: matrix, clash, parry, disarm window |
 | `docs/duel-match.md` | the tug-of-war: initiative, zones, respawn, gore, open items |
 | `docs/level-generation.md` | segment grammar, reachability proof |
+| `docs/campaign.md` | the Adventure's campaign bible: chapters, bestiary, mechanisms, build plan |
 | `docs/netplay.md` | host-authoritative prediction and reconciliation over WebSocket |
 | `docs/audio.md` | synthesis, buses, adding a voice |
 | `docs/ci.md` | workflows, secrets, what the repository owner must enable |

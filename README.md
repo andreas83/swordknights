@@ -264,6 +264,7 @@ xvfb-run -a godot --path . --rendering-driver opengl3 \
 | [`docs/duel-combat.md`](docs/duel-combat.md) | how a duel frame resolves: matrix, clash, parry, disarm window |
 | [`docs/duel-match.md`](docs/duel-match.md) | the tug-of-war: initiative, zones, respawn, gore, open items |
 | [`docs/level-generation.md`](docs/level-generation.md) | segment grammar and the reachability proof |
+| [`docs/campaign.md`](docs/campaign.md) | the campaign bible: five chapters, the bestiary, the mechanisms, the build plan |
 | [`docs/netplay.md`](docs/netplay.md) | host-authoritative prediction and reconciliation |
 | [`docs/audio.md`](docs/audio.md) | synthesis, buses, adding a voice |
 | [`docs/ci.md`](docs/ci.md) | workflows, secrets, what the repository owner must enable |
