@@ -121,24 +121,72 @@ var _hw := {}
 
 
 func _ready() -> void:
+	_bind()
+
+
+## --- the body this figure is drawn for -------------------------------------
+##
+## Everything this class reads from the character it dresses goes through the
+## eight methods below, so another kind of character can wear the same figure.
+## FighterArt overrides them to dress a duel Fighter; for the prince they read
+## the Player exactly as this file always did.
+
+## Finds the character and listens to it. False if there is nothing to dress.
+func _bind() -> bool:
 	_player = get_parent() as Player
 	if _player == null:
-		return
+		return false
 	_player.landed.connect(_on_landed)
 	_player.jumped.connect(_on_jumped)
 	_player.hurt.connect(_on_hurt)
 	_player.died.connect(_on_died)
 	PlayerFx.attach(_player)
+	return true
+
+
+func _has_body() -> bool:
+	return _player != null
+
+
+func _body_facing() -> int:
+	return _player.facing
+
+
+## (forward speed, fall speed) as shares of the character's top speeds, for
+## the cloth's lag.
+func _body_motion() -> Vector2:
+	return Vector2(
+		_player.velocity.x * _player.facing / Tuning.RUN_SPEED,
+		_player.velocity.y / Tuning.MAX_FALL_SPEED
+	)
+
+
+## How fast the run cycle turns over, as a share of top speed.
+func _speed_share() -> float:
+	return absf(_player.velocity.x) / Tuning.RUN_SPEED
+
+
+## True on frames the figure is not drawn at all: the invulnerability flicker.
+func _skip_frame() -> bool:
+	return _player.invulnerable > 0.0 and int(_time * 20.0) % 2 == 0
+
+
+## Whether the blade is drawn in front of the robe rather than behind it.
+func _blade_in_front() -> bool:
+	return _player.state == Player.State.ATTACK
+
+
+func _show_grip() -> bool:
+	return _player.is_hanging()
 
 
 func _process(delta: float) -> void:
 	_time += delta
 	_impulse_t += delta
 	_flash = maxf(0.0, _flash - delta / FLASH_TIME)
-	if _player != null:
-		var forward := _player.velocity.x * _player.facing / Tuning.RUN_SPEED
-		var drop := _player.velocity.y / Tuning.MAX_FALL_SPEED
-		var target := Vector2(clampf(forward, -1.5, 1.5), clampf(drop, -1.2, 1.2))
+	if _has_body():
+		var motion := _body_motion()
+		var target := Vector2(clampf(motion.x, -1.5, 1.5), clampf(motion.y, -1.2, 1.2))
 		_sway = _sway.lerp(target, 1.0 - exp(-delta * CLOTH_CHASE))
 	queue_redraw()
 
@@ -181,10 +229,10 @@ func _squash_impulse() -> float:
 ## --- drawing ---------------------------------------------------------------
 
 func _draw() -> void:
-	if _player == null:
+	if not _has_body():
 		return
 	# Invulnerability flicker: skip whole frames so the hit reads clearly.
-	if _player.invulnerable > 0.0 and int(_time * 20.0) % 2 == 0:
+	if _skip_frame():
 		return
 
 	var pose := _posture()
@@ -200,7 +248,7 @@ func _draw() -> void:
 	_draw_arm(_hand_back, _c(cloth_dark))
 	# At rest the blade hangs behind the robe and only its point shows past the
 	# hem; during a swing it comes round in front of everything.
-	var swinging := _player.state == Player.State.ATTACK
+	var swinging := _blade_in_front()
 	if not swinging:
 		_draw_weapon(pose)
 	_draw_robe(pose)
@@ -209,7 +257,7 @@ func _draw() -> void:
 	if swinging:
 		_draw_weapon(pose)
 	_draw_hood(pose)
-	if _player.is_hanging():
+	if _show_grip():
 		_draw_grip()
 
 
@@ -432,7 +480,7 @@ func _fwd(points: Array) -> PackedVector2Array:
 ## Turns a pose into points. Everything that depends on `facing`, `squash`,
 ## `lean` or `sink` happens exactly once, here.
 func _rig(pose: Dictionary) -> void:
-	_f = float(_player.facing)
+	_f = float(_body_facing())
 
 	var squash: float = clampf(float(pose["squash"]) + _squash_impulse(), 0.55, 1.3)
 	var width: float = clampf(1.0 / squash, 0.82, 1.28)
@@ -616,7 +664,7 @@ func _walk(t: float) -> Dictionary:
 ## it and swings against it — cloth pulled the other way by the leg that just
 ## went through it.
 func _run(t: float) -> Dictionary:
-	var speed := absf(_player.velocity.x) / Tuning.RUN_SPEED
+	var speed := _speed_share()
 	var c := sin(t * lerpf(13.0, 19.0, clampf(speed, 0.0, 1.0)))
 	return _pose({
 		"lean": 3.1,

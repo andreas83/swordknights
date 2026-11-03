@@ -208,6 +208,42 @@ frame, because the state machine keeps running underneath — and captures a
 frame with the feet on a fixed mark, so a fixed crop lands on the character
 every time.
 
+## The duel fighter wears the same figure
+
+The duel's `Fighter` is a different character with a different state machine,
+but it is drawn by the same rig. `scripts/duel/fighter_art.gd` extends
+`PlayerArt` and overrides the eight methods through which `PlayerArt` reads the
+body it dresses — `_bind()`, `_has_body()`, `_body_facing()`, `_body_motion()`,
+`_speed_share()`, `_skip_frame()`, `_blade_in_front()`, `_show_grip()` — plus
+`_grounded()` and `_posture()`. For the prince those methods read the `Player`
+exactly as before; a pixel comparison of level 1 before and after the change
+showed no difference anywhere on him.
+
+![every duel state](fighter-poses.png)
+
+What the fighter adds is one rule: **the sword is drawn where the simulation's
+blade rect is.** Same height as the stance band, same reach, the front hand
+moved onto its hilt in `_rig()`. The duel is decided by where that rectangle
+is, so the picture of the sword *is* the rectangle, and HIGH, MID and LOW read
+at a glance. When the blade is held but not up — a roll, a dive, the recovery
+of a thrust that missed — it is carried on the pose's angle instead, visibly
+lowered, because a fighter who missed has to be seen to be open.
+
+The same honesty applies to the body. Each pose was checked against the
+fighter's hurtbox with the overlay on, and three were changed to fit it: the
+roll pitches forward rather than folding down (the hood keeps its size, so a
+deep fold pushed the hips through the floor); the sweep stays half upright,
+because a sweeping fighter keeps its full-height hurtbox; and a downed fighter
+sits back inside its small box instead of lying full length past it.
+
+Seat two wears `Palette.WATER_DEEP`, `WATER_SHADE` and `WATER_NIGHT` in place of
+the prince's crimson steps.
+
+```bash
+xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1280x720 \
+  --script tests/fighter_poses.gd -- --out docs/fighter-poses.png [--hitboxes]
+```
+
 ## Tests
 
 ```bash

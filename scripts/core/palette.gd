@@ -22,6 +22,11 @@ const PAPER := Color("fff4c2")
 
 const WATER := Color("46c7b0")
 const WATER_DEEP := Color("1f8f86")
+## Player two's cloth in shade and its cloak: the same two steps down from
+## WATER_DEEP that CLOTH_DARK and SHADOW_DEEP are from CLOTH. Teal is water's and
+## player two's, nobody else's (docs/art-direction.md).
+const WATER_SHADE := Color("12605d")
+const WATER_NIGHT := Color("0b3a3c")
 const FOLIAGE := Color("5fbf7a")
 const CLOTH := Color("c6354f")
 const CLOTH_DARK := Color("8e1f38")

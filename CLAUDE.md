@@ -94,7 +94,7 @@ matching neither is silently skipped, which loses the coverage *and* leaves the
 build green. These match neither on purpose — support libraries
 (`duel_support.gd`, `fighter_support.gd`, `level_asserts.gd`), a live network
 harness (`net_live.gd`), and renderers for documentation images
-(`character_poses.gd`, `feel_frames.gd`, `ui_screens.gd`). A new file that is
+(`character_poses.gd`, `fighter_poses.gd`, `feel_frames.gd`, `ui_screens.gd`). A new file that is
 none of those and matches neither convention is a test nobody runs.
 
 A green suite is not evidence on its own. This repository has produced five

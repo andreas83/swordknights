@@ -8,8 +8,7 @@ of blades resolves is [`duel-combat.md`](duel-combat.md).
 ![Three frames of a demo match](duel-match.png)
 
 *Rendered with `tools/screenshot.gd` from `scenes/duel_match.tscn --demo`, on
-the real fighter. The fighters are drawn as their own hitboxes — body, blade,
-dropped sword — by `scripts/duel/fighter_art.gd`; see "Status". The demo's
+the real fighter, in the prince's figure (`scripts/duel/fighter_art.gd`). The demo's
 kills are scripted so a screenshot at a given second is always the same one.
 Rings are respawn timers, the track at the top is zone and initiative.*
 
@@ -167,11 +166,11 @@ Open before the match replaces the round duel:
    ledge and mark survived and the share of respawnable floor held at about
    half. The respawn lead is 1.5 × 480 = 720 px. `--framing=<px>` still frames
    a fixed width, for comparisons.
-2. **The fighter is drawn as its hitboxes.** `fighter_art.gd` argues for it:
-   the rectangles are what decides a duel, so the art that shows them teaches
-   the game. It reads, but next to the prince's rig in `player_art.gd` it is a
-   placeholder, and the larger the zone choice makes the fighter, the more it
-   shows.
+2. ~~The fighter is drawn as its hitboxes.~~ **The fighter wears the
+   prince's figure** (`fighter_art.gd` extends `PlayerArt`), with the sword
+   drawn exactly on the simulation's blade rect. See
+   [`character.md`](character.md#the-duel-fighter-wears-the-same-figure) and
+   `docs/fighter-poses.png`.
 3. **The zones are bare.** `zones_view.gd` builds its own tilemap, so the
    architecture and cast shadows in [`world.md`](world.md) do not run on them.
 4. **The HUD is on the fallback font**, not the game's typeface ([`ui.md`](ui.md)).
