@@ -107,6 +107,22 @@ func test_cpu_against_cpu_always_finishes() -> void:
 	assert_lte(float(drowned), float(deaths) * HAZARD_SHARE, "hazard deaths are rare")
 
 
+## A human who takes the initiative and then does not run home -- the input
+## stream below wanders east, away from seat one's gate, sweeping and
+## snatching -- has to be gone and got. The computer used to wait for them on
+## its respawn ground for as long as they stood there in a sweep, and then
+## refuse to cross the spike pit nine hundred pixels away to reach them: half
+## of these matches never ended.
+func test_a_leader_who_will_not_run_is_fetched() -> void:
+	await wait_physics_frames(1)
+	for i: int in 4:
+		var cpu := DuelCpu.new(1, DuelBrain.Difficulty.EASY, 5000 + i)
+		var bout := Cpu.bout(get_tree().root, _strip,
+			[Cpu.scripted_human(LIMIT, 600 + i), cpu], LIMIT)
+		assert_true(bool(bout["over"]), "against wandering hands #%d: over in %d frames"
+			% [i, bout["frames"]])
+
+
 ## A human who presses things -- the stream the determinism suites use -- against
 ## a MEDIUM computer, seed by seed.
 func _traced(frames: int, seed_value: int) -> Dictionary:

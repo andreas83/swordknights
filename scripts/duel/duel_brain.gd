@@ -338,9 +338,11 @@ func _fence(view: DuelView, want: Want, hold: bool = false) -> void:
 		return
 
 	if d > edge + 2.0:
-		# Close the distance -- unless the moat or the pit is between them, in
-		# which case the other one can do the crossing, and land in reach.
-		if hold or DuelFeet.gap_between(view.strip, me, _their_x(view)):
+		# Close the distance -- unless the moat or the pit is between them and
+		# they are near it, in which case the other one can do the crossing,
+		# and land in reach. Far off, it is only ground to cover.
+		var near_gap := d < ENGAGE and DuelFeet.gap_between(view.strip, me, _their_x(view))
+		if hold or near_gap:
 			_face(want, me, toward)
 		else:
 			want.dir = toward
@@ -680,7 +682,9 @@ func _intercept(view: DuelView, want: Want) -> void:
 				want.attack = true
 				_cool = tuning.thrust_frames + COOLDOWN
 			return
-		var coming := signf(them.velocity.x) == float(their_way) or not them.is_free()
+		# Coming is moving toward their gate, now. A fighter standing in a
+		# sweep or a snatch is not on the way, however long they stand there.
+		var coming := signf(them.velocity.x) == float(their_way)
 		if d > ENGAGE and (coming or _waited < WAIT):
 			# The respawn put this fighter on open ground ahead of them. Wait
 			# there, blade up, facing them, while they come to it -- and go and
