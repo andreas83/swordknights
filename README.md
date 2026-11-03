@@ -1,7 +1,9 @@
 # Swordknights
 
 A mobile-first platform adventure in the spirit of *Prince of Persia*:
-deliberate, weighty movement, ledge grabs, and a sun-bleached duotone city.
+deliberate, weighty movement, ledge grabs, and a sun-bleached duotone city —
+plus a two-player sword duel in the spirit of *Nidhogg*, playable on one
+keyboard or over the network.
 
 Built with **Godot 4.5.1**. There are no hand-drawn assets — terrain, skyline,
 characters and effects are all generated or drawn from one small palette.
@@ -36,6 +38,20 @@ Ledge grabs happen automatically when you fall past a grabbable corner while
 moving into it; press up (or jump) to mantle, down to let go. Hold down and
 press jump to drop through a one-way platform.
 
+In the local duel both players share one keyboard. A Godot action cannot tell
+two gamepads apart, so these bindings are keyboard-only by design:
+
+| Action       | Player one | Player two          |
+| ------------ | ---------- | ------------------- |
+| Move         | `W A S D`  | Arrows / numpad `8456` |
+| Jump         | `Space` / `V` | `K` / numpad `0` |
+| Sword        | `F`        | `J` / numpad `1`    |
+| Guard        | `G`        | `L` / numpad `2`    |
+| Walk (slow)  | `Shift`    | `;` / numpad `3`    |
+
+The networked duel uses the single-player bindings above, plus `Q` / `L` or
+R1 to guard.
+
 ## Project layout
 
 ```
@@ -49,8 +65,10 @@ scripts/
   ui/        HUD, menu, touch controls
   audio/     synthesis, mixer autoload, character sounds, music
   levels/    segment grammar, generator, reachability verifier
-scenes/      boot, menu, game, player, touch controls
-levels/      ASCII level files
+  duel/      two-player duel: rules, camera, HUD, art, local and online hosts
+  net/       transport, protocol, session, lobby, rendezvous server
+scenes/      boot, menu, game, player, duel, rendezvous, touch controls
+levels/      ASCII level and arena files
 assets/      generated tile atlas + TileSet
 tools/       project configuration, asset generation, screenshots
 tests/       headless test scripts
@@ -122,6 +140,23 @@ xvfb-run -a godot --path . --rendering-driver opengl3 \
   --scene res://scenes/game.tscn --out /tmp/shots --shots 1,3,6 --hold move_right
 ```
 
+## Documentation
+
+| | |
+| --- | --- |
+| [`docs/architecture.md`](docs/architecture.md) | layers, fixed timestep, collision, the input seam |
+| [`docs/art-direction.md`](docs/art-direction.md) | the look-and-feel thesis: one low sun, cast shadows, hard edges |
+| [`docs/character.md`](docs/character.md) | pose vocabulary, secondary motion, the feel lab |
+| [`docs/duel-spec.md`](docs/duel-spec.md) | the Nidhogg duel specification, with three engineering objections |
+| [`docs/level-generation.md`](docs/level-generation.md) | segment grammar and the reachability proof |
+| [`docs/netplay.md`](docs/netplay.md) | host-authoritative prediction and reconciliation |
+| [`docs/audio.md`](docs/audio.md) | synthesis, buses, adding a voice |
+| [`docs/ci.md`](docs/ci.md) | workflows, secrets, what the repository owner must enable |
+
+Contributors — human or agent — should start at [`CLAUDE.md`](CLAUDE.md): one
+command to run every check, and the invariants that are not safe to change
+quietly.
+
 ## Status
 
 Working: tilemap world with solid, one-way, ladder and hazard tiles; the full
@@ -131,9 +166,14 @@ and patrol guards; dead-zone follow camera; procedural parallax skyline; HUD;
 keyboard, gamepad and touch input; mode menu; build, test and release
 pipeline; procedural level generation with a reachability proof; procedural
 audio — synthesised sound effects, an Andalusian music loop with an intensity
-parameter, and persisted volume and mute settings.
+parameter, and persisted volume and mute settings; a two-player duel, both on
+one keyboard and over the network, with host-authoritative prediction,
+reconciliation and a desync test.
 
-In progress on a feature branch: a two-player duel mode over the network.
+In progress: rebuilding the duel on the *Nidhogg* model — one hit kills, three
+sword stances that clash or kill, disarm, sword throw, and a tug-of-war over a
+chain of zones instead of rounds and health bars. The specification and the
+objections to it are in [`docs/duel-spec.md`](docs/duel-spec.md).
 
 Not built yet: more hand-authored levels, enemy AI beyond a patrol route,
 cutscenes.
