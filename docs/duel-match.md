@@ -137,8 +137,19 @@ Open before the match replaces the round duel:
 3. **The HUD is on the fallback font**, not the game's typeface ([`ui.md`](ui.md)).
 4. **A zone is 640 px wide and the view is 320.** `ZoneStrip.SCREEN_WIDTH` is a
    640 px "design screen", so the camera zooms to 0.5 to fit a zone — and to
-   0.6875 on a 440-wide phone. That is non-integer zoom on nearest-filtered
-   pixel art, which `art-direction.md` and `feel.md` both rule out, and it puts
-   a fighter at a sixteenth of the screen's height instead of the eighth that
-   matches Nidhogg's framing. This is a design decision, not a bug, and it is
-   not made yet.
+   about 0.63–0.69 on wider phones. The game is landscape-only already, so the
+   view is 320–440 units wide whatever the device.
+
+   No pixels are lost: the stretch mode is `canvas_items`, which draws 2D at
+   the screen's native resolution, so at 0.5 every texel is a clean 2×2 block
+   at 720p (measured on `duel-match.png`'s source frames). Two real costs
+   remain. **Size:** a fighter is half its adventure size, about 6% of the
+   screen's height, and whether the three blade heights still read at that
+   size is a question for a phone in hand. **Uneven texels:** at 20:9 and
+   1080p the scale is 3.75 screen pixels per texel, so texels alternate 3 and
+   4 pixels wide and shimmer when the view scrolls; the frames also show a
+   slight vertical unevenness, because the camera is not snapped to the texel
+   grid. The second is fixed by snapping the zoom to a whole number of screen
+   pixels per texel and showing a little more than one zone, whatever width a
+   zone is. The first is a design decision, not a bug, and it is not made
+   yet.
