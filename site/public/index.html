@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swordknights</title>
+<meta name="description" content="A mobile-first platform adventure in the spirit of Prince of Persia, plus a two-player sword duel in the spirit of Nidhogg. Play it in the browser or install it on Android.">
+<meta name="theme-color" content="#2b0a14">
+<meta name="color-scheme" content="dark">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Swordknights">
+<meta property="og:description" content="A platform adventure in a sun-bleached duotone city, and a two-player sword duel. Play it in the browser.">
+<meta property="og:url" content="{{SITE_URL}}">
+<meta property="og:image" content="{{SITE_URL}}img/card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="628">
+<meta property="og:image:alt" content="A hooded swordsman on a gold-lit stone terrace of horseshoe arches, under a low red sun.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<script src="site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#play">Skip to the game</a>
+
+<header class="hero">
+	<div class="hero-text">
+		<h1 class="wordmark"><img src="img/wordmark.svg" width="139" height="15" alt="Swordknights"></h1>
+		<p class="lede">A mobile-first platform adventure in the spirit of <cite>Prince of Persia</cite>:
+		deliberate, weighty movement, ledge grabs, and a sun-bleached duotone city &mdash; plus a
+		two-player sword duel in the spirit of <cite>Nidhogg</cite>.</p>
+		<nav class="actions" aria-label="Get the game">
+			<a class="button" href="#play">Play in the browser</a>
+			<a class="button button-quiet" href="#android">Download for Android</a>
+		</nav>
+	</div>
+	<figure class="hero-shot">
+		<img src="img/terrace-960.webp"
+			srcset="img/terrace-960.webp 960w, img/terrace-1920.webp 1920w"
+			sizes="(min-width: 1200px) 1120px, 100vw"
+			width="960" height="540"
+			alt="Level one, the Sun Terrace: a hooded swordsman stands on a stone terrace lit gold by a low sun, above a row of horseshoe arches in crimson shadow. A torch burns beside him, a ladder drops into a courtyard, and domes fill the skyline behind.">
+	</figure>
+</header>
+
+<main>
+
+<section id="play" class="band" aria-labelledby="play-title">
+	<h2 id="play-title">Play</h2>
+
+	<div class="stage" data-stage>
+		<img class="stage-poster" src="img/menu-960.webp"
+			srcset="img/menu-960.webp 960w, img/menu-1920.webp 1920w"
+			sizes="(min-width: 1200px) 1120px, 100vw"
+			width="960" height="540"
+			alt="The title screen: SWORDKNIGHTS over a skyline of domes and towers, with the modes Adventure, Endless, Duel, Duel Online, Feel Lab and Sound.">
+		<a class="button stage-start" href="play/" data-start>Start the game</a>
+	</div>
+	<p class="stage-note">
+		The first start downloads the engine: about {{PLAY_SIZE}} before compression.
+		<a href="play/">Open the game on its own page</a> to give it the whole window
+		&mdash; on a phone, that is the way to play it; turn the phone sideways.
+		<button type="button" class="link-button" data-fullscreen hidden>Full screen</button>
+	</p>
+
+	<h3>What works where</h3>
+	<ul class="where">
+		<li><strong>Adventure, Endless and Feel Lab</strong> play with a keyboard, a gamepad or
+		touch. On a touchscreen the left half is a floating stick, and <b>JUMP</b> and
+		<b>SWORD</b> sit on the right.</li>
+		<li><strong>Duel</strong>, the tug of war, is two players sharing one keyboard. It has
+		no touch controls yet, so on a phone or tablet it cannot be played.</li>
+		<li><strong>Duel Online</strong> is still the earlier, round-based duel, and needs a
+		relay server you run yourself (see <a href="https://github.com/andreas83/swordknights/blob/main/docs/netplay.md">the netplay notes</a>).
+		None stands behind this page.</li>
+		<li>Sound starts with your first key press or tap: browsers keep a page silent until
+		then.</li>
+	</ul>
+</section>
+
+<section id="android" class="band" aria-labelledby="android-title">
+	<h2 id="android-title">Android</h2>
+	<div class="download">
+		<a class="button" href="download/swordknights.apk" download>Download the APK</a>
+		<p class="download-meta">{{APK_SIZE}} &middot; debug build of <a href="https://github.com/andreas83/swordknights/commit/{{COMMIT}}"><code>{{COMMIT_SHORT}}</code></a>, {{BUILD_DATE}}</p>
+	</div>
+	<p>This is a <strong>debug build</strong>, rebuilt from the latest commit on
+	<code>main</code> every time it changes and signed with a throwaway debug key. It is for
+	trying the game on a phone, not a release: it is not in any store and it does not update
+	itself. It runs on ARM phones and tablets, 32- and 64-bit.</p>
+
+	<h3>Installing it</h3>
+	<ol class="steps">
+		<li>Open this page on the phone and tap <b>Download the APK</b>.</li>
+		<li>Open the downloaded file. Android asks whether to allow installing apps from your
+		browser, or from your file manager; allow it for that one app.</li>
+		<li>Tap <b>Install</b>. Android may warn that the app is from an unknown source; that is
+		what any APK from outside a store looks like.</li>
+	</ol>
+	<p><strong>Uninstall any earlier copy first.</strong> Every build is signed with a fresh
+	debug key, and Android refuses to install an app over one signed differently &mdash; so a
+	new debug build will not install over an older one, nor over a release build of the same
+	game, and the other way round. Uninstalling clears the game's saved settings.</p>
+	<p class="checksum">SHA-256 <code>{{APK_SHA256}}</code></p>
+</section>
+
+<section id="game" class="band" aria-labelledby="game-title">
+	<h2 id="game-title">The game</h2>
+	<div class="columns">
+		<div>
+			<h3>The adventure</h3>
+			<p>A platformer with the cadence of <cite>Prince of Persia</cite>: movement with
+			weight to it, jumps you commit to, and ledge grabs that happen by themselves when
+			you fall past a corner while moving into it. Press up to mantle, down to let go.</p>
+			<p><b>Adventure</b> is the hand-built city, starting on the Sun Terrace.
+			<b>Endless</b> chains generated levels, and each one is proven reachable before
+			you are given it. <b>Feel Lab</b> lines up every kind of obstacle side by side,
+			to try the movement on.</p>
+		</div>
+		<div>
+			<h3>The duel</h3>
+			<p>A tug of war in the spirit of <cite>Nidhogg</cite>: one hit kills, and every
+			kill sends the world scrolling toward the killer's gate. Hold the sword high,
+			middle or low; meet a thrust at its height and the blades clash, move into its
+			height just as it starts and you disarm the attacker. A sword can be thrown, and
+			an empty-handed fighter still has a sweep and a stamp.</p>
+			<p>It is being rebuilt on that model now, so expect it to change.</p>
+		</div>
+		<div>
+			<h3>The look</h3>
+			<p>It is late afternoon in a stone city and the sun is nearly on the horizon.
+			Every surface is either lit gold or lost in crimson shadow, and the line between
+			them is hard.</p>
+			<p>There are no hand-drawn assets. Terrain, skyline, characters, lettering,
+			effects and sound are all generated by code from one small palette and one tuning
+			table &mdash; including the images on this page, which are rendered from the
+			game itself.</p>
+		</div>
+	</div>
+
+	<div class="gallery">
+		<figure>
+			<img src="img/duel-960.webp" loading="lazy"
+				srcset="img/duel-960.webp 960w, img/duel-1920.webp 1920w"
+				sizes="(min-width: 1200px) 548px, (min-width: 760px) 50vw, 100vw"
+				width="960" height="540"
+				alt="The duel: two hooded fighters, one crimson and one teal, face each other with swords drawn at the foot of an arcaded tower. Five rings across the top mark the zones of the tug of war, the middle one lit, labelled Neutral.">
+			<figcaption>The tug of war, in the neutral middle zone.</figcaption>
+		</figure>
+		<figure>
+			<img src="img/fighter-poses.webp" loading="lazy"
+				width="1280" height="720"
+				alt="Sixteen duel poses in a four-by-four grid, alternating crimson and teal fighters: high, mid and low stance, duck, run, jump, fall, thrust, recover, roll, dive kick, disarmed, sweep, pound, downed and dead.">
+			<figcaption>Every pose a duellist has.</figcaption>
+		</figure>
+	</div>
+</section>
+
+<section id="controls" class="band" aria-labelledby="controls-title">
+	<h2 id="controls-title">Controls</h2>
+	<div class="table-wrap">
+		<table>
+			<caption>Adventure, Endless and Feel Lab</caption>
+			<thead>
+				<tr><th scope="col">Action</th><th scope="col">Keyboard</th><th scope="col">Gamepad</th><th scope="col">Touch</th></tr>
+			</thead>
+			<tbody>
+				<tr><th scope="row">Move</th><td data-label="Keyboard"><kbd>&larr;</kbd> <kbd>&rarr;</kbd> / <kbd>A</kbd> <kbd>D</kbd></td><td data-label="Gamepad">Stick / D-pad</td><td data-label="Touch">Left half &mdash; floating stick</td></tr>
+				<tr><th scope="row">Up / down</th><td data-label="Keyboard"><kbd>&uarr;</kbd> <kbd>&darr;</kbd> / <kbd>W</kbd> <kbd>S</kbd></td><td data-label="Gamepad">Stick / D-pad</td><td data-label="Touch">Push the stick up or down</td></tr>
+				<tr><th scope="row">Jump</th><td data-label="Keyboard"><kbd>Space</kbd> / <kbd>K</kbd></td><td data-label="Gamepad">A</td><td data-label="Touch"><b>JUMP</b></td></tr>
+				<tr><th scope="row">Sword</th><td data-label="Keyboard"><kbd>J</kbd> / <kbd>E</kbd> / <kbd>Enter</kbd></td><td data-label="Gamepad">X / B</td><td data-label="Touch"><b>SWORD</b></td></tr>
+				<tr><th scope="row">Walk (slow)</th><td data-label="Keyboard"><kbd>Shift</kbd></td><td data-label="Gamepad">L1</td><td data-label="Touch">Small stick deflection</td></tr>
+				<tr><th scope="row">Pause</th><td data-label="Keyboard"><kbd>Esc</kbd> / <kbd>P</kbd></td><td data-label="Gamepad">Start</td><td data-label="Touch"><b>II</b></td></tr>
+				<tr><th scope="row">Mute</th><td data-label="Keyboard"><kbd>M</kbd></td><td data-label="Gamepad">&mdash;</td><td data-label="Touch">&mdash;</td></tr>
+			</tbody>
+		</table>
+	</div>
+	<p>Ledge grabs happen automatically when you fall past a grabbable corner while moving
+	into it; press up (or jump) to mantle, down to let go. Hold down and press jump to drop
+	through a one-way platform.</p>
+
+	<div class="table-wrap">
+		<table>
+			<caption>Duel &mdash; two players, one keyboard</caption>
+			<thead>
+				<tr><th scope="col">Action</th><th scope="col">Player one</th><th scope="col">Player two</th></tr>
+			</thead>
+			<tbody>
+				<tr><th scope="row">Run</th><td data-label="Player one"><kbd>A</kbd> <kbd>D</kbd></td><td data-label="Player two"><kbd>&larr;</kbd> <kbd>&rarr;</kbd> / numpad <kbd>4</kbd> <kbd>6</kbd></td></tr>
+				<tr><th scope="row">Sword high / low</th><td data-label="Player one">hold <kbd>W</kbd> / <kbd>S</kbd></td><td data-label="Player two">hold <kbd>&uarr;</kbd> / <kbd>&darr;</kbd> / numpad <kbd>8</kbd> <kbd>5</kbd></td></tr>
+				<tr><th scope="row">Duck</th><td data-label="Player one">hold <kbd>S</kbd>, standing still</td><td data-label="Player two">hold <kbd>&darr;</kbd>, standing still</td></tr>
+				<tr><th scope="row">Jump</th><td data-label="Player one"><kbd>Space</kbd> / <kbd>V</kbd></td><td data-label="Player two"><kbd>K</kbd> / numpad <kbd>0</kbd></td></tr>
+				<tr><th scope="row">Thrust</th><td data-label="Player one"><kbd>F</kbd></td><td data-label="Player two"><kbd>J</kbd> / numpad <kbd>1</kbd></td></tr>
+				<tr><th scope="row">Throw the sword</th><td data-label="Player one"><kbd>G</kbd></td><td data-label="Player two"><kbd>L</kbd> / numpad <kbd>2</kbd></td></tr>
+				<tr><th scope="row">Roll / dive kick</th><td colspan="2" data-label="Both players">down + jump, on the ground / in the air</td></tr>
+			</tbody>
+		</table>
+	</div>
+	<p>Holding neither up nor down is the middle stance. Up + throw angles the throw upward.
+	An empty-handed fighter sweeps on the ground and stamps from the air, and picks a sword up
+	by holding down over it. The bindings are keyboard-only by design: a Godot action cannot
+	tell two gamepads apart.</p>
+</section>
+
+</main>
+
+<footer class="site-footer">
+	<p>Built with Godot 4.5.1. Source, documentation and issues:
+	<a href="https://github.com/andreas83/swordknights">github.com/andreas83/swordknights</a>.</p>
+	<p>Original prototype by Andreas, with support from Harald P. and Michael W.
+	Licensed GPL-3.0-or-later.</p>
+	<p class="build">This page and both builds: commit <code>{{COMMIT_SHORT}}</code>, {{BUILD_DATE}}.</p>
+</footer>
+</body>
+</html>

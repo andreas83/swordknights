@@ -1,0 +1,543 @@
+/*
+ * Swordknights -- the public page.
+ *
+ * The page answers to docs/art-direction.md like the game does: two values,
+ * lit gold and crimson shadow, with a hard line between them. So no blur, no
+ * soft shadow, no rounded corners and no gradients. Where something needs to
+ * lift off the page it gets a hard offset shadow, the way a ledge drops a band
+ * of shade on the stone below it. The page itself sits in shadow (INK), and the
+ * gold is spent on what a visitor is meant to do next -- light leads the eye.
+ *
+ * Colours are scripts/core/palette.gd, by the same names. Teal is player two's
+ * and nobody else's, so it does not appear here.
+ */
+
+:root {
+	--ink: #2b0a14;
+	--shadow-deep: #7a1230;
+	--shadow: #b32142;
+	--shadow-warm: #d8452c;
+	--mid: #e8702a;
+	--light-warm: #f2a829;
+	--light: #f7ce2e;
+	--paper: #fff4c2;
+
+	--text: var(--paper);
+	/* PAPER taken 15% of the way toward INK: secondary text, still 12:1 on INK. */
+	--text-quiet: #dfd1a8;
+	--rule: var(--light-warm);
+
+	--gutter: 16px;
+	--measure: 68ch;
+	--wide: 1120px;
+
+	color-scheme: dark;
+}
+
+@media (min-width: 760px) {
+	:root {
+		--gutter: 32px;
+	}
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+	scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+}
+
+body {
+	margin: 0;
+	background: var(--ink);
+	color: var(--text);
+	font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Ubuntu, sans-serif;
+	overflow-wrap: break-word;
+}
+
+img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+}
+
+a {
+	color: var(--light);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 3px;
+}
+
+a:hover {
+	color: var(--paper);
+}
+
+:focus-visible {
+	outline: 3px solid var(--light);
+	outline-offset: 3px;
+}
+
+code,
+kbd {
+	font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+	font-size: 0.88em;
+}
+
+kbd {
+	display: inline-block;
+	min-width: 1.7em;
+	padding: 0 0.35em;
+	background: var(--shadow-deep);
+	border-bottom: 2px solid var(--shadow);
+	color: var(--paper);
+	text-align: center;
+	line-height: 1.5;
+}
+
+cite {
+	font-style: italic;
+}
+
+.skip {
+	position: absolute;
+	left: var(--gutter);
+	top: -100px;
+	z-index: 2;
+	padding: 8px 14px;
+	background: var(--light);
+	color: var(--ink);
+	font-weight: 700;
+}
+
+.skip:focus {
+	top: 12px;
+}
+
+/* ---------- Hero ---------- */
+
+.hero {
+	max-width: calc(var(--wide) + 2 * var(--gutter));
+	margin: 0 auto;
+	padding: 48px var(--gutter) 0;
+}
+
+.wordmark {
+	margin: 0 0 20px;
+	line-height: 0;
+}
+
+.wordmark img {
+	width: min(100%, 556px); /* four times the drawing, on a wide screen */
+}
+
+.lede {
+	max-width: 46ch;
+	margin: 0 0 28px;
+	font-size: 1.2rem;
+	line-height: 1.5;
+}
+
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 14px 18px;
+	margin-bottom: 40px;
+}
+
+.hero-shot {
+	margin: 0;
+	line-height: 0;
+	/* A lit rim along the bottom edge, as the title screen draws under its
+	   title, and a hard shade dropped beneath it. */
+	border-bottom: 3px solid var(--light);
+	box-shadow: 0 10px 0 var(--shadow-deep);
+}
+
+.hero-shot img {
+	width: 100%;
+}
+
+@media (min-width: 760px) {
+	.hero {
+		padding-top: 72px;
+	}
+
+	.lede {
+		font-size: 1.35rem;
+	}
+}
+
+/* ---------- Buttons ---------- */
+
+.button {
+	display: inline-block;
+	padding: 12px 22px;
+	background: var(--light);
+	color: var(--ink);
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-decoration: none;
+	box-shadow: 5px 5px 0 var(--shadow);
+	transition: transform 80ms steps(1), box-shadow 80ms steps(1);
+}
+
+.button:hover {
+	background: var(--paper);
+	color: var(--ink);
+}
+
+.button:active {
+	transform: translate(5px, 5px);
+	box-shadow: 0 0 0 var(--shadow);
+}
+
+.button-quiet {
+	background: transparent;
+	color: var(--light);
+	box-shadow: inset 0 0 0 2px var(--light);
+}
+
+.button-quiet:hover {
+	background: var(--shadow-deep);
+	color: var(--paper);
+}
+
+.button-quiet:active {
+	transform: none;
+}
+
+.link-button {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--light);
+	font: inherit;
+	text-decoration: underline;
+	text-decoration-thickness: 1px;
+	text-underline-offset: 3px;
+	cursor: pointer;
+}
+
+.link-button:hover {
+	color: var(--paper);
+}
+
+/* ---------- Sections ---------- */
+
+main {
+	max-width: calc(var(--wide) + 2 * var(--gutter));
+	margin: 0 auto;
+	padding: 0 var(--gutter);
+}
+
+.band {
+	padding: 72px 0 8px;
+}
+
+.band p,
+.band ul,
+.band ol {
+	max-width: var(--measure);
+}
+
+/* The game's title rule: a gold line between two diamonds. */
+h2 {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	margin: 0 0 28px;
+	color: var(--light);
+	font-size: 1.05rem;
+	font-weight: 700;
+	letter-spacing: 0.32em;
+	text-transform: uppercase;
+}
+
+h2::before,
+h2::after {
+	content: "";
+	flex: none;
+}
+
+h2::before {
+	width: 9px;
+	height: 9px;
+	background: var(--light);
+	transform: rotate(45deg);
+}
+
+h2::after {
+	flex: 1;
+	height: 2px;
+	background: var(--rule);
+}
+
+h3 {
+	margin: 36px 0 10px;
+	color: var(--paper);
+	font-size: 1.15rem;
+	letter-spacing: 0.02em;
+}
+
+/* ---------- Play ---------- */
+
+.stage {
+	position: relative;
+	aspect-ratio: 16 / 9;
+	background: var(--ink);
+	box-shadow: 0 0 0 2px var(--light), 10px 10px 0 2px var(--shadow-deep);
+	overflow: hidden;
+}
+
+.stage-poster {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	/* Put the poster in shade, so the one lit thing on it is the button. */
+	filter: brightness(0.45) saturate(0.9);
+}
+
+.stage-start {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	padding: 16px 30px;
+	font-size: 1.1rem;
+	white-space: nowrap;
+}
+
+.stage-start:active {
+	transform: translate(calc(-50% + 5px), calc(-50% + 5px));
+}
+
+.stage iframe {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	background: var(--ink);
+}
+
+.stage-note {
+	margin-top: 26px;
+	color: var(--text-quiet);
+}
+
+.where {
+	padding-left: 1.2em;
+}
+
+.where li + li {
+	margin-top: 10px;
+}
+
+.where li::marker {
+	color: var(--light);
+}
+
+/* ---------- Android ---------- */
+
+.download {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 14px 22px;
+	margin-bottom: 24px;
+}
+
+.download-meta {
+	margin: 0;
+	color: var(--text-quiet);
+}
+
+.steps {
+	padding-left: 1.4em;
+}
+
+.steps li + li {
+	margin-top: 8px;
+}
+
+.steps li::marker {
+	color: var(--light);
+	font-weight: 700;
+}
+
+.checksum {
+	color: var(--text-quiet);
+	font-size: 0.9rem;
+}
+
+.checksum code {
+	word-break: break-all;
+}
+
+/* ---------- The game ---------- */
+
+.columns {
+	display: grid;
+	gap: 0 40px;
+}
+
+.columns h3 {
+	margin-top: 8px;
+}
+
+.columns p {
+	margin: 0 0 14px;
+}
+
+.columns > div {
+	padding-top: 20px;
+	border-top: 2px solid var(--shadow-deep);
+}
+
+@media (min-width: 900px) {
+	.columns {
+		grid-template-columns: repeat(3, 1fr);
+	}
+}
+
+.gallery {
+	display: grid;
+	gap: 32px;
+	margin-top: 40px;
+}
+
+@media (min-width: 760px) {
+	.gallery {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+.gallery figure {
+	margin: 0;
+}
+
+.gallery img {
+	width: 100%;
+	box-shadow: 8px 8px 0 var(--shadow-deep);
+}
+
+.gallery figcaption {
+	margin-top: 16px;
+	color: var(--text-quiet);
+	font-size: 0.95rem;
+}
+
+/* ---------- Controls ---------- */
+
+.table-wrap {
+	margin: 0 0 18px;
+	overflow-x: auto;
+}
+
+table {
+	width: 100%;
+	min-width: 520px;
+	border-collapse: collapse;
+	font-size: 0.95rem;
+}
+
+caption {
+	padding-bottom: 10px;
+	color: var(--paper);
+	font-weight: 700;
+	text-align: left;
+}
+
+th,
+td {
+	padding: 9px 12px 9px 0;
+	border-bottom: 1px solid var(--shadow-deep);
+	text-align: left;
+	vertical-align: top;
+}
+
+thead th {
+	color: var(--light);
+	font-size: 0.8rem;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	border-bottom: 2px solid var(--rule);
+}
+
+tbody th {
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+#controls .table-wrap + p {
+	margin-bottom: 40px;
+}
+
+/* On a phone a four-column table either scrolls sideways or squeezes every
+   cell to a word per line. So each row becomes a short card instead: the
+   action as its heading, each cell labelled with the column it came from. The
+   table keeps its caption, so it still reads as one thing. */
+@media (max-width: 599px) {
+	tbody,
+	tr,
+	tbody th,
+	td {
+		display: block;
+	}
+
+	table {
+		min-width: 0;
+	}
+
+	thead {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+	}
+
+	tbody tr {
+		padding: 10px 0;
+		border-bottom: 1px solid var(--shadow-deep);
+	}
+
+	tbody th,
+	td {
+		padding: 2px 0;
+		border: 0;
+	}
+
+	tbody th {
+		color: var(--light);
+	}
+
+	td::before {
+		content: attr(data-label) ": ";
+		color: var(--text-quiet);
+	}
+}
+
+/* ---------- Footer ---------- */
+
+.site-footer {
+	width: min(var(--wide), 100% - 2 * var(--gutter));
+	margin: 72px auto 0;
+	padding: 28px 0 48px;
+	border-top: 2px solid var(--shadow-deep);
+	color: var(--text-quiet);
+	font-size: 0.92rem;
+}
+
+.site-footer p {
+	margin: 0 0 8px;
+}
