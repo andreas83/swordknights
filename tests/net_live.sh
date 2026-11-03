@@ -9,13 +9,20 @@
 # relay, the room codes and the handshake actually work, as opposed to being
 # individually correct.
 #
-# Two rounds of it:
+# Three rounds of it:
 #   1. DIRECT    one peer listens on a port, the other dials it
 #   2. RELAY     both peers dial the relay; one opens a room, the other joins
 #                by the four-letter code the first one printed
+#   3. OLDER     direct again, with a guest that sends no look -- byte for byte
+#                the HELLO of a build from before the looks
+#
+# In the first two, each peer sends a different chosen look in the handshake,
+# and each must report the other's arriving intact: over a socket, and through
+# the relay.
 #
 # Exits non-zero if either peer failed to connect, if the guest saw no
-# authoritative verifications, or if anything desynced.
+# authoritative verifications, if anything desynced, or if a look did not
+# arrive as it was sent.
 
 set -u
 
@@ -24,7 +31,12 @@ GODOT="${GODOT:-/usr/local/bin/godot}"
 WORK="$(mktemp -d)"
 RELAY_PORT="${RELAY_PORT:-45678}"
 DIRECT_PORT="${DIRECT_PORT:-45679}"
+OLD_PORT="${OLD_PORT:-45680}"
 FRAMES="${FRAMES:-300}"
+# Two looks that are nobody's default, so a fallback cannot pass for arrival.
+HOST_LOOK="figure=heroine,outfit=saffron,accent=pale,hair=gold,skin=copper"
+GUEST_LOOK="figure=prince,outfit=wine,accent=ink,hair=chestnut,skin=umber"
+DEFAULT_LOOK="figure=prince,outfit=crimson,accent=gold,hair=raven,skin=amber"
 fail=0
 
 cleanup() {
@@ -59,6 +71,25 @@ expect() {  # expect <report> <key> <test> <value> <description>
   fi
 }
 
+same() {  # same <report> <key> <wanted> <description>
+  local actual; actual="$(field "$1" "$2")"
+  if [ "$actual" = "$3" ]; then
+    echo "  ok    $4 ($2=$actual)"
+  else
+    echo "  FAIL  $4 — $2=${actual:-<nothing>}, wanted $3"
+    fail=1
+  fi
+}
+
+looks() {  # looks <host-report> <guest-report>
+  same "$1" sent_look "$HOST_LOOK" "host sent its look"
+  same "$2" sent_look "$GUEST_LOOK" "guest sent its look"
+  same "$2" got_look "$HOST_LOOK" "guest sees the host's look"
+  same "$1" got_look "$GUEST_LOOK" "host sees the guest's look"
+  same "$1" look_error "" "host dropped nothing"
+  same "$2" look_error "" "guest dropped nothing"
+}
+
 judge() {  # judge <host-report> <guest-report>
   # "ran" counts frames spent actually duelling. Whichever peer reaches its
   # budget first exits, so the other is no longer running by the time it writes
@@ -77,13 +108,15 @@ judge() {  # judge <host-report> <guest-report>
 }
 
 echo "=== 1. direct connection on 127.0.0.1:$DIRECT_PORT ==="
-peer direct_host --mode direct-host --port "$DIRECT_PORT" &
+peer direct_host --mode direct-host --port "$DIRECT_PORT" --look "$HOST_LOOK" &
 HOST_PID=$!
 sleep 3
-peer direct_guest --mode direct-guest --url "ws://127.0.0.1:$DIRECT_PORT" &
+peer direct_guest --mode direct-guest --url "ws://127.0.0.1:$DIRECT_PORT" \
+  --look "$GUEST_LOOK" &
 GUEST_PID=$!
 wait "$HOST_PID" "$GUEST_PID"
 judge direct_host direct_guest
+looks direct_host direct_guest
 
 echo
 echo "=== 2. relayed by room code via 127.0.0.1:$RELAY_PORT ==="
@@ -99,7 +132,7 @@ fi
 echo "  ok    relay listening"
 
 peer room_host --mode room-host --url "ws://127.0.0.1:$RELAY_PORT" \
-  --code-out "$WORK/code.txt" &
+  --code-out "$WORK/code.txt" --look "$HOST_LOOK" &
 HOST_PID=$!
 
 CODE=""
@@ -115,10 +148,26 @@ if [ -z "$CODE" ]; then
 fi
 echo "  ok    room code is $CODE"
 
-peer room_guest --mode room-guest --url "ws://127.0.0.1:$RELAY_PORT" --code "$CODE" &
+peer room_guest --mode room-guest --url "ws://127.0.0.1:$RELAY_PORT" --code "$CODE" \
+  --look "$GUEST_LOOK" &
 GUEST_PID=$!
 wait "$HOST_PID" "$GUEST_PID"
 judge room_host room_guest
+looks room_host room_guest
+
+echo
+echo "=== 3. a guest from before the looks, direct on 127.0.0.1:$OLD_PORT ==="
+peer old_host --mode direct-host --port "$OLD_PORT" --look "$HOST_LOOK" &
+HOST_PID=$!
+sleep 3
+peer old_guest --mode direct-guest --url "ws://127.0.0.1:$OLD_PORT" --look none &
+GUEST_PID=$!
+wait "$HOST_PID" "$GUEST_PID"
+judge old_host old_guest
+same old_guest sent_look "none" "the guest sent no look at all"
+same old_host got_fields 0 "the host received none"
+same old_host look_error "" "which is not an error"
+same old_host got_look "$DEFAULT_LOOK" "and shows the guest as the default"
 
 echo
 echo "  relay said:"
@@ -126,10 +175,10 @@ sed -n 's/^/       /p' "$WORK/relay.log" | grep -E "room|peer" | head -8
 
 echo
 if [ "$fail" -eq 0 ]; then
-  echo "PASS  net_live  (two processes, direct and relayed)"
+  echo "PASS  net_live  (two processes: direct, relayed, and an older guest)"
 else
   echo "FAIL  net_live"
-  for n in direct_host direct_guest room_host room_guest; do
+  for n in direct_host direct_guest room_host room_guest old_host old_guest; do
     [ -f "$WORK/$n.log" ] && { echo "--- $n ---"; tail -15 "$WORK/$n.log"; }
   done
 fi

@@ -16,6 +16,17 @@ extends RefCounted
 ## Sizes, so the bandwidth is not a mystery (see docs/netplay.md):
 ##   INPUT     ~11 bytes   client -> host, every frame
 ##   SNAPSHOT  ~230 bytes  host -> client, every SNAPSHOT_INTERVAL frames
+##   look      ~45 bytes   both ways, once, on the end of HELLO and WELCOME
+##
+## VERSION is still 1 although HELLO and WELCOME grew a look. That is the one
+## kind of change that does not need a bump: the look is an optional block on
+## the END of a message, and a version-1 decoder reads HELLO and WELCOME up to
+## their last fixed field and never asks whether bytes follow. So an older
+## build reads a newer HELLO exactly as it always did and plays on, showing
+## its opponent in the seat's default; a newer build reads an older HELLO as
+## one with no look, which is the same answer. A bump would have refused that
+## match in the lobby, to protect a field neither side needs to duel. Anything
+## that changes a field the duel does depend on still bumps VERSION.
 
 const VERSION := 1
 
@@ -62,6 +73,42 @@ const CODE_LENGTH := 4
 ## cannot shift under us between engine versions.
 const MAX_TEXT := 64
 
+## --- a player's look ---------------------------------------------------------
+##
+## The block HELLO and WELCOME may end with: the sender's figure and wardrobe
+## colours, as CharacterLook ids, so each phone can draw the other player as
+## they chose to be drawn. Presentation only. It is handed to the scene and to
+## nothing else -- not the match, not a snapshot, not a checksum -- so two
+## peers with different looks, or one with none, step identical duels.
+##
+##     [u8 LOOK_FORMAT][u8 count] then count x [u8 tag][u8 length][id bytes]
+##
+## Ids rather than option indices, for the reason the wardrobe's file uses
+## them: two builds may list the options in a different order, and an index
+## would then put a different colour on the other screen. An id the receiving
+## build does not know names nothing and falls back. The tag is the field's
+## position in LOOK_TAGS, which is therefore append-only: a tag past the end is
+## a field from a newer build and is skipped, which its length prefix allows.
+##
+## Nothing here is trusted. The block is read by the rule the wardrobe's loader
+## uses on its file: if the block cannot be read at all -- truncated, a count
+## past MAX_LOOK_FIELDS, a format this build does not know -- the whole look is
+## dropped; if it can, each field stands or falls alone, so an id that is too
+## long, is not lower-case ASCII, or repeats a field costs that one field. What
+## survives is still only a set of strings, and CharacterLook.take_ids() is
+## what decides whether they name anything. A malformed look never fails the
+## message it rides on: refusing a HELLO over a sash colour would stall the
+## handshake, which is exactly what a peer must not be able to do with it.
+
+const LOOK_FORMAT := 1
+## Wire tags. Append only; see above.
+const LOOK_TAGS: Array[String] = ["figure", "outfit", "accent", "hair", "skin"]
+## More entries than a look could need, so a newer build has room to grow and
+## a hostile one cannot make the reader loop for long.
+const MAX_LOOK_FIELDS := 16
+## Longer than any option id, short enough that a look stays tens of bytes.
+const MAX_LOOK_ID := 16
+
 
 ## --- encoding ---------------------------------------------------------------
 
@@ -80,19 +127,49 @@ static func _put_text(buf: StreamPeerBuffer, text: String) -> void:
 		buf.put_data(raw)
 
 
-static func hello(build: int, name: String) -> PackedByteArray:
+## `look` is the sender's CharacterLook ids (CharacterLook.to_ids()). Empty
+## sends no look block at all, which is byte for byte a version-1 HELLO.
+static func hello(build: int, name: String, look: Dictionary = {}) -> PackedByteArray:
 	var buf := _open(Type.HELLO)
 	buf.put_u32(build)
 	_put_text(buf, name)
+	_put_look(buf, look)
 	return buf.data_array
 
 
-static func welcome(slot: int, rounds_to_win: int, arena_hash: int) -> PackedByteArray:
+## The host's look rides on its WELCOME, as the guest's rides on its HELLO.
+static func welcome(
+	slot: int, rounds_to_win: int, arena_hash: int, look: Dictionary = {}
+) -> PackedByteArray:
 	var buf := _open(Type.WELCOME)
 	buf.put_u8(slot)
 	buf.put_u8(rounds_to_win)
 	buf.put_u32(arena_hash)
+	_put_look(buf, look)
 	return buf.data_array
+
+
+## Writes the fields of `look` that this build has a tag for and whose ids
+## would be accepted on the other side; anything else is left out rather than
+## sent to be refused. Writes nothing for an empty look.
+static func _put_look(buf: StreamPeerBuffer, look: Dictionary) -> void:
+	var fields: Array[PackedByteArray] = []
+	for tag: int in LOOK_TAGS.size():
+		var value: Variant = look.get(LOOK_TAGS[tag])
+		if typeof(value) != TYPE_STRING and typeof(value) != TYPE_STRING_NAME:
+			continue
+		var raw := String(value).to_ascii_buffer()
+		if not is_look_id(raw):
+			continue
+		var field := PackedByteArray([tag, raw.size()])
+		field.append_array(raw)
+		fields.append(field)
+	if fields.is_empty():
+		return
+	buf.put_u8(LOOK_FORMAT)
+	buf.put_u8(fields.size())
+	for field: PackedByteArray in fields:
+		buf.put_data(field)
 
 
 ## A window of consecutive input frames, oldest first, starting at `first_frame`.
@@ -222,6 +299,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			out["name"] = _get_text(buf)
 			if out["name"] == null:
 				return _short(type)
+			_get_look(buf, out)
 
 		Type.WELCOME:
 			if left < 6:
@@ -231,6 +309,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			out["arena_hash"] = buf.get_u32()
 			if out["slot"] > 1:
 				return {"error": "WELCOME names seat %d" % out["slot"]}
+			_get_look(buf, out)
 
 		Type.INPUT:
 			if left < 5:
@@ -328,6 +407,61 @@ static func _get_text(buf: StreamPeerBuffer) -> Variant:
 		return ""
 	var raw: PackedByteArray = buf.get_data(length)[1]
 	return raw.get_string_from_utf8()
+
+
+## Reads the optional look block from where `buf` stands into out["look"], as
+## {field: id}. Always sets it: empty when there was no block, which is an
+## older peer, or when the block could not be read, which also sets
+## out["look_error"] for the log. Never touches out["error"] -- see the note on
+## LOOK_FORMAT for why a bad look does not fail its message.
+static func _get_look(buf: StreamPeerBuffer, out: Dictionary) -> void:
+	out["look"] = {}
+	var total := buf.get_size()
+	if buf.get_position() >= total:
+		return
+	if total - buf.get_position() < 2:
+		out["look_error"] = "truncated look"
+		return
+	var look_format := buf.get_u8()
+	var count := buf.get_u8()
+	if look_format != LOOK_FORMAT:
+		out["look_error"] = "look format %d, expected %d" % [look_format, LOOK_FORMAT]
+		return
+	if count > MAX_LOOK_FIELDS:
+		out["look_error"] = "a look of %d fields" % count
+		return
+	var look := {}
+	for i: int in count:
+		if total - buf.get_position() < 2:
+			out["look_error"] = "truncated look"
+			return
+		var tag := buf.get_u8()
+		var length := buf.get_u8()
+		if total - buf.get_position() < length:
+			out["look_error"] = "truncated look"
+			return
+		var raw := PackedByteArray()
+		if length > 0:
+			raw = buf.get_data(length)[1]
+		if tag >= LOOK_TAGS.size() or look.has(LOOK_TAGS[tag]) or not is_look_id(raw):
+			continue # a newer build's field, a repeat, or not an id: this field only
+		look[LOOK_TAGS[tag]] = raw.get_string_from_ascii()
+	out["look"] = look
+
+
+## True for 1..MAX_LOOK_ID bytes of lower-case ASCII, digits and underscores,
+## which is every CharacterLook id. Checked as bytes, before anything is made a
+## String of them: a hostile peer's invalid UTF-8 never reaches a decoder that
+## would log about it.
+static func is_look_id(raw: PackedByteArray) -> bool:
+	if raw.is_empty() or raw.size() > MAX_LOOK_ID:
+		return false
+	for byte: int in raw:
+		var lower := byte >= 0x61 and byte <= 0x7a
+		var digit := byte >= 0x30 and byte <= 0x39
+		if not (lower or digit or byte == 0x5f):
+			return false
+	return true
 
 
 static func type_name(type: Type) -> String:

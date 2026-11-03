@@ -371,7 +371,8 @@ when the art binds to its fighter; and no choosable colour belongs to either
 team, so seat one can never carry teal and seat two never crimson.
 `tests/unit/test_duel_seats_distinct.gd` walks all 512 looks for both seats.
 Online, each phone shows its own seat in player one's look and the other seat
-in the default (`docs/netplay.md`).
+in the look the other phone sent, held to the same seat colour
+(`docs/netplay.md`, *The looks*).
 
 The title screen's row pitch went from 13 to 12 units to make room for the
 seventh row: at 13 the caption under the list landed on the rail.

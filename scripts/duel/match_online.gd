@@ -31,6 +31,9 @@ var _online := false
 var _local := false
 ## The seat this phone was given, once seated; -1 before and after.
 var _my_slot := -1
+## The other player's look as received in the handshake and checked against
+## this build's options; null before seating, after leaving, and in the lobby.
+var _their_look: CharacterLook = null
 
 
 func _ready() -> void:
@@ -135,6 +138,9 @@ func _start_session(as_host: bool) -> void:
 	# One player per device: the unsuffixed actions, which the keyboard, a
 	# gamepad and the touch controls all drive.
 	session.local_input = func() -> int: return PlayerInput.bits_from_actions("")
+	# Sent once, in the handshake, so the other phone can draw this player as
+	# they chose. Player one's look: a phone is one player.
+	session.local_look = _my_look().to_ids()
 	session.desync_detected.connect(_on_desync)
 	session.handshake_complete.connect(_on_seated)
 	# Deferred: these fire from inside session.poll(), and tearing the session
@@ -157,6 +163,12 @@ func _on_link_changed(link: NetTransport.Link, detail: String) -> void:
 func _on_seated(slot: int) -> void:
 	lobby.visible = false
 	_my_slot = slot
+	# Checked against this build's options by the rule the wardrobe reads its
+	# own file by: a field that is missing or names nothing stays the default,
+	# alone. An older build sends nothing, and its player is the prince.
+	_their_look = CharacterLook.from_ids(session.remote_look if session != null else {})
+	if session != null and session.remote_look_error != "":
+		push_warning("the other player's look was dropped: %s" % session.remote_look_error)
 	dress_fighters()
 	hud.your_slot = slot
 	hud.footer = "YOU ARE %s  ·  PAUSE TO LEAVE" % ("CRIMSON" if slot == 0 else "SEA-GREEN")
@@ -166,17 +178,26 @@ func _on_seated(slot: int) -> void:
 ## --- who wears what ---------------------------------------------------------
 
 ## Online, each phone shows its own player in the look chosen on it -- player
-## one's, since a phone is one player -- and the other seat in that seat's
-## default: the prince, in the seat's colour. The protocol carries inputs and
-## nothing else, and a look is not worth a protocol change (docs/netplay.md,
-## open items). Until seated, both seats are the defaults; played locally from
-## the lobby, it is the one-keyboard duel's two looks.
+## one's, since a phone is one player -- and the other player in the look their
+## phone sent in the handshake (docs/netplay.md, "The looks"). Whatever either
+## look says, dress_fighters() puts it on through FighterArt.dress(), which
+## imposes the seat's colour last, so a received look cannot put a player in
+## the other team's robe. Until seated, both seats are the defaults; played
+## locally from the lobby, it is the one-keyboard duel's two looks.
 func look_for(slot: int) -> CharacterLook:
 	if _local:
 		return super.look_for(slot)
-	if _online and slot == _my_slot:
-		return Wardrobe.open(wardrobe_path).look(Wardrobe.PLAYER_ONE)
+	if _online and _my_slot >= 0:
+		if slot == _my_slot:
+			return _my_look()
+		if _their_look != null:
+			return _their_look.duplicate_look()
 	return CharacterLook.new()
+
+
+func _my_look() -> CharacterLook:
+	return Wardrobe.open(wardrobe_path).look(Wardrobe.PLAYER_ONE)
+
 
 
 ## --- giving up --------------------------------------------------------------
@@ -207,6 +228,7 @@ func _teardown() -> void:
 	hud.session = null
 	hud.your_slot = -1
 	_my_slot = -1
+	_their_look = null
 	if transport != null:
 		transport.close()
 		transport = null

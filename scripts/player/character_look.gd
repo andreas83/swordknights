@@ -3,9 +3,11 @@ extends RefCounted
 ## One player's look: which figure, and which few palette colours it wears.
 ##
 ## Purely presentation. A look changes what PlayerArt draws and nothing that
-## the body, the hitbox, the tuning or a network peer can see -- both figures
-## stand on the same rig, so the heroine is exactly as tall, as wide and as
-## long in the reach as the prince.
+## the body, the hitbox, the tuning or the networked simulation can see --
+## both figures stand on the same rig, so the heroine is exactly as tall, as
+## wide and as long in the reach as the prince. Online, the ids travel once in
+## the handshake so the other phone can draw them too, and go no further than
+## its scene (scripts/net/protocol.gd).
 ##
 ## ## Every option is a Palette colour
 ##
@@ -181,6 +183,15 @@ func take_ids(ids: Dictionary) -> int:
 				taken += 1
 				break
 	return taken
+
+
+## A new look read from ids by take_ids(): the default, with each field that
+## names an option replaced. For ids from anywhere not trusted -- the other
+## player's handshake above all (scripts/net/protocol.gd).
+static func from_ids(ids: Dictionary) -> CharacterLook:
+	var look := CharacterLook.new()
+	look.take_ids(ids)
+	return look
 
 
 ## Puts this look on a figure. Colours first, then the costume, so a costume

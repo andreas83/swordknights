@@ -11,7 +11,9 @@ extends GutTest
 ##    seat can never carry the other seat's colour anywhere on the figure.
 ##
 ## And the online half: a phone shows its own seat in its player's look and
-## the other seat in that seat's default, without the protocol carrying either.
+## the other seat in the look the other phone sent in the handshake -- or the
+## seat's default when none came -- and a look that arrived over the wire is
+## held to both halves exactly like one chosen here, whatever it claims.
 
 const FIGHTER_SCENE := preload("res://scenes/fighter.tscn")
 const ONLINE_SCENE := preload("res://scenes/duel_match_online.tscn")
@@ -89,7 +91,36 @@ func test_the_seat_colour_wins_whichever_order_things_happen_in() -> void:
 	assert_true(art.costume is HeroineCostume, "and still the heroine")
 
 
-func test_online_shows_my_look_on_my_seat_and_the_default_on_theirs() -> void:
+## Every look there is, sent as a HELLO, read back as the other side reads it,
+## and put on each seat: the seat's colour still wins. The guest in the
+## sea-green seat asking for the crimson robe is the case that matters.
+func test_every_received_look_keeps_each_seat_in_its_colour() -> void:
+	var fighter := FIGHTER_SCENE.instantiate() as Fighter
+	add_child_autofree(fighter)
+	fighter.setup(0, null)
+	var bad: Array[String] = []
+	var crimson_asked := 0
+	for look: CharacterLook in _every_look():
+		var message := NetProtocol.decode(NetProtocol.hello(1, "x", look.to_ids()))
+		var received := CharacterLook.from_ids(message.get("look", {}))
+		if not received.equals(look):
+			bad.append("%s arrived as %s" % [look.to_ids(), received.to_ids()])
+			continue
+		crimson_asked += 1 if received.to_ids()["outfit"] == "crimson" else 0
+		for seat: int in 2:
+			var art := FighterArt.dress(fighter, seat, received)
+			var planes: Array[Color] = [art.cloth, art.cloth_dark, art.cloak_shade]
+			if planes != _team(seat):
+				bad.append("seat %d robe in received %s" % [seat, look.to_ids()])
+			for colour: Color in _chosen(art):
+				if _team(0).has(colour) or _team(1).has(colour):
+					bad.append("seat %d wears team colour %s in received %s"
+						% [seat, colour.to_html(), look.to_ids()])
+	assert_gt(crimson_asked, 0, "some received looks asked for the crimson robe")
+	assert_eq(bad, [] as Array[String], "\n".join(bad.slice(0, 8)))
+
+
+func test_online_shows_my_look_on_my_seat_and_theirs_on_theirs() -> void:
 	var wardrobe := Wardrobe.open(STORE)
 	var mine := CharacterLook.new()
 	mine.take_ids({"figure": "heroine", "accent": "fire", "hair": "gold"})
@@ -110,15 +141,37 @@ func test_online_shows_my_look_on_my_seat_and_the_default_on_theirs() -> void:
 		assert_true(scene.call("look_for", slot).equals(CharacterLook.new()),
 			"lobby seat %d is the default" % slot)
 
-	# Seated as the guest, in the sea-green seat: player one's look goes on
-	# seat two -- a phone is one player -- and seat one is the default.
+	# Seated as the guest, in the sea-green seat, with no session and so no
+	# look from the other side: player one's look goes on seat two -- a phone
+	# is one player -- and seat one is the default.
 	scene.set("_online", true)
 	scene.call("_on_seated", 1)
 	assert_true(scene.call("look_for", 1).equals(mine), "my seat wears my look")
 	assert_true(scene.call("look_for", 0).equals(CharacterLook.new()),
-		"their seat wears its default, not their choice, which this phone never saw")
+		"their seat wears its default when nothing was received")
 	var seats: Array = scene.get_node(^"World/Match").get("seats")
 	var art := (seats[1] as DuelSeat).node.get_node(^"FighterArt") as FighterArt
 	assert_true(art.costume is HeroineCostume, "and it was put on")
 	assert_eq(art.cloth, FighterArt.SEAT_CLOTH[1], "in the seat's colour")
+
+	# Seated again, as the host this time, with the guest's look received: the
+	# heroine asking for the crimson robe, with a fire sash. She goes on seat
+	# two in sea-green, and the sash and hair are hers.
+	var session := NetSession.new()
+	session.remote_look = {"figure": "heroine", "outfit": "crimson", "accent": "fire",
+		"hair": "gold", "skin": "nonsense"}
+	scene.set("session", session)
+	assert_eq(scene.get("session"), session, "the session took")
+	scene.call("_on_seated", 0)
+	var theirs: CharacterLook = scene.call("look_for", 1)
+	assert_true(theirs.is_heroine(), "their seat wears the look they sent")
+	assert_eq(theirs.to_ids()["skin"], CharacterLook.new().to_ids()["skin"],
+		"less the field that named nothing")
+	assert_true(scene.call("look_for", 0).equals(mine), "and mine is still mine")
+	var their_art := (seats[1] as DuelSeat).node.get_node(^"FighterArt") as FighterArt
+	assert_true(their_art.costume is HeroineCostume, "it was put on")
+	assert_eq(their_art.accent, Palette.MID, "with their sash")
+	assert_eq(their_art.cloth, FighterArt.SEAT_CLOTH[1], "in sea-green, not the crimson asked")
+	assert_eq(their_art.cloth_dark, FighterArt.SEAT_CLOTH_DARK[1], "all of it")
+	assert_eq(their_art.cloak_shade, FighterArt.SEAT_CLOAK[1], "every plane")
 	scene.set("_online", false)

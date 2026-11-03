@@ -176,9 +176,9 @@ desyncing in the third zone.
 
 ```
 guest                         host
-  |  HELLO (build, name)       |      repeated every 30 frames until answered
+  |  HELLO (build, name, look) |      repeated every 30 frames until answered
   |--------------------------->|
-  |      WELCOME (seat, zones, strip hash)
+  |      WELCOME (seat, zones, strip hash, look)
   |<---------------------------|      a mismatched strip is refused here
   |                            |
   |  INPUT (first_frame, bits[6])     every frame, a redundant window
@@ -192,7 +192,8 @@ guest                         host
   |<-------------------------->|
 ```
 
-Bandwidth: roughly **8 kB/s** from host to client and **0.7 kB/s** back.
+Bandwidth: roughly **8 kB/s** from host to client and **0.7 kB/s** back. The
+looks are about 45 bytes each way, once.
 
 The snapshot is *exact*. A 44-byte match header (frame, phase, initiative,
 zone, kills, and the timers and scroll as doubles) and a 100-byte block per
@@ -207,6 +208,72 @@ The client runs ahead of the newest snapshot by the measured one-way latency
 plus two frames of slack, so its input reaches the host before the host needs
 it. Drift is corrected by stepping twice in a frame, or not at all — never by
 jumping, which would be visible.
+
+### The looks
+
+Each phone draws the other player as that player chose to be drawn. The look —
+the figure and the four palette choices from the wardrobe's player one, since a
+phone is one player — rides once on the sender's half of the handshake: the
+guest's on `HELLO`, the host's on `WELCOME`. It is an optional block on the
+end of the message:
+
+```
+[u8 look format = 1][u8 count]   then count x   [u8 tag][u8 length][id bytes]
+tags: 0 figure, 1 outfit, 2 accent, 3 hair, 4 skin   (append only)
+```
+
+The values are the wardrobe's own ids (`heroine`, `saffron`, …), not indices,
+for the reason its save file uses them: two builds may list the options in a
+different order, and an index would put a different colour on the other
+screen. A whole look is under 50 bytes.
+
+**Presentation only.** `NetSession` keeps the received ids in `remote_look` and
+hands them to nothing but the scene: not the match, not a snapshot, not a
+checksum. `match_online.gd` reads them with `CharacterLook.from_ids()` when it
+is seated and dresses the other seat through `FighterArt.dress()`, which puts
+the seat's colour on *after* the look. So the guest stays sea-green and the
+host crimson whatever either sends — a guest asking for the crimson robe gets
+the heroine's sash and hair and a sea-green robe.
+`tests/match_net_test.gd` sends two different looks in every scenario and
+still asserts zero desyncs.
+
+**Nothing in it is trusted.** It is read by the rule the wardrobe reads its
+file by (`scripts/net/protocol.gd`, `_get_look`):
+
+- A block that cannot be read at all — cut short, a count over 16, a look
+  format this build does not know — is dropped whole: the other player is the
+  seat's default.
+- Otherwise each field stands or falls alone. An id that is empty, longer
+  than 16 bytes, or not lower-case ASCII, a tag past the end of the list (a
+  field from a newer build), or a second copy of a field costs that one field.
+  Ids are checked as bytes before they become a string, so a hostile peer's
+  bad UTF-8 never reaches a decoder that would log about it.
+- What survives is still only strings. `CharacterLook.take_ids()` decides
+  whether they name an option, and an id that names nothing keeps that
+  field's default.
+- A bad look never fails the message it rides on. Refusing a `HELLO` over a
+  sash would stall the handshake, which is exactly what a peer must not be
+  able to do with it. The reason is kept in `remote_look_error` and logged.
+- Once seated, later `HELLO`s cannot change the look.
+
+**Versions.** The protocol version stays **1**. A version-1 decoder reads
+`HELLO` and `WELCOME` up to their last fixed field and never asks whether bytes
+follow, and a message without a look is byte for byte a version-1 message. So
+the look is the one kind of change that needs no bump: an older build reads a
+newer `HELLO` or `WELCOME` exactly as it always did and plays on, showing its
+opponent as the seat's default; a newer build reads an older one as a message
+with no look, which is the same answer. Bumping would have refused that match
+in the lobby to protect a field neither side needs to duel. Anything that
+changes a field the duel depends on still bumps the version. A future change to
+the look itself bumps the look's own format byte, which an older build reads as
+"no look".
+
+`tests/unit/test_net_look_wire.gd` holds the encoding — every look round-trips,
+an older build's bytes, truncation at every length, noise —
+`tests/unit/test_net_look_session.gd` the handshake against an older peer and a
+bad look, `tests/unit/test_duel_seats_distinct.gd` the seat colour on every
+received look, and `tests/net_live.sh` checks that a chosen look crosses a real
+socket and the relay, and that a guest sending none is seated as the default.
 
 ---
 
@@ -331,7 +398,12 @@ hundreds of physics frames.
 starts the relay and two independent headless Godot processes and makes them
 duel through real sockets, direct and relayed, then judges what they wrote. It
 is the only check that the transport, the relay, the room codes and the
-handshake work as a system rather than individually.
+handshake work as a system rather than individually. Each peer sends a
+different look and must report the other's arriving intact, and a third round
+seats a guest that sends no look at all, as an older build does.
+
+The looks' own tests are GUT tests, because nothing in them steps a match:
+`tests/unit/test_net_look_wire.gd` and `tests/unit/test_net_look_session.gd`.
 
 ---
 
@@ -376,20 +448,6 @@ Honestly, and in roughly the order I would fix them.
   pulling it down each frame instead. On the strip's flat, axis-aligned tiles
   the two agree, and the tests say so, but a sloped or stepped zone would want
   snapping put back — deterministically, inside `_move()`.
-- **The opponent's look is not sent.** Each phone shows its own seat in the
-  look chosen on it (the wardrobe's player one, in that seat's team colour) and
-  the other seat in the seat's default: the prince, crimson or sea-green.
-  `NetSession`'s protocol carries inputs, snapshots and checksums, and a look
-  is presentation that no checksum may see, so it was left out rather than
-  bolted on. Sending it would be one more field in `HELLO` and in `WELCOME`
-  (five short ids, validated on arrival by `CharacterLook.take_ids()`, which
-  already falls back field by field), applied in `match_online.gd`'s
-  `look_for()`; the seat colour is imposed after any look, so a peer could not
-  use it to wear the other team's colour. Until then the two players see
-  different pictures of the same match, which is harmless — the duel is
-  decided by rectangles both of them agree on — but it means you cannot see
-  what your opponent chose. `tests/unit/test_duel_seats_distinct.gd` holds the
-  current behaviour.
 - **No bandwidth adaptation.** The snapshot rate is a constant.
 - **The clock sync is crude.** One-way latency is taken as half the round trip,
   which is wrong on an asymmetric connection.

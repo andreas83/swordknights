@@ -14,6 +14,13 @@ extends SceneTree
 ## Modes: direct-host, direct-guest, room-host, room-guest. Both peers play the
 ## tug-of-war match on the real fighter, which is what Duel Online runs.
 ##
+## `--look figure=heroine,outfit=wine,...` is the look this peer sends in the
+## handshake, as CharacterLook ids; `--look none` sends no look block at all,
+## which is byte for byte what a build from before the looks sent. The report
+## says what was sent (`sent_look`) and what came back from the other side,
+## read the way match_online.gd reads it (`got_look`), so the script can check
+## a chosen look really crossed the socket and the relay.
+##
 ## Runs at real time on purpose: no --fixed-fps. Two processes talking over a
 ## socket have to agree about how fast a second is.
 
@@ -28,6 +35,8 @@ var report_path := ""
 var code_out := ""
 ## Give up if nothing ever connects, so a failed run ends rather than hangs.
 var patience_frames := 1800
+## The look sent in the handshake, as ids. Empty sends none.
+var look_ids := {}
 
 var _duel: DuelMatch
 var _transport: WsTransport
@@ -146,6 +155,7 @@ func _start_session(as_host: bool) -> void:
 		func(frame: int, mine: int, theirs: int) -> void:
 			print("[%s] DESYNC frame %d: %08x vs %08x" % [mode, frame, mine, theirs])
 	)
+	_session.local_look = look_ids
 	_session.start(_transport, _duel, as_host)
 
 
@@ -170,6 +180,11 @@ func _finish(note: String) -> bool:
 		"starved=%d" % (_session.input_starved if _session != null else 0),
 		"rtt_ms=%.1f" % (_session.rtt_ms if _session != null else -1.0),
 		"transport=%s" % (_transport.describe() if _transport != null else "none"),
+		"sent_look=%s" % _look_text(look_ids),
+		"got_fields=%d" % (_session.remote_look.size() if _session != null else -1),
+		"got_look=%s" % _look_text(
+			CharacterLook.from_ids(_session.remote_look).to_ids() if _session != null else {}),
+		"look_error=%s" % (_session.remote_look_error if _session != null else ""),
 	])
 	var text := "\n".join(lines)
 	print("[%s] %s" % [mode, note])
@@ -182,6 +197,29 @@ func _finish(note: String) -> bool:
 	if _session != null:
 		_session.shutdown()
 	return true
+
+
+## A look as one line, "figure=heroine,outfit=wine,...", in the wardrobe's
+## field order; "none" for no look at all.
+static func _look_text(ids: Dictionary) -> String:
+	if ids.is_empty():
+		return "none"
+	var parts := PackedStringArray()
+	for field: String in CharacterLook.FIELDS:
+		parts.append("%s=%s" % [field, ids.get(field, "")])
+	return ",".join(parts)
+
+
+## The inverse of _look_text, for --look.
+static func _parse_look(text: String) -> Dictionary:
+	var ids := {}
+	if text == "none":
+		return ids
+	for part: String in text.split(",", false):
+		var pair := part.split("=")
+		if pair.size() == 2:
+			ids[pair[0].strip_edges()] = pair[1].strip_edges()
+	return ids
 
 
 ## What the match came to: kills, and who held the initiative at the end.
@@ -221,6 +259,9 @@ func _parse_args() -> void:
 				i += 2
 			"--patience":
 				patience_frames = maxi(60, int(value))
+				i += 2
+			"--look":
+				look_ids = _parse_look(value)
 				i += 2
 			_:
 				i += 1

@@ -25,6 +25,10 @@ const FIGHTER_SCENE: PackedScene = preload("res://scenes/fighter.tscn")
 const POLLS := 1200
 ## A handshake that has not completed after this many polls has failed.
 const HANDSHAKE_POLLS := 240
+const HOST_LOOK := {"figure": "heroine", "outfit": "saffron", "accent": "pale",
+	"hair": "gold", "skin": "copper"}
+const CLIENT_LOOK := {"figure": "prince", "outfit": "wine", "accent": "ink",
+	"hair": "raven", "skin": "umber"}
 
 var _s := Support.new()
 var _strip: ZoneStrip
@@ -73,6 +77,10 @@ func _scenario(label: String, latency: int, jitter: int, loss: float, seed_value
 	# The host sits in seat 0 and the client in seat 1; checked below.
 	host.local_input = _bot(host_match, 0, seed_value)
 	client.local_input = _bot(client_match, 1, seed_value)
+	# Two different looks, as two phones send. They are presentation and must
+	# change nothing below: the same zero desyncs, with them crossing.
+	host.local_look = HOST_LOOK
+	client.local_look = CLIENT_LOOK
 	var seats := [-1, -1]
 	host.handshake_complete.connect(func(slot: int) -> void: seats[0] = slot)
 	client.handshake_complete.connect(func(slot: int) -> void: seats[1] = slot)
@@ -90,6 +98,8 @@ func _scenario(label: String, latency: int, jitter: int, loss: float, seed_value
 		return
 
 	_s.equal(seats, [0, 1], "%s: the host is seat 0 and the client seat 1" % label)
+	_s.equal(host.remote_look, CLIENT_LOOK, "%s: the host has the client's look" % label)
+	_s.equal(client.remote_look, HOST_LOOK, "%s: the client has the host's look" % label)
 	var start := host_match.frame
 	for i: int in POLLS:
 		host.poll()

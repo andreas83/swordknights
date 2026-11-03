@@ -141,8 +141,8 @@ colours (robe, sash, hair, skin) for player one, who is the adventure, Endless
 and the crimson duel seat, and for player two, the sea-green seat. The choice
 is saved on the device. In a duel the robe always takes the seat's colour, so
 the two seats stay crimson and sea-green whatever either player wears. Online,
-each phone shows its own player in their look and the opponent in their
-seat's default. See [`docs/character.md`](docs/character.md) and
+each phone sends its player's look once, in the handshake, and shows the
+opponent in the look they chose, still in their seat's colour. See [`docs/character.md`](docs/character.md) and
 [`docs/ui.md`](docs/ui.md).
 
 ![The wardrobe: the heroine for player one, and player two in the sea-green seat](docs/wardrobe.png)

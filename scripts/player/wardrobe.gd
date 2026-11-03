@@ -5,7 +5,8 @@ extends RefCounted
 ## Player one is the adventure's figure -- the Adventure, Endless and the feel
 ## lab all dress their player from it -- and the crimson seat of a local duel.
 ## Player two is the sea-green seat. Online, a phone is one player, so it is
-## player one's look that a phone shows on its own seat (docs/netplay.md).
+## player one's look that a phone shows on its own seat and sends to the
+## other phone in the handshake (docs/netplay.md, "The looks").
 ##
 ## ## The file
 ##

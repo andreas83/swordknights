@@ -39,6 +39,12 @@ extends RefCounted
 ##
 ## The client needs no second simulation to do this: it reuses the one duel it
 ## has, because reconciliation is about to overwrite it anyway.
+##
+## THE LOOKS
+## Each side's look rides on its half of the handshake -- the guest's on HELLO,
+## the host's on WELCOME -- and is kept here as ids for the scene to dress the
+## other seat in. It is never handed to `duel`, and nothing here reads it
+## after the handshake, so it cannot reach a step, a snapshot or a checksum.
 
 signal desync_detected(frame: int, mine: int, theirs: int)
 signal handshake_complete(local_slot: int)
@@ -91,6 +97,17 @@ var remote_slot: int = DuelRules.SLOT_B
 ## seat. Kept as an injected dependency so a test can drive a session with a
 ## scripted stream and no devices at all.
 var local_input: Callable = func() -> int: return 0
+
+## This player's look, as CharacterLook ids, set by the scene before start().
+## Sent once, in the handshake. Empty sends none, as an older build does.
+var local_look: Dictionary = {}
+## The other player's look as it arrived: {field: id}, only the fields that
+## were well formed on the wire, and empty if it sent none. The ids are still
+## unchecked -- CharacterLook.take_ids() decides whether they name anything --
+## and they are presentation, read by the scene and never by the duel.
+var remote_look: Dictionary = {}
+## Why the other player's look was dropped, if it was. For the log.
+var remote_look_error := ""
 
 ## --- what the HUD shows -----------------------------------------------------
 var rtt_ms := 0.0
@@ -190,7 +207,7 @@ func poll() -> void:
 			if _handshake_frames > HANDSHAKE_TIMEOUT_FRAMES:
 				_fail("the other side never answered the handshake")
 			elif role == Role.CLIENT and _handshake_frames % HANDSHAKE_RETRY_FRAMES == 0:
-				transport.send(NetProtocol.hello(NetProtocol.VERSION, "challenger"))
+				transport.send(_hello())
 		Stage.RUNNING:
 			if _frames % PING_INTERVAL == 0:
 				_send_ping()
@@ -422,8 +439,9 @@ func _on_received(bytes: PackedByteArray) -> void:
 	match int(message["type"]):
 		NetProtocol.Type.HELLO:
 			if role == Role.HOST:
+				_take_remote_look(message)
 				transport.send(NetProtocol.welcome(
-					DuelRules.SLOT_B, duel.match_length(), _arena_hash
+					DuelRules.SLOT_B, duel.match_length(), _arena_hash, local_look
 				))
 				_begin_running()
 
@@ -442,6 +460,7 @@ func _on_received(bytes: PackedByteArray) -> void:
 					_fail("the host is playing a match this build cannot: %d"
 						% int(message["rounds_to_win"]))
 					return
+				_take_remote_look(message)
 				_begin_running()
 
 		NetProtocol.Type.INPUT:
@@ -518,7 +537,21 @@ func _on_peer_joined() -> void:
 	_handshake_frames = 0
 	# The guest speaks first; the host answers with the seating.
 	if role == Role.CLIENT:
-		transport.send(NetProtocol.hello(NetProtocol.VERSION, "challenger"))
+		transport.send(_hello())
+
+
+func _hello() -> PackedByteArray:
+	return NetProtocol.hello(NetProtocol.VERSION, "challenger", local_look)
+
+
+## Keeps the other player's look from the first handshake message that seats
+## us. Later repeats of HELLO are ignored, so nothing can change the look once
+## the match is running.
+func _take_remote_look(message: Dictionary) -> void:
+	if stage == Stage.RUNNING:
+		return
+	remote_look = (message.get("look", {}) as Dictionary).duplicate()
+	remote_look_error = String(message.get("look_error", ""))
 
 
 func _on_peer_left() -> void:
