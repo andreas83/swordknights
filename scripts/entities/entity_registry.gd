@@ -62,6 +62,7 @@ static func kinds() -> Dictionary:
 		"exit": ExitDoor,
 		"torch": Torch,
 		"patrol": Patrol,
+		"bastion": Bastion,
 		"lift": Lift,
 		"eclipse": Eclipse,
 		"kept_sun": KeptSun,

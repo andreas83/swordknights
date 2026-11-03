@@ -204,7 +204,11 @@ The rules Game applies, once a frame per foe, in this order:
 5. **Danger.** While `is_dangerous()`, the first of `dangers()` that touches
    his body is resolved: *parried* if his parry is up, he faces it and the
    danger has a `parry` (the guard's cut does; a slam need not), *evaded* in a
-   backstep's window if it is `evadable`, otherwise *landed*.
+   backstep's window if it is `evadable`, otherwise *landed*. A danger with
+   no `damage` and a `push` is a **shove**: landed, it throws the prince back
+   and staggers him (`Player.shove()`) with no heart lost and no grace given
+   -- the Bastion's shove, and his shield's face, which pushes back like a
+   wall because foes have no collision of their own.
 
 `take_blow()` answers an `Outcome`, and Game presents it: a wound or a kill
 gets the wound sound and the impact, `BLOCKED` the clang and a small held

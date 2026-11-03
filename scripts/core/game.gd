@@ -454,6 +454,11 @@ func _resolve_danger(danger: FoeDanger, body: Rect2) -> bool:
 		# to either of them -- the guard's own cut is its sound, and the
 		# missing hit is the read. No riposte, no reel: see Player.evades().
 		pass
+	elif danger.damage <= 0:
+		# A shove: thrown back and staggered, no heart and no grace, so a
+		# shield is a wall even to a prince who was just hit (FoeDanger).
+		danger.landed(danger.push != Vector2.ZERO
+			and player.shove(danger.push, danger.from_x, danger.stagger))
 	else:
 		var dealt := player.damage(danger.damage, danger.from_x)
 		danger.landed(dealt)

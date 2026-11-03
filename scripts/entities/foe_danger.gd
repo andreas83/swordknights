@@ -18,6 +18,12 @@ extends RefCounted
 ## A danger that has no `parry` cannot be parried: a raised sword is simply
 ## hit. That is a design lever, not an omission -- a falling block, a fire, a
 ## boss's slam can each say so in one line.
+##
+## A danger with no `damage` and a `push` is a **shove**: landed, it throws
+## the prince back at `push` (away from `from_x`) and staggers him for
+## `stagger` seconds, and costs no heart and grants no grace -- a Bastion's
+## shield, a wall that pushes back (Player.shove()). Without a push, a
+## danger with no damage does nothing at all.
 
 ## Where the blow is, in world units.
 var rect := Rect2()
@@ -28,6 +34,10 @@ var from_x := 0.0
 var damage := 1
 ## Whether a backstep's window lets it by.
 var evadable := true
+## For a shove (`damage` 0): the velocity it throws him at, x away from
+## `from_x`, and how long he reels.
+var push := Vector2.ZERO
+var stagger := 0.32
 ## `() -> bool`: the blow met a parry; true when it was turned. Unbound, it
 ## cannot be parried.
 var parry := Callable()

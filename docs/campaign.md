@@ -603,6 +603,16 @@ gold rivet line across it; the hat's brim is the whole read.
 | TURN | 30 | `LOOK_TIME` | the prince got behind him: his back is open for the whole turn |
 | STAGGER | 24 | `STAGGER_TIME` | after a wound; unlike a sentinel he is not knocked back, so the plunge's rebound comes down on him again |
 
+![The Bastion's states, with the prince and the sentinel for scale](bastion-poses.png)
+
+*Rendered by `tools/bastion_poses.gd`; `tests/unit/test_bastion.gd` pins the
+numbers.* As built (`scripts/entities/bastion.gd`): foes have no collision in
+this game, so his front is a wall by the referee's hand -- the shield's face
+pushes a body that touches it back about six pixels, and a blade that clangs
+off it the same, through Game's shove (`FoeDanger.push`), which costs no
+heart and grants no grace. His shield's two planes are the dark figure's,
+not the wall's: a crimson board vanished into every crimson wall behind it.
+
 Two hearts. **Counters:** the plunge (a wound; its rebound puts you back in
 the air to plunge again — the double plunge kills); a swing at his back during
 the turn. **Fails:** swings and air slashes from the front (clang), the parry

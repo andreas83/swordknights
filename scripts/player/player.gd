@@ -855,6 +855,23 @@ func damage(amount: int = 1, from_x: float = NAN) -> bool:
 	return true
 
 
+## Thrown back at `push` -- x away from `from_x` -- and staggered for
+## `seconds`: a shield's shove, a wall that pushes back. Not damage: no heart,
+## no grace after it, no `hurt`, so nothing on the HUD and nothing that lets
+## a body walk through the next one. False for a body that is down.
+func shove(push: Vector2, from_x: float, seconds: float) -> bool:
+	if state == State.DEAD:
+		return false
+	var away := int(signf(position.x - from_x))
+	if away == 0:
+		away = -facing
+	velocity = Vector2(away * push.x, push.y)
+	_set_crouched(false)
+	_hurt_timer = seconds
+	_enter(State.HURT)
+	return true
+
+
 ## Gives back up to `amount` hearts, never past MAX_HEALTH. Returns whether
 ## anything was restored, so a caller can tell a heal from a pickup at full
 ## health. A body that is down stays down: healing is not a revival, and the
