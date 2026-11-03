@@ -189,6 +189,89 @@ particle, no timer, no tween, nothing allocated or freed while playing. The
 node is `top_level`, so dust stays where it was kicked up instead of riding
 along with the character.
 
+## When nothing happens
+
+Leave the prince alone and he gets bored, in steps.
+`scripts/player/idle_art.gd` (`IdleArt`) is a child of the art, attached by
+`PlayerArt._bind()` the way the effects are, and it does three things: keeps
+a clock, lays a pose over `_idle()`, and draws a few props over the figure.
+
+![every idle beat](idle-poses.png)
+
+| Quiet for | What he does | How long |
+| --- | --- | --- |
+| 0–4 s | nothing new: the resting breath | — |
+| 4 s, 8 s | a **fidget**: a glance over the shoulder, or two tugs at the sash | 1.6 s / 1.5 s |
+| 12 s, then every 11 s | a **bit**, one of five, never the same twice running | 3.8–7 s |
+| 8 s into each 11 s cycle | a fidget, after the longest bit has finished | as above |
+
+The five bits:
+
+- **Sit** — lays the sword on the floor, sits cross-legged, stretches into a
+  yawn with both arms up, nods off for a moment, gets up and takes the sword.
+- **Juggle** — flips the sword up and catches it, flips it higher, it glances
+  off his fingers, he lunges and snatches it a hand above the floor, then
+  turns to the camera: nobody saw that.
+- **Swat** — a fly buzzes round his face; he swats, it darts behind his head;
+  he swats backwards, it lands on the crest of his hood; he looks up at it,
+  slaps his own head, and it flies away.
+- **Doze** — plants the sword and leans on the pommel; a "z" rises every
+  0.8 s while he sags over it; he jolts awake, looks behind him, then at you.
+- **Tap** — turns to the camera, hands on hips, taps his foot six times and
+  sighs.
+
+**Every pose is pose fields.** A bit is a table of keyframes over the same
+fields as every other state, eased with smoothstep, every field a key leaves
+out taken from the resting pose. So the rig draws it in whatever cloth and
+proportions the figure has: a recoloured or redrawn figure idles without a
+change in `idle_art.gd`. The props — the fly, a sword in the air or on the
+floor, the "z" — are drawn by `IdleArt` in world colours (`INK`, `STEEL`,
+`PAPER`), because they are not part of the figure.
+
+**Purely a picture.** `IdleArt` reads the `Player` and never writes to it.
+It runs in `_process`, which Godot runs after every physics step of a frame,
+so the frame a button goes down is the frame `IdleArt.is_calm()` goes false
+and the bit is dropped: no delay, no swallowed input, a press while seated
+is a press while standing. Calm is narrow on purpose — state `IDLE` and every
+input bit up — so every other state, the air slash, plunge and parry
+included, is not calm without having to be listed.
+
+**Small sounds**, through `GameAudio.cue` only: cloth for sitting, tugging
+and swatting, a high, quiet `sword_hit` for the catch and the fumble, a
+`step_walk` per tap, a soft thud for the bonk. There is no yawn: the voice
+catalogue has none, and synthesising one is a separate piece of work.
+
+**Not near a guard.** A live guard within `IdleArt.GUARD_NEAR` — 13 tiles
+across, 6 up or down — or one raising, cutting or recovering anywhere, holds
+the clock at zero, and one walking into range ends a bit on that frame. The
+camera rests centred on a standing prince, and a 180-unit frame is at most
+400 units wide on a 20:9 phone, so that box is "anywhere a guard could share
+the screen with him". If the player can see a guard, so can the prince; and
+a prince dozing beside one would teach that guards are harmless. Guards join
+`Patrol.GROUP` so the idle can ask the tree for them.
+
+**Not in the duel.** `FighterArt` overrides `_bind()`, so a duellist never
+gets an `IdleArt`. That is a decision, not an accident: a duellist standing
+still is in a stance, and the stance is the information. The fighter's sword
+is drawn exactly where the simulation's blade rect is and the body is kept
+inside the hurtbox, so a fighter who sat down or tossed his sword would be
+drawn lying about both. And the two peers of an online duel would roll
+different bits, since this clock is not in the snapshot.
+
+```bash
+xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 3072x720 \
+  --script tools/idle_poses.gd -- --out docs/idle-poses.png [--silhouette]
+```
+
+`tools/idle_poses.gd` pins one prince per cell with `IdleArt.pin()`, since a
+live game reaches a given bit only after a roll and twelve quiet seconds.
+`tests/unit/test_idle_art.gd` pins the ladder's timings, every button
+cancelling on its own frame, every non-`IDLE` state being un-calm, the guard
+radius and the raise, the duel, and that a hundred quiet seconds followed by
+a run, a jump, a swing and a crouch trace the same simulation frame for frame
+with the idle on as with it off. Each of those was seen to fail by breaking
+the thing it guards.
+
 ## The tuning, and what changed
 
 `scripts/core/tuning.gd` is the only place feel lives. The hard constraint on
