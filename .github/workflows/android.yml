@@ -67,7 +67,7 @@ jobs:
       signer: ${{ steps.verify.outputs.signer }}
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -312,7 +312,7 @@ jobs:
       SIGNER: ${{ needs.apk.outputs.signer }}
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download the APK
         uses: actions/download-artifact@v4
