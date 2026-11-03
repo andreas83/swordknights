@@ -102,5 +102,5 @@ func test_the_masked_flood_agrees_with_the_plain_one_where_nothing_changes() -> 
 	assert_eq((masked["reached"] as Dictionary).keys(), (plain["reached"] as Dictionary).keys(),
 		"the same cells reached")
 	assert_eq((masked["stranded"] as Dictionary).size(), 0, "and none stranded")
-	var search := ReachSearch.search(solver, level.spawn_point, goals, [] as Array[Vector2i])
+	var search := ReachSearch.search(solver, level.spawn_point, goals, {})
 	assert_true(bool(search["ok"]), "and the masked search finds the door")

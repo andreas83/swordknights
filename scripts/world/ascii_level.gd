@@ -17,25 +17,36 @@ extends RefCounted
 ## A comment that starts `;!` is a directive: an instruction about the level
 ## rather than a row of it (docs/world.md, "Directives and wiring"). It is a
 ## comment first -- the geometry parser skips it like any `;` line, so a
-## directive can never move a tile, and it is never taken for the title. Two
-## are read today:
+## directive can never move a tile, and it is never taken for the title:
 ##
-##     ;! time dusk                       the hour the level is set at
-##     ;! mark 1 plate channel=west_gate  glyph 1 places a "plate" here
+##     ;! time golden               the hour the level is set at
+##     ;! horizon 32                no sun below this row
+##     ;! channel 2 hold 4.0        what wire 2 does: latch, hold S, beat P
+##     ;! checkpoints route         order torches along the proved route
+##     ;! mark k plate channel=a    glyph k places a "plate", on wire a
 ##
-## `mark` is how a level places a kind the legend has no glyph for, with
-## parameters -- which is how mechanisms are wired: a plate and a gate that
-## name the same channel are connected. A declared glyph may be anything no
-## legend uses; every connected run of it is ONE entity, so a gate three
-## cells tall is one gate. Problems -- a malformed directive, a glyph in no
-## legend -- are collected in `problems` rather than raised: Game warns about
-## them on load, and a test refuses a shipping level that has any.
+## ## Wiring
+##
+## Mechanisms (Tiles.MECHANISM_LEGEND) are wired by mason's marks: a digit
+## cut in a stone cell -- solid, like the stone around it -- carries a
+## channel and wires the one mechanism it touches. Same mark, same wire. A
+## mark that touches no mechanism, or two, is a problem with its cell named.
+## Every connected run of one kind's glyphs is ONE mechanism, so a gate three
+## cells tall is one gate. `mark` binds a glyph no legend uses to any kind for
+## one level, with parameters, which is how a test or a one-off kind is
+## placed; it is wired by `channel=`.
+##
+## Problems -- a malformed directive, a stray mark, a glyph in no legend --
+## are collected in `problems` rather than raised: Game warns about them on
+## load, and a test refuses a shipping level that has any.
 
 const DIRECTIVE_MARKER := ";!"
 ## Directive names something reads. A name not here is reported, so a typo in
 ## a header is a problem and not silently nothing. Add a name when you add its
 ## reader.
-const DIRECTIVES: Array[String] = ["mark", "time"]
+const DIRECTIVES: Array[String] = ["mark", "time", "channel", "horizon", "checkpoints"]
+## The modes a channel can be given (ChannelBus).
+const CHANNEL_MODES: Array[String] = ["momentary", "latch", "hold", "beat"]
 
 var cols: int = 0
 var rows: int = 0
@@ -49,6 +60,10 @@ var entities: Array[Dictionary] = []
 var directives: Array[Dictionary] = []
 ## Glyph -> `{kind, params}`: what this level's `;! mark` lines declared.
 var declared: Dictionary = {}
+## Cell -> digit: the mason's marks, each solid stone in the grid.
+var masons_marks: Dictionary = {}
+## Channel -> `{mode, seconds, phase, period}` from `;! channel` lines.
+var channels: Dictionary = {}
 ## What is wrong with the text, for whoever wrote it. Never an error in play.
 var problems: PackedStringArray = PackedStringArray()
 ## Array of { id: String, cell: Vector2i }. Architecture the author placed by
@@ -103,6 +118,8 @@ func parse(text: String) -> void:
 	directives.clear()
 	declared.clear()
 	problems.clear()
+	masons_marks.clear()
+	channels.clear()
 	var number := 0
 	for raw: String in text.split("\n", true):
 		var line := raw.trim_suffix("\r")
@@ -142,6 +159,7 @@ func parse(text: String) -> void:
 	decorations.clear()
 	seals.clear()
 	var runs := {}
+	var mechanisms := {}
 
 	for y: int in rows:
 		var line: String = lines[y]
@@ -153,6 +171,20 @@ func parse(text: String) -> void:
 				if not runs.has(glyph):
 					runs[glyph] = []
 				(runs[glyph] as Array).append(Vector2i(x, y))
+				continue
+
+			# A mechanism: grouped by kind, so `[` and `]` can be one lift.
+			var mechanism := Tiles.mechanism_kind(glyph)
+			if mechanism != "":
+				if not mechanisms.has(mechanism):
+					mechanisms[mechanism] = []
+				(mechanisms[mechanism] as Array).append(Vector2i(x, y))
+				_grid[y * cols + x] = Tiles.mechanism_terrain(glyph)
+				continue
+
+			if Tiles.is_masons_mark(glyph):
+				masons_marks[Vector2i(x, y)] = glyph
+				_grid[y * cols + x] = Tiles.Kind.SOLID
 				continue
 
 			if Tiles.ENTITY_LEGEND.has(glyph):
@@ -184,7 +216,7 @@ func parse(text: String) -> void:
 				problems.append("row %d, column %d: '%s' is in no legend and not declared"
 					% [y, x, glyph])
 
-	_place_declared(runs)
+	_place_runs(runs, mechanisms)
 	_find_secrets()
 
 
@@ -217,8 +249,50 @@ func _read_directive(line: String, number: int) -> void:
 	directives.append({"name": directive_name, "args": args, "params": params, "line": number})
 	if not DIRECTIVES.has(directive_name):
 		problems.append("line %d: there is no directive '%s'" % [number, directive_name])
-	elif directive_name == "mark":
-		_declare(args, params, number)
+		return
+	match directive_name:
+		"mark":
+			_declare(args, params, number)
+		"channel":
+			_read_channel(args, params, number)
+		"horizon":
+			if args.size() != 1 or not args[0].is_valid_int():
+				problems.append("line %d: a horizon is one row number" % number)
+		"checkpoints":
+			if args.size() != 1 or not args[0] in ["x", "route"]:
+				problems.append("line %d: checkpoints are ordered by 'x' or 'route'" % number)
+		"time":
+			if args.size() != 1:
+				problems.append("line %d: a time is one stop or one number" % number)
+
+
+## `;! channel <name> <mode> [seconds | phase] [period=frames]`.
+func _read_channel(args: PackedStringArray, params: Dictionary, number: int) -> void:
+	if args.size() < 2:
+		problems.append("line %d: a channel needs a name and a mode" % number)
+		return
+	var mode := args[1].to_lower()
+	if not CHANNEL_MODES.has(mode):
+		problems.append("line %d: a channel's mode is %s, not '%s'"
+			% [number, "/".join(CHANNEL_MODES), mode])
+		return
+	var spec := {"mode": mode}
+	if mode == "hold":
+		if args.size() < 3 or not args[2].is_valid_float() or float(args[2]) <= 0.0:
+			problems.append("line %d: a hold needs its seconds" % number)
+			return
+		spec["seconds"] = float(args[2])
+	elif mode == "beat":
+		var period := String(params.get("period", "100"))
+		if args.size() < 3 or not args[2].is_valid_int() or not period.is_valid_int() \
+				or int(period) <= 0:
+			problems.append("line %d: a beat needs its phase in frames" % number)
+			return
+		spec["phase"] = int(args[2])
+		spec["period"] = int(period)
+	if channels.has(args[0]):
+		problems.append("line %d: channel %s is set twice; the last one wins" % [number, args[0]])
+	channels[args[0]] = spec
 
 
 ## `;! mark <glyph> <kind> [key=value ...]`: the glyph places that kind.
@@ -233,6 +307,9 @@ func _declare(args: PackedStringArray, params: Dictionary, number: int) -> void:
 	if glyph == COMMENT_MARKER or _in_a_legend(glyph):
 		problems.append("line %d: '%s' already means something in the legend" % [number, glyph])
 		return
+	if Tiles.is_masons_mark(glyph):
+		problems.append("line %d: '%s' is a mason's mark, not a glyph to declare" % [number, glyph])
+		return
 	for extra: String in args.slice(2):
 		problems.append("line %d: '%s' is not key=value" % [number, extra])
 	if declared.has(glyph):
@@ -242,31 +319,80 @@ func _declare(args: PackedStringArray, params: Dictionary, number: int) -> void:
 
 static func _in_a_legend(glyph: String) -> bool:
 	return (Tiles.LEGEND.has(glyph) or Tiles.ENTITY_LEGEND.has(glyph)
-		or Tiles.DECOR_LEGEND.has(glyph) or Tiles.SEAL_LEGEND.has(glyph))
+		or Tiles.DECOR_LEGEND.has(glyph) or Tiles.SEAL_LEGEND.has(glyph)
+		or Tiles.mechanism_kind(glyph) != "")
 
 
-## Every connected run of a declared glyph becomes one mark, anchored at its
-## bottom-left cell -- where a thing that stands, stands. Then the marks are
-## put back in reading order with the rest, which is the order Game places
-## and meets them in.
-func _place_declared(runs: Dictionary) -> void:
-	if runs.is_empty():
+## Every connected run of a declared glyph, and of a mechanism kind, becomes
+## one mark, anchored at its bottom-left cell -- where a thing that stands,
+## stands. The mechanisms are wired by the mason's marks touching them. Then
+## every mark goes back in reading order with the rest, which is the order
+## Game places and meets them in.
+func _place_runs(declared_runs: Dictionary, mechanism_runs: Dictionary) -> void:
+	var wired: Array[Dictionary] = []
+	if declared_runs.is_empty() and mechanism_runs.is_empty():
+		_wire(wired)
 		return
-	for glyph: String in runs:
+	for glyph: String in declared_runs:
 		var spec: Dictionary = declared[glyph]
-		for run: Array[Vector2i] in _connected(runs[glyph]):
-			var anchor := run[0]
-			for cell: Vector2i in run:
-				if cell.y > anchor.y or (cell.y == anchor.y and cell.x < anchor.x):
-					anchor = cell
-			entities.append({
-				"kind": String(spec["kind"]), "cell": anchor, "cells": run,
-				"params": (spec["params"] as Dictionary).duplicate(), "glyph": glyph,
-			})
+		for run: Array[Vector2i] in _connected(declared_runs[glyph]):
+			var mark := _run_mark(String(spec["kind"]), run,
+				(spec["params"] as Dictionary).duplicate())
+			mark["glyph"] = glyph
+			entities.append(mark)
+	for kind: String in mechanism_runs:
+		for run: Array[Vector2i] in _connected(mechanism_runs[kind]):
+			var mark := _run_mark(kind, run, {})
+			entities.append(mark)
+			wired.append(mark)
+	_wire(wired)
 	entities.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		var p: Vector2i = a["cell"]
 		var q: Vector2i = b["cell"]
 		return p.y < q.y or (p.y == q.y and p.x < q.x))
+
+
+static func _run_mark(kind: String, run: Array[Vector2i], params: Dictionary) -> Dictionary:
+	var anchor := run[0]
+	for cell: Vector2i in run:
+		if cell.y > anchor.y or (cell.y == anchor.y and cell.x < anchor.x):
+			anchor = cell
+	return {"kind": kind, "cell": anchor, "cells": run, "params": params}
+
+
+## Each mason's mark gives its digit, as `params.channel`, to the one
+## mechanism it touches. A mark touching none, or two, or a mechanism touching
+## two different marks, is a problem with the cell named: a wire to nothing is
+## a gate that never opens, and nobody sees it until they are standing there.
+func _wire(mechanisms: Array[Dictionary]) -> void:
+	if masons_marks.is_empty():
+		return
+	var owner := {}
+	for i: int in mechanisms.size():
+		for cell: Vector2i in mechanisms[i]["cells"]:
+			owner[cell] = i
+	var marks: Array = masons_marks.keys()
+	marks.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return a.y < b.y or (a.y == b.y and a.x < b.x))
+	for at: Vector2i in marks:
+		var digit := String(masons_marks[at])
+		var named := "mason's mark '%s' at column %d, row %d" % [digit, at.x, at.y]
+		var touching := {}
+		for step: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			if owner.has(at + step):
+				touching[owner[at + step]] = true
+		if touching.size() != 1:
+			problems.append("%s touches %d mechanisms: a mark wires exactly one"
+				% [named, touching.size()])
+			continue
+		var mark: Dictionary = mechanisms[int(touching.keys()[0])]
+		var params: Dictionary = mark["params"]
+		if params.has("channel") and String(params["channel"]) != digit:
+			problems.append("%s: the %s it touches already carries mark '%s'"
+				% [named, mark["kind"], params["channel"]])
+			continue
+		params["channel"] = digit
+		mark["mark"] = at
 
 
 ## `cells` split into 4-connected runs, each in reading order.
@@ -299,10 +425,7 @@ static func _connected(cells: Array) -> Array[Array]:
 static func _has_unknown_glyphs(line: String) -> bool:
 	for i: int in line.length():
 		var glyph := line[i]
-		if not (Tiles.LEGEND.has(glyph)
-				or Tiles.ENTITY_LEGEND.has(glyph)
-				or Tiles.DECOR_LEGEND.has(glyph)
-				or Tiles.SEAL_LEGEND.has(glyph)):
+		if not (_in_a_legend(glyph) or Tiles.is_masons_mark(glyph)):
 			return true
 	return false
 
@@ -426,6 +549,8 @@ func copy() -> AsciiLevel:
 	out.opened = opened.duplicate()
 	out.directives = directives.duplicate(true)
 	out.declared = declared.duplicate(true)
+	out.masons_marks = masons_marks.duplicate()
+	out.channels = channels.duplicate(true)
 	out.problems = problems.duplicate()
 	out._grid = _grid.duplicate()
 	out._secret_of = _secret_of.duplicate()

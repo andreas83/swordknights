@@ -101,7 +101,7 @@ func _ready() -> void:
 	# Malformed directives and glyphs in no legend: the level still plays, and
 	# whoever wrote it hears about it here (tests refuse a shipping level with
 	# any).
-	for problem: String in data.problems:
+	for problem: String in data.problems + EntityRegistry.problems_in(data):
 		push_warning("%s: %s" % [data.name, problem])
 
 	level.build(data)
@@ -114,6 +114,7 @@ func _ready() -> void:
 	_contact.foe_met = _resolve_foe
 	_contact.shot_met = _resolve_shot
 	_contact.harmed = _harm
+	_bus = ChannelBus.for_level(data)
 	_spawn_entities(data)
 
 	player.level = level
@@ -197,6 +198,8 @@ func _physics_process(delta: float) -> void:
 			# --- feel/flow (additive) --- spent in live frames, so a held
 			# frame does not count against it.
 			_impact_cooldown = maxf(0.0, _impact_cooldown - delta)
+			# --- mechanisms --- the wires' clock: holds count down, beats turn.
+			_bus.step()
 			_resolve_interactions()
 
 
@@ -552,9 +555,15 @@ func _harm(hearts: int, from_x: float) -> bool:
 
 func _restart() -> void:
 	for node: Node in _entities.get_children():
+		# A mechanism or a shot leaves now, not at the end of the frame. Left
+		# in the tree it is met once more: a plate lets go on the bus it was
+		# wired to, its old gate shuts and takes back the cells its
+		# replacement has just claimed, then clears them as it is freed.
+		if node is Mechanism or node is FoeProjectile:
+			_entities.remove_child(node)
 		node.queue_free()
 	_down.clear()
-	_bus = ChannelBus.new()
+	_bus = ChannelBus.for_level(level.data)
 	secrets.reseal() # --- secrets --- behind the wipe, like the rest
 	_spawn_entities(level.data)
 	secrets.furnish(_entities)
@@ -665,17 +674,20 @@ func _update_hud(refill: bool = false) -> void:
 ##   you, and anything a foe had loosed is gone. The clock keeps running: a
 ##   death costs the seconds since the torch, which is the point, and nothing
 ##   more.
-## - **Mechanisms do not remember.** Every plate, gate and crumbling floor is
-##   put back exactly as the level text placed it, on a fresh bus. This is the
-##   rule that keeps the first one true: a torch is proved with every channel
-##   off (LevelReachability.verify_from() starts the mask at zero), so a
-##   respawn into any other mechanism state would be a respawn the proof says
-##   nothing about. Keeping a gate the player opened sounds kinder until the
-##   same rule keeps a floor he broke, or a trapdoor he dropped, between the
-##   torch and the door -- a soft lock, and one only a restart cures. The
-##   things that do persist are safe by construction: relics never touch
-##   passability, foes being down only removes danger, and found secrets are
-##   proved never-a-trap in every combination (audit_secrets).
+## - **A trap resets; a deed does not.** Every plate, gate and crumbling floor
+##   is put back as the level text placed it, on a new bus that keeps what the
+##   old one latched: a gate whose plate latched it comes back open, a hold
+##   that was running does not, and a beat starts its count again. A latched
+##   wire is a puzzle solved, and solving it again after every death is replay
+##   with nothing to learn. What keeps the first rule true is the proof: a
+##   torch is proved from every channel mask the prince can be standing on it
+##   under (LevelReachability.prove_checkpoints()), and every bit in a mask is
+##   a latch, so whatever he respawns with is a state the proof has walked. A
+##   latch that drops a floor between a torch and the door costs that torch
+##   its checkpoint instead of making the respawn a soft lock. The rest that
+##   persists is safe by construction: relics never touch passability, foes
+##   being down only removes danger, and found secrets are proved never-a-trap
+##   in every combination (audit_secrets).
 
 ## Torch cells in `data` that a character could respawn on and still finish.
 ##
@@ -695,10 +707,7 @@ static func checkpoint_cells(data: AsciiLevel) -> Array[Vector2i]:
 	torches.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
 		return absf(float(a.x) - exit_x) < absf(float(b.x) - exit_x))
 
-	var proved: Array[Vector2i] = []
-	for cell: Vector2i in torches:
-		if bool(LevelReachability.verify_from(data, cell, proved)["ok"]):
-			proved.append(cell)
+	var proved := LevelReachability.prove_checkpoints(data, torches)
 	# Back in the level's own order, which is what a caller printing it expects.
 	var out: Array[Vector2i] = []
 	for mark: Dictionary in data.entities:
@@ -729,14 +738,14 @@ func _progress(at: Vector2) -> float:
 
 ## Back on the last checkpoint, behind the cover of the wipe. Every foe still
 ## standing goes back to its post, every projectile in the air is gone, every
-## mechanism is as authored on a new bus, and the rest of the level stays as
-## the prince left it.
+## mechanism is as authored on a new bus that keeps the old one's latches,
+## and the rest of the level stays as the prince left it.
 func _respawn() -> void:
 	for node: Node in _entities.get_children():
 		if node is Foe or node is FoeProjectile or node is Mechanism:
 			_entities.remove_child(node)
 			node.queue_free()
-	_bus = ChannelBus.new()
+	_bus = ChannelBus.for_level(level.data, _bus)
 	for entry: Dictionary in _returning:
 		var mark: Dictionary = entry["mark"]
 		if not _down.has(EntitySite.post_of(String(mark["kind"]), mark["cell"])):

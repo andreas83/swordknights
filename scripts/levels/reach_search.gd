@@ -16,21 +16,31 @@ extends RefCounted
 ## ladders -- sees the level as that state has it. Arriving somewhere can set
 ## bits (a plate), and a stand state reached under a new mask is checked again
 ## under it: a latch that takes the floor takes the prince with it.
+##
+## ## Checkpoints keep their latches
+##
+## A checkpoint respawn keeps what was latched (Game._respawn()), so a torch
+## is proved from every mask the prince can be standing on it under, not just
+## from the authored state (prove_checkpoints()). That set is the same as the
+## set he can respawn under because every bit in a mask is a latch: ReachModel
+## has no other way to set one. A latch that drops the floor between a torch
+## and the door therefore costs the torch its checkpoint, rather than making
+## a respawn a soft lock.
 
 const MASK_SHIFT := LevelReachability.Solver.MASK_SHIFT
 const LOW_MASK := LevelReachability.Solver.LOW_MASK
 
 
 ## Greedy best-first toward `exits` (and the cell above each), like
-## Solver.search(). An exit counts under any mask; a `proved` cell only with
-## every wire off, because that is the state it was proved in
-## (Game.checkpoint_cells()).
+## Solver.search(), from `start` with `start_mask` set. An exit counts under
+## any mask; a proved place only in the states it was proved in: `proved` is
+## full states, as states_of() makes them (prove_checkpoints()).
 static func search(solver: LevelReachability.Solver, start: Vector2i,
-		exits: Array[Vector2i], proved: Array[Vector2i]) -> Dictionary:
+		exits: Array[Vector2i], proved: Dictionary, start_mask: int = 0) -> Dictionary:
 	var exit_keys := _keys(solver, exits)
-	var proved_keys := _keys(solver, proved)
+	var proved_keys := proved
 	var goals: Array[Vector2i] = exits.duplicate()
-	goals.append_array(proved)
+	goals.append_array(_cells_of(solver, proved))
 
 	var span := solver.cols + solver.rows + 2
 	var buckets: Array[Array] = []
@@ -40,7 +50,8 @@ static func search(solver: LevelReachability.Solver, start: Vector2i,
 	var visited := {}
 	var lowest := span
 	var starts: Array[int] = []
-	arrive(solver, solver.cell_key(LevelReachability.MODE_STAND, start.x, start.y), 0, starts)
+	arrive(solver, solver.cell_key(LevelReachability.MODE_STAND, start.x, start.y), start_mask,
+		starts)
 	for full: int in starts:
 		if exit_keys.has(full & LOW_MASK) or proved_keys.has(full):
 			return {"ok": true, "reason": "spawn is already at the exit", "explored": 0}
@@ -152,6 +163,92 @@ static func survey(solver: LevelReachability.Solver, start: Vector2i,
 	}
 
 
+## The torches, in the order given, a death can come back to. Each must reach
+## the door, or a torch proved before it, from every mask the flood from the
+## spawn stands on it under; one the flood never stands on is proved with
+## every wire off, which is the proof a level without mechanisms gives it.
+## A flood that runs out of budget proves nothing rather than guess.
+static func prove_checkpoints(solver: LevelReachability.Solver, spawn: Vector2i,
+		exits: Array[Vector2i], torches: Array[Vector2i]) -> Array[Vector2i]:
+	var proved: Array[Vector2i] = []
+	var flood := standing_masks(solver, spawn, torches)
+	if not bool(flood["ok"]):
+		return proved
+	var claims_by_cell: Dictionary = flood["masks"]
+	var proved_states := {}
+	for torch: Vector2i in torches:
+		var claims: Array[int] = [0]
+		if claims_by_cell.has(torch):
+			claims.assign(claims_by_cell[torch])
+		else:
+			solver.use_mask(0)
+			if not solver.is_stand(torch.x, torch.y):
+				continue
+		var holds := true
+		for mask: int in claims:
+			if not bool(search(solver, torch, exits, proved_states, mask)["ok"]):
+				holds = false
+				break
+		if holds:
+			proved.append(torch)
+			proved_states.merge(states_of(solver, [torch] as Array[Vector2i], claims))
+	return proved
+
+
+## The masks the prince can be standing in each of `cells` under, flooding
+## from `start` with every wire off: `{ok, masks: cell -> Array[int]}`, the
+## masks ascending, and no entry for a cell the flood never stands in.
+static func standing_masks(solver: LevelReachability.Solver, start: Vector2i,
+		cells: Array[Vector2i]) -> Dictionary:
+	var wanted := {}
+	for cell: Vector2i in cells:
+		wanted[solver.cell_key(LevelReachability.MODE_STAND, cell.x, cell.y)] = cell
+	var seen := {}
+	var queue: Array[int] = []
+	var starts: Array[int] = []
+	arrive(solver, solver.cell_key(LevelReachability.MODE_STAND, start.x, start.y), 0, starts)
+	for full: int in starts:
+		if not seen.has(full):
+			seen[full] = true
+			queue.append(full)
+	var masks := {}
+	var head := 0
+	var neighbours: Array[int] = []
+	var arrivals: Array[int] = []
+	while head < queue.size():
+		var key: int = queue[head]
+		head += 1
+		if head > LevelReachability.MAX_STATES:
+			return {"ok": false, "masks": {}}
+		if wanted.has(key & LOW_MASK):
+			var cell: Vector2i = wanted[key & LOW_MASK]
+			if not masks.has(cell):
+				masks[cell] = [] as Array[int]
+			(masks[cell] as Array[int]).append(key >> MASK_SHIFT)
+		_expand(solver, key, neighbours)
+		for next: int in neighbours:
+			arrivals.clear()
+			arrive(solver, next, key >> MASK_SHIFT, arrivals)
+			for full: int in arrivals:
+				if not seen.has(full):
+					seen[full] = true
+					queue.append(full)
+	for cell: Vector2i in masks:
+		(masks[cell] as Array[int]).sort()
+	return {"ok": true, "masks": masks}
+
+
+## The full states -- standing and on a ladder -- of every cell in `cells`
+## under every mask in `masks`, for search()'s `proved`.
+static func states_of(solver: LevelReachability.Solver, cells: Array[Vector2i],
+		masks: Array[int]) -> Dictionary:
+	var out := {}
+	for key: int in _keys(solver, cells):
+		for mask: int in masks:
+			out[(mask << MASK_SHIFT) | key] = true
+	return out
+
+
 ## Arriving in cell key `low` from a state with `mask`, appending the full
 ## states the prince ends up in. Standing somewhere can set bits; under the
 ## new mask he may not be standing any more, and then he falls from there and
@@ -183,6 +280,18 @@ static func arrive(solver: LevelReachability.Solver, low: int, mask: int,
 static func _expand(solver: LevelReachability.Solver, key: int, out: Array[int]) -> void:
 	solver.use_mask(key >> MASK_SHIFT)
 	solver.expand(key & LOW_MASK, out)
+
+
+## The cells of a set of full states, once each, for the search's heuristic.
+static func _cells_of(solver: LevelReachability.Solver, states: Dictionary) -> Array[Vector2i]:
+	var seen := {}
+	for state: int in states:
+		var index := (state & LOW_MASK) >> 1
+		seen[Vector2i(index % solver.cols, index / solver.cols)] = true
+	var out: Array[Vector2i] = []
+	for cell: Vector2i in seen:
+		out.append(cell)
+	return out
 
 
 ## Standing and ladder cell keys for every cell in `cells`.

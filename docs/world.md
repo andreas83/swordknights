@@ -273,8 +273,8 @@ that starts `;!` is a **directive**:
 
 ```
 ;! time dusk
-;! mark 1 plate channel=west_gate
-;! mark 2 gate channel=west_gate
+;! channel 1 latch
+;! channel 2 hold 4.0
 ; The Cistern Gate
 ```
 
@@ -286,41 +286,117 @@ comment. `;` stays the only comment marker; `#` is still a solid tile.
 | Directive | Means | Read by |
 | --- | --- | --- |
 | `time <stop>` | the hour the level is set at | the time-of-day grade |
+| `horizon <row>` | the row the sun has set behind | the time-of-day grade |
+| `checkpoints x\|route` | what "further on" means for a torch | `Game`'s forward-only rule |
+| `channel <name> <mode> …` | what a wire does (below) | `ChannelBus`, the reach model |
 | `mark <glyph> <kind> [key=value …]` | `glyph` places an entity of `kind` here, with these parameters | `AsciiLevel` |
 
 `AsciiLevel.DIRECTIVES` lists the names something reads. A name that is not
 there is a *problem*, like a malformed line or a glyph in no legend; problems
-are collected in `AsciiLevel.problems`, `Game` warns about them when the
+are collected in `AsciiLevel.problems`, `Game` warns about them (and about
+what only the registry can tell, `EntityRegistry.problems_in()`) when the
 level loads, and `tests/unit/test_level_directives.gd` refuses a shipping
 level that has any. Nothing about a problem stops a level from playing.
 
+### Mechanism glyphs
+
+A glyph in `Tiles.MECHANISM_LEGEND` places a mechanism the way an entity
+glyph places an entity, with three differences. Every **connected run** of
+one kind's glyphs (up, down, left, right) is *one* mechanism, anchored at the
+run's bottom-left cell — where a thing that stands, stands — with the whole
+run in its `cells`, so a portcullis three cells tall is one gate. Its cell
+parses as `Tiles.MECHANISM_TERRAIN` says: empty, unless the mechanism is
+terrain and stays it, like a plate, which is a floor stone. And it is wired by
+the mason's marks it touches.
+
+The legend starts empty; each mechanism's builder adds its glyph, with one
+line in `EntityRegistry.kinds()`. The campaign's proposed glyphs
+(`docs/campaign.md`, *Glyphs*) are all free.
+
+### Mason's marks
+
+A digit `1`–`9` is a **mason's mark**: solid stone carved with a channel
+number. A mark wires the one mechanism it touches, up, down, left or right,
+and every mechanism carrying the same digit is on the same wire — the stone
+under a plate and the lintel over its gate:
+
+```
+;! channel 1 latch
+#######1#######
+       !
+  @    !     D
+###o###########
+###1###########
+```
+
+Marks live in stone rather than in a header so an edit that inserts a row or
+a column cannot detach a wire, and the mark's cell collides exactly as the
+wall it is cut in. Three things are problems, each with its cell named: a
+mark touching no mechanism, a mark touching two, and a mechanism touching
+two different marks. A fourth needs the registry: a mechanism that is nothing
+without a wire (`Mechanism.wired()`) placed with no mark.
+
+### Channels
+
+What a press *means* is the wire's, never the trigger's, so a plate is just a
+plate and the level says what it does:
+
+| Line | The wire is on |
+| --- | --- |
+| *(none)* — momentary | while anything presses it: two plates on one wire are an OR |
+| `channel 1 latch` | from the first press, for good |
+| `channel 2 hold 4.0` | while pressed, then for 4.0 s after the last foot leaves |
+| `channel 4 beat 0` | for the first half of every period (100 frames), from frame 0 |
+| `channel 5 beat 50 period=120` | the same clock, phased and with its own period |
+
+`ChannelBus.step()` is the wires' clock, called once per playing physics
+frame by `Game`: a hold counts down in frames and a beat is
+`frame - phase` modulo its period, so a blade on a beat cuts on the same
+physics frame on every device and stops for a hitstop or a pause exactly as
+the actors do. A channel can also be named by a word, with `channel=` on a
+declared mark (below), and a wire can be latched from code
+(`ChannelBus.latch()`), for a deed — a seal opened, a lever pulled.
+
 ### Declared marks
 
-`mark` binds a glyph no legend uses to a registered entity kind for this level
-only. Digits are the natural choice, and there are plenty of free letters.
-Every **connected run** of the glyph (up, down, left, right) is *one* entity,
-anchored at the run's bottom-left cell — where a thing that stands, stands —
-with the whole run in its `cells`. So a gate three cells tall is
+`mark` binds a glyph no legend uses to a registered kind for this level only:
+for a one-off, or for a test's toy. Letters are free; digits are not, since
+they are mason's marks. A declared run is one entity, like a mechanism
+glyph's, and its cell is left empty in the grid:
 
 ```
-;! mark 2 gate channel=a
-      2
-      2
-  @   2     D
+;! mark k plate channel=west
+;! mark m gate channel=west
+      m
+      m
+  @ k m     D
 ```
 
-one gate. Like every entity mark, a declared cell is left empty in the grid:
-whatever is there in play is the entity's to say (below). The marks join the
-legend's in reading order, which is the order `Game` places and meets them.
+Declared and legend marks join in reading order, which is the order `Game`
+places and meets them.
 
-### Wiring
+### From the campaign's drafts
 
-Mechanisms are wired by naming the same channel: every mark with
-`channel=west_gate` shares one wire on the level's `ChannelBus`
-(`scripts/mechanisms/channel_bus.gd`). A trigger turns its wire on; a
-receiver acts when it changes. A wire is on while any trigger **holds** it —
-two plates on one channel are an OR — or for good once one **latches** it.
-Wiring is data in the level text; there is nothing to connect in code.
+`docs/campaign.md` drafted its chapters before this syntax existed, with
+`; @` headers. Its marks, channel modes and glyphs are taken as they are;
+only the header prefix differs, so converting a draft is one substitution,
+`sed 's/^; @/;! /'`:
+
+| Draft | Level file |
+| --- | --- |
+| `; @time golden` | `;! time golden` |
+| `; @horizon 32` | `;! horizon 32` |
+| `; @channel 1 latch` | `;! channel 1 latch` |
+| `; @channel 2 hold 4.0` | `;! channel 2 hold 4.0` |
+| `; @channel 4 beat 0` | `;! channel 4 beat 0` (the drafts' 50-frame beats are the default 100-frame period's halves) |
+| digits `1`–`9` beside a mechanism | the same: mason's marks |
+| `o ! [ ] ' , x O Q z i` | the same, once registered in `Tiles.MECHANISM_LEGEND` (`o` with `MECHANISM_TERRAIN` solid) |
+| `w j g Y E` | the same, in `Tiles.ENTITY_LEGEND` and `EntityRegistry.kinds()` |
+
+`;!` rather than `; @`, because a directive must never be mistaken for prose:
+a legend comment such as `; @ marks the spawn` is exactly what a level's
+header says, and a `!` straight after the `;` is not something a sentence
+does.
 
 ### What a mechanism is in play
 
@@ -342,14 +418,20 @@ are props in the light, like a torch.
 
 ### Restarts and respawns
 
-A restart rebuilds the level, mechanisms included. **A checkpoint respawn
-also puts every mechanism back as the level text placed it**, on a fresh bus,
-while relics, found secrets and fallen foes stay as the prince left them.
-The reason is the checkpoint proof: a torch is proved to reach the door with
-every wire off, so a respawn into any other mechanism state is one the proof
-says nothing about — and keeping "the gate he opened" means also keeping "the
-floor he broke", which is a soft lock. `Game._respawn()` carries the full
-argument.
+A restart rebuilds the level, mechanisms included, on a new bus. **A
+checkpoint respawn puts every mechanism back as the level text placed it
+too, on a new bus that keeps what the old one latched**: a trap resets, a
+deed does not. A gate whose plate latched it comes back open; a held gate
+comes back shut and its race starts again from the plate; a beat starts its
+count again. Relics, found secrets and fallen foes stay as the prince left
+them.
+
+What makes keeping latches safe is the checkpoint proof: a torch is proved
+from every channel mask the prince can be standing on it under, and every
+bit the proof sets is a latch, so a respawn is always into a state the proof
+has walked. A latch that drops a floor between a torch and the door costs
+that torch its checkpoint instead of making the respawn a soft lock.
+`Game`'s checkpoint notes carry the argument.
 
 ### Proving a level with mechanisms
 
@@ -361,10 +443,14 @@ no mechanism is proved exactly as it always was.
 ## Tests
 
 - `tests/unit/test_level_directives.gd` — directives move no tile and are
-  never the title; declared runs, anchors, parameters and reading order; every
-  malformed line is a problem; shipping levels have none.
-- `tests/unit/test_mechanisms.gd` — the bus, the overlay, a toy plate and gate
-  in the game scene, and the restart and respawn rule.
+  never the title; a mason's mark wires the one mechanism it touches, and a
+  stray or doubled mark is a problem with its cell; declared runs, anchors,
+  parameters and reading order; channel lines; every malformed line is a
+  problem; shipping levels have none.
+- `tests/unit/test_mechanisms.gd` — the bus's four modes, the overlay, a
+  stone plate and a gate on one mark in the game scene, a beat gate keeping
+  time with the game, the restart rule, the respawn keeping latches and
+  resetting presses, and an unwired mechanism as a problem.
 - `tests/unit/test_secret_walls.gd`, `tests/unit/test_secret_count.gd` — the
   seals played through the real game scene, and the count.
 - `tests/unit/test_zone_dressing.gd` — the duel's zones: the stitched strip is

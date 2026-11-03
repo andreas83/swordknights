@@ -252,19 +252,29 @@ exist. Arriving somewhere can set bits, and a stand state reached under a new
 mask is checked again under it: a plate that drops the floor beneath the
 prince drops him, and he arrives wherever the fall leaves him.
 
-Three rules carry over with care:
+Four rules carry over with care:
 
-- **The start is every wire off** — the level as authored, which is also what
-  a checkpoint respawn puts back (`Game._respawn()`).
-- **A proved checkpoint counts only with every wire off.** Reachability is
-  transitive only between equal states: a torch proved with the gate shut says
-  nothing about arriving at it with the gate open. Exits count under any mask.
+- **The start is every wire off** — the level as authored.
+- **A checkpoint is proved under every latch it can be taken with.** A
+  respawn keeps what was latched (`docs/world.md`, *Restarts and respawns*),
+  so `prove_checkpoints()` floods from the spawn for the masks the prince can
+  be standing on each torch under (`ReachSearch.standing_masks()`) and proves
+  the torch from every one of them. That is the same set as the masks he can
+  respawn under because the model sets a bit only by latching. A torch the
+  flood never stands on is proved with every wire off, as one in a level
+  without mechanisms is.
+- **A proved place counts only in the states it was proved in.**
+  Reachability is transitive only between equal states: a torch proved with
+  the gate shut says nothing about arriving at it with the gate open, so the
+  search takes proved places as full states (`ReachSearch.states_of()`).
+  Exits count under any mask.
 - **A dead end is a state, not a cell.** `survey()` reports a cell stranded if
   *any* reached state of it is, and lists the states; the secret audit compares
   them state for state with the shut level.
 
 What the model leaves out is time (a gate open for three seconds) and
-momentary triggers (a plate held only while stood on); `reach_model.gd` says
+momentary triggers (a plate held only while stood on): a reach hook asks
+`model.channel_mode()` and says nothing for either. `reach_model.gd` says
 what to declare instead, and what a timed route would need from the search.
 
 **Levels without mechanisms are proved exactly as before.** The masked search
@@ -273,9 +283,11 @@ non-empty model. `tests/unit/test_reach_guard_rail.gd` checks that nothing
 shipping or generated takes it, pins the Sun Terrace's proof and four Endless
 ruins to numbers taken before the framework existed, and checks that the
 masked flood agrees with the plain one where nothing changes.
-`tests/unit/test_reach_mechanisms.gd` proves the toy: a gate passable only
-through its plate, a trapdoor plate that drops the prince, a checkpoint proved
-with every wire off and one that is not.
+`tests/unit/test_reach_mechanisms.gd` proves the toys: a gate passable only
+through its plate, a trapdoor plate that drops the prince, a torch that is a
+checkpoint only because the gate stays open behind it, one that is not
+because the bridge past it can already be down, and a stone plate on a mason's
+mark that opens its gate only on a latched wire.
 
 ### Retries
 

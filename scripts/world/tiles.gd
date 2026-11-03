@@ -18,6 +18,12 @@ extends RefCounted
 ##   SEAL_LEGEND    masonry hiding a secret room (docs/world.md, "Secrets").
 ##                  The cell is terrain like any other; the value says what
 ##                  it does until the secret is found.
+##   MECHANISM_LEGEND  a mechanism, placed per connected run and wired by the
+##                  mason's marks (MASONS_MARKS, the digits) that touch it.
+##                  Its cell is MECHANISM_TERRAIN's, empty by default.
+##
+## A level can also bind a glyph no legend uses for itself, with `;! mark`
+## (scripts/world/ascii_level.gd).
 ##
 ## The atlas has a lit half and a shade half in register: the shade twin of a
 ## tile is SHADE_ROW_OFFSET rows below it, which is how the world shader picks
@@ -77,6 +83,29 @@ const SEAL_KIND := {
 	"false": Kind.BACKDROP,
 	"cracked": Kind.SOLID,
 }
+
+## Mechanisms: plates, gates, lifts, crumbling stone (docs/world.md,
+## "Directives and wiring"). A glyph here places its kind like an entity mark,
+## with three differences: every connected run of glyphs of one kind is ONE
+## mechanism (a portcullis three cells tall is one gate, and `[` `]` can be one
+## lift); it is wired by the mason's marks it touches; and its cell parses as
+## MECHANISM_TERRAIN says, empty unless listed. Empty here until the builders
+## register theirs -- the campaign proposes `o ! [ ] ' , x O z i`.
+const MECHANISM_LEGEND := {}
+## The terrain a mechanism glyph's cell is in the grid. Only for something
+## that IS terrain and stays it, like a plate, which is a floor stone: the
+## tilemap draws and collides what is listed, so anything that stops being
+## stone in play (crumbling stone, a seal) must be EMPTY here and bring its
+## own collision (Mechanism.set_kind()).
+const MECHANISM_TERRAIN := {}
+## Mason's marks: stone carved with a channel number. A mark wires the one
+## mechanism it touches, up, down, left or right -- same mark, same channel --
+## and the cell is solid stone, so an edit that inserts a row cannot detach a
+## wire and the mark collides like the wall it is cut in.
+const MASONS_MARKS := "123456789"
+
+## Mechanisms a test registered for itself; see add_mechanism_for_test().
+static var _test_mechanisms: Dictionary = {}
 
 ## Architecture marks. The value is the decoration id WorldDresser plants.
 ## Each leaves the tile empty, so marking a level up cannot change what the
@@ -247,6 +276,35 @@ static func kind_of_atlas(coords: Vector2i) -> Kind:
 
 static func is_deadly(kind: Kind) -> bool:
 	return kind == Kind.SPIKES or kind == Kind.WATER
+
+
+## The kind a mechanism glyph places, or "" when it is not one.
+static func mechanism_kind(glyph: String) -> String:
+	if _test_mechanisms.has(glyph):
+		return String((_test_mechanisms[glyph] as Dictionary)["kind"])
+	return String(MECHANISM_LEGEND.get(glyph, ""))
+
+
+## The terrain a mechanism glyph's cell parses as.
+static func mechanism_terrain(glyph: String) -> Kind:
+	if _test_mechanisms.has(glyph):
+		return (_test_mechanisms[glyph] as Dictionary)["terrain"] as Kind
+	return MECHANISM_TERRAIN.get(glyph, Kind.EMPTY) as Kind
+
+
+static func is_masons_mark(glyph: String) -> bool:
+	return glyph.length() == 1 and MASONS_MARKS.contains(glyph)
+
+
+## Test seam: a mechanism glyph that exists only in a test. Pair every call
+## with remove_mechanism_for_test().
+static func add_mechanism_for_test(glyph: String, kind: String,
+		terrain: Kind = Kind.EMPTY) -> void:
+	_test_mechanisms[glyph] = {"kind": kind, "terrain": terrain}
+
+
+static func remove_mechanism_for_test(glyph: String) -> void:
+	_test_mechanisms.erase(glyph)
 
 
 static func is_foreground(decor_id: String) -> bool:

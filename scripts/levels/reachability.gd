@@ -105,10 +105,35 @@ static func verify_from(level: AsciiLevel, start: Vector2i,
 		goals.append_array(proved)
 		report = solver.search(spawn, goals)
 	else:
-		report = ReachSearch.search(solver, spawn, goals, proved)
+		report = ReachSearch.search(solver, spawn, goals,
+			ReachSearch.states_of(solver, proved, [0] as Array[int]))
 	report["spawn"] = spawn
 	report["goal"] = exits[0]
 	return report
+
+
+## The torches in `torches`, in that order, a death can come back to: each
+## proved by verify_from() against the ones proved before it, so proving them
+## from the door backwards makes every search a short hop. With mechanisms a
+## respawn keeps what was latched, so each is proved from every channel mask
+## the prince can be standing on it under (ReachSearch.prove_checkpoints()).
+static func prove_checkpoints(level: AsciiLevel, torches: Array[Vector2i]) -> Array[Vector2i]:
+	var model := ReachModel.for_level(level)
+	var proved: Array[Vector2i] = []
+	if model.is_empty():
+		for cell: Vector2i in torches:
+			if bool(verify_from(level, cell, proved)["ok"]):
+				proved.append(cell)
+		return proved
+	var solver := Solver.new(level, model)
+	var exits: Array[Vector2i] = []
+	for mark: Dictionary in level.entities:
+		var cell: Vector2i = mark["cell"]
+		if String(mark["kind"]) == "exit" and solver.is_stand(cell.x, cell.y):
+			exits.append_array([cell, cell + Vector2i.UP])
+	if exits.is_empty():
+		return proved
+	return ReachSearch.prove_checkpoints(solver, level.spawn_point, exits, torches)
 
 
 ## --- secrets ---------------------------------------------------------------
@@ -293,8 +318,7 @@ static func reaches(level: AsciiLevel, goals: Array[Vector2i]) -> Dictionary:
 		return _fail("spawn is not standing on clear solid ground", 0)
 	if model.is_empty():
 		return solver.search(level.spawn_point, goals)
-	var none: Array[Vector2i] = []
-	return ReachSearch.search(solver, level.spawn_point, goals, none)
+	return ReachSearch.search(solver, level.spawn_point, goals, {})
 
 
 ## The authoring envelope, for documentation and for the CLI's banner. The

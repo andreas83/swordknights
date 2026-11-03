@@ -36,8 +36,9 @@ extends RefCounted
 ##
 ## What happens to a kind at a checkpoint respawn is decided by what it is,
 ## not listed here: a Foe goes back to its post unless it was cut down, a
-## FoeProjectile is gone, a Mechanism is put back as authored, and everything
-## else keeps the state it was in -- a relic taken stays taken.
+## FoeProjectile is gone, a Mechanism is put back as authored on a bus that
+## keeps its latches, and everything else keeps the state it was in -- a relic
+## taken stays taken.
 ##
 ## `tests/unit/test_entity_registry.gd` holds the legend and this table
 ## together, and checks that every script here keeps the protocol.
@@ -68,6 +69,38 @@ static func kinds() -> Dictionary:
 
 static func has_kind(kind: String) -> bool:
 	return kinds().has(kind)
+
+
+## What is wrong with `level`'s marks that only the registry can tell: a kind
+## nothing registered, and a mechanism that is nothing without a wire
+## (Mechanism.wired()) placed with no mason's mark and no channel. The parser
+## finds the rest (AsciiLevel.problems); Game warns about both on load.
+static func problems_in(level: AsciiLevel) -> PackedStringArray:
+	var out := PackedStringArray()
+	var table := kinds()
+	for mark: Dictionary in level.entities:
+		var kind := String(mark["kind"])
+		var cell: Vector2i = mark["cell"]
+		var script := table.get(kind) as Script
+		if script == null:
+			if not ELSEWHERE.has(kind):
+				out.append("column %d, row %d: no kind '%s' is registered" % [cell.x, cell.y, kind])
+			continue
+		if not _extends(script, Mechanism) or not bool(script.call(&"wired")):
+			continue
+		if String((mark.get("params", {}) as Dictionary).get("channel", "")) == "":
+			out.append("the %s at column %d, row %d has no mason's mark: it is wired to nothing"
+				% [kind, cell.x, cell.y])
+	return out
+
+
+static func _extends(script: Script, base: Script) -> bool:
+	var at := script
+	while at != null:
+		if at == base:
+			return true
+		at = at.get_base_script()
+	return false
 
 
 ## The script registered for `kind`, or null.

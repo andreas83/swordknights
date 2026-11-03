@@ -7,13 +7,16 @@ extends Node2D
 ##
 ## ## Placed and wired from the level text
 ##
-## A mechanism is placed like any entity (scripts/entities/entity_registry.gd)
-## from a declared glyph, `;! mark 1 plate channel=west_gate`, and gets every
-## cell of the glyph's connected run in `cells` -- one gate three cells tall
-## is one gate -- and the declaration's `key=value` words in `params`.
-## `channel` is the wire: every mechanism naming the same one shares it on the
-## level's ChannelBus. A trigger turns it on (`bus.hold`, `bus.latch`) from
-## `meet()`, where it sees the prince; a receiver overrides `_on_channel()`.
+## A mechanism is placed like any entity (scripts/entities/entity_registry.gd),
+## from its glyph in Tiles.MECHANISM_LEGEND or a `;! mark` declaration, and
+## gets every cell of its connected run in `cells` -- one gate three cells
+## tall is one gate -- and its parameters in `params`. `channel` is the wire:
+## the digit of the mason's mark touching it, or a declaration's `channel=`.
+## Every mechanism on the same wire shares it on the level's ChannelBus. A
+## trigger presses and releases it (`bus.press`, `bus.release`) from `meet()`,
+## where it sees the prince, and the level's `;! channel` line says what a
+## press does -- latch, hold for a time, or nothing past the foot; a receiver
+## overrides `_on_channel()`, or reads `bus.beat()` for a blade on a beat.
 ##
 ## ## Changing what the character can pass
 ##
@@ -28,11 +31,13 @@ extends Node2D
 ##
 ## ## Restarts and respawns put it back as authored
 ##
-## A restart rebuilds every entity. A checkpoint respawn rebuilds every
-## mechanism too, with a new bus, so it comes back exactly as the level text
-## placed it -- see Game._respawn() for the argument: the respawn state has to
-## be the state the checkpoint was proved in. So keep all state in the node;
-## `_setup()` is the authored state, and that is the only reset there is.
+## A restart rebuilds every entity on a new bus. A checkpoint respawn rebuilds
+## every mechanism too, on a new bus that keeps what the old one latched -- a
+## trap resets, a deed does not; Game's checkpoint notes argue it -- so a
+## mechanism comes back as the level text placed it, in its wire's state. So
+## keep all state in the node, and make `_setup()` read the bus: a gate on a
+## latched wire must come back open, which is `bus.is_on(channel)`, not an
+## assumption that every wire starts off.
 ##
 ## ## Telling the proof
 ##
@@ -104,6 +109,13 @@ static func reach(_mark: Dictionary, _model: ReachModel) -> void:
 	pass
 
 
+## Whether this kind is nothing without a wire -- a gate, not a lift that can
+## also be ridden. One that is, placed with no mason's mark and no channel,
+## is a problem in the level (EntityRegistry.problems_in()).
+static func wired() -> bool:
+	return false
+
+
 ## --- collision ------------------------------------------------------------------
 
 ## Makes every cell `kind`: SOLID and PLATFORM collide (one-way for the
@@ -138,14 +150,18 @@ static func cell_rect(cell: Vector2i) -> Rect2:
 	return Rect2(Vector2(cell) * TILE, Vector2(TILE, TILE))
 
 
-## The prince is standing on one of this mechanism's cells: grounded, his feet
-## at the cell's floor, and his body over it. The plate's test.
+## The prince is standing on one of this mechanism's cells: grounded, his body
+## over it, and his feet ON the cell where it is stone -- a plate that is a
+## floor stone, as the campaign's are -- or IN it, with the floor under it,
+## where it is not. The plate's test.
 func feet_on(contact: Contact) -> bool:
 	if not contact.grounded:
 		return false
 	for cell: Vector2i in cells:
 		var box := cell_rect(cell)
-		if absf(contact.feet.y - box.end.y) > 1.0:
+		var stone := level != null and level.is_solid_cell(cell)
+		var floor_y := box.position.y if stone else box.end.y
+		if absf(contact.feet.y - floor_y) > 1.0:
 			continue
 		if contact.body.position.x < box.end.x and contact.body.end.x > box.position.x:
 			return true
@@ -171,6 +187,16 @@ static func mark_cells(mark: Dictionary) -> Array[Vector2i]:
 
 static func mark_channel(mark: Dictionary) -> StringName:
 	return StringName(String((mark.get("params", {}) as Dictionary).get("channel", "")))
+
+
+## The cells a body stands IN to stand ON `cells`: one row up. A plate that is
+## a floor stone is pressed from the cell above it, and that is the cell its
+## reach hook latches.
+static func cells_above(cells: Array[Vector2i]) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for cell: Vector2i in cells:
+		out.append(cell + Vector2i.UP)
+	return out
 
 
 ## --- internals ------------------------------------------------------------------

@@ -22,11 +22,14 @@ extends RefCounted
 ## - `fixed_cells(cells, kind)` -- these cells are `kind` in every state:
 ##   for something the proof should treat as always there, or never.
 ##
-## The proof starts with every channel off: the level as authored, which is
-## also what a checkpoint respawn puts back (Game._respawn()). A stand state
-## reached under a new mask is checked again under it -- a plate that drops a
-## trapdoor beneath the prince drops him -- so a latch can never leave him
-## standing on air.
+## The proof starts with every channel off: the level as authored. A stand
+## state reached under a new mask is checked again under it -- a plate that
+## drops a trapdoor beneath the prince drops him -- so a latch can never leave
+## him standing on air. A checkpoint respawn keeps the latches (Game's
+## checkpoint notes), so a torch is proved from every mask he can stand on it
+## under (ReachSearch.prove_checkpoints()); that is sound because these verbs
+## set bits only by latching. A mechanism that sets a bit any other way --
+## a hold, once the search has a clock -- has to change that proof too.
 ##
 ## ## What it does not model, and what to do instead
 ##
@@ -59,6 +62,9 @@ var _fixed: Dictionary = {}
 var _latches: Dictionary = {}
 ## Wiring the model could not take: too many channels.
 var problems := PackedStringArray()
+## channel -> `{mode, seconds, phase, period}`, the level's `;! channel` lines,
+## for a reach hook to ask what its wire does (channel_mode()).
+var channels: Dictionary = {}
 
 
 ## The model of `level`: every mark whose registered kind has a reach hook
@@ -68,6 +74,7 @@ static func for_level(level: AsciiLevel) -> ReachModel:
 	var model := ReachModel.new()
 	if level == null:
 		return model
+	model.channels = level.channels.duplicate(true)
 	var kinds := EntityRegistry.kinds()
 	for mark: Dictionary in level.entities:
 		var script := kinds.get(String(mark["kind"])) as Script
@@ -105,6 +112,13 @@ func bit(channel: StringName) -> int:
 
 func channel_count() -> int:
 	return _bits.size()
+
+
+## What `channel` does when pressed: "momentary" (no `;! channel` line),
+## "latch", "hold" or "beat". A plate's hook latches only a latch: a held
+## wire is a race the model has no clock for, and is said as nothing.
+func channel_mode(channel: StringName) -> String:
+	return String((channels.get(String(channel), {}) as Dictionary).get("mode", "momentary"))
 
 
 ## --- what a mechanism can say ----------------------------------------------------

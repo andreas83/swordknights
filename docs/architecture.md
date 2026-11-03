@@ -237,48 +237,65 @@ hold the contract with toy foes that answer it differently from the guard.
 
 Plates, gates, crumbling floors, timed traps and lifts are mechanisms: a
 script that `extends Mechanism` (`scripts/mechanisms/mechanism.gd`), one line
-in `EntityRegistry.kinds()`, and a `;! mark` declaration in each level that
-uses it (`docs/world.md`, *Directives and wiring*):
+in `EntityRegistry.kinds()`, and its glyph in `Tiles.MECHANISM_LEGEND` — plus
+`Tiles.MECHANISM_TERRAIN` if its cell is stone that stays stone, as a plate's
+is. Levels wire it with mason's marks and say what each wire does with a
+`;! channel` line (`docs/world.md`, *Directives and wiring*):
 
 ```
-;! mark 1 plate channel=west_gate
-;! mark 2 gate channel=west_gate
+;! channel 1 latch
+#######1#######
+       !
+  @    !     D
+###o###########
+###1###########
 ```
 
 What the base gives a mechanism, and what it overrides:
 
 | | |
 | --- | --- |
-| `cells`, `params`, `channel` | every cell of its glyph's connected run, the declaration's `key=value` words, its wire |
-| `_setup()` | override: the authored state — its collision and look as the level text has it |
-| `meet(contact)` | override, for a trigger: sense the prince (`feet_on()`, `body_in()`) and `bus.hold()`, `bus.release()` or `bus.latch()` its channel |
+| `cells`, `params`, `channel` | every cell of its glyph's connected run, its parameters, and its wire: the digit of the mason's mark it touches |
+| `_setup()` | override: its collision and look as the level text has it, *in its wire's state* — read `bus.is_on(channel)`, because a respawn can bring it back on a latched wire |
+| `meet(contact)` | override, for a trigger: sense the prince (`feet_on()`, `body_in()`) and `bus.press()` / `bus.release()` its channel; `bus.latch()` for a deed that is never undone |
 | `_on_channel(on)` | override, for a receiver: its wire changed |
+| `static func wired() -> bool` | override to return true if it is nothing without a wire (a gate): placed without a mark, it is a level problem |
 | `set_kind(kind)` | make its cells stone, a one-way platform, spikes, a ladder or air — its own `StaticBody2D` on `Tiles.MASK_SOLID` / `MASK_ONE_WAY` for the prince's physics *and* the level's overlay for his probes; never the tilemap |
 | `contact.harm(hearts, from_x)` | hurt the prince without being a foe (a crusher); something that kills outright is `set_kind(SPIKES)` |
 | `cue` / `impact` | presentation, through `GameAudio.cue` and Game's impact budget |
 | `static func reach(mark, model)` | override: how it changes passability, for the proof |
 
+A trigger never decides what its press means. Momentary, latched, held for
+seconds or on a beat is the channel's mode, set by the level, and kept by
+`ChannelBus` — which `Game` steps once per playing physics frame, so a hold
+counts down and a beat turns in simulation steps, frozen by a hitstop like
+everything else.
+
 Three rules:
 
 1. **All state lives in the node, and `_setup()` is the only reset.** A
-   restart and a checkpoint respawn both rebuild every mechanism from its
-   mark on a new bus. The respawn rule is deliberate — a torch is proved with
-   every wire off, so the respawn must be into that state — and it is argued
-   in `Game._respawn()`.
+   restart rebuilds every mechanism from its mark on a new bus; a checkpoint
+   respawn does too, on a bus that keeps what was latched — a trap resets, a
+   deed does not. The rule and its proof obligation are argued in Game's
+   checkpoint notes.
 2. **Change collision through `set_kind()`, never through the TileMap.** The
    body and the overlay must agree, or the prince can walk through a gate he
    can grab, or grab one he walks through.
 3. **Tell the proof.** In `reach()`, describe the mechanism to the
    `ReachModel` (`scripts/levels/reach_model.gd`) with `switch_cells()`,
-   `latch_on_stand()` and `fixed_cells()`. Say the conservative thing for
-   anything with a clock in it: a timed gate the proof treats as shut, a
-   crumbling floor as a latch that drops it the moment it is stood on. A
-   mechanism that says nothing is treated as never changing anything.
+   `latch_on_stand()` and `fixed_cells()`, and ask `model.channel_mode()`
+   what a press means: a plate's press is a latch to the proof only on a
+   `latch` wire. Say the conservative thing for anything with a clock in it:
+   a held gate the proof treats as shut, a crumbling floor as a latch that
+   drops it the moment it is stood on. A mechanism that says nothing is
+   treated as never changing anything. The only verb that sets a bit is a
+   latch, and the checkpoint proof leans on that; a mechanism that needs
+   another (a race against a hold) changes `ReachSearch` as well.
 
-The framework ships with no real mechanism, only the toy that proves it — a
-permanent plate that opens a gate, in `tests/unit/test_mechanisms.gd` (in
-play) and `tests/unit/test_reach_mechanisms.gd` (in the proof). Copy their
-shape.
+The framework ships with no real mechanism, only the toys that prove it — a
+stone plate and a portcullis on one mason's mark, in
+`tests/unit/test_mechanisms.gd` (in play) and
+`tests/unit/test_reach_mechanisms.gd` (in the proof). Copy their shape.
 
 ## Configuration as code
 
