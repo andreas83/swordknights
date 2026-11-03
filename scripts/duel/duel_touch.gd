@@ -40,16 +40,15 @@ func _layout() -> void:
 	var view := size
 	if view == Vector2.ZERO:
 		view = get_viewport().get_visible_rect().size
-	# The safe area is reported in physical pixels; convert to canvas units,
-	# the same way TouchControls does.
-	var window := Vector2(DisplayServer.window_get_size())
-	var scale := view.x / maxf(1.0, window.x)
-	var safe := DisplayServer.get_display_safe_area()
-	var inset_right := (window.x - (safe.position.x + safe.size.x)) * scale
-	var inset_bottom := (window.y - (safe.position.y + safe.size.y)) * scale
+	# The same safe rectangle TouchControls lays JUMP and SWORD out against:
+	# UiLayout converts the physical-pixel safe area to canvas units and refuses
+	# a desktop-sized one. Converting it here by hand, as this did, put the
+	# button off the right edge whenever the reported area was wider than the
+	# window -- the bug TouchControls had and UiLayout.safe() was made for.
+	var safe := UiLayout.safe(view)
 
 	# Up and to the left of JUMP, clear of SWORD.
-	_at = Vector2(view.x - inset_right - 52.0, view.y - inset_bottom - 78.0)
+	_at = Vector2(safe.end.x - 52.0, safe.end.y - 78.0)
 	queue_redraw()
 
 

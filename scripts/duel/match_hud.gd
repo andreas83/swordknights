@@ -24,10 +24,23 @@ extends Control
 ## pips). Neutral is drawn as neither arrow rather than as a dimmed one: nobody
 ## is leading is a real state, not a missing value, and the usual bug in a mode
 ## like this is a screen that implies someone is pushing when nobody is.
+##
+## WHO IS WHO
+## Against the computer the seats have names, and the screen says which is
+## which where the eye already is: a tag at each end of the rope, on the side
+## of that seat's gate, with a lozenge in the seat's colour -- YOU beside the
+## west gate, CPU and its level beside the east. The tags hug the rope rather
+## than the screen's corners, because the top right corner is the pause and
+## mute buttons' on a phone. The names then carry through the line under the
+## rope and the result. The one-keyboard duel sets no tags: ONE and TWO are
+## the arrow's colours, and the arrow says it.
 
 const PIP := 4.0
 const PIP_GAP := 13.0
 const ARROW := 13.0
+## How far beyond an end pip a seat's lozenge sits: past the arrow's tip, which
+## is ARROW + 8 out, by a few units more than the lozenge is wide.
+const TAG_OFFSET := ARROW + 14.0
 ## Seconds a flashed word stays up.
 const FLASH_TIME := 1.1
 ## A hint wider than the safe area is broken at its separators instead of
@@ -39,6 +52,9 @@ var fight: DuelMatch
 var session: NetSession
 ## Which seat this screen is driving, or -1 for a local match with both.
 var your_slot := -1
+## Per seat, a name and an optional second line -- ["YOU"], ["CPU", "HARD"] --
+## or empty for seats known only as ONE and TWO. See WHO IS WHO above.
+var seat_tags: Array[PackedStringArray] = []
 var footer := ""
 
 var _time := 0.0
@@ -123,6 +139,7 @@ func _draw_rope(content: Rect2) -> float:
 				Palette.with_alpha(GoreField.BLOOD_FRESH[seat], 0.75), 1.2)
 
 	var below := origin.y + PIP + 4.0
+	_draw_tags(origin, span, below)
 	if leader < 0:
 		UiFont.draw_text(self, "NEUTRAL", Vector2(cx, below), UiFont.Cut.MICRO,
 			Palette.with_alpha(Palette.PAPER, 0.6), UiFont.Align.CENTER, 0.6)
@@ -147,14 +164,52 @@ func _draw_rope(content: Rect2) -> float:
 
 	# The words are paper, not the seat's colour: crimson type on a crimson
 	# sky is the arrow's job to carry, and a line nobody can read says nothing.
-	var said := "%s PUSHING %s" % [
-		DuelRules.slot_label(leader), "WEST" if direction < 0.0 else "EAST",
-	]
+	var way := "WEST" if direction < 0.0 else "EAST"
+	var said := "%s PUSHING %s" % [seat_name(leader), way]
 	if leader == your_slot:
-		said = "YOU ARE PUSHING %s" % ("WEST" if direction < 0.0 else "EAST")
+		said = "YOU ARE PUSHING %s" % way
+	if not seat_tags.is_empty():
+		# With tags up the arrow points at the leader's own tag -- each seat's
+		# gate is on its own side -- so the line need only say who, and it has
+		# to: a longer one runs into the tags' second lines at 320 units.
+		said = "YOU LEAD" if leader == your_slot else "%s LEADS" % seat_name(leader)
 	UiFont.draw_text(self, said, Vector2(cx, below), UiFont.Cut.MICRO,
 		Palette.PAPER, UiFont.Align.CENTER, 0.8)
 	return below + UiFont.line(UiFont.Cut.MICRO)
+
+
+## What the band and the rope call a seat: its tag's name, or ONE and TWO.
+func seat_name(slot: int) -> String:
+	if slot >= 0 and slot < seat_tags.size() and not seat_tags[slot].is_empty():
+		return seat_tags[slot][0]
+	return DuelRules.slot_label(slot)
+
+
+## A tag at each end of the rope, outside the arrow: the seat's lozenge in its
+## colour, its name on the pip row, its second line under it, dimmer. Seat one
+## is the west end and reads leftward from the rope; seat two the east.
+func _draw_tags(origin: Vector2, span: float, below: float) -> void:
+	if seat_tags.size() < 2:
+		return
+	var cut := UiFont.Cut.MICRO
+	var name_y := roundf(origin.y - UiFont.cap(cut) * 0.5)
+	for slot: int in 2:
+		var tag := seat_tags[slot]
+		if tag.is_empty():
+			continue
+		var side := -1.0 if slot == 0 else 1.0
+		var end := origin.x + (0.0 if slot == 0 else span)
+		var mark := Vector2(roundf(end + side * TAG_OFFSET), origin.y)
+		# A rim of light under the seat's colour: crimson on a crimson sky is
+		# otherwise a mark nobody can find.
+		UiMarks.lozenge(self, mark, 4.4, Palette.with_alpha(Palette.LIGHT_SOFT, 0.85), 0.8)
+		UiMarks.lozenge(self, mark, 3.0, GoreField.BLOOD_FRESH[slot])
+		var at := Vector2(mark.x + side * 6.0, name_y)
+		var align := UiFont.Align.RIGHT if slot == 0 else UiFont.Align.LEFT
+		UiFont.draw_text(self, tag[0], at, cut, Palette.PAPER, align, 0.8)
+		if tag.size() > 1:
+			UiFont.draw_text(self, tag[1], Vector2(at.x, below), cut,
+				Palette.with_alpha(Palette.LIGHT_SOFT, 0.85), align, 0.6)
 
 
 ## The connection, for an online match. Returns the y below it.
@@ -231,7 +286,7 @@ func _draw_result(band: Rect2) -> void:
 	_band_plate(band, 0.6)
 
 	var title := UiFont.fit(PackedStringArray([
-		"%s WINS" % DuelRules.slot_label(winner),
+		"YOU WIN" if winner == your_slot else "%s WINS" % seat_name(winner),
 	]), room, UiFont.Cut.DISPLAY)
 	UiFont.draw_text(self, title, Vector2(cx, band.position.y + 4.0),
 		UiFont.Cut.DISPLAY, Palette.PAPER, UiFont.Align.CENTER, 0.8)

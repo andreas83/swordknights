@@ -76,6 +76,9 @@ func _catalogue() -> Array[Dictionary]:
 		{"name": "match", "scene": "res://scenes/duel_match.tscn", "pose": ""},
 		{"name": "match_flash", "scene": "res://scenes/duel_match.tscn", "pose": "flash"},
 		{"name": "match_over", "scene": "res://scenes/duel_match.tscn", "pose": "over"},
+		{"name": "menu_cpu", "scene": "res://scenes/menu.tscn", "pose": "cpu"},
+		{"name": "match_cpu", "scene": "res://scenes/duel_match_cpu.tscn", "pose": "touch",
+			"cpu": DuelBrain.Difficulty.HARD},
 		{"name": "wardrobe", "scene": "res://scenes/wardrobe.tscn", "pose": "prince"},
 		{"name": "wardrobe_heroine", "scene": "res://scenes/wardrobe.tscn",
 			"pose": "heroine"},
@@ -97,7 +100,12 @@ func _build(shot: Dictionary) -> void:
 		push_error("ui_screens: cannot load %s" % shot["scene"])
 		_index = _shots.size()
 		return
+	if shot.has("cpu"):
+		# What the menu's row would have chosen, read by the scene as it readies.
+		ModeRegistry.choose("duel_cpu", int(shot["cpu"]))
 	_stage = packed.instantiate()
+	if shot.has("cpu") and "wardrobe_path" in _stage:
+		_stage.set("wardrobe_path", WARDROBE_STORE)
 	if _stage is WardrobeScreen:
 		_stock_wardrobe(String(shot["pose"]))
 		(_stage as WardrobeScreen).store_path = WARDROBE_STORE
@@ -112,6 +120,22 @@ func _pose(shot: Dictionary) -> void:
 			var surface := _stage.get_node_or_null(^"TouchControls/Surface")
 			if surface != null:
 				surface.visible = true
+			# The duel's THROW button shows itself only on a phone.
+			var throw := _stage.get_node_or_null(^"ThrowLayer/ThrowButton")
+			if throw != null:
+				throw.visible = true
+		"cpu":
+			# DUEL VS CPU chosen, at HARD, with the thumbs up beside it.
+			var thumbs := _stage.get_node_or_null(^"TouchControls/Surface")
+			if thumbs != null:
+				thumbs.visible = true
+			var menu := _stage as MenuScene
+			if menu != null:
+				for _row: int in menu.rows().size():
+					if String(menu.rows()[menu.index()]["id"]) == "duel_cpu":
+						break
+					menu.move(1)
+				menu.shift_choice(2)
 		"update":
 			# A dev build that has been superseded, with the thumbs up so the
 			# plaque is seen next to the pause and mute buttons it must clear.

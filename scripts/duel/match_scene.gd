@@ -197,12 +197,18 @@ func _physics_process(_delta: float) -> void:
 			_to_menu()
 		return
 
-	# The only line that matters: one frame of match is two bytes of intent.
+	_step()
+	_follow_the_match()
+
+
+## The only line that matters: one frame of match is two bytes of intent. Here
+## both come off one keyboard; scripts/duel/match_cpu.gd takes the second from
+## the computer instead, and that is the whole of the difference.
+func _step() -> void:
 	fight.step(
 		PlayerInput.bits_from_actions("_p1"),
 		PlayerInput.bits_from_actions("_p2")
 	)
-	_follow_the_match()
 
 
 ## Presentation that tracks the simulation rather than reacting to it: which
@@ -256,14 +262,26 @@ func _on_death_retracted(victim: int, frame: int) -> void:
 
 
 func _down(victim: int) -> String:
-	return "%s DOWN" % DuelRules.slot_label(victim)
+	return _said(victim, "%s DOWN", "YOU ARE DOWN")
+
+
+## What a seat is called in the band: ONE and TWO on one keyboard. A scene
+## that knows which seat is the player's (the computer opponent's) says YOU.
+func seat_name(slot: int) -> String:
+	return DuelRules.slot_label(slot)
+
+
+## `third` with the seat's name in it, or `second` when the seat is the player.
+func _said(slot: int, third: String, second: String) -> String:
+	var who := seat_name(slot)
+	return second if who == "YOU" else third % who
 
 
 func _on_initiative_changed(leader: int) -> void:
 	if leader < 0:
 		return
-	var who := DuelRules.slot_label(leader)
-	hud.flash("%s HAS THE INITIATIVE" % who, "%s LEADS" % who)
+	hud.flash(_said(leader, "%s HAS THE INITIATIVE", "YOU HAVE THE INITIATIVE"),
+		_said(leader, "%s LEADS", "YOU LEAD"))
 
 
 func _on_fighter_respawned(_slot: int, _at: Vector2, _facing: int) -> void:
@@ -272,8 +290,8 @@ func _on_fighter_respawned(_slot: int, _at: Vector2, _facing: int) -> void:
 
 func _on_leader_consumed(winner: int, _at: Vector2) -> void:
 	camera.shake(2.2, 0.6)
-	var who := DuelRules.slot_label(winner)
-	hud.flash("%s REACHES THE GATE" % who, "%s AT THE GATE" % who)
+	hud.flash(_said(winner, "%s REACHES THE GATE", "YOU REACH THE GATE"),
+		_said(winner, "%s AT THE GATE", "YOU AT THE GATE"))
 
 
 ## The catch: a camera beat, the steel, and the word. No frozen frame. The
