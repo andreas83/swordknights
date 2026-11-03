@@ -42,7 +42,7 @@ lists what was built and then removed.
 The resting behaviour is unchanged: a dead zone (Godot's drag margins) so a
 hop or a turn-around does not shove the screen about, and a vertical anchor on
 the last grounded height so jumping does not pan the view. What is new is that
-four beats bend it.
+five beats bend it.
 
 | Beat | What the frame does | Budget |
 | --- | --- | --- |
@@ -51,6 +51,7 @@ four beats bend it.
 | **a long fall** | follows down, and leads the fall so the ground arrives before the player does | `FALL_LEAD_MAX`, 30 px |
 | **a ledge grab** | stops leading, lifts onto the ledge being taken | `GRAB_LIFT`, 10 px |
 | **a hard landing** | settles with the weight of it, then recovers | `SETTLE_MAX`, 4 px |
+| **a backstep** | holds the lead where it was; dips one pixel | 0.3 of `SETTLE_MAX` |
 
 All the vertical reframing added together is 44 px of a 180 px frame, and
 `tests/feel_camera_test.gd` fails if that grows past 48.
@@ -148,11 +149,29 @@ held frames, camera, sparks through `PlayerFx.sword_hit()`, and sound through
 | plunge meets stone | 0 | shake 2.2, on top of the hard landing's own | at the point, 0.45 | `sword_hit` at 0.62 under the landing's thump |
 | parry turns a cut | 5 | shake 0.8, settle 0.35 | where the blades meet, 0.7 | `sword_hit` at 1.35: a bright clang, not the dull wound |
 
+| backstep pushes off | 0 | no shake; settle 0.3 (one pixel); the lead is held | none: five motes of grit thrown forward from the front foot | `cloth` at −2 dB with `sword` at 0.7, −10 dB under it: a whoosh, not a swing |
+| backstep lets a cut by | 0 | nothing | none | nothing beyond the guard's own `sword` |
+
 The plunge into stone holds no frames on purpose. Hitstop is for something
 that resists you, and the floor was simply there — the same reason a landing
 does not hold any (below). The parry's camera is nearly still on purpose too:
 a parry is the prince standing his ground, and a frame that lurches says the
 opposite.
+
+The backstep is the quietest beat of all, because nothing connects. Its feel
+is the push-off — the grit, the cloth, the low whoosh of the blade drawn back,
+and the frame giving one pixel as the weight goes onto the rear foot
+(`Game.BACKSTEP_SETTLE`). A cut it lets by has no beat of its own: no hitstop,
+since nothing resisted, and no spark or clang, since nothing met. The guard's
+cut is already heard, and the hit that did not land is the read.
+
+One camera rule had to change for it. The lead is scaled by speed and aimed by
+facing, and the backstep is the one move that is fast while facing against its
+own motion: left alone, it threw the frame most of a full lead *toward* the
+guard and drifted it back over a second — a lurch on every dodge. While
+`Player.is_backstepping()`, `GameCamera` holds the lead where it was, and the
+dead zone takes the 23 px step. `tests/unit/test_backstep_costs.gd` fails if
+the lead moves.
 
 ### Hitstop and the duel — read this before changing anything
 

@@ -76,6 +76,7 @@ does not care:
 | `PLUNGE` | the only vertical line in the moveset: both hands at the hip, point straight down past the tucked feet, every piece of cloth streaming up |
 | `PLUNGE_LAND` | down on one knee over a blade bitten into the stone, drawn short because the buried part is not there to see, then dragged free |
 | `PARRY` | the high guard: weight on the back foot, both hands over the hood and the blade across above it, where the sentinel's cut comes down; the edge gleams only while the parry can still turn a cut |
+| `BACKSTEP` | the parry's opposite: leaning *away*, the blade upright in front of the face rather than level over the hood, the free arm flung back for balance, feet off the floor for the middle of the slide, then the knees taking the weight; the edge gleams only while a cut from the front would miss |
 | `HURT` | thrown back and tilted, hood knocked away, whole figure burned white for 0.14 s |
 | `DEAD` | toppled: the robe keeps its shape, the figure does not |
 
@@ -132,6 +133,103 @@ There is no in-game control hint in the adventure to update — the touch
 buttons are lettered JUMP and SWORD and nothing else is written on screen
 during play — so the combinations are documented in the README's controls
 table, which is where the game tells a player what the buttons do.
+
+## The backstep
+
+The third move made of the stick and SWORD: **stick back + SWORD, on the
+ground**. A slide of `backstep_distance()` — 22.75 px, about 1.4 tiles — away
+from the way the prince faces, the blade raised across his body. For the
+first `BACKSTEP_ACTIVE` (15 frames) a guard's cut **from the front** does not
+land (`Player.evades()`, checked in `Game._resolve_guard()` after the parry).
+From behind — the blade he is stepping back into — or after the window, he is
+hit as normal. The parry *wins* the exchange; the backstep *survives* it.
+
+| | |
+| --- | --- |
+| Touch | stick **back** (away from the way he faces) + **SWORD**, on the ground |
+| Keyboard / pad | back + sword |
+| Slide | `BACKSTEP_SPEED` 210 px/s falling linearly to nothing over `BACKSTEP_SLIDE` (12 frames); `Tuning.backstep_speed()` is both what moves him and what `backstep_distance()` integrates |
+| Whole move | `BACKSTEP_TIME` (27 frames): nothing comes out of it — no swing, no jump, no turn, no second backstep — until it is over |
+| Window | `BACKSTEP_ACTIVE` (15 frames), from the front only |
+| Rearm | `BACKSTEP_REARM` (12 frames) after the end before the stick and SWORD can make another |
+| Feel | cloth at −2 dB and the `sword` voice low and soft (pitch 0.7, −10 dB) as a whoosh under it, both through `GameAudio.cue`; five motes of grit thrown forward from the front foot; the camera dips one pixel (`settle` 0.3) and holds its lead |
+
+### How the stick is read, before the turn
+
+Standing or walking, the stick going back turns the prince on the spot, on
+that frame. A backstep that came out after that turn would step back facing
+away from the blade, so `_reads_backstep()` reads the stick against the facing
+he had *before* it:
+
+- **Stick and button on the same frame:** the turn has not happened yet. It is
+  a backstep if that turn would have been on the spot (`|velocity.x|` at or
+  under `WALK_SPEED`).
+- **Stick a few frames first:** within `BACKSTEP_READ` (6 frames, as long as a
+  planted `TURN` lasts) of an on-the-spot turn, SWORD takes the turn back and
+  backsteps. A thumb never lands the stick and the button together. A second
+  turn inside that time is a wiggle and cancels the first, so back-forward-
+  SWORD swings forward instead of stepping toward the blade.
+- **At a run:** the stick behind plants a `TURN`, as it always has, and a
+  SWORD press in it swings the new way when the turn is done. A running
+  prince's weight is going forward; the backstep is a move from a stance.
+- **Up wins over back:** up-and-back with SWORD is the parry. A diagonal is a
+  thumb reaching for up past a stick that has drifted.
+- **SWORD first, stick after:** a swing, as for the parry.
+- **Inside the rearm:** the press is whatever it was before the backstep
+  existed — a swing the way he faces.
+
+### What it costs, against the guard's beats
+
+`tests/unit/test_backstep.gd` pins each of these against `Patrol`'s 27-frame
+raise, 9-frame cut and 33-frame opening, reads the stick and plays the window;
+`tests/unit/test_backstep_costs.gd` plays the costs, the edges below, the one
+swing and the feel beat. Each test was seen to fail with the thing it guards
+broken on purpose.
+
+- **The window outlasts a cut, not a raise.** 15 > 9, so with his back to a
+  wall a timed backstep outlasts the whole cut; 15 < 27, so thrown on sight
+  with nowhere to go it is over before the blade comes down.
+- **No riposte, no reel.** `evades()` arms nothing, the guard goes into his
+  plain `RECOVER` (33 frames) instead of the parried reel (54), and a SWORD
+  press does not cut the backstep short.
+- **Ground is lost.** From where a guard raises (`ENGAGE_GAP`), 22.75 px is
+  four times the 5.3 px needed to step out of his cut. Take the latest
+  backstep that *needed* its window — thrown two frames before the cut, too
+  late to slide clear — and its 27 frames, the run back over the lost ground
+  and the swing's lead come to 44 frames from the cut, against an opening that
+  closes at 42 (the cut's 9 plus `RECOVER`'s 33). The test models the run with
+  the real acceleration and the swing pressed on the run, sliding into reach.
+  The parry thrown in the same frames gets its riposte in at once.
+- **Blocked, it still answers later than the parry.** Against a wall or at a
+  lip the backstep loses no ground, and then the guard's opening *is* his — 25
+  frames after the cut, where the parry's riposte comes after the clang's 5
+  held frames. A prince with his back to a drop has paid in position already.
+- **It does not chain.** The hole between the windows of two backsteps as close
+  as they can come is 12 + 12 frames, longer than a cut, and a chain retreats
+  at 34 px/s, slower than a walk. A held stick and a mashed button make one.
+
+### Edges and the grammar
+
+**It stops at the lip, as a careful step does.** `Player._careful()` lets the
+body end each frame only with the whole of it over floor (solid or one-way)
+and none of it in spikes or water; otherwise it stops with the heel on the
+edge of the last tile. The tests put a nine-tile drop, a one-tile gap and a
+spike pit behind him. A backstep that starts already overhanging a lip goes
+nowhere, and keeps its window.
+
+**It is not grammar.** It is ground-only (back + SWORD in the air is the air
+slash), no jump comes out of it (a jump out of the slide would carry its speed
+into the air), and it crosses no gap of any width, so no level can come to
+depend on it and `LevelReachability` offers it nowhere. `hop_tiles()`,
+`platform_step_tiles()`, `grab_tiles()` and `gap_tiles()` are unchanged.
+
+**It breaks no wall.** The raised blade is not a blow: `attack_rect()` stays
+empty for the whole move, so it neither wounds a guard nor opens a cracked
+wall, and it fires no `attacked`, so one swing still takes one heart. Its body
+does open a false wall it slides into, exactly as walking into one does.
+
+**Not idle.** `IdleArt.is_calm()` is true only in `IDLE`, so a backstep and
+its recovery never start a fidget.
 
 ## Adding a state
 
@@ -439,8 +537,8 @@ costume.draw_*()` lines in `_draw()` and one `costume.tick()` in `_process()`.
 
 The consequence that matters: **a pose added to `player_art.gd` or
 `sword_poses.gd` is the heroine's too, with no change to her file.** The air
-slash, the plunge, its landing and the parry arrived after her costume was
-written and she wears all four, and so the idle ladder (below). `tests/unit/test_figure_poses.gd` draws every
+slash, the plunge, its landing, the parry and the backstep arrived after her
+costume was written and she wears all five, and so the idle ladder (below). `tests/unit/test_figure_poses.gd` draws every
 `Player.State` and every `Fighter.State` as both figures, reading the states
 from the enums, so a new state is covered the moment it exists. It fails on a
 plane Godot cannot triangulate (a polygon that folds over in some pose) and on

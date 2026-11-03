@@ -67,6 +67,7 @@ repository owner should set up (the `DEBUG_KEYSTORE_B64` secret), is in
 | Air slash   | Sword in the air    | X / B         | **SWORD** in a jump or fall |
 | Plunge      | Down + sword in the air | Down + X / B | Stick down + **SWORD** in the air |
 | Parry       | Up + sword          | Up + X / B    | Stick up + **SWORD**       |
+| Backstep    | Back + sword        | Back + X / B  | Stick back + **SWORD**     |
 | Walk (slow) | `Shift`             | L1            | Small stick deflection     |
 | Pause       | `Esc` / `P`         | Start         | **II**                     |
 | Mute        | `M`                 | —             | —                          |
@@ -80,7 +81,12 @@ sword in the air is the **plunge**: straight down, point first, onto a guard's
 head — it springs you back off him, but a plunge that misses bites the floor
 and holds you there. Up and sword on the ground is the **parry**: it turns a
 guard's cut if it is up when the blade comes down, opens him for a riposte,
-and leaves you open if you raise it too soon. Jump on a ladder to leap off it,
+and leaves you open if you raise it too soon. Back (away from the way you
+face) and sword on the ground is the **backstep**: a skip of about a tile and
+a half back, still facing him, and his cut from the front misses you for the
+first quarter-second. It gives up the ground and the riposte, cannot be thrown
+twice in a row, and stops at the edge of a drop rather than going over it.
+Jump on a ladder to leap off it,
 sideways if you hold a direction. A relic gives back a heart.
 
 Presses are forgiven at both ends: a jump made a moment before you land still
