@@ -62,9 +62,10 @@ shadows go soft.
 
 No dialogue, no cutscene text. The story is told by four things only.
 
-**Title cards.** The level card `Hud.show_title()` already draws, plus a
-numeral and one line of epigraph in the TEXT cut under it, inside the reserved
-band (`docs/ui.md`). Nothing else is ever written on screen in play.
+**Title cards.** The level card, plus a numeral and one line of epigraph in
+the TEXT cut under it, inside the reserved band (`Hud.show_card()`,
+`docs/ui.md`, "Chapter cards"). Nothing else is ever written on screen in
+play.
 
 | | Card | Epigraph |
 | --- | --- | --- |
@@ -92,7 +93,7 @@ campaign retroactively makes Endless's ruins the same city.
 
 **The city.** The Mirror Tower stands in the parallax skyline from Chapter I,
 its great mirror dark and turned away, and grows nearer each chapter until you
-are on it (a landmark in `ParallaxSky`, (to be built)). The doves that peck on
+are on it (`ParallaxSky.tower`; *The presentation, as built*, below). The doves that peck on
 the lit terraces go to roost at dusk; at night the owls hunt where they were.
 The Well's mouth is seen, dark, at the foot of the tower in Chapter IV, and
 entered in V. The kept sun is the boss arena's only light.
@@ -104,6 +105,80 @@ sun sets (IV), the stolen light turned back (V).
 The ending: the kept sun rises up the Well and out over the city, every window
 lit from inside; then dawn — and for one frame the light comes from the right,
 the only time in the game it does (an owner decision, below).
+
+### The presentation, as built
+
+What the four things above became on screen, and the decisions taken on the
+way. Each is held by a test that was seen to fail with the thing it guards
+broken.
+
+**The cards.** Every entry's card is data in the catalogue: `numeral`,
+`title` and `epigraph` are fields of each entry in `Campaign.entries()`, and
+`Campaign.card()` is what `CampaignGame` hands the HUD on entering a chapter,
+over the level file's plain title — so a level still plays on its own as it
+always did. The card is set in three strokes (the rule opens, the name comes
+up on it, the epigraph a beat later), holds for 4.4 s, and is taken away by
+the first press of any verb — or, once it has been read, by a verb held
+since before it opened — never eating the press: the prince's first jump
+always happens, and the card is gone before it peaks. The **finale** has no
+numeral of its own and no epigraph, by decision rather than omission: the
+bible gives it none, and a boss told by a sentence would be the one place
+the story spoke. Its card carries the eclipse — a black disc ringed with
+fire — where the numeral would be. `tests/unit/test_title_cards.gd`.
+
+**The Mirror Tower.** One number per entry, `Campaign.TOWER`, from 1 (on the
+far skyline) toward 0 (here):
+
+| | Chapter | Tower | Where it stands |
+| --- | --- | --- | --- |
+| I | The Sun Terrace | 1.0 | a needle over the far roofs, its mirror a dark disc |
+| II | The Long Arcade | 0.72 | over the plaza's roofs |
+| III | The Aqueduct | 0.46 | across the ravine, its crown catching the sunset |
+| IV | The Mirror Tower | 0 | on it: the level is its west face |
+| V | The Sun Well | 0 | under it |
+| — | The Eclipse | 0 | under it |
+
+"Grows nearer each chapter *until you are on it*" settles IV and V: a tower
+in their skies would be a second one standing behind the first, so the
+landmark is seen in I, II and III and once more at the dawn. It stands ahead
+of the player, in the east, drifting at a third of the sun's rate so that a
+whole chapter never carries it past the middle of the view; it is drawn in
+the sky's own language — a flat silhouette, arched windows cut in ink, a
+parapet and a lantern course where the city's tops are domes — and what
+makes it the landmark is its outline: square-shouldered, taller than any
+roof, and the one circle on a stick in the sky, the great mirror hung off
+its west end, its bronze back to the city. Its tone is the sky behind its
+crown a step toward ink, or a step up out of the ink once the sky is ink
+(a fixed tone vanished at sunset, Chapter III's own hour, and the test that
+found it now holds every hour at every distance); from sunset on its top
+courses keep a two-pixel rim of the last light on the west. A camera low in
+a tall chapter lifts the skyline, and the crown stops at the top of the
+frame rather than leave it, as the sun's drift stops at the edge. The duel's
+sky, and every sky but the campaign's, has none of this
+(`tests/unit/test_mirror_tower.gd`, `tests/unit/test_duel_sky.gd`).
+
+**The dawn.** One still after the Eclipse (`DawnFrame`,
+`levels/dawn.txt`), held under DAWN and THE SUN REMEMBERS until the player
+goes back to the chapter select. A terrace in the first light: the doorway
+in the west wall he came up out of, one wide gold floor, a short balustrade
+at the lip where the city drops away, and the swordknight between them in
+his saved look, facing the sun, his long shadow running west along the
+floor. The sun is low and large on the right — the only frame where it is —
+and the city's windows are lit from inside, as the ending says the kept sun
+left them. Behind him in the west the Mirror Tower's great mirror, dark and
+turned away since Chapter I, holds the sun: a flat gold face in its bronze
+rim and one point of paper. The light is from the east in every layer: the
+whole frame is reflected over a solve made once, so the stones, the figure
+and the shadows agree (`docs/world.md`, "The dawn"); the words cast their
+shadow to the left. Nothing moves but what always moves — the air, the
+cloth, the sun's pulse. The frame is dressed by its author alone
+(`;! dress authored`). `tests/unit/test_dawn_frame.gd`.
+
+**Still open.** The rising of the kept sun out of the Well before the dawn
+is the boss's, and lands in front of this frame when it is built; the
+`sunrise` voice the bible names is not built, so the dawn plays
+`level_complete` as the ending card did. The cards' timings are first
+numbers, judged by eye at 320 and 440 units, not measured on players.
 
 What is deliberately **not** borrowed from *Prince of Persia*: no princess, no
 vizier, no sultan, no hourglass or countdown, no potions, no mirror-double, no
@@ -1192,8 +1267,8 @@ thing they guard broken (`CLAUDE.md`).
     rises with a ladder climb.
 14. **Chapter construction.** Each draft becomes `levels/chapter_0N.txt` (to
     be built) as its mechanisms land, never before; the title card's numeral
-    and epigraph; the inscriptions in `Inscription.AUTHORED`; the Mirror
-    Tower in the sky; the dawn. *Done when* `tests/unit/test_campaign.gd` (to
+    and epigraph (built); the inscriptions in `Inscription.AUTHORED`; the
+    Mirror Tower in the sky (built); the dawn (built). *Done when* `tests/unit/test_campaign.gd` (to
     be built) loads every chapter and runs on each what the drafts were held
     to here — the exit, the secrets audit, every torch proved, every relic
     reachable, every door's opener, every beam, every lit mirror, the collapse
@@ -1221,10 +1296,13 @@ Builders treat these as settled.
    prince back at the start of the phase he is in.
 4. **The dawn epilogue frame is lit from the right**: the one frame in the game
    where the sun is in the east, with a mirrored shadow solve made once.
+   Built: `DawnFrame` (*The presentation, as built*).
 5. **There is an assist option: longer warnings.** One persisted setting that
    scales every foe's tell and every timed window that guards a death by the
    same factor, read through one API, so no foe can forget it. Off by default;
    the numbers in this bible are the unassisted ones.
 6. **The Adventure is called *The Last Light*.**
 7. **Chapter I changes only in presentation**: the Mirror Tower in its sky and
-   the title-card epigraph. Its level file does not change.
+   the title-card epigraph. Its level file does not change. Built: its card
+   and its tower come from the catalogue, and `levels/level_01.txt` is
+   untouched.
