@@ -20,7 +20,8 @@ extends Node2D
 ##   and when the next entry is not built yet, JUMP TO CHAPTERS returns to the
 ##   chapter select, where it waits marked "still being built".
 ## - **Each chapter opens on its card**: numeral, name and epigraph from the
-##   catalogue (Campaign.card()), in place of the level's plain title.
+##   catalogue (Campaign.card()), in place of the level's plain title; and
+##   its sky has the Mirror Tower in it, at the entry's distance.
 ## - **Sword goes back to the chapter select**, from pause or the complete
 ##   screen (`Game.quit_scene`), not to the title: the campaign is a place.
 
@@ -75,6 +76,8 @@ func _build() -> void:
 	# has just put up: the numeral and the epigraph are the campaign's, not
 	# the level file's, so a level stays playable on its own as it was.
 	_game.hud.show_card(Campaign.card(index))
+	# The Mirror Tower, as near as this chapter has come to it.
+	_game.sky.tower = float(entry.get("tower", 0.0))
 
 
 func _advance_label() -> String:

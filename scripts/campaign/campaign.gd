@@ -28,11 +28,34 @@ extends RefCounted
 ##   own level. Six entries, then, not five with a sub-entry: progress,
 ##   unlocking and CONTINUE need no second kind of thing.
 ##
+## - `tower` is how far away the Mirror Tower stands in the chapter's sky,
+##   from 1 on the far skyline toward 0 (ParallaxSky.tower). One number per
+##   entry, kept in TOWER beside the list rather than in each line of it, so
+##   the entries stay one line each. It only ever comes nearer: a test holds
+##   it to that, chapter by chapter.
+##
 ## After the last entry comes the ending card, ENDING, and then the chapter
 ## select.
 
 ## The card after the last entry.
 const ENDING := {"title": "Dawn", "epigraph": "The sun remembers"}
+
+## How far away the Mirror Tower stands in each entry's sky, by id
+## (docs/campaign.md, "Story without words": it "grows nearer each chapter
+## until you are on it"): on the far skyline from the Sun Terrace, over the
+## plaza's roofs at the end of the Long Arcade, across the ravine the
+## Aqueduct crosses toward it -- and then 0, on it. Chapter IV is its west
+## face and Chapter V is under its foot, so a tower in their skies would be a
+## second one standing behind the first. The steps shrink as it nears, the
+## way a landmark you walk toward grows. An id not here has no tower.
+const TOWER := {
+	"sun_terrace": 1.0,
+	"long_arcade": 0.72,
+	"aqueduct": 0.46,
+	"mirror_tower": 0.0,
+	"sun_well": 0.0,
+	"eclipse": 0.0,
+}
 
 ## Which entry CampaignGame plays: set by the chapter select before it
 ## changes scene, and moved on by CampaignGame as chapters chain.
@@ -116,5 +139,5 @@ static func _entry(id: String, numeral: String, title: String, epigraph: String,
 		time: String, file: String = "", finale: bool = false) -> Dictionary:
 	return {
 		"id": id, "numeral": numeral, "title": title, "epigraph": epigraph,
-		"time": time, "file": file, "finale": finale,
+		"time": time, "file": file, "finale": finale, "tower": float(TOWER.get(id, 0.0)),
 	}
