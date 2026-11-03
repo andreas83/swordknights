@@ -61,9 +61,10 @@ it; it would make a blood spot something two peers could diverge over.
 `tests/match_gore_test.gd` proves gore never touches state.
 
 **Geometry is never streamed.** `ZoneStrip` answers every collision question for
-every zone from the level text, always. Only the *tilemap cells* — and so the
-engine's physics bodies built from them — are streamed, three zones around the
-view plus wherever a fighter stands or is about to respawn. A simulation whose
+every zone from the level text, always, and the physics a fighter moves against
+is the match's own ground layer, built whole. Only the *drawing* is streamed —
+each zone's tile layers, dressed and lit — three zones around the view plus
+wherever a fighter stands or is about to respawn. A simulation whose
 answers depended on what had finished loading would be one two peers could
 disagree about.
 
@@ -110,6 +111,27 @@ From the spec, with its numbers:
   (`GATE_STANDOFF`). The gate's lintel in `zone_01.txt` sits high for exactly
   this reason: the leader has to be able to go over the top.
 
+## The zones
+
+One screen each, one set piece each, and the stake rises toward either end
+(`levels/duel_zones.txt` lists them):
+
+| Zone | | Set piece | Stake |
+| --- | --- | --- | --- |
+| 3 | the Mirror Court | a raised tower over an arcade, a ladder either side | none: the start |
+| 2, 4 | the Cistern Court | a spike pit three tiles wide, a stepping stone over it | a hazard with help |
+| 1, 5 | the Gates | the arch, the crowd, and a moat of open water one jump out | a hazard with none, at dusk |
+
+**The moat is two tiles, not three.** The duel fighter has no ledge grab, so
+any gap is a hazard, and its running jump carries about 42 px. Over a
+three-tile (48 px) moat exactly one press frame gets across; over two tiles a
+run gets across if jump is pressed anywhere in a window of about eight frames
+(16 px), and walking in still kills. `tests/match_fighter_test.gd` runs at the
+moat from both gates and holds the window to at least four frames, and fails
+with a three-tile moat. The pyramid of steps that stood there before came out
+to make room, which raised the gate zones' open ground from 14 to 18 of 30
+columns; the strip is 86 of 150, a little over half.
+
 A respawn's zone is streamed in when its timer **starts**, not when the fighter
 appears, so the only stream not triggered by travel has two seconds' warning.
 
@@ -131,6 +153,10 @@ reconciling client does not paint the same death twice.
   pacifist line.
 - `tests/zone_strip_test.gd` — loading, seams, spawn columns, and that no cell
   is written on a frame a fight crosses a seam.
+- `tests/unit/test_zone_dressing.gd` — the zones are dressed and lit as one
+  world, and none of it reaches the simulation.
+- `tests/match_fighter_test.gd` — the match on the real fighter, including the
+  gate moat: walking in kills, a running jump crosses.
 - `tests/match_gore_test.gd` — gore never reaches state or checksum, and the
   list is bounded.
 
@@ -206,3 +232,8 @@ The five items that stood between the match and replacing the round duel:
    one-number code (`scripts/net/lan_code.gd`). `tests/match_net_test.gd` plays
    it between two sessions under latency, jitter and loss, and
    `tests/net_live.sh` between two processes, direct and relayed.
+
+Task 14, the zone design, is done to the extent above: a set piece per zone and
+a rising stake. Left for a designer's eye rather than a test: whether the
+middle court should be flatter still, and whether the gate zones want a second
+feature between the moat and the arch.

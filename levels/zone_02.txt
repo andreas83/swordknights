@@ -1,9 +1,12 @@
 ; The Cistern Court
 ;
-; Zone 2 of 5. The strip's one hazard: a cistern of spikes with a single
-; one-way stepping stone hanging over the middle of it. The duel fighter has no
-; ledge grab, so the pit's teeth are its width against a running jump rather
-; than against a grab -- the rule CLAUDE.md gives for the prince.
+; Zone 2 of 5. The first stake: a cistern of spikes with a single one-way
+; stepping stone hanging over the middle of it. The middle court has no hazard
+; and the gate zone beyond this one has a moat with nothing over it; this is
+; the step between, a pit too wide to jump bare but with a stone to cross on.
+; The duel fighter has no ledge grab, so the pit's teeth are its width against
+; a running jump rather than against a grab -- the rule CLAUDE.md gives for the
+; prince.
 ;
 ; A respawn is never placed in or beside it: scripts/duel/zones.gd only spawns
 ; on a flat floor with five clear rows over it.

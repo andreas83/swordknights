@@ -48,6 +48,7 @@ func _physics_process(_delta: float) -> bool:
 	_the_fighters_stand_on_the_ground()
 	_a_thrust_kills_through_the_match()
 	_a_hazard_kills_and_credits_the_other_seat()
+	_the_gate_moat_is_a_stake_not_a_wall()
 	_two_runs_on_the_same_inputs_agree()
 	_a_rewind_replays_the_same_frames()
 
@@ -144,6 +145,80 @@ func _a_hazard_kills_and_credits_the_other_seat() -> void:
 	_s.equal(fight.kills[0], 1, "a hazard death is credited to the other seat")
 	_s.equal(fight.leader_slot(), 0, "and the other seat takes the initiative")
 	fight.free()
+
+
+## The water in front of each gate (levels/zone_01.txt) is the strip's last
+## stake: a runner who walks into it dies, and one who jumps it from a run gets
+## across with a window of several frames, not one. Measured from both gates,
+## since the strip mirrors and so must the stake.
+func _the_gate_moat_is_a_stake_not_a_wall() -> void:
+	for seat: int in 2:
+		var moat := _moat_columns(seat)
+		if not _s.check(moat.x >= 0, "seat %d's gate zone has a moat" % seat):
+			continue
+		var walked := _run_at_the_moat(seat, moat, -INF)
+		_s.equal(walked, "died", "seat %d walking into the moat dies" % seat)
+		var window := 0
+		for lead: int in range(-8, 32, 2):
+			if _run_at_the_moat(seat, moat, float(lead)) == "crossed":
+				window += 1
+		# Two pixels a step at 120 px/s is one frame a step.
+		_s.check(window >= 4, "seat %d can jump the moat in a window of %d frames"
+			% [seat, window])
+
+
+## [first, last] column of the water nearest seat's gate, or (-1, -1).
+func _moat_columns(seat: int) -> Vector2i:
+	var zone := 0 if seat == 0 else _strip.zone_count() - 1
+	var first := zone * _strip.zone_cols
+	var found := Vector2i(-1, -1)
+	for x: int in range(first, first + _strip.zone_cols):
+		if _strip.kind_at(x, _strip.rows() - 1) != Tiles.Kind.WATER:
+			continue
+		found.x = x if found.x < 0 else found.x
+		found.y = x
+	return found
+
+
+## Runs seat toward its gate from the far side of the moat, pressing jump when
+## the body is `lead` px short of the near lip (-INF: never). Returns "died",
+## "crossed" or "stopped".
+func _run_at_the_moat(seat: int, moat: Vector2i, lead: float) -> String:
+	var fight := _open_match()
+	if fight == null:
+		return "no match"
+	var zone := 0 if seat == 0 else _strip.zone_count() - 1
+	var toward := ZoneStrip.goal_direction(seat)
+	var tile := float(ZoneStrip.TILE)
+	var near_lip := (moat.y + 1) * tile if toward < 0 else moat.x * tile
+	var far_lip := moat.x * tile if toward < 0 else (moat.y + 1) * tile
+	var floor_y := float(_strip.ground_row(moat.x - 2)) * tile
+	fight.scroll = _strip.zone_left(zone)
+	fight.zone_index = zone
+	fight.seats[seat].respawn_at(Vector2(near_lip - toward * 6.0 * tile, floor_y), toward)
+	var other := Vector2(near_lip - toward * 12.0 * tile, floor_y)
+	fight.seats[1 - seat].respawn_at(other, -toward)
+	var run := PlayerInput.BIT_LEFT if toward < 0 else PlayerInput.BIT_RIGHT
+	var jumped := 0
+	var outcome := "stopped"
+	for i: int in 200:
+		var bits := run
+		var short := (fight.fighter_position(seat).x - near_lip) * -float(toward)
+		if jumped == 0 and short <= lead:
+			jumped = 1
+		if jumped > 0 and jumped <= 14:
+			bits |= PlayerInput.BIT_JUMP
+			jumped += 1
+		var pair := [bits, 0] if seat == 0 else [0, bits]
+		fight.step(pair[0], pair[1])
+		if not fight.is_fighter_alive(seat):
+			outcome = "died"
+			break
+		if (fight.fighter_position(seat).x - far_lip) * float(toward) > 1.5 * tile:
+			outcome = "crossed"
+			break
+	fight.free()
+	return outcome
 
 
 ## --- determinism ------------------------------------------------------------

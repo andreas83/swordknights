@@ -5,12 +5,26 @@
 ;
 ; Legend (see scripts/world/tiles.gd):
 ;   #  solid   =  one-way platform   H  ladder   :  background niche
-;   ^  spikes  t  torch              D  the gate (the endpoint)
+;   ^  spikes  ~  water   t  torch   D  the gate (the endpoint)
+;
+; THE LAST STAKE. The strip gets more dangerous toward each end, the way a
+; Nidhogg screen does: the middle court has no hazard at all, the cistern one
+; zone out has spikes but a stone to cross on, and here, one jump from the
+; gate, the moat is open water with nothing over it. A runner carrying the
+; initiative has to jump it, under the dusk that falls on this room, and a
+; runner who walks into it hands the rope back two screens from winning.
+;
+; Two tiles, not three. The duel fighter has no ledge grab, so any gap is a
+; hazard, and its jump carries about 42 px at a run: over a three-tile moat
+; that leaves one frame to press in, which is a coin toss, not a stake. Over
+; two there is a comfortable window -- see the moat note in
+; docs/duel-match.md for the measurement.
 ;
 ; The gate's lintel sits at rows 13-14, so the five rows above the floor on the
 ; approach are clear. That is not decoration: when the leader is pinned at the
-; final zone the opponent spawns right in front of the gate, and the leader has
-; to be able to go over the top of them rather than be forced to fight.
+; final zone the opponent spawns right in front of the gate -- between the moat
+; and the arch -- and the leader has to be able to go over the top of them
+; rather than be forced to fight.
 
 
 
@@ -27,10 +41,10 @@
 ########            t
 ########     H======
 :::::::      H
-:::::::      H        =
-:::::::      H           t  :
-:::::::      H          ### :
-:D:::::  t   H         #####:
-##############################
-##############################
-##############################
+:::::::      H
+:::::::      H              :
+:::::::      H              :
+:D:::::  t   H          t   :
+####################  ########
+####################~~########
+####################~~########

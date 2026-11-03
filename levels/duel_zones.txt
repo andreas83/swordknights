@@ -18,6 +18,18 @@
 ;
 ; Three to five zones. Player one pushes west toward zone 1's gate, player two
 ; pushes east toward the last zone's gate, and the match starts in the middle.
+;
+; THE SHAPE OF THE STRIP
+; Each zone is one screen with one set piece, and the stake rises toward each
+; end, as it does across a Nidhogg level:
+;
+;   zone 3  the Mirror Court   the start; a raised tower, two ladders, no hazard
+;   zone 2  the Cistern Court  spikes, with a stepping stone to cross on
+;   zone 1  the West Gate      bare water one jump from the gate, at dusk
+;
+; and zones 4 and 5 are 2 and 1 reversed. About half of every zone's floor is
+; open ground a respawn can use; tests/zone_strip_test.gd holds each zone to
+; eight columns of it and the strip to more than half.
 
 zone_01.txt
 zone_02.txt
