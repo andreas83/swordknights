@@ -252,14 +252,14 @@ func _a_rewind_replays_the_same_frames() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 23
 	for i: int in 200:
-		fight.step(rng.randi() & 0xff, rng.randi() & 0xff)
+		fight.step(_duellist(fight, 0, rng), _duellist(fight, 1, rng))
 
 	var snapshot := fight.write_state()
 	var inputs: Array[Vector2i] = []
 	var states: Array[PackedByteArray] = []
 	var sums: Array[int] = []
 	for i: int in 300:
-		var bits := Vector2i(rng.randi() & 0xff, rng.randi() & 0xff)
+		var bits := Vector2i(_duellist(fight, 0, rng), _duellist(fight, 1, rng))
 		inputs.append(bits)
 		fight.step(bits.x, bits.y)
 		states.append(fight.write_state())
@@ -276,6 +276,34 @@ func _a_rewind_replays_the_same_frames() -> void:
 	_s.check(fight.kills[0] + fight.kills[1] > 0,
 		"the replayed stretch included at least one death")
 	fight.free()
+
+
+## Random buttons for one seat, always closing on the other, attacking on about
+## one frame in three, with the throw kept rare -- tests/match_net_test.gd's
+## bot, minus the session.
+##
+## The stretch below used to be pure noise, and its one death was luck: two
+## fighters pressing random directions mostly walk past each other, and on four
+## seeds of five, pure noise over that stretch kills nobody. Any change to the
+## rules moves which seeds are lucky, and takes the death with it. Closing alone
+## was measured and is not enough either (a death in five seeds of eight).
+## Closing and pressing the attack gave a death in the stretch on all eight
+## seeds tried, so a death here is a property of the input rather than of the
+## seed. The inputs are recorded, so the replay does not read positions; only
+## the first pass does.
+func _duellist(fight: DuelMatch, seat: int, rng: RandomNumberGenerator) -> int:
+	var bits := rng.randi() & 0xff
+	if rng.randi() % 8 != 0:
+		bits &= ~PlayerInput.BIT_THROW
+	bits &= ~PlayerInput.BIT_ATTACK
+	if rng.randi() % 3 == 0:
+		bits |= PlayerInput.BIT_ATTACK
+	bits &= ~(PlayerInput.BIT_LEFT | PlayerInput.BIT_RIGHT)
+	var me := fight.fighter_position(seat)
+	var them := fight.fighter_position(1 - seat)
+	if absf(them.x - me.x) > 6.0:
+		bits |= PlayerInput.BIT_RIGHT if them.x > me.x else PlayerInput.BIT_LEFT
+	return bits
 
 
 func _random_run(seed_value: int) -> PackedInt64Array:
