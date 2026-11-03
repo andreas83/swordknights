@@ -23,11 +23,14 @@ extends Camera2D
 ## else.
 ##
 ## FRAMED ON TWO FIGHTERS AT OPPOSITE ENDS OF A ZONE
-## Solved by construction rather than by zooming. The view is exactly one zone
-## wide and the simulation holds both fighters inside that window, so they are
-## both on screen at every moment of the match without the zoom ever moving. A
-## breathing zoom would also make "1.5 screen widths" ambiguous, and that number
-## has to mean the same thing on a phone and on a desktop.
+## Solved by construction rather than by zooming. The scale is fixed by the
+## fighter's height on screen (_apply_zoom), a zone is narrow enough to fit
+## across a phone at that scale (ZoneStrip.SCREEN_WIDTH), and the simulation
+## holds both fighters inside a window one zone wide -- so on a phone they are
+## both on screen at every moment without the zoom ever moving. On a screen
+## narrower than a zone at that scale the view follows the pair instead. A
+## breathing zoom would make "1.5 screen widths" ambiguous, and that number has
+## to mean the same thing on a phone and on a desktop.
 ##
 ## Nothing here runs in _physics_process. The match steps at a fixed 60 Hz and
 ## may step twice in one frame while a client reconciles; the camera glides at
@@ -38,6 +41,11 @@ extends Camera2D
 ## and the window re-centres on the new leader.
 const FOLLOW := 14.0
 const VERTICAL_FOLLOW := 6.0
+
+## How tall a standing fighter is, as a share of the screen's height. The middle
+## of 8-9%: big enough that a blade's height reads on a phone, small enough
+## that a zone still fits across one. See _apply_zoom().
+const FIGHTER_SHARE := 0.085
 
 var fight: DuelMatch
 
@@ -128,26 +136,41 @@ func _target() -> Vector2:
 	return Vector2(centre, vertical)
 
 
-## One zone across, whatever the window's aspect, at a whole number of screen
+## A fighter stands 8-9% of the screen's height, at a whole number of screen
 ## pixels per world pixel.
 ##
-## The world width is fixed and the view's height follows from it, rather than
-## the other way round: the horizontal is what the mode's distances are written
-## in. But the exact fit is a fractional scale on most screens -- 3.75 screen
-## pixels per texel on a 20:9 phone at 1080p -- and a fractional scale on
-## nearest-filtered pixel art draws texels alternately three and four pixels
-## wide, which shimmers as the view scrolls. So the scale is rounded DOWN to a
-## whole number: every texel is the same size, and the view shows a little more
-## than one zone rather than a little less. The window's walls are what bound
-## the fight, not the screen's edge, so the extra margin costs nothing.
+## The scale is set by HEIGHT, because what the player has to read is a
+## fighter -- which of three heights its blade is at -- and that depends on how
+## tall the fighter is on the glass, not on the aspect. A first version fitted
+## one zone to the width instead: on a phone that was a 0.5 zoom and a fighter
+## at about 6% of the screen, and the stances were hard to tell apart.
+##
+## The exact target is a fractional scale on almost every screen, and a
+## fractional scale on nearest-filtered pixel art draws texels alternately n
+## and n+1 pixels wide, which shimmers as the view scrolls. So the scale is
+## rounded to the nearest whole number of screen pixels per texel: 8.1% at
+## 1080 px tall, 9.2-9.4% at 1170-1440. ZoneStrip.SCREEN_WIDTH is chosen so a
+## whole zone still fits across a phone at that scale; where it does not -- a
+## 16:9 tablet, a 4:3 iPad -- _target() follows the fighters instead.
+##
+## `framing_width` overrides all of this with a fixed world width, for
+## comparing framings side by side.
 func _apply_zoom() -> void:
-	var wanted := framing_width if framing_width > 0.0 else fight.strip.zone_width()
 	var view := _view_size()
 	var stretch := _stretch()
-	if stretch <= 0.0:
-		zoom = Vector2.ONE * (view.x / wanted)
+	if framing_width > 0.0:
+		if stretch <= 0.0:
+			zoom = Vector2.ONE * (view.x / framing_width)
+			return
+		var fitted := maxf(1.0, floorf(view.x * stretch / framing_width))
+		zoom = Vector2.ONE * (fitted / stretch)
 		return
-	var pixels := maxf(1.0, floorf(view.x * stretch / wanted))
+
+	var body := DuelTuning.default().body_height
+	if stretch <= 0.0:
+		zoom = Vector2.ONE * (view.y * FIGHTER_SHARE / body)
+		return
+	var pixels := maxf(1.0, roundf(view.y * stretch * FIGHTER_SHARE / body))
 	zoom = Vector2.ONE * (pixels / stretch)
 
 

@@ -97,8 +97,8 @@ func _the_timer() -> void:
 
 func _one_and_a_half_screens() -> void:
 	_s.equal(
-		DuelMatch.RESPAWN_LEAD, 960.0,
-		"the lead is 1.5 screens, and a screen is 640 px"
+		DuelMatch.RESPAWN_LEAD, 720.0,
+		"the lead is 1.5 screens, and a screen is 480 px"
 	)
 
 	var fight := _open_match()

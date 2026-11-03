@@ -66,7 +66,7 @@ const DT := DuelRules.DT
 ## The respawn algorithm, from the specification.
 const RESPAWN_DELAY := 2.0
 ## "Roughly 1.5 screen widths ahead in the leader's direction of travel." One
-## zone is one screen, and the screen is the DESIGN screen — 640 px — not
+## zone is one screen, and the screen is the DESIGN screen — 480 px — not
 ## whatever the device happens to be showing. A phone and a desktop have to
 ## agree about where a fighter comes back.
 const RESPAWN_LEAD := 1.5 * ZoneStrip.SCREEN_WIDTH
@@ -177,8 +177,9 @@ func build(zones: ZoneStrip, view: ZoneView = null) -> bool:
 ## reads is never streamed -- now holds for the physics space too. ZoneView's
 ## tilemap has collision switched off; it only draws.
 ##
-## Five zones of 40 x 14 cells is under three thousand tiles of static
-## collision, built once per match. Hidden, because a TileMapLayer collides
+## Five zones of 30 x 23 cells is at most 3,450 tiles of static collision,
+## and far fewer in practice -- only solid and one-way cells -- built once per
+## match. Hidden, because a TileMapLayer collides
 ## whether or not it draws.
 func _build_ground() -> void:
 	if _ground != null:

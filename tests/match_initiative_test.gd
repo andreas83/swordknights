@@ -32,6 +32,10 @@ extends SceneTree
 
 const Support := preload("res://tests/duel_support.gd")
 const MANIFEST := "res://levels/duel_zones.txt"
+## Where the window starts: the left edge of the middle of five zones. Derived,
+## because it was written as 1280 and a zone-width change made it silently
+## wrong -- `pulled < 1280` would have passed with no rope taken at all.
+const MIDDLE_LEFT := 2.0 * ZoneStrip.SCREEN_WIDTH
 
 const LEFT := PlayerInput.BIT_LEFT
 const RIGHT := PlayerInput.BIT_RIGHT
@@ -129,7 +133,7 @@ func _opens_neutral() -> void:
 	_s.equal(fight.initiative, DuelMatch.Initiative.NEUTRAL, "a match opens neutral")
 	_s.equal(fight.leader_slot(), -1, "nobody is leading")
 	_s.equal(fight.zone_index, 2, "the rope starts in the middle zone")
-	_s.equal(fight.scroll, 1280.0, "the window starts on the middle zone")
+	_s.equal(fight.scroll, MIDDLE_LEFT, "the window starts on the middle zone")
 	_s.equal(fight.phase, DuelMatch.Phase.COUNTDOWN, "and it starts on the marks")
 	_s.equal(fight.winner, DuelRules.DRAW, "with no winner")
 	_s.equal(fight.kills[0], 0, "and no kills")
@@ -245,7 +249,7 @@ func _the_wrong_way_does_not_scroll() -> void:
 	_hold(fight, 60, 0, 0)
 	var pulled := fight.scroll
 	var zone := fight.zone_index
-	_s.check(pulled < 1280.0, "the leader has taken some rope")
+	_s.check(pulled < MIDDLE_LEFT, "the leader has taken some rope")
 
 	# Now the leader turns round and sprints the other way, for nine seconds.
 	_run_seat(fight, 540, 0, 1)
@@ -343,7 +347,7 @@ func _the_gate() -> void:
 	fight.reset_match()
 	_s.equal(fight.initiative, DuelMatch.Initiative.NEUTRAL, "the reset is neutral again")
 	_s.equal(fight.zone_index, 2, "back in the middle zone")
-	_s.equal(fight.scroll, 1280.0, "with the window back in the middle")
+	_s.equal(fight.scroll, MIDDLE_LEFT, "with the window back in the middle")
 	_s.equal(fight.frame, 0, "and the clock back at zero")
 	_s.equal(fight.winner, DuelRules.DRAW, "and no winner")
 	_s.equal(fight.kills[0], 0, "and the kills cleared")

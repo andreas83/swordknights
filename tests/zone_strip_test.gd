@@ -21,8 +21,10 @@ const Support := preload("res://tests/duel_support.gd")
 const MANIFEST := "res://levels/duel_zones.txt"
 
 ## Builds happen when the window is half way across a zone, so no build may
-## land within this many pixels of a seam. Four tenths of a zone.
-const SEAM_GUARD := 256.0
+## land within this share of a zone's width of a seam. A fraction rather than
+## pixels: it was 256 px, which was four tenths of a 640 px zone and more than
+## half of a 480 px one -- at which point every build looked like a seam build.
+const SEAM_GUARD_SHARE := 0.4
 
 var _s := Support.new()
 
@@ -46,12 +48,13 @@ func _initialize() -> void:
 
 func _shape(strip: ZoneStrip) -> void:
 	_s.equal(strip.zone_count(), 5, "five zones")
-	_s.equal(strip.zone_cols, 40, "a zone is 40 cells wide")
+	_s.equal(strip.zone_cols, 30, "a zone is 30 cells wide")
 	_s.equal(strip.zone_rows, 23, "a zone is 23 cells tall")
 	_s.equal(strip.zone_width(), ZoneStrip.SCREEN_WIDTH, "one zone is one screen")
-	_s.equal(strip.cols(), 200, "the strip is 200 cells wide")
+	_s.equal(strip.cols(), 5 * strip.zone_cols, "the strip is five zones wide")
 	_s.equal(
-		strip.world_size(), Vector2(3200.0, 368.0), "the strip is 3200x368 px"
+		strip.world_size(), Vector2(5.0 * ZoneStrip.SCREEN_WIDTH, 368.0),
+		"the strip is five design screens wide and 23 tiles tall"
 	)
 
 	# Past either end is wall, not void: the gates are the only way out.
@@ -61,7 +64,7 @@ func _shape(strip: ZoneStrip) -> void:
 
 	# A zone boundary is not a special case for the geometry.
 	_s.equal(
-		strip.kind_at(39, 22), strip.kind_at(40, 22),
+		strip.kind_at(29, 22), strip.kind_at(30, 22),
 		"the ground runs through the seam between zone 0 and zone 1"
 	)
 
@@ -213,7 +216,7 @@ func _streaming(strip: ZoneStrip) -> void:
 			# The first focus realises the opening window from nothing; every
 			# build after it is one the view chose when to do.
 			if step > 0 and absf(fposmod(at, width) - width * 0.5) \
-					> width * 0.5 - SEAM_GUARD:
+					> width * 0.5 - width * SEAM_GUARD_SHARE:
 				seam_builds += 1
 
 		# Everything on screen has to be standable.

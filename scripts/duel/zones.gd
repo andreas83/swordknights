@@ -34,7 +34,15 @@ const TILE := 16
 ## "1.5 screen widths" in the respawn algorithm a world constant rather than a
 ## property of whatever device is drawing. A match between a phone and a desktop
 ## has to agree about where a fighter respawns.
-const SCREEN_WIDTH := 640.0
+##
+## 480 px, thirty tiles, because of how big a fighter is on screen. The duel
+## camera scales so a fighter stands 8-9% of the screen's height (MatchCamera),
+## and at that scale a phone shows between about 506 px (an iPhone) and 600 px
+## (a 20:9 Android) of world. A zone has to fit inside the narrowest of those, or
+## two fighters at opposite ends of the window are not both on screen -- and
+## seeing your opponent at all times is the mode. It was 640 at first, which
+## needed a 0.5 zoom and left a fighter at about 6% of the screen.
+const SCREEN_WIDTH := 480.0
 
 ## A respawn is only ever placed on ground a fighter could be jumped over or
 ## rolled past: FLAT_RUN cells of unbroken solid floor either side, with

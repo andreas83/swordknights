@@ -153,15 +153,20 @@ still start the round-based duel in `scripts/duel/duel.gd`. Both implement
 
 Open before the match replaces the round duel:
 
-1. **Zone width — a design decision, not made yet.** `ZoneStrip.SCREEN_WIDTH`
-   is a 640 px "design screen"; the view is 320–440 units wide. At 640 a
-   fighter is about 5% of the screen's height on a phone, at 320 about 12%.
-   No pixels are lost either way: the stretch mode is `canvas_items`, which
-   draws at native resolution. The camera now rounds its scale **down** to a
-   whole number of screen pixels per texel and snaps its position to the
-   pixel grid, so texels are all the same size on any aspect and the view shows
-   slightly more than one zone, never less. `--framing=320` in the scene's user
-   arguments frames the view 320 px wide, for comparing.
+1. ~~Zone width.~~ **Decided: a fighter stands 8–9% of the screen's height**,
+   and the strip follows from that. The camera scales by height
+   (`MatchCamera.FIGHTER_SHARE`, 0.085) at a whole number of screen pixels per
+   texel — 8.1% at 1080 px tall, 9.2–9.4% at 1170–1440 — and snaps to the pixel
+   grid, so texels are all one size on any aspect. At that scale phones show
+   506–600 px of world, so a zone is 480 px (30 tiles,
+   `ZoneStrip.SCREEN_WIDTH`) and always fits across: both fighters are on
+   screen at every moment, as the mode needs. On narrower screens — a 16:9
+   720p device, a 4:3 tablet — the camera follows the pair. The five zones were
+   cut from 40 columns to 30 by removing only columns identical to their
+   neighbour, chosen to keep the most open ground, so every gate, ladder,
+   ledge and mark survived and the share of respawnable floor held at about
+   half. The respawn lead is 1.5 × 480 = 720 px. `--framing=<px>` still frames
+   a fixed width, for comparisons.
 2. **The fighter is drawn as its hitboxes.** `fighter_art.gd` argues for it:
    the rectangles are what decides a duel, so the art that shows them teaches
    the game. It reads, but next to the prince's rig in `player_art.gd` it is a
