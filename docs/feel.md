@@ -225,6 +225,7 @@ calls `change_scene_to_file` directly — the menu, today.
 | any scene | itself, on load | reveal only |
 | pause → menu | `menu.tscn` | normal |
 | complete → replay | same level, rebuilt behind the cover | normal |
+| complete → descend (Endless) | the next ruin, generated behind the cover | normal |
 | complete → menu | `menu.tscn` | normal |
 | death → respawn | the last torch, behind the cover | **fast** |
 

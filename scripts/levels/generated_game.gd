@@ -13,35 +13,91 @@ extends Node2D
 ## played again. `godot --headless --script tools/generate_level.gd --
 ## --seed <n>` reproduces exactly what was played, and `seed_override` pins a
 ## seed from the editor.
+##
+## ## The descent
+##
+## Escaping a ruin leads down into the next one rather than replaying it. The
+## mode used to stop at the first door — jump rebuilt the same seed at the same
+## 0.55 — so it had no second level, no curve and nothing to carry on toward.
+## Now ruin 1 opens gentler than that (`difficulty`, 0.4) and each door down
+## adds DIFFICULTY_STEP until MAX_DIFFICULTY. The generator already ramps
+## *within* a ruin from 55% to 100% of what it is asked for, so the two curves
+## stack: every ruin opens a little easier than the last one ended, which is
+## the breather a run needs, and still opens harder than the last one opened.
+##
+## Ruin n's seed follows from ruin 1's (`next_seed()`), so a pinned seed pins
+## the whole descent and the readout's seed is still the one to report.
 
 const GAME_SCENE := "res://scenes/game.tscn"
+## Added per ruin descended.
+const DIFFICULTY_STEP := 0.1
+## The top of the generator's dial, where every segment is in play and gaps
+## open to their full width. Asking for more would ask for nothing new.
+const MAX_DIFFICULTY := 0.95
 
 ## Target width in tiles. Long enough to be a level, short enough that the
 ## whole run is a couple of minutes.
 @export var length: int = 170
-@export_range(0.0, 1.0, 0.05) var difficulty: float = 0.55
-## Non-zero replays one particular level instead of rolling a fresh one.
+## The first ruin's difficulty; each ruin below it adds DIFFICULTY_STEP.
+@export_range(0.0, 1.0, 0.05) var difficulty: float = 0.4
+## Non-zero replays one particular descent instead of rolling a fresh one.
 @export var seed_override: int = 0
 
+## The ruin being played, and how many doors down it is.
 var seed_value: int = 0
+var depth: int = 1
 
+var _first_seed: int = 0
 var _game: Game
 var _readout: Readout
 
 
-func _ready() -> void:
-	seed_value = seed_override if seed_override != 0 else _fresh_seed()
+## How hard ruin `at_depth` is, starting from `start`.
+static func difficulty_at(at_depth: int, start: float) -> float:
+	return minf(start + float(at_depth - 1) * DIFFICULTY_STEP, MAX_DIFFICULTY)
 
-	var result := LevelGenerator.build(seed_value, length, difficulty)
+
+## The seed of ruin `at_depth` in the descent that starts at `first`.
+static func next_seed(first: int, at_depth: int) -> int:
+	if at_depth <= 1:
+		return first
+	return hash([first, at_depth]) & 0x7FFFFFFF
+
+
+func current_difficulty() -> float:
+	return difficulty_at(depth, difficulty)
+
+
+func _ready() -> void:
+	_first_seed = seed_override if seed_override != 0 else _fresh_seed()
+	seed_value = _first_seed
 	_readout = Readout.new()
+	_mount_readout()
+	_build()
+
+
+## Behind the cover of the complete screen's wipe: the next ruin down.
+func _descend() -> void:
+	depth += 1
+	seed_value = next_seed(_first_seed, depth)
+	if _game != null:
+		remove_child(_game)
+		_game.queue_free()
+		_game = null
+	_build()
+
+
+func _build() -> void:
+	var result := LevelGenerator.build(seed_value, length, current_difficulty())
 	_readout.seed_value = seed_value
-	_readout.difficulty = difficulty
+	_readout.difficulty = current_difficulty()
+	_readout.depth = depth
+	_readout.queue_redraw()
 
 	if not bool(result["ok"]):
 		# The generator already pushed the detail; say enough on screen that a
 		# tester can report the seed that broke it.
 		_readout.failure = "GENERATION FAILED"
-		_mount_readout()
 		push_error("GeneratedGame: %s" % String(result["reason"]))
 		return
 
@@ -49,19 +105,19 @@ func _ready() -> void:
 	var packed := load(GAME_SCENE) as PackedScene
 	if packed == null:
 		_readout.failure = "MISSING GAME SCENE"
-		_mount_readout()
 		push_error("GeneratedGame: could not load %s" % GAME_SCENE)
 		return
 
 	_game = packed.instantiate() as Game
 	# Before add_child, or Game._ready falls back to its level_path export.
 	_game.level_source = level
+	_game.advance = _descend
 	add_child(_game)
 
 	_readout.level_name = level.name
 	_readout.beats = int((result["beats"] as Array).size())
 	_readout.columns = level.cols
-	_mount_readout()
+	_readout.queue_redraw()
 
 	print("GeneratedGame: seed %d, %d columns, %d beats, %d attempt(s), %s" % [
 		seed_value, level.cols, _readout.beats, int(result["attempts"]),
@@ -92,6 +148,7 @@ static func _fresh_seed() -> int:
 class Readout extends Control:
 	var seed_value: int = 0
 	var difficulty: float = 0.0
+	var depth: int = 1
 	var level_name: String = ""
 	var beats: int = 0
 	var columns: int = 0
@@ -127,7 +184,8 @@ class Readout extends Control:
 				UiFont.Cut.MICRO, Palette.LIGHT_SOFT, UiFont.Align.LEFT, 0.7)
 			return
 
-		UiFont.draw_text(self, "SEED %d" % seed_value, Vector2(left, bottom - 14.0),
+		UiFont.draw_text(self, "RUIN %d  ·  SEED %d" % [depth, seed_value],
+			Vector2(left, bottom - 14.0),
 			UiFont.Cut.TEXT, Palette.PAPER, UiFont.Align.LEFT, 0.7)
 		UiFont.draw_text(self,
 			"%d COLS  %d BEATS  DIFF %.2f" % [columns, beats, difficulty],

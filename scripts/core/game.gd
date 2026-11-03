@@ -32,6 +32,10 @@ const CHECKPOINT_REACH := 10.0
 @export_file("*.txt") var level_path: String = "res://levels/level_01.txt"
 ## Set instead of level_path to run a generated level without writing a file.
 var level_source: AsciiLevel
+## What jump does on the complete screen, when a mode has somewhere further to
+## go. Called at full cover of the wipe, like a restart. Unset, jump replays
+## this level — the Adventure's one hand-authored level has no next one.
+var advance := Callable()
 
 @onready var level: Level = $Level
 @onready var player: Player = $Player
@@ -124,7 +128,7 @@ func _physics_process(delta: float) -> void:
 			if Flow.busy():
 				pass
 			elif Input.is_action_just_pressed("jump"):
-				Flow.wipe(self, _restart)
+				Flow.wipe(self, advance if advance.is_valid() else _restart)
 			elif Input.is_action_just_pressed("attack"):
 				Flow.change_scene(self, MENU_SCENE)
 		Phase.DYING:
@@ -182,7 +186,9 @@ func _overlay_subtitle() -> String:
 		Phase.PAUSED:
 			return "PAUSE TO RESUME  ·  SWORD TO QUIT"
 		Phase.COMPLETE:
-			return "%d/%d RELICS  ·  %.1fs  ·  JUMP TO REPLAY" % [relics, relics_total, elapsed]
+			var next := "DESCEND" if advance.is_valid() else "REPLAY"
+			return "%d/%d RELICS  ·  %.1fs  ·  JUMP TO %s" % [
+				relics, relics_total, elapsed, next]
 		_:
 			return ""
 

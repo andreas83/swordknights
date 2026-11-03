@@ -285,7 +285,7 @@ through `Game.level_source`, which must be set **before** `add_child()`
 because `Game._ready()` is what reads it. Endless and Adventure therefore
 always run the identical playable scene.
 
-A fresh seed is rolled each entry and shown top-right for the whole level, so
+A fresh seed is rolled each entry and shown bottom-left for the whole level, so
 a good roll can be written down and replayed:
 
 ```
@@ -293,6 +293,21 @@ godot --headless --path . --script tools/generate_level.gd -- --seed <that one>
 ```
 
 Set `seed_override` on the scene to pin one from the editor.
+
+### The descent
+
+Escaping a ruin leads down into the next one: the complete screen reads
+*JUMP TO DESCEND*, and `Game.advance` hands the rebuild to
+`GeneratedGame._descend()` at full cover of the wipe. Ruin 1 is asked for
+0.40, each door down adds `DIFFICULTY_STEP` (0.1), and the dial stops at
+`MAX_DIFFICULTY` (0.95, where every segment is in play). The generator's own
+within-level ramp (55% → 100% of the request) stacks with that, so each ruin
+opens a little easier than the last one ended — a breather at every door —
+and still opens harder than the last one opened. Ruin *n*'s seed is
+`GeneratedGame.next_seed(first, n)`, so the seed on screen for ruin 1 pins
+the whole descent; the readout shows `RUIN n · SEED s` for the ruin in play.
+`tests/unit/test_endless_descent.gd` escapes a ruin through the real jump
+press and checks where it leads.
 
 Some seeds worth looking at, all at the default length 170:
 

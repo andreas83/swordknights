@@ -49,6 +49,10 @@ Every torch you reach on foot is a checkpoint: the flame flares, and a death
 sends you back there rather than to the start. Relics you picked up and guards
 you cut down stay that way; the clock keeps running.
 
+**Endless** is a descent: each ruin you escape leads down into a new one, a
+step harder, from a gentle first ruin up to the generator's hardest. The ruin
+number and its seed sit bottom-left, and the first seed replays the whole run.
+
 The local duel is a tug of war in the spirit of *Nidhogg*: one hit kills, and
 every kill sends the world scrolling toward the killer's gate. Both players
 share one keyboard; a Godot action cannot tell two gamepads apart, so these
