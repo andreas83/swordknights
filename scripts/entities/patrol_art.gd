@@ -590,7 +590,9 @@ func _recover(t: float) -> Dictionary:
 
 
 func _stagger(t: float) -> Dictionary:
-	var recover := smoothstep(0.0, Patrol.STAGGER_TIME, t)
+	# Over the whole reel, so a parried guard is still visibly off balance at
+	# the end of his longer opening rather than standing straight half-way in.
+	var recover := smoothstep(0.0, _guard.stagger_length, t)
 	return _pose({
 		"tilt": lerpf(-0.32, -0.08, recover),
 		"lean": -2.6,

@@ -83,11 +83,17 @@ func _check_install() -> void:
 func _check_hitstop_budget() -> void:
 	_true(Flow.MAX_HITSTOP <= 7.0 * Flow.FRAME,
 		"the hitstop ceiling is %.0f frames (<= 7)" % (Flow.MAX_HITSTOP / Flow.FRAME))
-	for frames: int in [Flow.HIT_FRAMES, Flow.STOMP_FRAMES, Flow.HURT_FRAMES]:
+	var stops: Array[int] = [
+		Flow.HIT_FRAMES, Flow.STOMP_FRAMES, Flow.HURT_FRAMES,
+		Flow.PLUNGE_FRAMES, Flow.PARRY_FRAMES,
+	]
+	for frames: int in stops:
 		_true(float(frames) * Flow.FRAME <= Flow.MAX_HITSTOP,
 			"a %d-frame stop fits under the ceiling" % frames)
 	_true(Flow.STOMP_FRAMES >= Flow.HIT_FRAMES,
 		"a stomp weighs at least as much as a sword")
+	_true(Flow.PLUNGE_FRAMES >= Flow.STOMP_FRAMES,
+		"a plunge weighs at least as much as the stomp it contains")
 	_true(Flow.HURT_FRAMES <= Flow.HIT_FRAMES,
 		"taking a hit costs the player less time than landing one")
 

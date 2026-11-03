@@ -36,6 +36,8 @@ const CLOTH_ON_ENTER := {
 	Player.State.CLIMB_UP: -3.0,
 	Player.State.ATTACK: -5.0,
 	Player.State.AIR_SLASH: -4.0,
+	Player.State.PLUNGE: -1.0,
+	Player.State.PARRY: -4.0,
 }
 
 ## Below this impact a landing is inaudible — stepping off a kerb should not
@@ -169,6 +171,10 @@ func _on_state_entered(state: int) -> void:
 		_play("cloth", {"volume_db": float(CLOTH_ON_ENTER[state])})
 	if state == Player.State.CLIMB_UP:
 		_play("climb")
+	if state == Player.State.PARRY:
+		# The blade going up: the sword's own voice, higher and quieter than
+		# a swing, so a parry and a swing are told apart by ear.
+		_play("sword", {"pitch": 1.25, "volume_db": -5.0})
 
 
 func _on_jumped() -> void:
@@ -212,7 +218,7 @@ func _on_died() -> void:
 	_heat = 0.0
 
 
+## Through the front door like every other sound in the game (CLAUDE.md).
+## `_director` is still resolved for the music intensity, which is not a cue.
 func _play(event: String, opts: Dictionary = {}) -> void:
-	if _director == null:
-		return
-	_director.play(event, opts)
+	GameAudio.cue(event, opts)

@@ -64,6 +64,9 @@ repository owner should set up (the `DEBUG_KEYSTORE_B64` secret), is in
 | Up / down   | `↑` `↓` / `W` `S`   | Stick / D-pad | Push the stick up or down  |
 | Jump        | `Space` / `K`       | A             | **JUMP**                   |
 | Sword       | `J` / `E` / `Enter` | X / B         | **SWORD**                  |
+| Air slash   | Sword in the air    | X / B         | **SWORD** in a jump or fall |
+| Plunge      | Down + sword in the air | Down + X / B | Stick down + **SWORD** in the air |
+| Parry       | Up + sword          | Up + X / B    | Stick up + **SWORD**       |
 | Walk (slow) | `Shift`             | L1            | Small stick deflection     |
 | Pause       | `Esc` / `P`         | Start         | **II**                     |
 | Mute        | `M`                 | —             | —                          |
@@ -72,9 +75,17 @@ Ledge grabs happen automatically when you fall past a grabbable corner while
 moving into it; press up (or jump) to mantle, down to let go. Hold down and
 press jump to drop through a one-way platform.
 
-Presses are forgiven at both ends: a jump or a sword press made a moment
-before you land still fires, a jump just after running off an edge still
-counts, and a quick tap of jump is a short hop rather than nothing.
+The sword swings in the air too, without touching the jump's arc. Down and
+sword in the air is the **plunge**: straight down, point first, onto a guard's
+head — it springs you back off him, but a plunge that misses bites the floor
+and holds you there. Up and sword on the ground is the **parry**: it turns a
+guard's cut if it is up when the blade comes down, opens him for a riposte,
+and leaves you open if you raise it too soon. Jump on a ladder to leap off it,
+sideways if you hold a direction. A relic gives back a heart.
+
+Presses are forgiven at both ends: a jump made a moment before you land still
+fires, a jump just after running off an edge still counts, and a quick tap of
+jump is a short hop rather than nothing.
 
 Every torch you reach on foot is a checkpoint: the flame flares, and a death
 sends you back there rather than to the start. Relics you picked up and guards

@@ -110,6 +110,8 @@ weight in the game and the easiest to overspend, so it has a budget:
 | --- | --- | --- |
 | sword connects (ground swing or air slash) | `HIT_FRAMES` = 4 | enough to register, short enough to swing again |
 | stomp | `STOMP_FRAMES` = 5 | heavier: the whole body is behind it |
+| plunge into a guard | `PLUNGE_FRAMES` = 6 | the ceiling: the whole fall is behind it, and the sword |
+| parry | `PARRY_FRAMES` = 5 | the clang is the moment the player reads that it worked; short of the plunge, because the riposte wants the frame back |
 | player takes a hit | `HURT_FRAMES` = 3 | the player needs control back, not a lesson |
 | death | 0 | death has its own beat, below |
 
@@ -132,6 +134,25 @@ While a hitstop holds, `Game` stops stepping the player and the entities,
 `GameCamera` holds its position and does not re-roll the shake, and `PlayerFx`
 holds its particles and the sword trail. All four have to agree or the freeze
 reads as a dropped frame instead of as weight.
+
+### The specials' beats
+
+The two special moves (`docs/character.md`) each get one beat, built from the
+same four parts as every other impact so they cannot disagree with each other:
+held frames, camera, sparks through `PlayerFx.sword_hit()`, and sound through
+`GameAudio.cue()`.
+
+| Moment | Held | Camera | Sparks | Sound |
+| --- | --- | --- | --- | --- |
+| plunge finds a guard | 6 | shake 2.8, settle at full weight | at his helm, full weight | `guard_hit` at 0.8 under `land_hard` at −6 dB |
+| plunge meets stone | 0 | shake 2.2, on top of the hard landing's own | at the point, 0.45 | `sword_hit` at 0.62 under the landing's thump |
+| parry turns a cut | 5 | shake 0.8, settle 0.35 | where the blades meet, 0.7 | `sword_hit` at 1.35: a bright clang, not the dull wound |
+
+The plunge into stone holds no frames on purpose. Hitstop is for something
+that resists you, and the floor was simply there — the same reason a landing
+does not hold any (below). The parry's camera is nearly still on purpose too:
+a parry is the prince standing his ground, and a frame that lurches says the
+opposite.
 
 ### Hitstop and the duel — read this before changing anything
 

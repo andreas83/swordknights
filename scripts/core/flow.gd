@@ -60,6 +60,13 @@ const HIT_FRAMES := 4
 const STOMP_FRAMES := 5
 ## Taking a hit. Short — the player needs control back, not a lesson.
 const HURT_FRAMES := 3
+## A plunge that lands on a guard: the whole fall is behind it, so it takes the
+## ceiling. Still never more than MAX_HITSTOP.
+const PLUNGE_FRAMES := 6
+## Steel turning steel. Longer than a hit, because the clang is the moment the
+## player reads that the parry worked; shorter than a stomp, because the
+## riposte is the point and it wants the frame back.
+const PARRY_FRAMES := 5
 ## The ceiling. Hitstop is taken with max(), never summed, and never exceeds
 ## this, so three things connecting at once cannot stack into a stutter.
 const MAX_HITSTOP := 6.0 * FRAME

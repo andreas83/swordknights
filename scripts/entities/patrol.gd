@@ -63,6 +63,11 @@ const STRIKE_TIME := 0.15
 ## The opening after a cut. Blade down, body bent: the time to answer it.
 const RECOVER_TIME := 0.55
 const STAGGER_TIME := 0.4
+## How long a guard whose cut was parried reels. Longer than RECOVER_TIME on
+## purpose: a cut turned aside at the last moment is a bigger opening than one
+## that met empty air, and the prince is already standing inside reach to take
+## it. That gap is the parry's whole reward, so test_specials.gd pins it.
+const PARRIED_TIME := 0.9
 ## How long the body stays after the killing blow, collapsing and flickering
 ## out, before the node goes. Nothing about it is dangerous or hittable.
 const DEATH_TIME := 1.3
@@ -88,6 +93,9 @@ var facing: int = -1
 var health: int = MAX_HEALTH
 var state: State = State.WALK
 var state_time: float = 0.0
+## How long the current STAGGER lasts: STAGGER_TIME for a wound, PARRIED_TIME
+## for a parried cut.
+var stagger_length: float = STAGGER_TIME
 
 ## The prince's body this frame, or an empty rect when there is nobody to
 ## fight. Game writes it every physics frame; the guard never reaches for the
@@ -149,8 +157,22 @@ func hit(from_x: float) -> bool:
 		defeated.emit()
 		return true
 	_enter(State.STAGGER)
+	stagger_length = STAGGER_TIME
 	staggered.emit()
 	return false
+
+
+## The cut was turned aside. No wound -- a parry is a defence -- but the sabre
+## is thrown wide and the guard reels where he stands for PARRIED_TIME. Only a
+## live cut can be parried; returns whether this one was.
+func parried() -> bool:
+	if state != State.STRIKE:
+		return false
+	velocity.x = 0.0
+	_enter(State.STAGGER)
+	stagger_length = PARRIED_TIME
+	staggered.emit()
+	return true
 
 
 func _physics_process(delta: float) -> void:
@@ -203,7 +225,7 @@ func tick(delta: float, grounded: bool) -> void:
 				_enter(State.WALK)
 		State.STAGGER:
 			velocity.x *= 0.88
-			if state_time >= STAGGER_TIME:
+			if state_time >= stagger_length:
 				_enter(State.WALK)
 		State.DYING:
 			velocity.x *= 0.86

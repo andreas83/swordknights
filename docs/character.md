@@ -73,6 +73,9 @@ does not care:
 | `LADDER` | foreshortened shoulders, hood nearly edge on, hands and feet alternating; JUMP leaves it as a `JUMP` |
 | `ATTACK` | wind up back, lunge through, recover; the blade's arc matches `Player.attack_rect()`'s active window |
 | `AIR_SLASH` | the opposite of `ATTACK` on both counts the eye uses: knees drawn up off the floor instead of planted wide, and the blade coming *down* from overhead past the feet instead of *across* |
+| `PLUNGE` | the only vertical line in the moveset: both hands at the hip, point straight down past the tucked feet, every piece of cloth streaming up |
+| `PLUNGE_LAND` | down on one knee over a blade bitten into the stone, drawn short because the buried part is not there to see, then dragged free |
+| `PARRY` | the high guard: weight on the back foot, both hands over the hood and the blade across above it, where the sentinel's cut comes down; the edge gleams only while the parry can still turn a cut |
 | `HURT` | thrown back and tilted, hood knocked away, whole figure burned white for 0.14 s |
 | `DEAD` | toppled: the robe keeps its shape, the figure does not |
 
@@ -100,10 +103,44 @@ braked would drop a swing thrown half way across a gap into the pit, on a
 phone where SWORD sits next to JUMP. The one thing it costs is a ledge: a
 slashing prince is holding a sword, so the grab probe is off until it ends.
 
+## The two specials
+
+Two moves on top of the swing, each made of the stick and SWORD, because a
+phone has two buttons and the brief was not to add a third. Up and down are
+the only directions a thumb can add to SWORD without changing where the prince
+is going, and each points at where its move happens: the parry goes up to meet
+an overhead cut, the plunge goes down. Both are built against the sentinel's
+three beats — the 27-frame raise, the 9-frame cut and the 33-frame opening —
+and `tests/unit/test_specials.gd` pins each risk and reward against
+`Patrol`'s numbers the way `test_patrol.gd` pins the plain swing.
+
+| | **Plunge** | **Parry** |
+| --- | --- | --- |
+| Touch | stick **down** + **SWORD**, in a jump or a fall | stick **up** + **SWORD**, on the ground |
+| Keyboard / pad | down + sword in the air | up + sword |
+| What it does | gives up the run (`velocity.x` 0), drops at `MAX_FALL_SPEED` with the point `PLUNGE_REACH` (8 px) under the feet; no steering, no ledge | plants the feet and raises the blade for `PARRY_TIME` (24 frames); it turns a cut only in the first `PARRY_ACTIVE` (12) and only from the front |
+| Reward | a heart from where the guard cannot answer: his cut stops at `CUT_HIGH` (18 px), below the top of his own helm, so a body coming down on him is out of it; then it springs back off him (`STOMP_BOUNCE`, as a stomp does) into a jump that can plunge again | no wound to the guard, but his sabre is thrown wide and he reels where he stands for `PARRIED_TIME` (54 frames) — longer than the 33 of a whiffed cut, with the prince already inside reach — and the riposte skips the parry's recovery |
+| Risk | a plunge that meets stone bites it and holds the prince for `PLUNGE_RECOVER` (25 frames), jump or no jump; landed in front of a guard that raises on him, 25 frames plus the sword's lead is longer than the raise, so he eats the cut. Over a pit there is no grab to save it | thrown on sight, it is down again 15 frames before the cut lands and the recovery holds him there: the swing is the answer to a raise caught early, the parry to one caught late (after about frame 23, where a swing no longer lands first) |
+| Feel | `PLUNGE_FRAMES` (6) hitstop, the ceiling; shake 2.8, a full-weight settle, sparks at the helm, a low `guard_hit` under a `land_hard` thump. Into stone: no hitstop, shake 2.2 on top of the landing, sparks at the point, a low `sword_hit` ring | `PARRY_FRAMES` (5) hitstop, sparks where the blades meet, almost no camera (shake 0.8), a bright `sword_hit` clang at pitch 1.35; the raise itself is a high, quiet `sword` |
+
+Neither is grammar. The plunge only ever drops straight down, which no level
+needs and every fall already covers, and the parry does not move the prince;
+`LevelReachability` offers neither. The plunge is also the stomp with a sword
+in it: the stomp still works without one, and it shares its bounce constant.
+
+There is no in-game control hint in the adventure to update — the touch
+buttons are lettered JUMP and SWORD and nothing else is written on screen
+during play — so the combinations are documented in the README's controls
+table, which is where the game tells a player what the buttons do.
+
 ## Adding a state
 
 1. Add the case to `_posture()` and write a `_my_state()` function returning
-   `_pose({...})` with only the fields that matter. Give it a docstring that
+   `_pose({...})` with only the fields that matter. A pose with the sword in
+   play goes in `scripts/player/sword_poses.gd` instead, as a static function
+   returning just those fields, which `_posture()` passes to `_pose()`: every
+   blade drawn there is a promise about a hitbox in `Player`, so those curves
+   and those windows sit together. Give it a docstring that
    says what the pose is supposed to **read** as, not what the numbers are.
 2. If the state needs a quantity no field expresses, add the field to
    `_pose()`'s defaults and consume it in `_rig()` or a `_draw_*` helper. Do

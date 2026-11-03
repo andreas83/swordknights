@@ -173,7 +173,11 @@ func _skip_frame() -> bool:
 
 ## Whether the blade is drawn in front of the robe rather than behind it.
 func _blade_in_front() -> bool:
-	return _player.is_striking()
+	match _player.state:
+		Player.State.PLUNGE_LAND, Player.State.PARRY:
+			return true
+		_:
+			return _player.is_striking()
 
 
 func _show_grip() -> bool:
@@ -549,7 +553,8 @@ func _place(forward: float, y: float, lean: float, weight: float, tilt: float) -
 func _grounded() -> bool:
 	match _player.state:
 		Player.State.IDLE, Player.State.WALK, Player.State.RUN, Player.State.TURN, \
-		Player.State.CROUCH, Player.State.LAND, Player.State.ATTACK:
+		Player.State.CROUCH, Player.State.LAND, Player.State.ATTACK, \
+		Player.State.PLUNGE_LAND, Player.State.PARRY:
 			return true
 		_:
 			return _player.is_grounded()
@@ -619,9 +624,15 @@ func _posture() -> Dictionary:
 		Player.State.LADDER:
 			return _ladder(t)
 		Player.State.ATTACK:
-			return _attack(t)
+			return _pose(SwordPoses.attack(t))
 		Player.State.AIR_SLASH:
-			return _air_slash(t)
+			return _pose(SwordPoses.air_slash(t))
+		Player.State.PLUNGE:
+			return _pose(SwordPoses.plunge())
+		Player.State.PLUNGE_LAND:
+			return _pose(SwordPoses.plunge_land(t))
+		Player.State.PARRY:
+			return _pose(SwordPoses.parry(t))
 		Player.State.HURT:
 			return _hurt(t)
 		Player.State.DEAD:
@@ -838,66 +849,6 @@ func _ladder(t: float) -> Dictionary:
 		"arm_a": -1.35 - c * 0.4, "arm_a_len": 6.4,
 		"arm_b": -1.35 + c * 0.4, "arm_b_len": 6.4,
 		"cloak_sweep": 0.2, "cloak_rise": -1.2, "cloak_flare": 0.75,
-	})
-
-
-## Wind up back, lunge through, recover. The blade angle is the same curve as
-## player.gd's attack_rect window, so what you see is what connects.
-func _attack(t: float) -> Dictionary:
-	var phase := clampf(t / Tuning.ATTACK_TIME, 0.0, 1.0)
-	var drive := smoothstep(0.18, 0.5, phase)
-	var settle := smoothstep(0.72, 1.0, phase)
-	var out := drive - settle
-	return _pose({
-		"squash": lerpf(0.98, 1.0, out),
-		"sink": lerpf(0.8, 2.4, out),
-		"lean": lerpf(-2.2, 4.4, out),
-		"twist": lerpf(0.72, 1.0, out),
-		"stride": lerpf(-1.4, 4.4, out),
-		"stance": lerpf(1.2, 1.9, out),
-		"knee": lerpf(0.4, -0.6, out),
-		"hem_lift": lerpf(0.8, 2.4, out),
-		"hem_fwd": lerpf(1.8, -2.6, out),
-		"hem_spread": lerpf(0.4, 1.0, out),
-		"hood_tilt": lerpf(-0.1, 0.3, out),
-		"arm_a": lerpf(-2.5, 0.55, drive) - settle * 0.8, "arm_a_len": 6.6,
-		"arm_b": 2.1 - out * 0.6,
-		"cloak_sweep": lerpf(-1.6, 3.4, out), "cloak_rise": 1.2, "cloak_flare": 1.5,
-		"blade": lerpf(-2.6, 0.75, drive) - settle * 0.9,
-		"blade_len": 11.0,
-		"blade_hot": 1.0 if phase > 0.22 and phase < 0.82 else 0.0,
-	})
-
-
-## A cleave from overhead down past the feet, legs tucked under it. It has to
-## read as a different swing from ATTACK at 22 px: the ground swing is a lunge
-## along the floor with the feet planted wide, so this one is the opposite on
-## both counts -- knees drawn up off the ground and the blade travelling down
-## rather than across, ending point-low in front. The blade curve is the same
-## shape as Player.attack_rect()'s window, so what you see is what connects.
-func _air_slash(t: float) -> Dictionary:
-	var phase := clampf(t / Tuning.ATTACK_TIME, 0.0, 1.0)
-	var drive := smoothstep(0.15, 0.5, phase)
-	var settle := smoothstep(0.75, 1.0, phase)
-	var out := drive - settle
-	return _pose({
-		"squash": lerpf(1.06, 0.98, out),
-		"lean": lerpf(-0.8, 3.2, out),
-		"twist": lerpf(0.78, 1.0, out),
-		"dangle": lerpf(-1.6, -2.8, out),
-		"stride": lerpf(1.6, 3.0, out),
-		"stance": 0.6,
-		"knee": lerpf(4.4, 3.6, out),
-		"hem_lift": 5.2,
-		"hem_fwd": lerpf(-0.4, -2.6, out),
-		"hood_tilt": lerpf(-0.3, 0.38, out),
-		"arm_a": lerpf(-2.3, 1.2, drive) - settle * 0.7, "arm_a_len": 6.8,
-		"arm_b": lerpf(-0.6, 2.2, out), "arm_b_len": 5.8,
-		"cloak_sweep": lerpf(0.6, 3.0, out), "cloak_rise": lerpf(-1.4, 3.2, out),
-		"cloak_flare": 1.4,
-		"blade": lerpf(-2.5, 1.2, drive) - settle * 0.9,
-		"blade_len": 12.0,
-		"blade_hot": 1.0 if phase > 0.22 and phase < 0.82 else 0.0,
 	})
 
 

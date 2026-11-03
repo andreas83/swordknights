@@ -107,6 +107,33 @@ const ATTACK_HEIGHT := 14.0
 ## grammar.
 const AIR_SLASH_HEIGHT := 21.0
 
+# The two specials. Like the air slash, neither feeds the grammar: the plunge
+# only ever drops straight down, which no level needs and every fall already
+# covers, and the parry does not move the prince at all. LevelReachability
+# offers neither.
+
+## THE PLUNGE: down + SWORD in a jump or a fall. The run is given up, the
+## point goes under the feet and the body drops at MAX_FALL_SPEED. Its point
+## reaches this far below the feet, so it finds a guard's head a frame or two
+## before the boots would.
+const PLUNGE_REACH := 8.0
+## The blade bitten into the floor after a plunge that met stone instead of a
+## guard. Longer than a guard's raise minus the sword's lead
+## (tests/unit/test_specials.gd), so a plunge that misses in front of him
+## cannot be swung out of: that is its price.
+const PLUNGE_RECOVER := 0.42
+## The share of JUMP_SPEED a stomp or a landed plunge springs back with.
+const STOMP_BOUNCE := 0.68
+
+## THE PARRY: up + SWORD on the ground. The blade goes up over the head, where
+## the sentinel's cut comes from. It turns a cut only inside PARRY_ACTIVE, and
+## the rest of PARRY_TIME is a recovery the cut can still land in, so a parry
+## thrown up the moment the raise starts is down again when the blade arrives.
+## The swing is the answer to a raise caught early; the parry is the answer to
+## one caught late.
+const PARRY_TIME := 0.4
+const PARRY_ACTIVE := 0.2
+
 # Landing.
 #
 # Both thresholds sit above flat_jump_land_speed(), which is the whole point:

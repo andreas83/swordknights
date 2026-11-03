@@ -90,6 +90,7 @@ func _ready() -> void:
 	player.hurt.connect(_on_hurt)
 	player.healed.connect(func(_h: int) -> void: _update_hud())
 	player.died.connect(_on_died)
+	player.plunge_landed.connect(_on_plunge_landed)
 
 	camera.setup(player, level.world_size())
 	sky.camera = camera
@@ -280,6 +281,9 @@ func _resolve_guard(guard: Patrol, body: Rect2, attack: Rect2, has_attack: bool)
 	if has_attack and not _struck.has(id) and attack.intersects(guard.bounds()):
 		_struck[id] = true
 		guard.hit(player.global_position.x)
+		if player.is_plunging():
+			_plunge_hit(guard)
+			return
 		GameAudio.cue("guard_hit")
 		# --- feel/flow (additive) ---
 		_impact(guard.global_position, Flow.HIT_FRAMES, 1.9, 0.55)
@@ -296,12 +300,51 @@ func _resolve_guard(guard: Patrol, body: Rect2, attack: Rect2, has_attack: bool)
 		# --- feel/flow (additive) --- heavier than the
 		# sword: the whole body is behind this one.
 		_impact(guard.global_position, Flow.STOMP_FRAMES, 2.6, 0.8)
-		player.velocity.y = -Tuning.JUMP_SPEED * 0.68
+		player.velocity.y = -Tuning.JUMP_SPEED * Tuning.STOMP_BOUNCE
 	elif guard.is_dangerous() and body.intersects(guard.strike_rect()):
-		if player.damage(1, guard.global_position.x):
+		if player.deflect(guard.global_position.x) and guard.parried():
+			_on_parried(guard)
+		elif player.damage(1, guard.global_position.x):
 			# --- feel/flow (additive) --- only when it landed:
 			# damage() returns false during invulnerability.
 			Flow.hitstop(self, Flow.HURT_FRAMES * Flow.FRAME)
+
+
+## A plunge found a guard: the whole fall is behind this one, so it is the
+## heaviest beat in the adventure -- the hitstop ceiling, the hardest shake
+## short of a death, a full-weight settle, sparks at his helm -- and the prince
+## springs back off him. The low wound sound under a stone thump, because the
+## body arrived with the blade.
+func _plunge_hit(guard: Patrol) -> void:
+	GameAudio.cue("guard_hit", {"pitch": 0.8})
+	GameAudio.cue("land_hard", {"volume_db": -6.0})
+	_impact(guard.global_position + Vector2(0.0, -Patrol.BODY.y),
+		Flow.PLUNGE_FRAMES, 2.8, 1.0)
+	player.rebound()
+
+
+## Steel turned steel. A bright clang rather than the dull wound sound, a held
+## frame on the contact, sparks where the blades met, and almost no camera: a
+## parry is the prince standing his ground, and a frame that lurches says the
+## opposite.
+func _on_parried(guard: Patrol) -> void:
+	GameAudio.cue("sword_hit", {"pitch": 1.35})
+	var at := Vector2(
+		(player.global_position.x + guard.global_position.x) * 0.5,
+		guard.global_position.y - Patrol.CUT_HIGH)
+	_impact(at, Flow.PARRY_FRAMES, 0.8, 0.7)
+
+
+## A plunge that met stone. The landing already thumps, dusts and settles at
+## full weight; on top of it the point bites -- a low ring of steel, a shake
+## and sparks at the point. No hitstop: that is for things that resist you,
+## and the floor was simply there (docs/feel.md).
+func _on_plunge_landed() -> void:
+	GameAudio.cue("sword_hit", {"pitch": 0.62, "volume_db": -3.0})
+	camera.shake(2.2, 0.22)
+	var fx := PlayerFx.attach(player)
+	if fx != null and fx.is_inside_tree():
+		fx.sword_hit(player.global_position + Vector2(player.facing * 2.0, 0.0), 0.45)
 
 
 func _complete() -> void:

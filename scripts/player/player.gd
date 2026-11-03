@@ -20,6 +20,8 @@ signal hurt(remaining_health: int)
 ## full health heals nothing and says nothing.
 signal healed(health: int)
 signal died()
+## A plunge met the floor instead of a guard: the point is in the stone.
+signal plunge_landed()
 
 ## New states go on the end, so a state's number never changes under anything
 ## that has stored one.
@@ -28,7 +30,7 @@ enum State {
 	JUMP, FALL, LAND,
 	HANG, CLIMB_UP, LADDER,
 	ATTACK, HURT, DEAD,
-	AIR_SLASH,
+	AIR_SLASH, PLUNGE, PLUNGE_LAND, PARRY,
 }
 
 const TILE := 16.0
@@ -63,6 +65,8 @@ var _ladder_lockout: float = 0.0
 ## state_time, so an air slash in the middle of a jump does not restart the
 ## MIN_JUMP_HOLD clock: see _enter().
 var _rise_time: float = 0.0
+## A parry that turned a cut: the next sword press comes out at once.
+var _riposte := false
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 
@@ -87,6 +91,7 @@ func respawn(at: Vector2) -> void:
 	_jump_buffer = 0.0
 	_attack_buffer = 0.0
 	_ladder_lockout = 0.0
+	_riposte = false
 	_set_crouched(false)
 
 
@@ -106,11 +111,15 @@ func body_rect() -> Rect2:
 
 ## Sword hitbox for this frame, or a zero-size rect when not connecting.
 ##
+## The plunge's is its own shape: see _plunge_rect().
+##
 ## The ground swing and the air slash share the live window and the reach;
 ## they differ only in the band. In the air the blade comes down steeply, so
 ## its band runs from the chest to just past the feet, which is where a guard
 ## is when the prince is jumping at him.
 func attack_rect() -> Rect2:
+	if state == State.PLUNGE:
+		return _plunge_rect()
 	if state != State.ATTACK and state != State.AIR_SLASH:
 		return Rect2()
 	var phase := state_time / Tuning.ATTACK_TIME
@@ -124,9 +133,47 @@ func attack_rect() -> Rect2:
 	return Rect2(x, position.y - _height() + 3.0, w, Tuning.ATTACK_HEIGHT)
 
 
+## The plunge's point, under the feet, live for the whole drop. As wide as the
+## body and a pixel more each side: the point is held in both hands at the
+## middle, and a plunge is aimed by where the body is, not by facing.
+func _plunge_rect() -> Rect2:
+	var half := Tuning.BODY_WIDTH * 0.5 + 1.0
+	return Rect2(position.x - half, position.y - 4.0, half * 2.0, Tuning.PLUNGE_REACH + 4.0)
+
+
 ## The blade is moving and drawn in front of the body: the trail follows it.
 func is_striking() -> bool:
-	return state == State.ATTACK or state == State.AIR_SLASH
+	return state == State.ATTACK or state == State.AIR_SLASH or state == State.PLUNGE
+
+
+func is_plunging() -> bool:
+	return state == State.PLUNGE
+
+
+## The parry is up and still inside the window where it turns a cut.
+func is_parrying() -> bool:
+	return state == State.PARRY and state_time < Tuning.PARRY_ACTIVE
+
+
+## Whether a cut from a blade at `from_x` is turned this frame: the parry is
+## live and the prince is facing the blade. A parry is a sword held up in
+## front; a cut from behind goes round it. True also arms the riposte.
+func deflect(from_x: float) -> bool:
+	if not is_parrying():
+		return false
+	var toward := int(signf(from_x - position.x))
+	if toward != 0 and toward != facing:
+		return false
+	_riposte = true
+	return true
+
+
+## A plunge that found a guard springs back off him, the way a stomp does: it
+## is the stomp with the sword in it. It comes out as a jump the player can
+## steer, so a second plunge is a decision and not a bounce.
+func rebound() -> void:
+	velocity.y = -Tuning.JUMP_SPEED * Tuning.STOMP_BOUNCE
+	_enter(State.JUMP)
 
 
 func _physics_process(delta: float) -> void:
@@ -188,6 +235,16 @@ func _update_free(delta: float) -> void:
 			_steer(delta, want_x, walking, false)
 			if state_time >= Tuning.ATTACK_TIME:
 				_enter(State.JUMP if velocity.y < 0.0 else State.FALL)
+		State.PLUNGE:
+			# Committed: no steering, no ledge, straight down until something
+			# stops it.
+			velocity.x = 0.0
+		State.PLUNGE_LAND:
+			velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * delta)
+			if state_time >= Tuning.PLUNGE_RECOVER:
+				_enter(State.IDLE if grounded else State.FALL)
+		State.PARRY:
+			_update_parry(delta, grounded)
 		State.LAND:
 			_land_timer -= delta
 			velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * delta)
@@ -285,23 +342,48 @@ func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) ->
 			_enter(State.RUN)
 
 
-## The sword button. On the ground it swings; in a jump or a fall it slashes
-## there and then, where it used to wait in the buffer for the landing. False
-## when the sword cannot come out from this state, so the press stays buffered.
+## The sword button, read with the stick. On the ground it swings, or with up
+## held raises the parry; in a jump or a fall it slashes there and then, or
+## with down held plunges. Up and down are the only directions a thumb can add
+## to SWORD without changing where it is going, and each one points at where
+## the move happens: the parry goes up to meet an overhead cut, the plunge
+## goes down. False when the sword cannot come out from this state, so the
+## press stays buffered.
 func _start_sword(delta: float, want_x: int, walking: bool, grounded: bool) -> bool:
 	if grounded:
 		_attack_buffer = 0.0
+		if input.up:
+			_enter(State.PARRY)
+			return true
 		_enter(State.ATTACK)
 		attacked.emit()
 		return true
 	if state != State.JUMP and state != State.FALL:
 		return false
 	_attack_buffer = 0.0
-	_enter(State.AIR_SLASH)
-	# The press frame is an airborne frame like any other: steered, not held.
-	_steer(delta, want_x, walking, false)
+	if input.down:
+		velocity = Vector2(0.0, maxf(velocity.y, Tuning.MAX_FALL_SPEED))
+		_enter(State.PLUNGE)
+	else:
+		_enter(State.AIR_SLASH)
+		# The press frame is an airborne frame like any other: steered, not held.
+		_steer(delta, want_x, walking, false)
 	attacked.emit()
 	return true
+
+
+## Feet planted, blade up. A parry that turned a cut lets the next sword press
+## out at once -- the riposte -- instead of waiting out the recovery; one that
+## turned nothing waits it out, which is what makes throwing it on sight a
+## mistake.
+func _update_parry(delta: float, grounded: bool) -> void:
+	velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * delta)
+	if _riposte and _attack_buffer > 0.0:
+		_attack_buffer = 0.0
+		_enter(State.ATTACK)
+		attacked.emit()
+	elif state_time >= Tuning.PARRY_TIME:
+		_enter(State.IDLE if grounded else State.FALL)
 
 
 ## Horizontal speed toward the stick, or friction toward rest.
@@ -324,11 +406,13 @@ func _steer(delta: float, want_x: int, walking: bool, grounded: bool) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, friction * delta)
 
 
-## Whether a jump may fire from the current state: not out of a swing, a slash
-## or a crouch.
+## Whether a jump may fire from the current state: not out of a swing, a slash,
+## a crouch, or either special -- a special is a commitment, and one a jump
+## could cancel would have no price.
 func _jump_allowed() -> bool:
 	match state:
-		State.ATTACK, State.AIR_SLASH, State.CROUCH:
+		State.ATTACK, State.AIR_SLASH, State.CROUCH, State.PLUNGE, State.PLUNGE_LAND, \
+		State.PARRY:
 			return false
 		_:
 			return true
@@ -346,6 +430,12 @@ func _on_touch_ground(impact: float) -> void:
 		return
 	last_impact = impact
 	landed.emit(impact)
+	if state == State.PLUNGE:
+		# The point meets stone instead of a guard and bites. This replaces
+		# LAND: the landing is always hard, and this is its recovery.
+		_enter(State.PLUNGE_LAND)
+		plunge_landed.emit()
+		return
 	if state == State.AIR_SLASH and impact < Tuning.SOFT_LAND_SPEED:
 		# A slash that lands finishes on the feet: the same swing at the same
 		# phase, now planted. Not re-entered, so the clock carries on and Game
@@ -368,7 +458,8 @@ func _resolve_air_state() -> void:
 	# A swing or a hit is not interrupted by the arc it happens in, and a slash
 	# keeps its hands off ledges: they are holding a sword.
 	match state:
-		State.ATTACK, State.AIR_SLASH, State.HURT:
+		State.ATTACK, State.AIR_SLASH, State.HURT, State.PLUNGE, State.PLUNGE_LAND, \
+		State.PARRY:
 			return
 	if velocity.y > 0.0:
 		if state != State.FALL:
@@ -589,6 +680,8 @@ func _enter(next: State) -> void:
 	# again; anything else entering JUMP is a new rise.
 	if next == State.JUMP and state != State.AIR_SLASH:
 		_rise_time = 0.0
+	if next == State.PARRY:
+		_riposte = false
 	state = next
 	state_time = 0.0
 
