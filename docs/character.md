@@ -159,6 +159,8 @@ Run `tests/tuning_feel_test.gd` and `tests/character_traversal_test.gd` too.
 | `CLIMB_UP_TIME 0.34` | `0.27`, `HANG_HOLD_TIME 0.08` → `0.06` | The mantle was long enough to feel like a cutscene. |
 | `MAX_GRAB_FALL_SPEED 260` | `310` | Above `flat_jump_land_speed()`, so a ledge is still grabbable at the speed a jump actually falls past it. Strictly more forgiving; it can never make geometry unreachable. |
 | `ATTACK_TIME 0.28` | `0.24`, `INVULNERABLE_TIME 1.1` → `0.9` | Both were long enough to notice. |
+| *(none — the cut applied from frame 1)* | `MIN_JUMP_HOLD 0.1` | **For thumbs.** A one-frame tap rose 6 px, and a jump buffered before landing and released before it fired rose 2 px — a jump that did not happen. Releasing jump now cuts the rise only after six frames in the air, so the shortest jump is a ~21 px hop: over a tile, still well short of a held jump. No apex moves, so the grammar cannot. |
+| *(none — a press outside IDLE/WALK/RUN was dropped)* | `ATTACK_BUFFER 0.12` | A sword press in the last frames of a fall, in a turn, in a landing or in the tail of a swing did nothing. It is now kept like a jump press and swings on the first frame it can. |
 
 **Nothing that defines reach moved.** `GRAVITY`, `JUMP_SPEED`, `RUN_SPEED`,
 `WALK_SPEED`, `BODY_WIDTH`, `BODY_HEIGHT` and `GRAB_PROBE_Y` are untouched, so

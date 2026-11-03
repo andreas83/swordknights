@@ -47,6 +47,17 @@ const APEX_THRESHOLD := 52.0
 # Forgiveness windows
 const COYOTE_TIME := 0.1
 const JUMP_BUFFER := 0.14
+## Releasing jump cuts the rise only after this long in the air. A thumb taps
+## for a frame or four, and a jump buffered before landing is usually released
+## before it fires; with the cut live from the first frame those rose 6 px and
+## 2 px. Six frames makes the shortest jump a hop of about 21 px, still well
+## short of a held jump, so the cut keeps its meaning. Changes no apex, so it
+## cannot move the grammar.
+const MIN_JUMP_HOLD := 0.1
+## A sword press is kept this long, like a jump press, so one made in the last
+## frames of a fall, in a turn or in a landing swings as soon as it can instead
+## of being eaten.
+const ATTACK_BUFFER := 0.12
 
 # Ledges
 const GRAB_PROBE_Y := 6.0

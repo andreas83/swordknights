@@ -43,6 +43,7 @@ var input: PlayerInput = LocalInput.new()
 
 var _coyote: float = 0.0
 var _jump_buffer: float = 0.0
+var _attack_buffer: float = 0.0
 var _turn_timer: float = 0.0
 var _land_timer: float = 0.0
 var _hurt_timer: float = 0.0
@@ -73,6 +74,7 @@ func respawn(at: Vector2) -> void:
 	invulnerable = 0.0
 	_coyote = 0.0
 	_jump_buffer = 0.0
+	_attack_buffer = 0.0
 	_set_crouched(false)
 
 
@@ -109,8 +111,11 @@ func _physics_process(delta: float) -> void:
 	invulnerable = maxf(0.0, invulnerable - delta)
 	_jump_buffer = maxf(0.0, _jump_buffer - delta)
 	_drop_through = maxf(0.0, _drop_through - delta)
+	_attack_buffer = maxf(0.0, _attack_buffer - delta)
 	if input.just_pressed_jump:
 		_jump_buffer = Tuning.JUMP_BUFFER
+	if input.just_pressed_attack:
+		_attack_buffer = Tuning.ATTACK_BUFFER
 
 	# One-way platforms are a separate physics layer, so dropping through is
 	# simply ignoring that layer for a moment.
@@ -180,7 +185,10 @@ func _update_free(delta: float) -> void:
 		_enter(State.JUMP)
 		jumped.emit()
 
-	if state == State.JUMP and velocity.y < 0.0 and not input.jump:
+	# Not before MIN_JUMP_HOLD: a tap, or a buffered press already released by
+	# the frame it fires, is a short hop rather than a twitch.
+	var cut_allowed := state_time >= Tuning.MIN_JUMP_HOLD
+	if state == State.JUMP and velocity.y < 0.0 and not input.jump and cut_allowed:
 		velocity.y *= Tuning.JUMP_CUT_MULTIPLIER
 
 	if grounded and input.down and input.just_pressed_jump:
@@ -196,7 +204,10 @@ func _update_free(delta: float) -> void:
 
 
 func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) -> void:
-	if grounded and input.just_pressed_attack:
+	# Buffered, like jump: a press from the end of a fall, a turn, a landing or
+	# the tail of the last swing comes out here, on the first frame it can.
+	if grounded and _attack_buffer > 0.0:
+		_attack_buffer = 0.0
 		_enter(State.ATTACK)
 		attacked.emit()
 		return

@@ -73,12 +73,15 @@ generated one.
 ## Character state machine
 
 `scripts/player/player.gd` keeps every transition in one `match` block. The
-feel comes from four forgiveness mechanisms, all tunable in
+feel comes from five forgiveness mechanisms, all tunable in
 `scripts/core/tuning.gd`:
 
 - **Coyote time** — a jump is accepted for 0.1 s after walking off an edge.
 - **Jump buffering** — a jump pressed up to 0.14 s before landing still fires.
-- **Variable height** — releasing the button mid-rise cuts upward velocity.
+- **Sword buffering** — a sword press is kept for 0.12 s, so one made at the
+  end of a fall, in a turn or in a landing swings as soon as it can.
+- **Variable height** — releasing the button mid-rise cuts upward velocity,
+  but not in the first 0.1 s, so a tap is a hop rather than a twitch.
 - **Apex float** — reduced gravity near the top of the arc, so mid-air
   steering reads clearly.
 

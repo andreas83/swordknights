@@ -41,6 +41,10 @@ Ledge grabs happen automatically when you fall past a grabbable corner while
 moving into it; press up (or jump) to mantle, down to let go. Hold down and
 press jump to drop through a one-way platform.
 
+Presses are forgiven at both ends: a jump or a sword press made a moment
+before you land still fires, a jump just after running off an edge still
+counts, and a quick tap of jump is a short hop rather than nothing.
+
 Every torch you reach on foot is a checkpoint: the flame flares, and a death
 sends you back there rather than to the start. Relics you picked up and guards
 you cut down stay that way; the clock keeps running.
