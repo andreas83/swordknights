@@ -70,7 +70,7 @@ does not care:
 | `LAND` | squashed, knees out, hem splayed, dust |
 | `HANG` | two ink knuckles above a narrow column. Nothing else in the game has that shape |
 | `CLIMB_UP` | a knee driven onto the ledge, then standing up over it, interpolated by the climb's own progress |
-| `LADDER` | foreshortened shoulders, hood nearly edge on, hands and feet alternating |
+| `LADDER` | foreshortened shoulders, hood nearly edge on, hands and feet alternating; JUMP leaves it as a `JUMP` |
 | `ATTACK` | wind up back, lunge through, recover; the blade's arc matches `Player.attack_rect()`'s active window |
 | `HURT` | thrown back and tilted, hood knocked away, whole figure burned white for 0.14 s |
 | `DEAD` | toppled: the robe keeps its shape, the figure does not |
@@ -161,6 +161,14 @@ Run `tests/tuning_feel_test.gd` and `tests/character_traversal_test.gd` too.
 | `ATTACK_TIME 0.28` | `0.24`, `INVULNERABLE_TIME 1.1` → `0.9` | Both were long enough to notice. |
 | *(none — the cut applied from frame 1)* | `MIN_JUMP_HOLD 0.1` | **For thumbs.** A one-frame tap rose 6 px, and a jump buffered before landing and released before it fired rose 2 px — a jump that did not happen. Releasing jump now cuts the rise only after six frames in the air, so the shortest jump is a ~21 px hop: over a tile, still well short of a held jump. No apex moves, so the grammar cannot. |
 | *(none — a press outside IDLE/WALK/RUN was dropped)* | `ATTACK_BUFFER 0.12` | A sword press in the last frames of a fall, in a turn, in a landing or in the tail of a swing did nothing. It is now kept like a jump press and swings on the first frame it can. |
+| `LADDER_SPEED 48` | `88` | **Measured 3.0 tiles/s, now 5.5** (`tests/unit/test_ladder.gd` times it in the real scene). The feel lab's seven-tile ladder took 2.3 s, longer than walking the whole lab; it now takes 1.3 s, a run's pace. |
+| *(a ladder jump that re-grabbed the next frame)* | `LADDER_JUMP_SCALE 0.82`, `LADDER_REGRAB_TIME 0.3` | JUMP on a ladder always left it — for one frame. The stick is still pushed up when the thumb taps JUMP, so the next frame's free movement put the prince back on the rungs. A ladder jump now goes sideways at run speed when a direction is held and straight up off the rungs when none is, and keeps the hands off every ladder for 18 frames. The 0.82 was already the jump's height; it moved here from `player.gd`. |
+| *(a ladder caught in mid-air slid)* | — | Gravity and the air-state pass ran on top of a mid-air grab and turned it back into `FALL`, so a ladder could only be taken from the floor. `LevelReachability` has always routed through the mid-air catch; the player can now do it. |
+
+**None of the ladder numbers is grammar.** `LevelReachability` steps between
+ladder cells whatever the climb speed and offers no ladder jump, so the
+ladder tuning can make a proved level quicker to climb or easier to leave and
+can never make it unprovable. `tuning.gd` says so next to the numbers.
 
 **Nothing that defines reach moved.** `GRAVITY`, `JUMP_SPEED`, `RUN_SPEED`,
 `WALK_SPEED`, `BODY_WIDTH`, `BODY_HEIGHT` and `GRAB_PROBE_Y` are untouched, so

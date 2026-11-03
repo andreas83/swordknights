@@ -67,7 +67,28 @@ const CLIMB_UP_TIME := 0.27
 const MAX_GRAB_FALL_SPEED := 310.0
 
 # Ladders
-const LADDER_SPEED := 48.0
+#
+# None of these feed the traversal grammar, and that is a fact about the
+# proof rather than a hope: LevelReachability moves between ladder cells as
+# discrete steps whatever the speed, and offers no ladder jump at all (its
+# docstring lists that among the moves it deliberately leaves out). So a
+# retune here can make a proved level faster to climb or easier to leave, and
+# can never make it unprovable or prove a level the player cannot finish.
+#
+## Climb speed, up and down. Was 48 -- three tiles a second, so the feel lab's
+## seven-tile ladder took longer than walking the whole lab. Now a run's pace:
+## a ladder is a corridor stood on its end, and a corridor walked at half pace
+## is a wait.
+const LADDER_SPEED := 88.0
+## A jump off the rungs rises this share of a floor jump. Less than a full
+## jump because there is no floor to push from; enough to clear the rung row.
+const LADDER_JUMP_SCALE := 0.82
+## After a ladder jump the hands stay off every ladder this long. The thumb is
+## nearly always still holding the stick up or down when it taps JUMP, and
+## without this the very next frame put the prince back on the rungs. Long
+## enough to leave the column sideways; short enough that a straight-up hop
+## still catches the ladder again on the way down.
+const LADDER_REGRAB_TIME := 0.3
 
 # Combat and damage
 const MAX_HEALTH := 3

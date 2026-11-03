@@ -549,6 +549,8 @@ class Solver extends RefCounted:
 			if feet - _body > floor_limit:
 				return # fell out of the world
 
+			# Catching a ladder mid-arc. Player._update_free() holds a catch
+			# made in the air; tests/unit/test_ladder.gd plays it.
 			if rect_flags(cx, feet) & F_LADDER != 0:
 				_offer_ladder(floori(cx / _tile), floori((feet - 0.001) / _tile), out)
 

@@ -55,6 +55,7 @@ var _climb_from := Vector2.ZERO
 var _climb_to := Vector2.ZERO
 var _climb_progress: float = 0.0
 var _crouched := false
+var _ladder_lockout: float = 0.0
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 
@@ -78,6 +79,7 @@ func respawn(at: Vector2) -> void:
 	_coyote = 0.0
 	_jump_buffer = 0.0
 	_attack_buffer = 0.0
+	_ladder_lockout = 0.0
 	_set_crouched(false)
 
 
@@ -115,6 +117,7 @@ func _physics_process(delta: float) -> void:
 	_jump_buffer = maxf(0.0, _jump_buffer - delta)
 	_drop_through = maxf(0.0, _drop_through - delta)
 	_attack_buffer = maxf(0.0, _attack_buffer - delta)
+	_ladder_lockout = maxf(0.0, _ladder_lockout - delta)
 	if input.just_pressed_jump:
 		_jump_buffer = Tuning.JUMP_BUFFER
 	if input.just_pressed_attack:
@@ -177,6 +180,16 @@ func _update_free(delta: float) -> void:
 		_:
 			_free_movement(delta, want_x, walking, grounded)
 
+	# A ladder caught this frame holds. Without this, gravity and
+	# _resolve_air_state() ran on top of the grab and turned it straight back
+	# into FALL, so a ladder could only be taken from the floor: one caught in
+	# the air let the prince slide down it at 9 px/s and never climb. The
+	# reachability proof has always assumed the mid-air catch
+	# (LevelReachability._trace offers MODE_LADDER on any frame the body
+	# overlaps a ladder), so this makes the player do what the proof claims.
+	if state == State.LADDER:
+		return
+
 	_apply_gravity(delta)
 
 	# Coyote time plus a buffered press means both a late and an early tap work.
@@ -215,7 +228,8 @@ func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) ->
 		attacked.emit()
 		return
 
-	if (input.up or input.down) and level != null and level.rect_is_climbable(body_rect()):
+	var reaching := (input.up or input.down) and _ladder_lockout <= 0.0
+	if reaching and level != null and level.rect_is_climbable(body_rect()):
 		velocity = Vector2.ZERO
 		_enter(State.LADDER)
 		return
@@ -371,16 +385,36 @@ func _update_ladder(delta: float) -> void:
 		_enter(State.FALL)
 		return
 
+	# Before moving, so the frame the thumb taps JUMP is a leap, not a rung.
+	if _jump_buffer > 0.0:
+		_leap_off_ladder()
+		return
+
 	velocity = Vector2(input.axis_x * Tuning.WALK_SPEED * 0.5, input.axis_y * Tuning.LADDER_SPEED)
 	if input.axis_x != 0:
 		facing = input.axis_x
 	_move(delta)
 
-	if _jump_buffer > 0.0:
-		_jump_buffer = 0.0
-		velocity.y = -Tuning.JUMP_SPEED * 0.82
-		_enter(State.JUMP)
-		jumped.emit()
+
+## Leaves the rungs with a jump: sideways at full stride when a direction is
+## held, straight up off the rungs when none is. The sideways leap takes the
+## run's speed rather than the ladder's half-walk shuffle, because a jump that
+## drifts off a ladder at 20 px/s is still on the ladder when it lands.
+##
+## Either way the hands are kept off every ladder for LADDER_REGRAB_TIME. A
+## ladder jump existed before this, and on a phone it did nothing: the stick
+## was still pushed up when JUMP was tapped, and on the very next frame
+## _free_movement() saw a vertical input over a ladder and put the prince back
+## on it. The lockout is what makes the jump a jump.
+func _leap_off_ladder() -> void:
+	_jump_buffer = 0.0
+	_ladder_lockout = Tuning.LADDER_REGRAB_TIME
+	var stride := Tuning.WALK_SPEED if input.walk else Tuning.RUN_SPEED
+	velocity = Vector2(input.axis_x * stride, -Tuning.JUMP_SPEED * Tuning.LADDER_JUMP_SCALE)
+	if input.axis_x != 0:
+		facing = input.axis_x
+	_enter(State.JUMP)
+	jumped.emit()
 
 
 ## --- damage ----------------------------------------------------------------
