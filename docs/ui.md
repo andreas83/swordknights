@@ -350,6 +350,41 @@ looks for anything they can set. Off by default, saved at once to
 boots the game plays unassisted, whatever a developer last chose. Six rows
 made the pitch 15 rather than 16, or the build line landed on the rail's hint.
 
+### Chapter select
+
+The title screen's ADVENTURE opens *The Last Light*'s chapter select
+(`scripts/ui/chapter_select.gd`), headed with the campaign's name.
+
+CONTINUE is the first row and the cursor starts on it: the one thing a
+returning player wants is to carry on, and it costs one press. It goes to the
+first entry that is open, built and not yet cleared, and names it on the
+right. Under it, every entry in order — numeral, title, and on the right what
+the player has done there: the best time once cleared (`1:14.6`), NEW when
+open and unplayed, LOCKED until the one before is cleared, TO COME while it is
+still being built. The finale has no numeral; it is set in under chapter V
+with a lozenge. A row that cannot be played is dimmed but still visited by
+the cursor — what is ahead is part of the reason to go on — and jump on it is
+the back sound and nothing else.
+
+Two caption lines under the list speak for the selected row: the hour it is
+set at and its epigraph, then its bests in full — BEST, RELICS, SECRETS — or
+why it cannot be played (CLEAR THE SUN TERRACE TO OPEN IT, STILL BEING BUILT).
+Each line falls back to a shorter phrasing at narrow widths; the best time,
+which the row already shows, is the first thing to go.
+
+Driven like every other page: up/down, jump to play, sword or pause back to
+the title screen. Rows can be tapped: a tap selects, a tap on the selected row
+plays it. With the thumb buttons up, the list keeps out of JUMP's corner and
+the caption out of SWORD's reach — SWORD sits 110 units in from the right and
+50 up, further in than the JUMP corner the wardrobe's list was measured
+against — so no tap on a row is also a tap on a button. Seven rows at 14
+units leave room for the two captions above the rail at 180 units tall.
+
+The ending card (`scripts/campaign/ending_card.gd`) is DAWN over THE SUN
+REMEMBERS, set in the reserved band like a level card. It holds for a second
+and a half before jump, sword or a tap returns to the chapter select: a card a
+held jump skips is a card nobody saw.
+
 ### Wardrobe
 
 `scripts/ui/wardrobe_screen.gd`, `scenes/wardrobe.tscn`: choose the figure each

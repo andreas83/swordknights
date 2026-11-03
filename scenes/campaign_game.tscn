@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+; The Last Light, from the chapter Campaign.selected names. A single node, like
+; Endless: it instantiates res://scenes/game.tscn at runtime so the campaign
+; and every other mode run the same playable scene. See
+; scripts/campaign/campaign_game.gd.
+
+[ext_resource type="Script" path="res://scripts/campaign/campaign_game.gd" id="1_campaign"]
+
+[node name="CampaignGame" type="Node2D"]
+script = ExtResource("1_campaign")

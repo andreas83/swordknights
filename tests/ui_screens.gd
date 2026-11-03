@@ -20,6 +20,8 @@ const SETTLE_FRAMES := 6
 ## Where the wardrobe shots keep their looks: never the real save, so a shot
 ## does not change what someone plays as, nor depend on it.
 const WARDROBE_STORE := "user://ui_screens_wardrobe.cfg"
+## Where the chapter select shots keep their progress, for the same reason.
+const PROGRESS_STORE := "user://ui_screens_progress.cfg"
 
 var _out_dir := "user://ui"
 var _only := ""
@@ -84,6 +86,9 @@ func _catalogue() -> Array[Dictionary]:
 			"pose": "heroine"},
 		{"name": "wardrobe_two", "scene": "res://scenes/wardrobe.tscn", "pose": "two"},
 		{"name": "wardrobe_touch", "scene": "res://scenes/wardrobe.tscn", "pose": "touch"},
+		{"name": "chapters", "scene": "res://scenes/chapter_select.tscn", "pose": ""},
+		{"name": "chapters_touch", "scene": "res://scenes/chapter_select.tscn",
+			"pose": "touch", "cleared": true},
 	]
 	if _only == "":
 		return all
@@ -109,6 +114,9 @@ func _build(shot: Dictionary) -> void:
 	if _stage is WardrobeScreen:
 		_stock_wardrobe(String(shot["pose"]))
 		(_stage as WardrobeScreen).store_path = WARDROBE_STORE
+	if _stage is ChapterSelect:
+		_stock_progress(bool(shot.get("cleared", false)))
+		(_stage as ChapterSelect).store_path = PROGRESS_STORE
 	root.add_child(_stage)
 
 
@@ -200,6 +208,15 @@ func _stock_wardrobe(pose: String) -> void:
 	two.take_ids({"figure": "heroine", "accent": "pale", "hair": "henna", "skin": "copper"})
 	wardrobe.set_look(Wardrobe.PLAYER_TWO, two)
 	wardrobe.save()
+
+
+## A first launch, or chapter I cleared with something left to find in it.
+func _stock_progress(cleared: bool) -> void:
+	var progress := CampaignProgress.new()
+	progress.path = PROGRESS_STORE
+	if cleared:
+		progress.record_clear(0, 74.6, 5, 6, 2, 3)
+	progress.save()
 
 
 func _capture(name: String) -> void:

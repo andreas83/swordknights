@@ -258,6 +258,7 @@ func test_every_malformed_line_is_a_problem_and_breaks_nothing() -> void:
 ;! mark q gate
 ;! mark q lift
 ;! tiem dusk
+;! time teatime
 ;! channel 3 stay
 ;! channel 3 hold
 ;! channel 6 beat
@@ -280,6 +281,7 @@ func test_every_malformed_line_is_a_problem_and_breaks_nothing() -> void:
 		"'stray' is not key=value",
 		"'q' is declared twice",
 		"there is no directive 'tiem'",
+		"there is no time 'teatime'",
 		"not 'stay'",
 		"a hold needs its seconds",
 		"a beat needs its phase in frames",

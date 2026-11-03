@@ -264,6 +264,9 @@ func _read_directive(line: String, number: int) -> void:
 		"time":
 			if args.size() != 1:
 				problems.append("line %d: a time is one stop or one number" % number)
+			elif not TimeOfDay.is_valid(args[0]):
+				problems.append("line %d: there is no time '%s': a stop (%s) or 0 to 1"
+					% [number, args[0], ", ".join(TimeOfDay.STOPS)])
 
 
 ## `;! channel <name> <mode> [seconds | phase] [period=frames]`.

@@ -309,6 +309,43 @@ stone plate and a portcullis on one mason's mark, in
 `tests/unit/test_mechanisms.gd` (in play) and
 `tests/unit/test_reach_mechanisms.gd` (in the proof). Copy their shape.
 
+### Adding a chapter
+
+The Adventure is *The Last Light*, an ordered list of entries in
+`scripts/campaign/campaign.gd`. A chapter is a level file under `levels/` and
+its line in `Campaign.entries()` — `id`, numeral, title, epigraph, the hour it
+is set at, and the file. The five chapters and the finale are already listed
+from `docs/campaign.md`, with their files empty: an entry with no file is
+shown on the chapter select as still being built and is never played, so the
+campaign works with only chapter I. Building a chapter is filling in its
+`file`.
+
+Three things to keep:
+
+1. **The `id` never changes** once a build with the entry has shipped. It
+   keys the saved progress (`user://progress.cfg`, `CampaignProgress`), so a
+   chapter can be retitled or moved without anyone's record moving with it.
+2. **The level says its own hour.** `;! time golden` in the file is what the
+   grade reads; the entry's `time` is what the chapter select prints, and
+   `tests/unit/test_campaign_catalogue.gd` fails if they differ — and if the
+   level does not parse clean, is not wired, or cannot be finished.
+3. **A finale is an entry.** The Eclipse is the sixth entry, marked `finale`,
+   rather than a phase of Chapter V's level: a checkpoint respawn is per
+   level, and the boss's arena has to be where a death comes back to, with
+   its won phases kept. It carries no numeral (the select draws it under
+   chapter V) and needs no other kind of thing — progress, unlocking and
+   CONTINUE treat it as one more entry. Anything else that ends a chapter can
+   be the same.
+
+`CampaignGame` (`scenes/campaign_game.tscn`) plays the entries through the one
+`scenes/game.tscn`, as Endless does: a clear is recorded when it happens and
+opens the next entry; jump on the complete screen plays the next entry behind
+the wipe (`Game.advance`, with `Game.advance_label` saying CONTINUE), goes back
+to the chapter select when the next is not built, and shows the ending card
+(`Campaign.ENDING`) after the last; sword leaves for the chapter select
+(`Game.quit_scene`). `tests/unit/test_campaign_game.gd` plays a two-chapter
+campaign through all of it.
+
 ## Configuration as code
 
 `project.godot` is written by `tools/configure_project.gd`. Settings and input

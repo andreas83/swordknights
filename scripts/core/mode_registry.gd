@@ -16,8 +16,8 @@ static func modes() -> Array[Dictionary]:
 		{
 			"id": "adventure",
 			"title": "Adventure",
-			"subtitle": "The Sun Terrace",
-			"scene": "res://scenes/game.tscn",
+			"subtitle": "The Last Light",
+			"scene": "res://scenes/chapter_select.tscn",
 			"available": true,
 		},
 		{

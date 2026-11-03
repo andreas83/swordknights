@@ -43,8 +43,14 @@ const BACKSTEP_SETTLE := 0.3
 var level_source: AsciiLevel
 ## What jump does on the complete screen, when a mode has somewhere further to
 ## go. Called at full cover of the wipe, like a restart. Unset, jump replays
-## this level — the Adventure's one hand-authored level has no next one.
+## this level, as the scene on its own does.
 var advance := Callable()
+## The word the complete screen gives `advance`: JUMP TO DESCEND in Endless,
+## JUMP TO CONTINUE between chapters (CampaignGame).
+var advance_label := "DESCEND"
+## Where sword takes the player from the pause and complete screens: the
+## title screen, or the chapter select for a chapter of the campaign.
+var quit_scene := MENU_SCENE
 
 @onready var level: Level = $Level
 @onready var player: Player = $Player
@@ -174,14 +180,14 @@ func _physics_process(delta: float) -> void:
 	match phase:
 		Phase.PAUSED:
 			if Input.is_action_just_pressed("attack") and not Flow.busy():
-				Flow.change_scene(self, MENU_SCENE)
+				Flow.change_scene(self, quit_scene)
 		Phase.COMPLETE:
 			if Flow.busy():
 				pass
 			elif Input.is_action_just_pressed("jump"):
 				Flow.wipe(self, advance if advance.is_valid() else _restart)
 			elif Input.is_action_just_pressed("attack"):
-				Flow.change_scene(self, MENU_SCENE)
+				Flow.change_scene(self, quit_scene)
 		Phase.DYING:
 			# --- feel/flow (additive) --- the beat, then the respawn behind
 			# the wipe. Nothing is added to the wait: the player is already
@@ -239,7 +245,7 @@ func _overlay_subtitle() -> String:
 		Phase.PAUSED:
 			return "PAUSE TO RESUME  ·  SWORD TO QUIT"
 		Phase.COMPLETE:
-			var next := "DESCEND" if advance.is_valid() else "REPLAY"
+			var next := advance_label if advance.is_valid() else "REPLAY"
 			# --- secrets --- counted only where there are any to count, and
 			# then the prompt takes a line of its own: all four will not fit
 			# across a phone held in landscape.

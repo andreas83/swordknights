@@ -93,6 +93,14 @@ Presses are forgiven at both ends: a jump made a moment before you land still
 fires, a jump just after running off an edge still counts, and a quick tap of
 jump is a short hop rather than nothing.
 
+**Adventure** is *The Last Light*, played chapter by chapter from the chapter
+select: CONTINUE carries on from the first chapter you have not cleared, and
+each chapter keeps your best time and the most relics and secrets you have
+found in it. Clearing a chapter opens the next; jump on the complete screen
+plays it. Chapter I, the Sun Terrace, is built; the chapters after it are
+listed and marked as still being built. There is one assist, **longer
+warnings**, under SETTINGS: every foe's tell lasts half as long again.
+
 Every torch you reach on foot is a checkpoint: the flame flares, and a death
 sends you back there rather than to the start. Relics you picked up and guards
 you cut down stay that way; the clock keeps running.
