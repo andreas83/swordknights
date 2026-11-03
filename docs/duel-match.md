@@ -24,6 +24,10 @@ Rings are respawn timers, the track at the top is zone and initiative.*
 | `scripts/duel/zones_view.gd` | streams the zones' drawn layers near the camera, dressed and lit |
 | `scripts/duel/gore.gd` (`GoreField`) | decals, presentation only |
 | `scripts/duel/match_camera.gd`, `match_hud.gd`, `match_gate.gd` | presentation |
+| `scripts/duel/duel_brain.gd` (`DuelBrain`) | the computer opponent: one input byte a frame from a `DuelView` |
+| `scripts/duel/duel_view.gd`, `duel_eyes.gd`, `duel_cpu.gd` | what it may see, how late, and the order that keeps it honest |
+| `scripts/duel/duel_feet.gd` (`DuelFeet`) | where its jumps land: the moat, the pit and the benches |
+| `scripts/duel/match_cpu.gd`, `scenes/duel_match_cpu.tscn` | Duel vs CPU: the match with seat two's byte from the computer |
 | `levels/duel_zones.txt`, `levels/zone_0*.txt` | the strip: a manifest and five zones |
 
 ## One frame
@@ -149,6 +153,170 @@ blood of a predicted kill the host never had, and moves a kill the correction
 moved to the host's frame and place. `docs/netplay.md`, "Corrected outcomes",
 has the rule and the argument for it.
 
+## The computer opponent
+
+**Duel vs CPU** (`scenes/duel_match_cpu.tscn`) is the one-keyboard match with
+seat two's input byte taken from the computer instead of the keyboard
+(`_step()` in `scripts/duel/match_cpu.gd`; the rest of that file is names and
+seeds). It is the only way to duel on one phone. The player is seat one,
+crimson, on the shared actions — the stick, JUMP, SWORD and THROW on a phone,
+the single-player keys or a gamepad on a desktop — and the computer wears the
+wardrobe's second look, in sea-green.
+
+### What it may know
+
+The opponent is a `DuelBrain`, and all it is ever handed is a `DuelView`, one
+per frame. It answers with one byte of `PlayerInput`, the same eight bits a
+keyboard, a replay or the network produce, and the match steps it exactly as
+it steps a person. It holds no match, fighter, seat or input object, so it
+cannot touch a rule and cannot read the player's buttons. That is checked on
+the scripts themselves, not promised (`tests/unit/test_duel_cpu_seat.gd`).
+
+| In the view | As of |
+| --- | --- |
+| its own fighter | the last frame stepped |
+| the other fighter, the swords out of hand, the initiative, the other's respawn timer | `reaction` frames before the frame being decided |
+| the level and the fighter's numbers | always: they never change, and both are on the screen |
+
+**The order of a frame** is `DuelCpu`'s: the computer's bits are chosen from
+frames already stepped, then the frame is stepped with the player's bits —
+read off the input map there, for the first time — then the frame is looked
+at. `DuelEyes` keeps a copy of what each frame showed, so "acts on what it saw
+N frames ago" is literally a picture N frames old; subtracting N frames of
+motion from the live match would be a guess at the past made with the present
+in hand. The seat test changes the player's input on one frame and holds the
+computer to the same bytes for its whole reaction time, and to different ones
+after it. Hand the brain the newest picture instead and the test fails: the
+computer answers one frame later.
+
+**Why its own fighter is not late.** A player knows what their own thumbs are
+doing without waiting to see it, and a jump over the moat timed off a picture
+of yourself a third of a second old is a suicide, not a reaction. Everything
+the other player did reaches it late; nothing they are doing reaches it at all.
+
+### How it plays
+
+Range is most of Nidhogg. A thrust reaches a body at 27 px between the feet
+(`body_width + blade_reach`) and a resting blade at 34. Between the two — the
+edge — a thrust can be parried or read but cannot kill, so the computer fences
+from there:
+
+- **Guard.** It holds the other fighter's height, which parries, as often as
+  its level guards, reconsidered every 8 to 24 frames rather than every frame.
+- **Read.** From the edge it flicks into the other's height one frame in four.
+  Four is inside the five-frame disarm window
+  ([`duel-combat.md`](duel-combat.md#the-disarm-window)), so a thrust from the
+  edge always meets a flick on its way in. Inside the edge it stops flicking:
+  a mismatched stance there is a dead one.
+- **Attack.** It picks an open line — a height the other is not holding, and
+  of those the one they hold least, from a running count of their stances —
+  shows it for `tell` frames, steps in and thrusts. If they moved into it
+  during the tell, a `feint` takes the other open line on the thrust frame;
+  without one the thrust goes where it was shown, and is parried. A thrust
+  that missed, a snatch at nothing, a disarmed or downed fighter is punished
+  at once, with no tell. The longer two fighters stand at the edge the likelier
+  an attack, so two careful fighters do not stand there forever.
+- **Throw.** At a back running away, low by preference, because a low throw
+  cannot be caught and has to be jumped; at range now and then. A throw coming
+  at it is ducked if high, rolled under if middle and jumped if low, and the
+  dodge is held until the blade is out the other side of the body. Empty-handed
+  it snatches a high or middle throw instead, then fetches the nearest sword it
+  can reach — never one in the water — and sweeps and stamps if there is none.
+- **With the initiative** it runs for its gate and does not fight. A respawn
+  in its way is vaulted: jumped if its blade is low, and otherwise rolled under
+  seven times in ten and jumped the rest, so the vault is not a certainty to
+  wait for. A jump comes down inside the other's reach, so once past, with them
+  following, it rolls, which is faster than they can run. Near the end of the
+  strip it stops short of the spot in front of the gate where the other is
+  about to reappear: the rule (`DuelMatch.respawn_plan`) and the ring counting
+  it down are both on the screen.
+- **Without it**, it waits on the open ground a respawn puts it on, blade up,
+  and meets the runner where it stands rather than running at them (two
+  fighters closing at once close faster than either can see); thrusts low at a
+  roller; chases, and throws at, one who got past; and goes and gets one who
+  stops coming rather than waiting for a runner who will not run.
+
+**The ground.** Every step goes through `DuelFeet`, which integrates the
+fighter's own motion — the acceleration, gravity, jump cut and terminal speed
+from `DuelTuning`, in the order `Fighter.simulate()` applies them — against the
+tiles the referee kills on, and says where a jump lands. It tries a full jump
+and two hops and takes the best on the first frame one lands well onto its
+footing; at the lip it takes any safe one; with none it stops. A jump, roll,
+thrust or throw the brain asks for is refused if it would come down in a
+hazard. The prediction is the grid's and the fighter's motion is the physics
+engine's, and the two part at corners: a one-way platform's corner does not
+reliably catch a body falling past it, so a landing counts only with three
+pixels of the body over footing (`DuelFeet.FOOTHOLD`). The easy opponent once
+drowned off a landing with six hundredths of a pixel of the moat's far lip
+under it, so `tests/unit/test_duel_cpu_feet.gd` sweeps every lip in twentieths
+of a pixel against an oracle that shares no code with the rule.
+
+### The levels
+
+`DuelBrain.PROFILES`, one dictionary per level. Every knob is one a player can
+feel; none of them is how much it is allowed to know.
+
+| | EASY | MEDIUM | HARD |
+| --- | --- | --- | --- |
+| reaction: frames late it sees the other | 20 | 13 | 8 |
+| anticipate: how far it leads a moving fighter | 0.4 | 0.5 | 1.0 |
+| tell: frames it shows a thrust's height first | 22 | 10 | 4 |
+| feint: chance to switch line on the thrust | 0 | 0.15 | 0.4 |
+| guard: chance to hold the other's height | 0.3 | 0.65 | 0.9 |
+| flick: chance to fish for a disarm at the edge | 0 | 0.25 | 0.5 |
+| blunder: chance a thrust, vault or dodge goes wrong | 0.35 | 0.12 | 0.04 |
+| aggression: attacks a second at the edge | 0.45 | 1.0 | 1.8 |
+| throw: chance a second at a back running away | 0.2 | 0.5 | 0.9 |
+| slop: frames late it jumps a hazard, never past the lip | 2 | 1 | 0 |
+
+EASY is built to be beaten by someone who has just picked the game up: it sees
+a third of a second late, shows every thrust's height for a third of a second
+before it comes, guards one time in three and gets one thing in three wrong.
+HARD sees in eight frames, which is quicker than a person, and is kept a fight
+rather than a wall by its blunders and by the fact that it, too, cannot see a
+thrust coming inside the disarm window: it guesses, as a person does.
+
+### Seeds
+
+All its chance comes from one `RandomNumberGenerator`, seeded in `reset()` and
+drawn only inside `decide()`. The same seed and the same player inputs are the
+same match, every checksum equal; a different seed is a different match
+(`tests/unit/test_duel_cpu_bouts.gd`). The scene prints the level and the seed
+when a match starts, takes `--seed=N` and `--cpu=easy|medium|hard` in the user
+arguments, and takes the next seed for a rematch. The player's inputs are not
+recorded, so a printed seed alone does not yet replay a match someone played;
+see the open items.
+
+### Measured
+
+Headless, on the real fighter, at most three minutes a match:
+
+| Against | Result |
+| --- | --- |
+| the closing bot of `tests/match_net_test.gd`, made to run for its gate when it leads; 20 seeds a level | EASY won 7, MEDIUM 17, HARD 20 |
+| the same in the suite, 10 seeds a level | EASY 5, MEDIUM 8, HARD 10 |
+| itself, 10 seeds a pairing | every match finished: EASY–EASY in 1,004 frames on average, MEDIUM–MEDIUM in 2,398 (longest 6,207), HARD–HARD in 3,197 (longest 8,917); HARD beat EASY 10 times in 10 and MEDIUM 8 |
+| a scripted human (the determinism suites' input stream), 12 seeds a level | the computer won every match; the hands killed EASY 6 times, MEDIUM 6, HARD 2 |
+| the ground, across all of the above | no deaths |
+
+The suite holds HARD to eight wins in ten against the bot, EASY to losing some
+and winning some, MEDIUM between them, every computer-against-computer match to
+an end, and hazard deaths to one in twenty; each of those was seen to fail with
+the behaviour behind it broken.
+
+### Open
+
+- **The numbers are measured against scripts, not people.** Whether EASY is
+  beatable by a newcomer on a phone, and whether HARD is a fight rather than a
+  wall, wants playing on a phone, as the disarm window did. The knobs are in
+  one table for that.
+- **The level is not saved.** The menu remembers it for the session
+  (`ModeRegistry.choose`) and opens every launch on EASY.
+- **A real match cannot be replayed from its seed alone** until the player's
+  inputs are recorded with it.
+- **Moves it does not use:** the dive kick, the thrust in the air, and turning
+  a throw aside with a thrust.
+
 ## Tests
 
 - `tests/match_initiative_test.gd` — leader state, the ratchet, the window.
@@ -161,6 +329,16 @@ has the rule and the argument for it.
   world, and none of it reaches the simulation.
 - `tests/match_fighter_test.gd` — the match on the real fighter, including the
   gate moat: walking in kills, a running jump crosses.
+- `tests/unit/test_duel_cpu_seat.gd` — the computer holds nothing it could
+  peek through, presses only bytes a person could, and answers the player's
+  input no sooner than its reaction time.
+- `tests/unit/test_duel_cpu_bouts.gd` — replay from a seed, the win rates by
+  level, computer against computer always finishing, and a leader who will not
+  run being fetched.
+- `tests/unit/test_duel_cpu_feet.gd` — every hazard crossed by the real fighter
+  from a run and from a standstill, and the landing rule against an oracle.
+- `tests/unit/test_duel_cpu_mode.gd` — the menu's row and levels, and the scene
+  stepping both seats.
 - `tests/match_gore_test.gd` — gore never reaches state or checksum, and the
   list is bounded.
 
@@ -176,7 +354,8 @@ byte for byte. Each of those checks was seen to fail with its fix removed.
 The match's own suites still run on the placeholder in `match_stub_fighter.gd`,
 on purpose: they test the rope, and do not need a physics space.
 
-Both menu entries run the match, and **the round duel is retired**: its
+All three menu entries run the match — Duel, Duel vs CPU and Duel Online —
+and **the round duel is retired**: its
 simulation, scenes, camera, HUD and art are gone, and so is the duel-only code
 it needed in `scripts/player/player.gd` (guard, stagger, first-blood and its own
 slide loop — the prince is the adventure's again). What its tests proved about

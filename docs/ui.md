@@ -212,8 +212,26 @@ standing behind. The balustrade is the only piece of foreground occlusion on
 any screen and it is what makes the menu a place rather than a background.
 
 Only the selected mode shows its subtitle, in a fixed slot below the list, so
-moving the selection does not reflow anything. Seven rows each with a caption
+moving the selection does not reflow anything. Eight rows each with a caption
 is a wall of small type.
+
+**A row with choices.** A mode may list `choices` in `ModeRegistry`; DUEL VS
+CPU lists EASY, MEDIUM and HARD. With that row selected the caption slot shows
+all of them, the chosen one in the light colour and the others dim, with a
+caret on each side of it that there is somewhere to step to — EASY points only
+right, HARD only left — and left and right step it, stopping at the ends. The
+same left/right sets a value on every other page, and the stick already does
+it, so the choice needs no page of its own. The words are centred as a whole
+on the list, so stepping moves the light and nothing else; at 320 units with
+the thumbs up they end five units short of the SWORD button. The hint on the
+rail says `LEFT / RIGHT: HOW HARD · JUMP TO BEGIN` while the row is selected.
+What was chosen is kept by `ModeRegistry.choose()` for the session, for the
+scene to read and for the menu to show again on the way back.
+
+**The row pitch** is twelve units at most. With more rows than twelve leaves
+room for between the title and a caption clear of the rail, the pitch closes
+up (`MenuScene._row_pitch`): eight rows sit at eleven. Seven still sit at
+twelve, so adding a row never moves a screen that had room for it.
 
 The hint line is cut into the rail (`UiLayout.rail(view)`, shared with the
 settings page). When the on-screen stick is up, a sword button covers the right
@@ -276,6 +294,20 @@ in paper, not in the seat's colour — crimson type on a crimson sky is
 illegible, and the arrow already carries the colour. Under it, for an online
 match, the network line, then the persistent hint; a hint wider than the safe
 area breaks at its `  ·  ` separators rather than running off a 4:3 screen.
+
+**Who is who, against the computer.** In Duel vs CPU each end of the rope
+carries a tag on the side of that seat's gate: `YOU` beside the west gate, and
+`CPU` with its level under it beside the east, each with a lozenge in the
+seat's colour on a rim of light (a crimson mark on a crimson sky is otherwise
+no mark). The tags hug the rope, outside the arrow's tip, rather than the
+screen's corners, because the top right corner is the pause and mute buttons'
+on a phone; the second line is how the longest level, MEDIUM, still fits
+inside them at 320 units. With tags up the line under the rope says only who
+leads — `YOU LEAD`, `CPU LEADS` — since the arrow now points at the leader's
+own tag, and a longer line runs into the tags' second lines. The band and the
+result speak to the player: `YOU ARE DOWN`, `YOU HAVE THE INITIATIVE`,
+`YOU WIN`; the computer is `CPU`. The one-keyboard duel sets no tags and reads
+as before.
 
 Everything an event throws up — a death, the initiative changing hands, the
 gate — goes in the band, at the display cut if it fits and the text cut if it
@@ -386,6 +418,12 @@ are the same width at five pixels and nobody reads a label on a button they
 are hitting with a thumb. It is the only touch-reachable way to silence the
 game short of the settings screen.
 
+The duel's THROW button (`scripts/duel/duel_touch.gd`, in Duel Online and Duel
+vs CPU) lays itself out against the same `UiLayout.safe()`, up and to the left
+of JUMP. It used to convert the safe area by hand, which put it off the right
+edge whenever the reported area was wider than the window — the bug the stick
+and the other buttons had before UiLayout.
+
 ---
 
 ## Looking at it
@@ -397,7 +435,9 @@ different typeface.
 ```sh
 # One frame per interface state, including the ones you cannot reach by
 # playing: pause, settings, a finished match, the wardrobe as the heroine
-# and as player two (wardrobe_heroine, wardrobe_two, wardrobe_touch).
+# and as player two (wardrobe_heroine, wardrobe_two, wardrobe_touch), and
+# DUEL VS CPU chosen at HARD and played with the thumbs up (menu_cpu,
+# match_cpu).
 xvfb-run -a godot --path . --rendering-driver opengl3 \
   --script tests/ui_screens.gd -- --out /tmp/ui/after --window 1280x720
 
@@ -407,9 +447,11 @@ xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1280x720 \
   --script tools/screenshot.gd -- --scene res://scenes/wardrobe.tscn \
   --out /tmp/wardrobe --shots 0.8,2.4
 
-# The same at a wide-phone aspect: a 440x180 canvas.
-xvfb-run -a godot --path . --rendering-driver opengl3 \
-  --script tests/ui_screens.gd -- --out /tmp/ui/wide --window 1760x720
+# The same at a wide-phone aspect: a 440x180 canvas. A window wider than
+# xvfb's default 1280-pixel screen reports that screen as its safe area and
+# everything centred slides left, so give it a wider screen.
+xvfb-run -a -s "-screen 0 1920x1080x24" godot --path . --rendering-driver \
+  opengl3 --script tests/ui_screens.gd -- --out /tmp/ui/wide --window 1760x720
 
 # Back down to 1:1, or a magnified crop in canvas units.
 python3 tools/crop_1to1.py /tmp/ui/after/menu.png /tmp/menu.png

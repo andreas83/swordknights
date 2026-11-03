@@ -3,7 +3,7 @@
 A mobile-first platform adventure in the spirit of *Prince of Persia*:
 deliberate, weighty movement, ledge grabs, and a sun-bleached duotone city —
 plus a two-player sword duel in the spirit of *Nidhogg*, playable on one
-keyboard or over the network.
+keyboard, over the network, or against the computer.
 
 Built with **Godot 4.5.1**. There are no hand-drawn assets — terrain, skyline,
 characters and effects are all generated or drawn from one small palette.
@@ -132,6 +132,16 @@ holding down over it. It can also snatch a thrown sword out of the air: press
 throw just as the blade arrives, and it is yours. Snatch too early and you stand
 there with open hands; a low throw cannot be caught at all
 ([`docs/duel-combat.md`](docs/duel-combat.md#the-catch)).
+
+**Duel vs CPU** is the duel on one phone: you in the crimson seat, the computer
+in the sea-green one. Left and right on its row in the menu choose **EASY**,
+**MEDIUM** or **HARD**. The computer plays through the same eight buttons you
+do, sees the fight a reaction time late (20 frames on EASY, 8 on HARD, at 60
+a second) and never sees your buttons at all; EASY telegraphs its thrusts and
+blunders, HARD guards, reads for the disarm and feints. The stick, JUMP, SWORD
+and THROW are as in Duel Online; on a desktop it is the single-player keys.
+How it plays and why is in
+[`docs/duel-match.md`](docs/duel-match.md#the-computer-opponent).
 
 Two players do not fit on one phone, so on phones each plays on their own:
 **Duel Online** → *Host on this Wi-Fi* on one phone shows a short code, and the
@@ -285,9 +295,11 @@ test and release pipeline; procedural level generation with a reachability proof
 audio — synthesised sound effects, an Andalusian music loop with an intensity
 parameter, and persisted volume and mute settings; a two-player duel on the
 *Nidhogg* model — one hit kills, three sword stances that clash or kill,
-disarm, sword throw, and a tug-of-war over a chain of zones — both on one
-keyboard and over the network, with host-authoritative prediction,
-reconciliation and a desync test. The round-based duel it replaced is retired.
+disarm, sword throw, and a tug-of-war over a chain of zones — on one
+keyboard, over the network, with host-authoritative prediction,
+reconciliation and a desync test, and against a computer opponent at three
+levels that plays through the input seam and sees the fight a reaction time
+late. The round-based duel it replaced is retired.
 
 In progress: the duel's open items, listed under *Status* in
 [`docs/duel-match.md`](docs/duel-match.md). The specification and the
