@@ -38,10 +38,18 @@ runs:
         set -euo pipefail
         full="${{ inputs.version }}-${{ inputs.release-suffix }}"
         echo "full-version=${full}" >> "$GITHUB_OUTPUT"
+        # Godot names its template directory, and writes version.txt inside
+        # it, with a DOT before the release suffix -- 4.5.1.stable -- while
+        # the release tag and every file name use a dash: 4.5.1-stable.
+        # Installing under the dashed name put the templates where Godot never
+        # looks, and the version check below compared the two spellings and
+        # could not pass; every export job failed at that check.
+        template="${{ inputs.version }}.${{ inputs.release-suffix }}"
+        echo "template-version=${template}" >> "$GITHUB_OUTPUT"
         echo "install-dir=${HOME}/godot/${full}" >> "$GITHUB_OUTPUT"
         echo "godot-bin=${HOME}/godot/${full}/godot" >> "$GITHUB_OUTPUT"
         # Godot looks for templates under this exact, version-stamped path.
-        echo "templates-dir=${HOME}/.local/share/godot/export_templates/${full}" >> "$GITHUB_OUTPUT"
+        echo "templates-dir=${HOME}/.local/share/godot/export_templates/${template}" >> "$GITHUB_OUTPUT"
         echo "base-url=https://github.com/godotengine/godot/releases/download/${full}" >> "$GITHUB_OUTPUT"
 
     - name: Restore cached editor
@@ -57,7 +65,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: ${{ steps.paths.outputs.templates-dir }}
-        key: godot-templates-${{ steps.paths.outputs.full-version }}
+        key: godot-templates-v2-${{ steps.paths.outputs.template-version }}
 
     - name: Fetch release checksums
       # Needed whenever we are about to download something. The release's own
@@ -147,7 +155,7 @@ runs:
         fi
         installed="$(cat "${version_file}")"
         echo "Installed templates: ${installed}"
-        if [[ "${installed}" != "${{ steps.paths.outputs.full-version }}" ]]; then
-          echo "::error::Template version ${installed} does not match editor ${{ steps.paths.outputs.full-version }}"
+        if [[ "${installed}" != "${{ steps.paths.outputs.template-version }}" ]]; then
+          echo "::error::Template version ${installed} does not match editor ${{ steps.paths.outputs.template-version }}"
           exit 1
         fi
