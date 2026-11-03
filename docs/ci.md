@@ -8,8 +8,10 @@ the official GitHub release and verified against that release's own
 - [Run every check locally](#run-every-check-locally)
 - [Writing tests](#writing-tests)
 - [The workflows](#the-workflows)
+- [The dev channel: one-tap updates on the phone](#the-dev-channel-one-tap-updates-on-the-phone)
 - [What the repository owner must enable](#what-the-repository-owner-must-enable)
 - [Secrets](#secrets)
+- [The debug key](#the-debug-key)
 - [The COOP/COEP decision](#the-coopcoep-decision)
 - [Decisions worth knowing about](#decisions-worth-knowing-about)
 - [Bumping the pinned versions](#bumping-the-pinned-versions)
@@ -170,21 +172,45 @@ Two files, twelve tests, which exist to prove the harness works end to end:
 
 ## The workflows
 
-### `android.yml` — a debug APK on every push to `main`
+### `android.yml` — the development build, on every push to `main`
 
-For trying the game on a phone. Exports the Android preset as a **debug**
-build on every push to `main` (documentation-only pushes aside) and on demand
-from the Actions tab, signs it with the standard Android debug identity
-generated inside the run, verifies the signature with `apksigner`, and uploads
-it as the run's artifact `swordknights-debug-apk`, kept fourteen days. It needs
-no secrets. To install: open the run, download the artifact, unzip, open the
-`.apk` on the phone and allow installing from that app. A debug build cannot be
-installed over a release build of the same package, or the reverse.
+For trying the game on a phone. On every push to `main` (documentation-only
+pushes aside), and on demand from the Actions tab, two jobs:
 
-Artifacts need a GitHub login and expire, so this is the build for
-contributors. The public download is the same debug build, made again by
-[`pages.yml`](#pagesyml--the-public-site-on-push-to-main-and-on-demand) and
-published on the site.
+| Job | Permissions | Does |
+| --- | --- | --- |
+| `apk` | `contents: read` | stamps the build (below), exports the Android preset as a **debug** build, signs it with [the debug key](#the-debug-key), checks the signature with `apksigner` and that every level is in the APK, and uploads the run's artifact `swordknights-debug-apk`, kept fourteen days |
+| `publish` | `contents: write` | `main` only: replaces the APK and `version.json` on the rolling **`dev` pre-release**, moves the `dev` tag to the commit, writes the release notes from the commit. See [the dev channel](#the-dev-channel-one-tap-updates-on-the-phone) |
+
+**The build is stamped before it is exported.** `stamp_version.sh --dev`
+writes `version/code` = the workflow's **run number** and
+`version/name` = `0.1.0-dev+<short sha>` into `export_presets.cfg`, and the
+same values, the channel `dev` and the feed URL into
+`scripts/core/build_stamp.gd`. Android only installs an APK over the copy on
+the phone when its version code is higher; the run number rises by one on
+every run of this workflow and is never reused. It is per workflow, so if the
+dev build ever moves to another workflow its numbering restarts at 1; add the
+old workflow's last run number to `GITHUB_RUN_NUMBER` in the stamp step then,
+or phones will not take the new builds. The stamp is never committed.
+
+**`publish` refuses to go backwards.** It reads the `code` in the published
+`version.json` first, and a run whose build number is lower — a re-run of an
+old run — leaves the release alone and says so.
+
+**Concurrency.** On `main` a run is never cancelled by the next push, because a
+cancel halfway through `publish` would leave the release without its APK.
+GitHub keeps at most one run waiting per group and drops older waiting ones, so
+a burst of pushes builds the first and the last. Runs on other branches still
+cancel each other. `publish` also has its own group, `dev-release`.
+
+**Why this workflow owns the APK, and `pages.yml` no longer builds one.**
+Before, the same debug APK was exported twice per push — once here as an
+artifact, once in `pages.yml` to copy onto the site. A release asset downloads
+without a login and has a URL that never changes, so the site now links to the
+`dev` asset and the second export is gone. It also means an APK fetched from
+the site is the stamped build that will later offer the next one; a copy built
+by `pages.yml` would not have been stamped. The artifact is still uploaded,
+for anyone who wants the APK of one particular run.
 
 Three things every export job needed, found when this one was first run — the
 web deploy had been failing on every push since the pipeline was written:
@@ -200,8 +226,8 @@ web deploy had been failing on every push since the pipeline was written:
   changes nothing on screen.
 - **SDK and JDK paths.** These live in Godot's editor settings, not the
   project, and on a fresh runner Godot guesses `~/Android/Sdk`. Both Android
-  workflows write `ANDROID_HOME` and `JAVA_HOME` into the editor settings after
-  the import step.
+  workflows (`android.yml`, `release.yml`) write `ANDROID_HOME` and
+  `JAVA_HOME` into the editor settings after the import step.
 
 And a fourth, found when the web build was first played rather than only
 exported:
@@ -211,8 +237,8 @@ exported:
   resources. Every export so far — web, Android, release — booted to the menu
   and then opened an empty world in Adventure, Feel Lab and both duels; only
   Endless, which generates its levels, worked. Every preset now carries
-  `include_filter="levels/*.txt"`, and `pages.yml` fails if any level is
-  missing from the web pack or the APK.
+  `include_filter="levels/*.txt"`; `pages.yml` fails if any level is missing
+  from the web pack, and `android.yml` if any is missing from the APK.
 
 ### `ci.yml` — on push to `main` and on every pull request
 
@@ -222,8 +248,7 @@ Two jobs, run in parallel.
 `.github/requirements-ci.txt`.
 
 1. `gdlint .` — blocking.
-2. `gdformat --check tests` — blocking.
-3. `gdformat --check scripts tools` — advisory, see
+2. `gdformat --check scripts tools tests` — advisory, see
    [below](#gdformat-is-advisory-everywhere).
 
 **`check`** — Godot 4.5.1, no export templates (they are a 1.3 GB download and
@@ -253,19 +278,21 @@ Why three separate validation steps rather than one:
 ### `pages.yml` — the public site, on push to `main` and on demand
 
 Builds and publishes the project's public page: what the game is, screenshots,
-the web build to play under `play/`, and a debug APK under
-`download/swordknights.apk`. Four jobs:
+and the web build to play under `play/`. Its **Download the APK** button links
+to the `dev` pre-release's asset
+(`https://github.com/<owner>/<repo>/releases/download/dev/swordknights-dev.apk`),
+which [`android.yml`](#androidyml--the-development-build-on-every-push-to-main)
+publishes; this workflow builds no APK of its own. Three jobs:
 
 | Job | Needs Pages? | Does |
 | --- | --- | --- |
 | `web` | no | exports the Web preset; checks the four files exist, that no `*.worker.js` was emitted, and that every `levels/*.txt` is in `index.pck` |
-| `apk` | no | the same steps as `android.yml` — JDK, SDK check, editor-settings paths, a generated debug keystore — then `apksigner verify` and the same level check on the APK |
-| `site` | no | `site/assemble.sh`: copies `site/public/`, puts the export under `play/` and the APK under `download/`, writes the APK's size and SHA-256, the engine's size and the commit into the page, and uploads the result with `actions/upload-pages-artifact` |
+| `site` | no | `site/assemble.sh`: copies `site/public/`, puts the export under `play/`, writes the engine's size, the commit and the `dev` APK's URL into the page, and uploads the result with `actions/upload-pages-artifact` |
 | `deploy` | **yes** | `main` only: checks that Pages is enabled with Source "GitHub Actions" and says so plainly if not, then `actions/deploy-pages` |
 
 The split is deliberate. Until the repository owner enables Pages (see
 [below](#what-the-repository-owner-must-enable)), only `deploy` fails, with an
-error naming the setting; the three build jobs still run and stay green, so a
+error naming the setting; the two build jobs still run and stay green, so a
 broken export is never hidden behind a missing setting, and the finished site
 is downloadable from the run as the `github-pages` artifact. Before this, every
 run died at `actions/configure-pages` with "Get Pages site failed ... Not
@@ -283,22 +310,26 @@ engine never imports them and they stay out of the game's pack:
 | | |
 | --- | --- |
 | `site/public/` | the page — `index.html`, `style.css`, `site.js`, `img/` — copied as is, apart from the `{{PLACEHOLDERS}}` |
-| `site/assemble.sh` | the one place the page, the export and the APK meet; runs locally too |
+| `site/assemble.sh` | the one place the page and the export meet, and where the APK link is written; runs locally too |
 | `site/render_images.sh` | re-renders every image on the page from the game, with `tools/screenshot.gd` |
 | `site/wordmark.py` | sets the title in the game's own bitmap typeface, as an SVG |
 
 The screenshots are committed, not rendered in CI: each one should be looked at
 before it goes on the page. Re-run `site/render_images.sh` after a visual
 change and review the images in the diff. The exports and the APK are never
-committed; they exist only in the workflow's artifacts and on the site.
+committed; they exist only in the workflows' artifacts, on the site and on the
+`dev` release.
 
-To preview the site locally, with any file standing in for the APK:
+To preview the site locally:
 
 ```bash
 godot --headless --path . --export-release "Web" build/web/index.html
-site/assemble.sh --web build/web --apk path/to/any.apk --out build/site
+site/assemble.sh --web build/web --out build/site
 python3 -m http.server -d build/site 8000
 ```
+
+`REPOSITORY=owner/repo` points the APK button at a fork's `dev` release;
+`pages.yml` sets it from `github.repository`.
 
 **How the game is embedded.** The site does not mount the engine into its own
 page. `play/` is the export exactly as Godot writes it, and the landing page
@@ -314,12 +345,10 @@ job's worker-file check stops that before it ships. Nothing loads the engine
 until the visitor asks: the page itself is about 100 KB, the engine about
 39 MB.
 
-**The APK** on the site is debug-signed with a key generated in each run, so
-every build has a different signature: Android will not install one over the
-previous one, nor over a release build. The page says so and tells people to
-uninstall first. A stable debug key, kept as a repository secret, would make
-updates install in place; that is a choice for the owner, not something the
-workflow should invent.
+**The APK** the site links to is the `dev` pre-release's, signed with
+[the debug key](#the-debug-key), which stays the same from build to build, so
+each new build installs over the last. The page tells people what to do when
+Android refuses an install as signed differently: uninstall once.
 
 `concurrency` is set to one run per branch and deliberately **not**
 `cancel-in-progress`: cancelling a Pages deployment midway can leave the site
@@ -328,11 +357,16 @@ half-published.
 ### `release.yml` — on tag `v*`
 
 Four jobs. `.github/scripts/stamp_version.sh` writes the tag into
-`export_presets.cfg` inside the runner first, so the committed file can keep a
-placeholder version. `v1.2.3` becomes `version/name "1.2.3"` and
-`version/code 10203`, which keeps the Android version code rising with the tag.
-A tag that is not `vMAJOR.MINOR.PATCH` fails the job rather than being stamped
-as nonsense.
+`export_presets.cfg` and `scripts/core/build_stamp.gd` inside the runner
+first, so the committed files can keep placeholder versions. `v1.2.3` becomes
+`version/name "1.2.3"` and `version/code 10203`, which keeps the Android
+version code rising with the tag, and the stamp's channel becomes `release`,
+which never checks for updates. A tag that is not `vMAJOR.MINOR.PATCH` fails
+the job rather than being stamped as nonsense.
+
+Release codes (10203) and dev codes (run numbers) are separate ranges and do
+not need to interleave: a release and a dev build are signed with different
+keys, so Android never installs one over the other whatever their codes say.
 
 | Job | Runner | Produces |
 | --- | ------ | -------- |
@@ -348,7 +382,8 @@ Android.
 
 `publish` uses the preinstalled `gh` CLI rather than a third-party release
 action, and uploads with `--clobber`, so re-running the workflow on the same tag
-is idempotent.
+is idempotent. It never touches the `dev` tag or release, and `android.yml`
+never touches anything else.
 
 The Android job uses the Android SDK that is **already on the GitHub-hosted
 ubuntu image** and fails with a clear message if it is absent, so there is no
@@ -377,6 +412,73 @@ Those three move by hand; see
 
 ---
 
+## The dev channel: one-tap updates on the phone
+
+The owner tests debug APKs on a phone. Without this, every update meant opening
+the Actions run in a browser, downloading the artifact zip, unzipping it and
+installing. Now the game tells you a newer build exists, and one tap starts the
+install.
+
+**Why not straight from the Actions artifact.** Artifacts cannot be downloaded
+without an authenticated token, even on a public repository; they arrive as a
+zip and they expire. The app would have to carry a token, which is out of the
+question. Release assets on a public repository download without one, so the
+channel is a release.
+
+**The pieces:**
+
+| | |
+| --- | --- |
+| Release | <https://github.com/andreas83/swordknights/releases/tag/dev> — a pre-release on tag `dev`, title `Development build <n>`, notes from the commit(s) that were built |
+| APK | <https://github.com/andreas83/swordknights/releases/download/dev/swordknights-dev.apk> — same URL for every build |
+| Manifest | <https://github.com/andreas83/swordknights/releases/download/dev/version.json> |
+| Written by | `android.yml`, job `publish`, via `.github/scripts/dev_manifest.sh` |
+| Read by | `UpdateCheck` (`scripts/core/update_check.gd`) at the title screen; decisions in `DevUpdate` (`scripts/core/dev_update.gd`) |
+
+`version.json`:
+
+```json
+{
+  "code": 57,
+  "name": "0.1.0-dev+4f2c9e1",
+  "sha": "4f2c9e1…(40 hex)",
+  "date": "2026-11-03T10:42:32Z",
+  "apk_url": "https://github.com/andreas83/swordknights/releases/download/dev/swordknights-dev.apk",
+  "apk_sha256": "…",
+  "signer_sha256": "…"
+}
+```
+
+The app needs only `code` and `apk_url`; the last two are for a person working
+out why an install failed.
+
+**In the app.** A build checks only if it is a debug build *and* stamped with
+channel `dev` *and* has a feed URL — which only `android.yml` produces. A run
+from the editor carries no channel; a release build is not a debug build and is
+stamped `release` with no feed. Two independent locks, so neither a stamping
+mistake nor a debug export of a tag is enough to make a build call home.
+`tests/unit/test_update_check.gd` and `tests/unit/test_dev_update.gd` hold
+both, and also that the committed stamp is unstamped.
+
+At the title screen it fetches the manifest with `HTTPRequest`, in the
+background, with an eight-second timeout. If `code` is higher than its own, a
+plaque hangs from the lintel: **UPDATE AVAILABLE · BUILD n** (see
+[`docs/ui.md`](ui.md#title-screen)). Tapping it hands `apk_url` to
+`OS.shell_open`: the browser downloads the APK and Android offers to install
+it over the running copy. Godot cannot install a package itself without an
+Android plugin (`REQUEST_INSTALL_PACKAGES` plus a `FileProvider` intent); the
+browser route needs neither and is the one Android already trusts. Offline, a
+404 before the first publish, a rate limit, a timeout or a malformed manifest
+all show nothing and log nothing. The settings page shows the running build:
+name, number and commit.
+
+**What can still stop an update:** a changed signing key. If the key changes,
+Android refuses the new build as "conflicts with an existing package", and the
+game has to be uninstalled once. That is what [the debug key](#the-debug-key)
+is about.
+
+---
+
 ## What the repository owner must enable
 
 Three things, all in the repository's own settings. Until the first two are
@@ -399,12 +501,18 @@ done, `pages.yml`'s `deploy` job will fail and the site will not be online.
    default can and should stay at **Read repository contents and packages
    permissions**. What must be allowed is that workflows *can* request more:
    if your organisation restricts `GITHUB_TOKEN` permissions, `pages.yml` needs
-   `pages: write` and `id-token: write`, and `release.yml` needs
-   `contents: write`.
+   `pages: write` and `id-token: write`, and `release.yml` and the `publish`
+   job of `android.yml` need `contents: write`. On a personal repository
+   nothing restricts this, and nothing needs changing.
 
 3. **A `github-pages` environment** is created automatically on the first Pages
    deployment. If your organisation requires environment approvals, that
    environment will need a reviewer or the deployment will sit pending.
+
+4. **Recommended: the debug keystore secret.** Not required — `android.yml`
+   falls back to the Actions cache — but the cache can be evicted, and then the
+   phone needs an uninstall. Ten minutes, once; see
+   [the debug key](#the-debug-key).
 
 Nothing else. No self-hosted runners, no org-level secrets, and no third-party
 app installations.
@@ -414,8 +522,17 @@ app installations.
 ## Secrets
 
 Set under *Settings → Secrets and variables → Actions → Repository secrets*.
-None of these are needed for `ci.yml` or `pages.yml` — only `release.yml` reads
-them.
+None of these are needed for `ci.yml` or `pages.yml`. `release.yml` reads the
+release ones; `android.yml` reads the optional debug ones.
+
+### Android — optional, for development builds
+
+| Secret | What it is |
+| ------ | ---------- |
+| `DEBUG_KEYSTORE_B64` | The debug keystore, base64 on one line. When set, it signs every dev build and the cache is not used |
+| `DEBUG_KEYSTORE_ALIAS` | Only if your keystore's alias is not `androiddebugkey` |
+| `DEBUG_KEYSTORE_PASSWORD` | Only if its store/key password is not `android` |
+| `KEYSTORE_EXPORT_PASSPHRASE` | Temporary: only while [exporting the cached key](#keep-the-key-you-have-no-uninstall); delete it afterwards |
 
 ### Android — required for a release
 
@@ -470,6 +587,100 @@ and the export emits an Xcode project instead of a signed `.ipa`.
 A genuinely store-ready `.ipa` also needs the provisioning profile and the
 signing certificate installed into a keychain on the macOS runner. That is not
 wired up here — it is the remaining work on the iOS path.
+
+---
+
+## The debug key
+
+Android installs an APK over the copy on the phone only if both are signed
+with the same key. So every development build has to be signed with the same
+debug key, or each update fails with "App not installed" / "conflicts with an
+existing package" until the game is uninstalled.
+
+`android.yml` takes the key from, in order:
+
+1. **The `DEBUG_KEYSTORE_B64` secret**, when it is set. It does not expire, and
+   pull requests from forks cannot read it.
+2. **The Actions cache**, key `android-debug-keystore-v1`, when it is not. The
+   first run that found neither generated a key there, and every run since has
+   restored it. The weakness: GitHub evicts a cache entry nobody has read for
+   **seven days**, so a week with no push to `main` that touches the game means
+   a new key and an uninstall. Every workflow run in the repository can read
+   the cache, including one from a pull request.
+3. **A new key**, generated when both are missing. The run says so with a
+   warning.
+
+Each build's release notes carry its signing-certificate SHA-256, so when an
+install is refused you can see whether the key changed.
+
+Moving the key into the secret is a one-time job for the owner — a workflow
+cannot set a secret. There are two ways.
+
+### Keep the key you have (no uninstall)
+
+The cached key cannot be downloaded from the cache directly, so `android.yml`
+has a manual switch that exports it, **encrypted**: on a public repository
+every signed-in GitHub user can download a run's artifacts. You need the
+GitHub CLI (`gh`), `openssl` and `keytool` (any JDK), and must have run
+`gh auth login`.
+
+```bash
+# 1. A throwaway passphrase, only for the transfer.
+openssl rand -base64 32 > passphrase.txt
+gh secret set KEYSTORE_EXPORT_PASSPHRASE -R andreas83/swordknights < passphrase.txt
+
+# 2. Run the workflow on main with the export switch on, and wait for it.
+gh workflow run android.yml -R andreas83/swordknights --ref main -f export_keystore=true
+sleep 10
+run=$(gh run list -R andreas83/swordknights --workflow android.yml -L 1 \
+  --json databaseId --jq '.[0].databaseId')
+gh run watch "$run" -R andreas83/swordknights
+
+# 3. Download and decrypt it.
+gh run download "$run" -R andreas83/swordknights -n debug-keystore-encrypted -D export
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+  -in export/swordknights-debug.keystore.enc -out swordknights-debug.keystore \
+  -pass file:passphrase.txt
+
+# 4. Check it: alias androiddebugkey, and the SHA256 line should match
+#    "Signing certificate SHA-256" in the notes of the current dev release.
+keytool -list -v -keystore swordknights-debug.keystore -storepass android \
+  | grep -E 'Alias name|SHA256:'
+
+# 5. Store it as the secret. (macOS: `base64 -i swordknights-debug.keystore`.)
+base64 -w0 swordknights-debug.keystore \
+  | gh secret set DEBUG_KEYSTORE_B64 -R andreas83/swordknights
+
+# 6. Clean up. Keep swordknights-debug.keystore somewhere safe as a backup.
+gh secret delete KEYSTORE_EXPORT_PASSPHRASE -R andreas83/swordknights
+rm -rf passphrase.txt export
+```
+
+The run in step 2 also publishes a normal dev build. If its log says it
+*generated a new* key, the cache had already been evicted and there was nothing
+to keep: use the second way instead, or keep this new key, which the phone
+will need one uninstall for either way. If the export step fails asking for
+`KEYSTORE_EXPORT_PASSPHRASE`, step 1 did not take. The next push after step 5
+logs "Signing with the keystore from DEBUG_KEYSTORE_B64".
+
+Optionally, once the secret is in use, delete the cached copy so the key no
+longer sits where every workflow can read it:
+`gh cache delete android-debug-keystore-v1 -R andreas83/swordknights`.
+
+### Make a new key (one uninstall)
+
+```bash
+keytool -genkeypair -noprompt -keystore swordknights-debug.keystore \
+  -alias androiddebugkey -storepass android -keypass android \
+  -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+base64 -w0 swordknights-debug.keystore \
+  | gh secret set DEBUG_KEYSTORE_B64 -R andreas83/swordknights
+```
+
+With a different alias or password, also set `DEBUG_KEYSTORE_ALIAS` and
+`DEBUG_KEYSTORE_PASSWORD`. The first build signed with it will not install over
+the build on the phone: uninstall the game once, install the new build, and
+updates install in place from then on.
 
 ---
 
