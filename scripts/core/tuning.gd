@@ -186,6 +186,40 @@ const SOFT_LAND_SPEED := 265.0
 const HARD_LAND_SPEED := 330.0
 const LAND_RECOVER_TIME := 0.12
 
+# The fatal fall.
+#
+# The owner's rule (docs/campaign.md, "Decided by the owner"): a fall of ten
+# tiles or more kills. That is twice the deepest drop a level may ask for --
+# five, because the camera shows about 5.6 tiles under the feet and no
+# landing may be out of frame at take-off ("No blind jumps") -- so the rule
+# never ends a route, only a mistake.
+#
+# It is a HEIGHT, and it cannot be a landing speed. A fall from rest reaches
+# MAX_FALL_SPEED terminal_fall_height() below where it started, which at 60 Hz
+# is five tiles to the pixel: the deepest drop a level is allowed and a drop
+# that should kill land at the same 360 px/s, and land_speed_after_drop(5)
+# equals land_speed_after_drop(10). A speed threshold would kill on every
+# intended five-tile drop or on no drop at all. What tells them apart is how
+# far the feet came down from where the body last stopped rising -- the apex,
+# so a jump that peaks and falls ten tiles counts -- and that is what Player
+# measures and LevelReachability prunes, both through is_fatal_fall().
+#
+# Raising MAX_FALL_SPEED until terminal speed came only at ten tiles (about
+# 540 px/s) was the alternative, and was turned down. The plunge drops at that
+# speed and is timed against a guard's raise (tests/unit/test_specials.gd);
+# impact_weight() and GameCamera.fall_lead() are both scaled to it, so every
+# landing the game has today would read lighter and every fall would be led
+# less. One constant would have retuned three systems to state one rule.
+const FATAL_FALL_TILES := 10
+## How far under fatal_fall_height() a fall still counts. A ten-tile drop off
+## a ledge is exactly 160 px in the proof's arithmetic, but the body rests a
+## few hundredths of a pixel off the floor (the physics engine's margin) at
+## both ends, so a line drawn at exactly 160 would fall on one side or the
+## other by rounding. Half a pixel is far below anything a level can express
+## and far above that noise, so both the player and the proof see the line at
+## ten tiles.
+const FALL_SLACK := 0.5
+
 # Derived traversal grammar — what the level generator and the hand-authored
 # levels are allowed to assume. Kept here so it cannot drift from the tuning.
 const TILE := 16.0
@@ -286,6 +320,54 @@ static func flat_jump_land_speed() -> float:
 static func land_speed_after_drop(tiles: float) -> float:
 	var v2 := JUMP_SPEED * JUMP_SPEED + 2.0 * GRAVITY * tiles * TILE
 	return minf(sqrt(v2), MAX_FALL_SPEED)
+
+
+## --- the fatal fall ----------------------------------------------------------
+##
+## FATAL_FALL_TILES and the block above it say why this is a height. These are
+## the only places the rule is computed: Player and LevelReachability call
+## is_fatal_fall(), and tests/unit/test_fatal_fall.gd pins the rest.
+
+## The fall, in pixels from the apex to the feet at touchdown, that kills.
+static func fatal_fall_height() -> float:
+	return float(FATAL_FALL_TILES) * TILE
+
+
+## Whether a landing `height` pixels below the apex of its fall kills. The one
+## comparison: the player dies by it and the proof prunes by it, so they
+## cannot disagree about where the line is.
+static func is_fatal_fall(height: float) -> bool:
+	return height >= fatal_fall_height() - FALL_SLACK
+
+
+## How far a body falls from rest before it reaches MAX_FALL_SPEED, in pixels.
+## Every landing from deeper than this hits at the same speed, which is the
+## argument for the rule being a height (FATAL_FALL_TILES).
+##
+## Integrated at 60 Hz with the apex band's reduced gravity, as jump_airtime()
+## is: the closed form says 4.6 tiles, the simulation falls 5.0.
+static func terminal_fall_height() -> float:
+	var dt := 1.0 / 60.0
+	var velocity := 0.0
+	var height := 0.0
+	while velocity < MAX_FALL_SPEED:
+		var scale := APEX_GRAVITY_SCALE if absf(velocity) < APEX_THRESHOLD else 1.0
+		velocity = minf(velocity + GRAVITY * scale * dt, MAX_FALL_SPEED)
+		height += velocity * dt
+	return height
+
+
+## The deepest drop, in whole tiles, that a full jump can be taken off and
+## survived: the jump's rise above the ledge counts toward the fall, so this
+## is FATAL_FALL_TILES less the hop and a little more (seven, against the nine
+## a walk off the same ledge survives). max_jump_rise() is the closed form,
+## which overstates the 60 Hz apex by about 2 px -- the safe side for a number
+## that says how deep a jump may go.
+static func safe_jump_drop_tiles() -> int:
+	var drop := 0
+	while not is_fatal_fall(float(drop + 1) * TILE + max_jump_rise()):
+		drop += 1
+	return drop
 
 
 ## The backstep's speed `t` seconds into it: BACKSTEP_SPEED falling off in a

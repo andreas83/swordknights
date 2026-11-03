@@ -8,7 +8,9 @@ extends RefCounted
 ## stepping the same arithmetic scripts/player/player.gd steps — the two-phase
 ## gravity of `_apply_gravity`, the `move_toward` air control of
 ## `_free_movement`, the one-way platform layer, and the hand probe of
-## `_try_grab_ledge` with its hang-rect and stand-rect clearance checks.
+## `_try_grab_ledge` with its hang-rect and stand-rect clearance checks. A
+## landing ten tiles or more below its apex kills the player
+## (Tuning.FATAL_FALL_TILES), so the search prunes it like a spike.
 ##
 ## Nothing here hardcodes a jump height, a gap width or a grab reach. The reach
 ## envelope falls out of scripts/core/tuning.gd through the simulation, which
@@ -800,6 +802,13 @@ class Solver extends RefCounted:
 	## input held for the whole arc, `facing` is what the grab probe uses when
 	## `dir` is zero, `offset` shifts the takeoff away from the middle of the
 	## tile, and `ignore_platforms` is the drop-through window in frames.
+	##
+	## A landing Tuning.is_fatal_fall() says kills is not offered: the player
+	## dies of it (Player._fall_to_death()), so no route may pass through it.
+	## The test is the same function the player dies by, not a copy of its
+	## threshold. A ladder caught or a ledge grabbed on the way down is still
+	## offered, because the player survives those: they come before the
+	## landing, and the arc ends at the landing either way.
 	func _trace(sx: int, sy: int, jump: bool, dir: int, facing: int, v0: float,
 			offset: float, ignore_platforms: int, out: Array[int]) -> void:
 		var cx := float(sx) * _tile + _tile * 0.5 + offset
@@ -808,6 +817,10 @@ class Solver extends RefCounted:
 		var vy := -Tuning.JUMP_SPEED if jump else 0.0
 		var grounded := not jump
 		var floor_limit := float(rows) * _tile + 64.0
+		# The top of the fall, for the fatal-fall rule: the arc only ever
+		# rises and then falls, so the highest the feet have been is the apex
+		# Player._note_fall_top() measures from.
+		var top := feet
 
 		# An arc may only start somewhere the body could actually be.
 		if rect_flags(cx, feet) & (F_SOLID | F_HAZARD) != 0:
@@ -877,6 +890,7 @@ class Solver extends RefCounted:
 						ny = float(head + 1) * _tile + _body
 						vy = 0.0
 				feet = ny
+				top = minf(top, feet)
 				if landed:
 					vy = 0.0
 					grounded = true
@@ -896,6 +910,8 @@ class Solver extends RefCounted:
 				_probe_ledge(cx, feet, dir if dir != 0 else facing, out)
 
 			if landed:
+				if Tuning.is_fatal_fall(feet - top):
+					return # ten tiles from the apex: the landing kills the player
 				_offer_stand(floori(cx / _tile), floori(feet / _tile) - 1, out)
 				return
 

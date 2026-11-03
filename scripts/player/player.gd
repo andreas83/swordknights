@@ -77,6 +77,11 @@ var _about_face: float = 0.0
 ## Counting down from the start of a backstep; another cannot start until it
 ## is spent. Tuning.BACKSTEP_REARM says why.
 var _backstep_rearm: float = 0.0
+## --- the fatal fall --- the feet's height where the fall now being measured
+## began, and whether the death this body is down with was a fall's. See
+## _note_fall_top() and _fall_to_death().
+var _fall_top: float = 0.0
+var _fell := false
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 
@@ -106,11 +111,26 @@ func respawn(at: Vector2) -> void:
 	_riposte = false
 	_about_face = 0.0
 	_backstep_rearm = 0.0
+	_fall_top = at.y
+	_fell = false
 	_set_crouched(false)
 
 
 func is_alive() -> bool:
 	return state != State.DEAD
+
+
+## Down, and from a fall: the landing killed him (Tuning.FATAL_FALL_TILES). The
+## art lays him out by it and the sound gives the landing its own weight, so
+## a fall reads as a fall and not as a wound.
+func is_fallen() -> bool:
+	return state == State.DEAD and _fell
+
+
+## How far the feet are below the apex of the fall now being measured, in
+## pixels: 0 on the ground, on a ladder, hanging, or still going up.
+func fall_height() -> float:
+	return maxf(0.0, position.y - _fall_top)
 
 
 func is_hanging() -> bool:
@@ -237,6 +257,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		collision_mask = Tiles.MASK_SOLID | Tiles.MASK_ONE_WAY
 
+	_note_fall_top()
 	match state:
 		State.DEAD:
 			_apply_gravity(delta)
@@ -572,6 +593,11 @@ func _apply_gravity(delta: float) -> void:
 func _on_touch_ground(impact: float) -> void:
 	if state == State.DEAD or state == State.HURT:
 		return
+	# Before anything a landing can turn into: a plunge, a slash finishing on
+	# the feet, a hard landing. Ten tiles kills whatever the body was doing.
+	if Tuning.is_fatal_fall(position.y - _fall_top):
+		_fall_to_death(impact)
+		return
 	last_impact = impact
 	landed.emit(impact)
 	if state == State.PLUNGE:
@@ -594,6 +620,65 @@ func _on_touch_ground(impact: float) -> void:
 	elif impact >= Tuning.SOFT_LAND_SPEED:
 		_land_timer = Tuning.LAND_RECOVER_TIME
 		_enter(State.LAND)
+
+
+## --- the fatal fall ---------------------------------------------------------
+##
+## Tuning.FATAL_FALL_TILES says why the rule is a height and not a speed. This
+## is where the height is measured, from the top of the fall: the body's feet
+## on the last frame that began with it held up or going up. Read at the
+## start of the frame, before it moves, so the frame that turns a rise into a
+## fall leaves the apex where it was, and a warp or a respawn -- a body put
+## somewhere at rest -- starts a fall from where it was put.
+##
+## What resets it, and so does not count toward a fall:
+##
+## - **The floor**, and a lift with it: a lift is a floor that moves, and the
+##   feet on it are held up. Only the drop after leaving it counts.
+## - **A ladder**, climbed down or caught in mid-air: the rungs hold him, so a
+##   long fall caught on one is two short ones, and a long ladder is no fall.
+##   This one has to be named: climbing down moves him at LADDER_SPEED.
+## - **A ledge grab**: hanging, the hands hold him at rest (_update_hang()
+##   zeroes the velocity every frame, which is what resets it), so a grab that
+##   catches a fall ends it, and letting go starts another from the hang.
+## - **Going up**: a stomp's or a plunge's bounce off a guard is a new arc,
+##   so a guard at the foot of a drop breaks the fall. So does a hit's
+##   knockback, which always throws him up -- and HURT lasts 0.32 s, too short
+##   to fall ten tiles from rest, which is why a landing in HURT (which skips
+##   _on_touch_ground) needs no check of its own.
+##
+## What does not reset it: **the plunge**. It is the same fall at the hardest
+## speed the game has, and it kills like one. Exempting it would make down +
+## SWORD a way to cancel any fall, so the rule would only ever kill a player
+## who had not found the trick -- a rule about knowledge, where the owner's
+## is about mistakes -- and the proof, which offers no plunge, would be
+## pruning landings any player who knew could take.
+##
+## Water is not excepted because it does not need to be: it kills on contact
+## (Level.rect_is_deadly()), and a body falls into it a frame or more before
+## its feet can reach the bed, so a fall into water is a death by water, with
+## that one cause. Spikes likewise.
+func _note_fall_top() -> void:
+	if velocity.y <= 0.0 or is_grounded() or state == State.LADDER:
+		_fall_top = position.y
+
+
+## The landing is the death: one cause, told by the landing itself. The body
+## stops where it hit -- no knockback hop, which is a wound's -- and the
+## landing beat fires at full weight before `died`, with the state already
+## DEAD, so whatever hangs off `landed` (the dust, the camera's settle, the
+## thud) can tell this landing from one that is walked away from. `died` is
+## the ordinary death: the hold, the wipe and the checkpoint respawn are
+## Game's, unchanged.
+func _fall_to_death(impact: float) -> void:
+	last_impact = impact
+	health = 0
+	velocity = Vector2.ZERO
+	_fell = true
+	_set_crouched(false)
+	_enter(State.DEAD)
+	landed.emit(impact)
+	died.emit()
 
 
 func _resolve_air_state() -> void:

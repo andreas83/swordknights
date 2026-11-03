@@ -89,6 +89,12 @@ func _pin(pose: Dictionary) -> void:
 	_player.velocity = pose.get("velocity", Vector2.ZERO)
 	_player.health = pose.get("health", Tuning.MAX_HEALTH)
 	_player.position = FEET + pose.get("offset", Vector2.ZERO)
+	# A death from a fall is DEAD with the fall's flag up, which nothing
+	# public sets but the landing itself. Read back: Object.set() on a name
+	# the script does not have drops the value in silence (CLAUDE.md).
+	_player.set("_fell", pose.get("fell", false))
+	if _player.is_fallen() != (pose.get("fell", false) and _player.state == Player.State.DEAD):
+		push_error("could not pose %s: the fall flag did not take" % String(pose["name"]))
 
 
 func _enter(pose: Dictionary) -> void:
@@ -161,6 +167,9 @@ func _pose_table() -> Array[Dictionary]:
 			"velocity": Vector2(-80.0, -40.0), "health": 2,
 			"emit": [["hurt", 2]]},
 		{"name": "dead", "state": Player.State.DEAD, "t": 0.70, "health": 0},
+		{"name": "dead-fall", "state": Player.State.DEAD, "t": 0.70, "health": 0,
+			"fell": true, "impact": Tuning.MAX_FALL_SPEED,
+			"emit": [["landed", Tuning.MAX_FALL_SPEED]]},
 	]
 
 

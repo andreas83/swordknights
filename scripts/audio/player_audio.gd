@@ -48,6 +48,13 @@ const LAND_FLOOR := 40.0
 ## How long a hit or a swing keeps the music intensity raised.
 const HEAT_DECAY := 0.55
 
+## A landing from ten tiles (Tuning.FATAL_FALL_TILES): the hard landing's
+## voice a fifth lower and at its loudest, with stone under it. Every
+## survivable landing from five tiles down hits at the same speed and so
+## sounds the same, at pitch 0.92; this one is pitched apart from all of them,
+## so the ear has the cause before `die` follows it.
+const FATAL_LANDING := {"pitch": 0.68, "volume_db": 2.0}
+
 
 @export var drive_music_intensity := true
 
@@ -106,7 +113,7 @@ static func event_names() -> PackedStringArray:
 	return PackedStringArray([
 		"step_run", "step_walk", "ladder", "cloth", "jump",
 		"land_soft", "land_hard", "ledge_grab", "climb",
-		"sword", "hurt", "die",
+		"sword", "hurt", "die", "masonry",
 	])
 
 
@@ -188,6 +195,9 @@ func _on_jumped() -> void:
 
 
 func _on_landed(impact: float) -> void:
+	if _player.is_fallen():
+		_on_fatal_landing()
+		return
 	var voice := voice_for_landing(impact)
 	if voice == "":
 		return
@@ -202,6 +212,12 @@ func _on_landed(impact: float) -> void:
 		_play("cloth", {"volume_db": lerpf(-10.0, -2.0, t)})
 	if voice == "land_hard":
 		_heat = 1.0
+
+
+func _on_fatal_landing() -> void:
+	_play("land_hard", FATAL_LANDING)
+	_play("masonry", {"pitch": 0.6, "volume_db": -8.0})
+	_play("cloth", {"volume_db": -1.0})
 
 
 func _on_grabbed_ledge() -> void:

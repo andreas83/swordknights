@@ -902,6 +902,10 @@ func _hurt(t: float) -> Dictionary:
 
 ## Toppled: the robe keeps its shape, the figure does not.
 func _dead(t: float) -> Dictionary:
+	# FighterArt draws a duellist through this pose too, with no Player behind
+	# it: a duel has no falls to die of.
+	if _player != null and _player.is_fallen():
+		return _dead_of_fall(t)
 	var fall := smoothstep(0.0, 0.45, t)
 	return _pose({
 		"squash": lerpf(1.0, 0.92, fall),
@@ -918,4 +922,32 @@ func _dead(t: float) -> Dictionary:
 		"arm_a": 2.6, "arm_b": 3.0,
 		"cloak_sweep": lerpf(-1.0, 2.6, fall), "cloak_rise": -1.6, "cloak_flare": 2.0,
 		"blade": 2.9, "blade_len": 9.0,
+	})
+
+
+## Dead from a fall (Tuning.FATAL_FALL_TILES): folded at the knees on the
+## frame he hits, then pitched forward onto his face in a fifth of a second,
+## arms flung out ahead and the blade knocked flat beyond them. The wound's
+## death goes over backwards off a knockback hop; this one goes down where it
+## landed, forwards, with no hop -- so the two causes never share a silhouette,
+## and the 300 ms the death beat holds (docs/feel.md) is enough to read which
+## one it was.
+func _dead_of_fall(t: float) -> Dictionary:
+	var down := smoothstep(0.0, 0.2, t)
+	return _pose({
+		"squash": lerpf(0.74, 0.9, down),
+		"tilt": lerpf(0.3, 1.36, down),
+		"sink": lerpf(3.0, 2.0, down),
+		"lean": 1.0,
+		"stride": -0.6,
+		"stance": 1.6,
+		"knee": 0.4,
+		"hem_lift": -0.4,
+		"hem_spread": 2.4,
+		"hood_tilt": 0.7,
+		"glint": 0.0,
+		"arm_a": lerpf(-0.6, 0.12, down), "arm_b": lerpf(-0.3, 0.34, down),
+		"arm_a_len": 6.6, "arm_b_len": 6.2,
+		"cloak_sweep": lerpf(0.6, 1.8, down), "cloak_rise": -1.6, "cloak_flare": 1.8,
+		"blade": 0.1, "blade_len": 9.0,
 	})
