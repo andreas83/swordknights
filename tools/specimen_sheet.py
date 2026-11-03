@@ -166,8 +166,8 @@ def screens_block(pen: Pen, image, y: int, dirs: dict) -> int:
         ("settings", "SETTINGS — NEW"),
         ("hud_hurt", "LEVEL HUD"),
         ("hud_pause", "PAUSE OVERLAY"),
-        ("duel_countdown", "DUEL · COUNTDOWN"),
-        ("duel_over", "DUEL · MATCH OVER"),
+        ("match_flash", "DUEL · INITIATIVE"),
+        ("match_over", "DUEL · MATCH OVER"),
         ("menu_touch", "TOUCH CONTROLS"),
     ]
     columns = [name for name in ("before", "after", "wide") if name in dirs]

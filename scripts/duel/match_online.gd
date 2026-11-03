@@ -142,6 +142,7 @@ func _start_session(as_host: bool) -> void:
 	session.peer_departed.connect(
 		func() -> void: _offer_fallback("the other player left"), CONNECT_DEFERRED)
 	session.start(transport, fight, as_host)
+	hud.session = session
 	_online = true
 
 
@@ -153,6 +154,7 @@ func _on_link_changed(link: NetTransport.Link, detail: String) -> void:
 
 func _on_seated(slot: int) -> void:
 	lobby.visible = false
+	hud.your_slot = slot
 	hud.footer = "YOU ARE %s  ·  PAUSE TO LEAVE" % ("CRIMSON" if slot == 0 else "SEA-GREEN")
 	camera.setup(fight)
 
@@ -180,6 +182,8 @@ func _teardown() -> void:
 	if session != null:
 		session.shutdown()
 		session = null
+	hud.session = null
+	hud.your_slot = -1
 	if transport != null:
 		transport.close()
 		transport = null

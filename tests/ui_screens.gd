@@ -2,7 +2,7 @@ extends SceneTree
 ## Renders one frame per interface state, so the layout can be judged as pixels.
 ##
 ## tools/screenshot.gd walks a live scene, which cannot reach a pause overlay,
-## a settings screen or a finished duel on demand. This harness builds each
+## a settings screen or a finished match on demand. This harness builds each
 ## screen, pokes it into the state we want to look at, and captures a frame.
 ##
 ##     xvfb-run -a godot --path . --rendering-driver opengl3 \
@@ -69,8 +69,9 @@ func _catalogue() -> Array[Dictionary]:
 		{"name": "hud_title", "scene": "res://scenes/game.tscn", "pose": "title"},
 		{"name": "hud_hurt", "scene": "res://scenes/game.tscn", "pose": "hurt"},
 		{"name": "hud_pause", "scene": "res://scenes/game.tscn", "pose": "pause"},
-		{"name": "duel_countdown", "scene": "res://scenes/duel_local.tscn", "pose": ""},
-		{"name": "duel_over", "scene": "res://scenes/duel_local.tscn", "pose": "over"},
+		{"name": "match", "scene": "res://scenes/duel_match.tscn", "pose": ""},
+		{"name": "match_flash", "scene": "res://scenes/duel_match.tscn", "pose": "flash"},
+		{"name": "match_over", "scene": "res://scenes/duel_match.tscn", "pose": "over"},
 	]
 	if _only == "":
 		return all
@@ -118,11 +119,13 @@ func _pose(shot: Dictionary) -> void:
 			if hud != null:
 				hud.update_model(2, 3, 1, 3)
 				hud.set_overlay("PAUSED", "PAUSE TO RESUME  ·  SWORD TO QUIT")
+		"flash":
+			if hud != null:
+				hud.flash("ONE HAS THE INITIATIVE", "ONE LEADS")
 		"over":
-			if hud != null and hud.duel != null:
-				hud.duel.phase = Duel.Phase.MATCH_OVER
-				hud.duel.match_winner = 0
-				hud.duel.scores = PackedInt32Array([3, 1])
+			if hud != null and hud.fight != null:
+				hud.fight.phase = DuelMatch.Phase.MATCH_OVER
+				hud.fight.winner = 0
 				hud.footer = "JUMP FOR A REMATCH  ·  SWORD FOR THE MENU"
 				hud.queue_redraw()
 		_:

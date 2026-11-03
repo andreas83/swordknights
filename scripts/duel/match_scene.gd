@@ -223,7 +223,8 @@ func _on_fighter_died(victim: int, _killer: int, at: Vector2) -> void:
 func _on_initiative_changed(leader: int) -> void:
 	if leader < 0:
 		return
-	hud.flash("%s HAS THE INITIATIVE" % DuelRules.slot_label(leader))
+	var who := DuelRules.slot_label(leader)
+	hud.flash("%s HAS THE INITIATIVE" % who, "%s LEADS" % who)
 
 
 func _on_fighter_respawned(_slot: int, _at: Vector2, _facing: int) -> void:
@@ -232,7 +233,8 @@ func _on_fighter_respawned(_slot: int, _at: Vector2, _facing: int) -> void:
 
 func _on_leader_consumed(winner: int, _at: Vector2) -> void:
 	camera.shake(2.2, 0.6)
-	hud.flash("%s REACHES THE GATE" % DuelRules.slot_label(winner))
+	var who := DuelRules.slot_label(winner)
+	hud.flash("%s REACHES THE GATE" % who, "%s AT THE GATE" % who)
 
 
 func _on_match_over(_winner: int) -> void:

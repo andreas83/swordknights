@@ -3,8 +3,18 @@ extends Control
 ## What the rope is doing: who has initiative, which way, and how far.
 ##
 ## Drawn rather than built out of Control nodes, for the same reason
-## scripts/duel/duel_hud.gd and scripts/ui/hud.gd are: it shares the palette and
-## the shapes with everything else on screen.
+## scripts/ui/hud.gd is: it shares the palette and the shapes with everything
+## else on screen. Typography, safe areas and the reserved overlay band all come
+## from scripts/ui (docs/ui.md), so this screen and the adventure HUD cannot
+## drift apart -- and nothing here touches ThemeDB.fallback_font.
+##
+## WHERE THINGS GO
+## Chrome hangs from the top of `UiLayout.content()`: the rope, the line that
+## names it, the network line, then the persistent hint. Words thrown up by an
+## event (a death, the initiative, the gate) and the result go in
+## `UiLayout.banner()` and nowhere else. The bottom of the screen is the floor
+## the fight is on, and a zone's floor can be a row of spikes; the only things
+## drawn down there are the two respawn rings, which are marks, not words.
 ##
 ## THE INITIATIVE INDICATOR
 ## The specification calls for showArrowUI(currentLeader), and an arrow is right
@@ -18,48 +28,73 @@ extends Control
 const PIP := 4.0
 const PIP_GAP := 13.0
 const ARROW := 13.0
+## Seconds a flashed word stays up.
+const FLASH_TIME := 1.1
+## A hint wider than the safe area is broken at its separators instead of
+## running off both edges of a 4:3 screen.
+const HINT_BREAK := "  ·  "
 
 var fight: DuelMatch
+## Optional. Set for an online match; left null for a local one.
+var session: NetSession
 ## Which seat this screen is driving, or -1 for a local match with both.
 var your_slot := -1
 var footer := ""
 
-var _font: Font
+var _time := 0.0
 var _flash := 0.0
-var _flash_text := ""
+var _flash_options := PackedStringArray()
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	_font = ThemeDB.fallback_font
+	get_viewport().size_changed.connect(queue_redraw)
 
 
-func flash(text: String) -> void:
-	_flash_text = text
-	_flash = 1.1
+## A short line thrown up in the band. `terse` is said instead when `text` will
+## not fit across the screen at the display cut -- a 4:3 tablet is 320 units
+## wide and "ONE HAS THE INITIATIVE" is not.
+func flash(text: String, terse: String = "") -> void:
+	_flash_options = PackedStringArray([text])
+	if terse != "":
+		_flash_options.append(terse)
+	_flash = FLASH_TIME
 
 
 func _process(delta: float) -> void:
+	_time += delta
 	_flash = maxf(0.0, _flash - delta)
 	queue_redraw()
 
 
 func _draw() -> void:
-	if fight == null or fight.strip == null:
+	if fight == null or fight.strip == null or size.x <= 0.0:
 		return
-	_draw_rope(size)
-	_draw_respawns(size)
-	_draw_flash(size)
-	_draw_footer(size)
+	var content := UiLayout.content(size)
+	var band := UiLayout.banner(size)
+
+	var y := _draw_rope(content)
+	y = _draw_status(content, y)
+	_draw_respawns(content)
+	if fight.phase == DuelMatch.Phase.MATCH_OVER:
+		_draw_result(band)
+		return
+	_draw_hint(content, y)
+	if session != null and session.desync_count > 0:
+		_draw_desync(band)
+	else:
+		_draw_flash(band)
 
 
-## The zone pips, with the arrow of initiative over them. Reads left to right as
-## the strip does: seat one is pulling toward the left pip, seat two the right.
-func _draw_rope(view: Vector2) -> void:
+## The zone pips, with the arrow of initiative over them, and the line that
+## names what the arrow says. Reads left to right as the strip does: seat one is
+## pulling toward the left pip, seat two the right. Returns the y below it.
+func _draw_rope(content: Rect2) -> float:
 	var zones := fight.zone_count()
 	var span := float(zones - 1) * PIP_GAP
-	var origin := Vector2(view.x * 0.5 - span * 0.5, 13.0)
+	var cx := roundf(content.position.x + content.size.x * 0.5)
+	var origin := Vector2(roundf(cx - span * 0.5), content.position.y + PIP)
 	var leader := fight.leader_slot()
 
 	for zone: int in zones:
@@ -79,40 +114,79 @@ func _draw_rope(view: Vector2) -> void:
 			draw_arc(at, PIP + 2.4, 0.0, TAU, 20,
 				Palette.with_alpha(GoreField.BLOOD_FRESH[seat], 0.75), 1.2)
 
+	var below := origin.y + PIP + 4.0
 	if leader < 0:
-		_text(Vector2(view.x * 0.5, 30.0), "NEUTRAL",
-			Palette.with_alpha(Palette.PAPER, 0.55), true)
-		return
+		UiFont.draw_text(self, "NEUTRAL", Vector2(cx, below), UiFont.Cut.MICRO,
+			Palette.with_alpha(Palette.PAPER, 0.6), UiFont.Align.CENTER, 0.6)
+		return below + UiFont.line(UiFont.Cut.MICRO)
 
 	# The arrow: the leader's colour, pointing the way the world is open.
 	var direction := float(ZoneStrip.goal_direction(leader))
 	var tip := origin + Vector2(
-		(span * 0.5) + direction * (span * 0.5 + ARROW + 8.0), 0.0
+		roundf(span * 0.5 + direction * (span * 0.5 + ARROW + 8.0)), 0.0
 	)
 	var colour := GoreField.BLOOD_FRESH[leader]
-	draw_colored_polygon(PackedVector2Array([
+	var arrow := PackedVector2Array([
 		tip,
 		tip - Vector2(direction * ARROW, -ARROW * 0.52),
 		tip - Vector2(direction * ARROW, ARROW * 0.52),
-	]), colour)
-	_text(
-		Vector2(view.x * 0.5, 30.0),
-		"%s PUSHING %s" % [
-			DuelRules.slot_label(leader), "WEST" if direction < 0.0 else "EAST",
-		],
-		colour, true
-	)
+	])
+	var cast := PackedVector2Array()
+	for point: Vector2 in arrow:
+		cast.append(point + UiMarks.CAST)
+	draw_colored_polygon(cast, Palette.with_alpha(Palette.INK, 0.6))
+	draw_colored_polygon(arrow, colour)
+
+	# The words are paper, not the seat's colour: crimson type on a crimson
+	# sky is the arrow's job to carry, and a line nobody can read says nothing.
+	var said := "%s PUSHING %s" % [
+		DuelRules.slot_label(leader), "WEST" if direction < 0.0 else "EAST",
+	]
+	if leader == your_slot:
+		said = "YOU ARE PUSHING %s" % ("WEST" if direction < 0.0 else "EAST")
+	UiFont.draw_text(self, said, Vector2(cx, below), UiFont.Cut.MICRO,
+		Palette.PAPER, UiFont.Align.CENTER, 0.8)
+	return below + UiFont.line(UiFont.Cut.MICRO)
+
+
+## The connection, for an online match. Returns the y below it.
+func _draw_status(content: Rect2, y: float) -> float:
+	if session == null:
+		return y
+	var cx := content.position.x + content.size.x * 0.5
+	UiFont.draw_text(self, session.status_line(), Vector2(cx, y), UiFont.Cut.MICRO,
+		Palette.with_alpha(Palette.LIGHT_SOFT, 0.8 if session.desync_count > 0 else 0.55),
+		UiFont.Align.CENTER, 0.6)
+	return y + UiFont.line(UiFont.Cut.MICRO)
+
+
+## The persistent hint, under the rope. Broken at its separators when it is
+## wider than the safe area.
+func _draw_hint(content: Rect2, y: float) -> void:
+	if footer == "":
+		return
+	var cx := content.position.x + content.size.x * 0.5
+	var lines := PackedStringArray([footer])
+	if UiFont.width(footer, UiFont.Cut.MICRO) > content.size.x:
+		lines = footer.split(HINT_BREAK, false)
+	for line: String in lines:
+		UiFont.draw_text(self, line, Vector2(cx, y), UiFont.Cut.MICRO,
+			Palette.with_alpha(Palette.PAPER, 0.5), UiFont.Align.CENTER, 0.5)
+		y += UiFont.line(UiFont.Cut.MICRO)
 
 
 ## A ring closing on each fighter who is down, so the leader can see how long
 ## they have before the other one is standing in front of them.
-func _draw_respawns(view: Vector2) -> void:
+func _draw_respawns(content: Rect2) -> void:
 	for slot: int in 2:
 		var left := fight.respawn_left(slot)
 		if left <= 0.0:
 			continue
 		var done := 1.0 - clampf(left / DuelMatch.RESPAWN_DELAY, 0.0, 1.0)
-		var at := Vector2(24.0 if slot == 0 else view.x - 24.0, view.y - 22.0)
+		var at := Vector2(
+			content.position.x + 8.0 if slot == 0 else content.end.x - 8.0,
+			content.end.y - 8.0
+		)
 		var colour := GoreField.BLOOD_FRESH[slot]
 		draw_arc(at, 8.0, 0.0, TAU, 24, Palette.with_alpha(colour, 0.25), 1.0)
 		draw_arc(at, 8.0, -PI * 0.5, -PI * 0.5 + TAU * done, 24, colour, 2.0)
@@ -120,48 +194,71 @@ func _draw_respawns(view: Vector2) -> void:
 			draw_circle(at, 2.0, Palette.PAPER)
 
 
-func _draw_flash(view: Vector2) -> void:
-	if _flash <= 0.0 or _flash_text == "":
+## A struck word in the reserved band, where nothing of the fight is.
+func _draw_flash(band: Rect2) -> void:
+	if _flash <= 0.0 or _flash_options.is_empty():
 		return
 	var alpha := clampf(_flash, 0.0, 1.0)
-	_text(
-		Vector2(view.x * 0.5, view.y * 0.42), _flash_text,
-		Palette.with_alpha(Palette.PAPER, alpha), true, 2.0
-	)
+	var room := band.size.x - UiLayout.GUTTER * 2.0
+	var cut := UiFont.Cut.DISPLAY
+	var said := UiFont.fit(_flash_options, room, cut)
+	if UiFont.width(said, cut) > room:
+		cut = UiFont.Cut.TEXT
+		said = UiFont.fit(_flash_options, room, cut)
+	UiFont.draw_text(self, said,
+		Vector2(band.position.x + band.size.x * 0.5,
+			band.position.y + (band.size.y - UiFont.cap(cut)) * 0.5),
+		cut, Palette.with_alpha(Palette.PAPER, alpha), UiFont.Align.CENTER, alpha * 0.8)
 
 
-func _draw_footer(view: Vector2) -> void:
-	if fight.phase == DuelMatch.Phase.MATCH_OVER:
-		_text(
-			Vector2(view.x * 0.5, view.y * 0.5),
-			"%s IS TAKEN THROUGH THE GATE" % DuelRules.slot_label(fight.winner),
-			GoreField.BLOOD_FRESH[maxi(fight.winner, 0)], true, 1.6
-		)
-	if footer == "":
-		return
-	_text(
-		Vector2(view.x * 0.5, view.y - 9.0), footer,
-		Palette.with_alpha(Palette.PAPER, 0.5), true
-	)
+## Who was taken through which gate, on the carved plate the adventure HUD
+## sets its overlays on. Four things in forty-eight units: title, rule, how,
+## and what to press. The numbers are the band's, not the screen's, so a taller
+## phone does not spread them out.
+func _draw_result(band: Rect2) -> void:
+	var winner := maxi(fight.winner, 0)
+	var cx := band.position.x + band.size.x * 0.5
+	var room := band.size.x - UiLayout.GUTTER * 2.0
+	draw_rect(Rect2(Vector2.ZERO, size), Palette.with_alpha(Palette.INK, 0.45))
+	_band_plate(band, 0.6)
+
+	var title := UiFont.fit(PackedStringArray([
+		"%s WINS" % DuelRules.slot_label(winner),
+	]), room, UiFont.Cut.DISPLAY)
+	UiFont.draw_text(self, title, Vector2(cx, band.position.y + 4.0),
+		UiFont.Cut.DISPLAY, Palette.PAPER, UiFont.Align.CENTER, 0.8)
+	UiMarks.rule(self, Vector2(cx, band.position.y + 22.0),
+		minf(band.size.x * 0.3, 48.0), Palette.with_alpha(GoreField.BLOOD_FRESH[winner], 0.9))
+	var gate := "WEST" if ZoneStrip.goal_direction(winner) < 0 else "EAST"
+	var how := UiFont.fit(PackedStringArray([
+		"TAKEN THROUGH THE %s GATE" % gate, "THROUGH THE %s GATE" % gate,
+	]), room, UiFont.Cut.TEXT)
+	UiFont.draw_text(self, how, Vector2(cx, band.position.y + 27.0),
+		UiFont.Cut.TEXT, Palette.LIGHT_SOFT, UiFont.Align.CENTER, 0.6)
+	if footer != "":
+		var hint := UiFont.fit(PackedStringArray([
+			footer, footer.replace(HINT_BREAK, "  "),
+		]), room, UiFont.Cut.MICRO)
+		UiFont.draw_text(self, hint, Vector2(cx, band.position.y + 39.0),
+			UiFont.Cut.MICRO, Palette.with_alpha(Palette.PAPER, 0.8),
+			UiFont.Align.CENTER, 0.6)
 
 
-## Letter-spaced small caps, the same shape scripts/ui/hud.gd uses. Repeated
-## rather than shared because scripts/ui is not this branch's to change.
-func _text(
-	at: Vector2, text: String, colour: Color, centred: bool, scale: float = 1.0
-) -> void:
-	if _font == null:
-		return
-	var points := 8.0 * scale
-	var spacing := 1.6 * scale
-	var width := 0.0
-	for i: int in text.length():
-		width += _font.get_string_size(text[i], HORIZONTAL_ALIGNMENT_LEFT, -1,
-			int(points)).x + spacing
-	var cursor := at - Vector2(width * 0.5 if centred else 0.0, 0.0)
-	for i: int in text.length():
-		var glyph := text[i]
-		draw_string(_font, cursor, glyph, HORIZONTAL_ALIGNMENT_LEFT, -1,
-			int(points), colour)
-		cursor.x += _font.get_string_size(glyph, HORIZONTAL_ALIGNMENT_LEFT, -1,
-			int(points)).x + spacing
+## A match that has quietly stopped agreeing with itself is worse than one that
+## admits it, so a desync gets the band to itself.
+func _draw_desync(band: Rect2) -> void:
+	var pulse := 0.55 + sin(_time * 7.0) * 0.2
+	var strip := Rect2(0.0, band.position.y + band.size.y * 0.5 - 9.0, size.x, 18.0)
+	draw_rect(strip, Palette.with_alpha(Palette.SHADOW_DEEP, pulse))
+	UiFont.draw_text(self, "SIMULATIONS DIVERGED",
+		Vector2(strip.position.x + strip.size.x * 0.5, strip.position.y + 6.0),
+		UiFont.Cut.TEXT, Palette.PAPER, UiFont.Align.CENTER, 0.8)
+
+
+## The carved plate an overlay is set on: the same band the adventure HUD uses.
+func _band_plate(band: Rect2, opacity: float) -> void:
+	draw_rect(band, Palette.with_alpha(Palette.SHADOW_DEEP, opacity))
+	draw_rect(Rect2(band.position, Vector2(band.size.x, 1.0)),
+		Palette.with_alpha(Palette.LIGHT_WARM, 0.8))
+	draw_rect(Rect2(band.position.x, band.end.y - 1.0, band.size.x, 1.0),
+		Palette.with_alpha(Palette.LIGHT_WARM, 0.5))

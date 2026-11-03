@@ -201,7 +201,7 @@ route, round it yourself.
 | Settings | `scripts/ui/settings_panel.gd` |
 | Level HUD, title card, pause/complete overlay | `scripts/ui/hud.gd` |
 | Touch controls | `scripts/ui/touch_controls.gd`, `scripts/ui/touch_surface.gd` |
-| Duel HUD | `scripts/duel/duel_hud.gd` |
+| Duel HUD | `scripts/duel/match_hud.gd` |
 
 ### Title screen
 
@@ -232,6 +232,23 @@ The relic itself answers in the world: it bursts into a star and six sparks for
 `Relic.BURST_TIME` instead of vanishing, and is no longer collectable from the
 moment it is taken, so standing in the burst cannot count it twice. Still no
 hitstop on a pickup — `docs/feel.md` explains why.
+
+### Duel HUD
+
+The rope hangs from the top of the content rectangle: five zone pips, the
+initiative arrow in the leader's colour, and under them one MICRO line that
+says what the arrow says (`ONE PUSHING WEST`, or `NEUTRAL`). That line is set
+in paper, not in the seat's colour — crimson type on a crimson sky is
+illegible, and the arrow already carries the colour. Under it, for an online
+match, the network line, then the persistent hint; a hint wider than the safe
+area breaks at its `  ·  ` separators rather than running off a 4:3 screen.
+
+Everything an event throws up — a death, the initiative changing hands, the
+gate — goes in the band, at the display cut if it fits and the text cut if it
+does not. `MatchHud.flash(text, terse)` takes a second, shorter phrasing for
+the narrow screen. The result is the band plate with title, rule, how the
+match was won and the hint. A desync takes the band over. The only things
+drawn at the bottom are the two respawn rings, which are marks, not words.
 
 ### Settings
 
@@ -272,7 +289,7 @@ different typeface.
 
 ```sh
 # One frame per interface state, including the ones you cannot reach by
-# playing: pause, settings, a finished duel.
+# playing: pause, settings, a finished match.
 xvfb-run -a godot --path . --rendering-driver opengl3 \
   --script tests/ui_screens.gd -- --out /tmp/ui/after --window 1280x720
 

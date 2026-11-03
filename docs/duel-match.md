@@ -173,7 +173,12 @@ Open before the match replaces the round duel:
    `docs/fighter-poses.png`.
 3. **The zones are bare.** `zones_view.gd` builds its own tilemap, so the
    architecture and cast shadows in [`world.md`](world.md) do not run on them.
-4. **The HUD is on the fallback font**, not the game's typeface ([`ui.md`](ui.md)).
+4. ~~The HUD is on the fallback font.~~ **The HUD is set in Alcazar**, on
+   `UiFont`, `UiLayout` and `UiMarks` like every other screen
+   ([`ui.md`](ui.md#duel-hud)): chrome at the top of the safe area, words for
+   events and the result only in the reserved band, and a second, shorter
+   phrasing for a 320-unit screen. `tests/ui_screens.gd` renders it as
+   `match`, `match_flash` and `match_over`.
 5. ~~The menu and the network session.~~ The menu's **Duel** is the match on
    one keyboard, and **Duel Online** is the match between two devices
    (`scenes/duel_match_online.tscn`, `scripts/duel/match_online.gd`): the lobby,
