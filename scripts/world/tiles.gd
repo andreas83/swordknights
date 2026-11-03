@@ -97,13 +97,17 @@ const MECHANISM_LEGEND := {
 	"[": "lift", ## a lift's platform at its home stop (scripts/mechanisms/lift.gd)
 	"]": "lift",
 	"'": "lift", ## the lift's travel: air, until the slab passes through it
+	"o": "plate", ## a pressure plate: a floor stone (scripts/mechanisms/plate.gd)
+	"!": "gate", ## a portcullis, hung from a lintel (scripts/mechanisms/gate.gd)
 }
 ## The terrain a mechanism glyph's cell is in the grid. Only for something
 ## that IS terrain and stays it, like a plate, which is a floor stone: the
 ## tilemap draws and collides what is listed, so anything that stops being
 ## stone in play (crumbling stone, a seal) must be EMPTY here and bring its
 ## own collision (Mechanism.set_kind()).
-const MECHANISM_TERRAIN := {}
+const MECHANISM_TERRAIN := {
+	"o": Kind.SOLID, ## a plate is the floor's own stone, and stays it
+}
 ## Mason's marks: stone carved with a channel number. A mark wires the one
 ## mechanism it touches, up, down, left or right -- same mark, same channel --
 ## and the cell is solid stone, so an edit that inserts a row cannot detach a

@@ -529,6 +529,27 @@ body, which the prince and the foes ride as they stand on terrain. To the
 proof an unwired lift is a ladder between its stops with the lower slab as
 floor; a wired one is floor at whichever stop its wire puts it.
 
+### Plates and gates
+
+`o` is a pressure plate: one of the floor's own stones (`MECHANISM_TERRAIN`
+solid), pressed while anyone with weight stands on any part of it, and what
+the press means is its wire's (`scripts/mechanisms/plate.gd`). It sinks 2 px
+over 4 frames with a click; in the world it never moves, so footing is the
+floor's. `!` is a portcullis, a vertical run hung from a lintel that carries
+its mark (`scripts/mechanisms/gate.gd`): it rises over 30 frames, falls in
+12 and slams, and never closes on a body -- it waits above one. Its
+counterweight hangs beside it on its plate's side and is the clock: up while
+the wire is held, sinking for exactly the hold after the last foot leaves,
+five chain ticks 12 frames apart in its last second, and the gate falls when
+it lands. A latched gate's weight goes up and stays, so the first gate a
+player meets already teaches the reading the races test.
+
+A plate or a gate draws the mason's mark that wires it, carved into the mark's
+own cell (`scripts/mechanisms/masons_mark.gd`): nine signs cut in straight
+lines, not numerals, lit on the lower and right inner edge of the cut. The
+same sign on the stone under a plate and on a gate's lintel is the wiring,
+told without a word.
+
 Who counts as standing on a plate or a lift is one helper,
 `scripts/mechanisms/weight.gd`: the prince, and any live foe whose
 `has_weight()` is true -- a cat or an owl answers false.
@@ -573,6 +594,11 @@ no mechanism is proved exactly as it always was.
   frames after it is empty, is not ferried back with a rider aboard, waits two
   tiles over a body in its way, follows a wire, is stone only at rest, is a
   ladder to the proof and goes home at a respawn.
+- `tests/unit/test_counterweights.gd` — plates and gates in the game scene: the
+  plate's sink, the gate's 30-frame rise (clear of a prince about frame 21),
+  a race won and a race lost (time, not hearts), the counterweight sinking for
+  exactly the hold with five ticks and a slam, a gate waiting above a body,
+  and a respawn keeping the latch and resetting the race.
 - `tests/unit/test_secret_walls.gd`, `tests/unit/test_secret_count.gd` — the
   seals played through the real game scene, and the count.
 - `tests/unit/test_zone_dressing.gd` — the duel's zones: the stitched strip is

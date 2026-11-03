@@ -99,7 +99,7 @@ for documentation images (`character_poses.gd`, `fighter_poses.gd`,
 `feel_frames.gd`, `ui_screens.gd`). A new file that is none of those and
 matches neither convention is a test nobody runs.
 
-A green suite is not evidence on its own. This repository has produced six
+A green suite is not evidence on its own. This repository has produced seven
 distinct ways of being green while testing nothing, and each is now a guard:
 
 | Failure | Guard |
@@ -110,8 +110,9 @@ distinct ways of being green while testing nothing, and each is now a guard:
 | Every check in a suite is skipped, and it prints PASS | `report()` in the support files fails on zero checks |
 | A comment names a test or doc that does not exist | `test_references_resolve.gd` |
 | A death is hidden by the checkpoint respawn | `death_watch.gd` fails any GUT test whose prince dies unannounced (`DeathWatch.expect_deaths(n)`); `test_death_watch.gd` |
+| Two scripts share a `class_name`, so one silently loses and parse-check passes | `test_class_names_unique.gd` |
 
-**When you find a seventh, add a guard — do not just fix the symptom.** A test
+**When you find an eighth, add a guard — do not just fix the symptom.** A test
 that measures nothing must fail, and a guard is only trusted once it has been
 seen to fail: break the thing on purpose and watch it go red.
 
