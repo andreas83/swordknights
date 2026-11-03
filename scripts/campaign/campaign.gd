@@ -83,6 +83,22 @@ static func numeral_of(index: int) -> String:
 	return ""
 
 
+## What entry `index`'s title card says (Hud.show_card()): its numeral, its
+## title and its epigraph -- or, for a finale, its title alone and the mark
+## of a finale where the numeral would be (docs/campaign.md, "Story without
+## words"). Empty past either end.
+static func card(index: int) -> Dictionary:
+	var at := entry(index)
+	if at.is_empty():
+		return {}
+	return {
+		"numeral": String(at.get("numeral", "")),
+		"title": String(at.get("title", "")),
+		"epigraph": String(at.get("epigraph", "")),
+		"finale": bool(at.get("finale", false)),
+	}
+
+
 ## Test seam: plays `list` instead of the real campaign until reset().
 static func use_for_test(list: Array[Dictionary]) -> void:
 	_for_tests = list.duplicate(true)

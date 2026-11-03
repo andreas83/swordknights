@@ -200,7 +200,7 @@ route, round it yourself.
 | Title screen | `scripts/ui/menu.gd`, `scenes/menu.tscn` |
 | Settings | `scripts/ui/settings_panel.gd` |
 | Wardrobe | `scripts/ui/wardrobe_screen.gd`, `scripts/ui/figure_preview.gd`, `scenes/wardrobe.tscn` |
-| Level HUD, title card, pause/complete overlay | `scripts/ui/hud.gd` |
+| Level HUD, title and chapter cards, pause/complete overlay | `scripts/ui/hud.gd` |
 | Touch controls | `scripts/ui/touch_controls.gd`, `scripts/ui/touch_surface.gd` |
 | Duel HUD | `scripts/duel/match_hud.gd` |
 
@@ -284,6 +284,50 @@ The relic itself answers in the world: it bursts into a star and six sparks for
 `Relic.BURST_TIME` instead of vanishing, and is no longer collectable from the
 moment it is taken, so standing in the burst cannot count it twice. Still no
 hitstop on a pickup — `docs/feel.md` explains why.
+
+### Chapter cards
+
+A chapter of *The Last Light* opens on its card (`Hud.show_card()`, fed by
+`Campaign.card()`), set in the reserved band over the picture, never in a
+box:
+
+```
+            THE MIRROR TOWER          DISPLAY, paper, cast
+        ◆════════  IV  ════════◆      the rule, broken for the numeral (TEXT)
+           CATCH THE LAST LIGHT       TEXT, paper, cast
+```
+
+The numeral is set into a break in the rule, the way a book sets a
+chapter's number into its ornament; drawn as a fourth line above the name it
+read as a stray mark at 1:1, and two free-floating lozenges beside it read
+as two more. The epigraph is paper, not gold: in `LIGHT` it vanished into the
+Sun Terrace's balustrade, which is exactly the band it is set over.
+
+**It is set in three strokes**, because a card that appears whole is a label
+and one that arrives is a title: the rule opens from the middle as the wipe
+lifts (`CARD_RULE_AT`, `CARD_RULE_OPEN`), the numeral and the name come up on
+it, and the epigraph follows a beat later (`CARD_EPIGRAPH_AT`) as a line of
+its own — read last, so it is the line that stays with you. It holds to
+`CARD_HOLD` (4.4 s) and fades.
+
+**The first press of any verb takes it away** (`SKIP_FADE`, a quarter of a
+second, from wherever its fade had got to). The band is the middle of the
+screen and so where the prince is; a card held over him through his first
+jump would be covering the game to show its name. The press itself is never
+taken — the jump happens, and the card is gone before the jump is at its
+height (`tests/unit/test_title_cards.gd` times both). A press counts at once
+and a hold does not — the jump that chose the chapter may still be down when
+the card opens, and that one was not aimed at it — until the card has been
+read (`CARD_READ`, 2.2 s): then a verb still held is play, so a player who ran
+in through the wipe is not run under the card for its whole hold. A plain
+level title (Endless, a
+level played on its own) is the same card with only its name, timed as it
+always was, and skippable the same way.
+
+**The finale has its own card.** The Eclipse has no numeral of its own and
+no epigraph — it is chapter V's last room, and what it is about is not said —
+so its rule carries the one silhouette in the game that is a ring of light, a
+black disc ringed with fire, where the numeral would be.
 
 ### Duel HUD
 

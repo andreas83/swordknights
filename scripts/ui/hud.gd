@@ -17,6 +17,33 @@ extends Control
 
 const TITLE_HOLD := 2.6
 const TITLE_FADE := 0.9
+## A chapter's card (show_card()) is set in three strokes rather than at
+## once: the rule opens from the middle as the wipe lifts, the numeral and
+## the name are set on it, and the epigraph follows a beat later as a line of
+## its own -- read last, so it is the line that stays with you. It holds
+## longer than a level's title because there is more to read, and it never
+## holds longer than the player wants: see SKIP_FADE.
+const CARD_RULE_AT := 0.25
+const CARD_RULE_OPEN := 0.15
+const CARD_NAME_FADE := 0.4
+const CARD_EPIGRAPH_AT := 1.1
+const CARD_EPIGRAPH_FADE := 0.5
+const CARD_HOLD := 4.4
+## The first press of any verb takes the card away this fast, from wherever
+## its fade had got to. The card sits in the reserved band, which is the
+## middle of the screen and so where the prince is; a card that held over him
+## through his first jump would be covering the game to show its name. The
+## press itself is never taken: the jump happens, and the card gets out of
+## its way. A press counts at once and a hold does not -- the jump that chose
+## the chapter may still be down when it opens, and that one was not aimed at
+## it -- until CARD_READ: by then the card has been read, and a verb still
+## held is play, so a player who ran in through the wipe is not run under the
+## card for its whole hold.
+const SKIP_FADE := 0.25
+const CARD_READ := 2.2
+const PLAY_ACTIONS: Array[StringName] = [
+	&"jump", &"attack", &"move_left", &"move_right", &"move_up", &"move_down", &"guard",
+]
 ## The secret banner is quicker than the title: it interrupts play rather than
 ## opening it, so it says its piece and gets out of the way of the room.
 const SECRET_HOLD := 1.5
@@ -38,6 +65,15 @@ var relics_total: int = 0
 
 var _title: String = ""
 var _title_time: float = 999.0
+# --- the chapter card --- the numeral (or the finale's eclipse in its place)
+# and the epigraph; empty for a plain level title. _skip_at is the card time
+# a press took it away at, and _skip_from the light it was going from.
+var _numeral: String = ""
+var _epigraph: String = ""
+var _finale := false
+var _skip_at: float = -1.0
+var _skip_from: float = 1.0
+var _held: Dictionary = {}
 var _overlay_title: String = ""
 var _overlay_subtitle: String = ""
 var _relic_pulse: float = 0.0
@@ -78,8 +114,55 @@ func update_model(hp: int, hp_max: int, got: int, total: int, refill: bool = fal
 
 
 func show_title(level_name: String) -> void:
-	_title = level_name.to_upper().replace("_", " ")
+	show_card({"title": level_name})
+
+
+## A chapter's title card: `{numeral, title, epigraph, finale}`, every field
+## but the title optional (Campaign.card()). With only a title it is the
+## level card every other mode shows, timed as it always was.
+func show_card(card: Dictionary) -> void:
+	_title = String(card.get("title", "")).to_upper().replace("_", " ")
+	_numeral = String(card.get("numeral", "")).to_upper()
+	_epigraph = String(card.get("epigraph", "")).to_upper()
+	_finale = bool(card.get("finale", false))
 	_title_time = 0.0
+	_skip_at = -1.0
+	_skip_from = 1.0
+	# Whatever is already held when the card opens is not a press at it.
+	_held.clear()
+	for action: StringName in PLAY_ACTIONS:
+		_held[action] = InputMap.has_action(action) and Input.is_action_pressed(action)
+	queue_redraw()
+
+
+## What the card on screen says, as show_card() was given it, upper-cased.
+func card() -> Dictionary:
+	return {"numeral": _numeral, "title": _title, "epigraph": _epigraph, "finale": _finale}
+
+
+## How much of the title card is on screen, 0 to 1.
+func title_alpha() -> float:
+	if _title == "":
+		return 0.0
+	if _skip_at >= 0.0:
+		return clampf(_skip_from * (1.0 - (_title_time - _skip_at) / SKIP_FADE), 0.0, 1.0)
+	if not _is_chapter_card():
+		return clampf(1.0 - (_title_time - TITLE_HOLD) / TITLE_FADE, 0.0, 1.0)
+	var rise := clampf((_title_time - CARD_RULE_AT) / CARD_RULE_OPEN, 0.0, 1.0)
+	return minf(rise, clampf(1.0 - (_title_time - CARD_HOLD) / TITLE_FADE, 0.0, 1.0))
+
+
+func title_showing() -> bool:
+	return title_alpha() > 0.0 or (_title != "" and _title_time < CARD_RULE_AT)
+
+
+## Whether the card was taken away by a press rather than by its clock.
+func title_skipped() -> bool:
+	return _skip_at >= 0.0
+
+
+func _is_chapter_card() -> bool:
+	return _numeral != "" or _epigraph != "" or _finale
 
 
 ## --- secrets --- "SECRET FOUND" over the count, in the reserved band. It
@@ -98,8 +181,12 @@ func set_overlay(title: String, subtitle: String) -> void:
 
 
 func _process(delta: float) -> void:
-	if _title_time <= TITLE_HOLD + TITLE_FADE:
+	if title_showing():
 		_title_time += delta
+		var held_on := _title_time >= CARD_READ and _holding_to_play()
+		if _skip_at < 0.0 and (_pressed_to_play() or held_on):
+			_skip_from = title_alpha()
+			_skip_at = _title_time
 		queue_redraw()
 	if _secret_time <= SECRET_HOLD + SECRET_FADE:
 		_secret_time += delta
@@ -123,9 +210,30 @@ func _draw() -> void:
 		_draw_overlay(view)
 	elif _secret_text != "" and _secret_time <= SECRET_HOLD + SECRET_FADE:
 		_draw_secret(UiLayout.banner(view))
-	elif _title != "" and _title_time <= TITLE_HOLD + TITLE_FADE:
-		var alpha := clampf(1.0 - (_title_time - TITLE_HOLD) / TITLE_FADE, 0.0, 1.0)
-		_draw_title_card(UiLayout.banner(view), alpha)
+	elif title_showing():
+		if _is_chapter_card():
+			_draw_chapter_card(UiLayout.banner(view), title_alpha())
+		else:
+			_draw_title_card(UiLayout.banner(view), title_alpha())
+
+
+## Whether any verb is down at all, press or hold.
+func _holding_to_play() -> bool:
+	for action: StringName in PLAY_ACTIONS:
+		if InputMap.has_action(action) and Input.is_action_pressed(action):
+			return true
+	return false
+
+
+## A press of any verb since the last frame -- an edge, not a hold.
+func _pressed_to_play() -> bool:
+	var pressed := false
+	for action: StringName in PLAY_ACTIONS:
+		var held := InputMap.has_action(action) and Input.is_action_pressed(action)
+		if held and not bool(_held.get(action, true)):
+			pressed = true
+		_held[action] = held
+	return pressed
 
 
 ## Health and relics, cut into the top-left corner of the safe area.
@@ -205,6 +313,80 @@ func _draw_title_card(band: Rect2, alpha: float) -> void:
 		Palette.with_alpha(Palette.PAPER, alpha), UiFont.Align.CENTER, alpha * 0.75)
 	UiMarks.rule(self, Vector2(cx, top + UiFont.cap(UiFont.Cut.DISPLAY) + 6.0),
 		maxf(24.0, wide * 0.5), Palette.with_alpha(Palette.LIGHT_SOFT, alpha * 0.8))
+
+
+## The chapter card, in the reserved band: the name in DISPLAY, the rule
+## under it broken in the middle for the numeral -- the way a book sets a
+## chapter's number into its ornament, so the numeral reads as the rule's and
+## not as a fourth line -- and under that the epigraph in TEXT, in paper with
+## the ink cast like every caption over the city (docs/ui.md, "The light").
+## The finale has no numeral of its own and no epigraph -- it is chapter V's
+## last room, and what it is about is not said -- so its rule carries the one
+## silhouette in the game that is a ring of light, the eclipse, in the
+## numeral's place. Everything is set on whole units and fades as one light;
+## the epigraph comes up a beat after the name (CARD_EPIGRAPH_AT).
+func _draw_chapter_card(band: Rect2, alpha: float) -> void:
+	var cx := roundf(band.position.x + band.size.x * 0.5)
+	var top := band.position.y + 6.0
+	var open := clampf((_title_time - CARD_RULE_AT) / CARD_RULE_OPEN, 0.0, 1.0)
+	var rule_y := top + UiFont.cap(UiFont.Cut.DISPLAY) + 8.0
+	var wide := UiFont.width(_title, UiFont.Cut.DISPLAY)
+	var gap := 0.0
+	if _finale:
+		gap = 9.0
+	elif _numeral != "":
+		gap = roundf(UiFont.width(_numeral, UiFont.Cut.TEXT) * 0.5) + 5.0
+	_rule_with_mark(Vector2(cx, rule_y), roundf(maxf(32.0, wide * 0.5) * open), gap,
+		Palette.with_alpha(Palette.LIGHT_SOFT, alpha * 0.8))
+	if open < 1.0:
+		return
+	var set_in := alpha
+	if _skip_at < 0.0:
+		set_in = minf(alpha, clampf((_title_time - CARD_RULE_AT - CARD_RULE_OPEN)
+			/ CARD_NAME_FADE, 0.0, 1.0))
+	UiFont.draw_text(self, _title, Vector2(cx, top), UiFont.Cut.DISPLAY,
+		Palette.with_alpha(Palette.PAPER, set_in), UiFont.Align.CENTER, set_in * 0.75)
+	var mark_y := rule_y + 1.0
+	if _finale:
+		_draw_eclipse(Vector2(cx, mark_y), set_in)
+	elif _numeral != "":
+		UiFont.draw_text(self, _numeral,
+			Vector2(cx, mark_y - roundf(UiFont.cap(UiFont.Cut.TEXT) * 0.5)), UiFont.Cut.TEXT,
+			Palette.with_alpha(Palette.LIGHT_SOFT, set_in), UiFont.Align.CENTER, set_in * 0.7)
+	if _epigraph == "":
+		return
+	var line := alpha
+	if _skip_at < 0.0:
+		line = minf(alpha, clampf((_title_time - CARD_EPIGRAPH_AT) / CARD_EPIGRAPH_FADE,
+			0.0, 1.0))
+	UiFont.draw_text(self, _epigraph, Vector2(cx, rule_y + 10.0), UiFont.Cut.TEXT,
+		Palette.with_alpha(Palette.PAPER, line * 0.92), UiFont.Align.CENTER, line * 0.8)
+
+
+## UiMarks.rule with its middle left open by `gap` either side of `at.x`, for
+## the mark set into it. Without a gap it is the rule.
+func _rule_with_mark(at: Vector2, half: float, gap: float, colour: Color) -> void:
+	if gap <= 0.0 or half <= gap + 4.0:
+		UiMarks.rule(self, at, half, colour)
+		return
+	var y := roundf(at.y)
+	var left := roundf(at.x - half)
+	var right := roundf(at.x + half)
+	for span: Vector2 in [Vector2(left + 3.0, at.x - gap), Vector2(at.x + gap, right - 3.0)]:
+		draw_rect(Rect2(span.x, y, span.y - span.x, 1.0), colour)
+		draw_rect(Rect2(span.x, y + 3.0, span.y - span.x, 1.0),
+			Palette.with_alpha(colour, colour.a * 0.5))
+	for x: float in [left, right]:
+		UiMarks.lozenge(self, Vector2(x, y + 1.5), 3.5, colour)
+
+
+## The Eclipse's mark: a black disc ringed with fire, a pixel of corona round
+## an ink face, cast like every raised mark.
+func _draw_eclipse(at: Vector2, alpha: float) -> void:
+	var centre := Vector2(roundf(at.x), roundf(at.y))
+	draw_circle(centre + UiMarks.CAST, 5.0, Palette.with_alpha(Palette.INK, alpha * 0.7))
+	draw_circle(centre, 5.0, Palette.with_alpha(Palette.LIGHT, alpha))
+	draw_circle(centre, 3.6, Palette.with_alpha(Palette.INK, alpha))
 
 
 ## PAUSED / ESCAPED. The game is stopped, so this one gets weight: a scrim over

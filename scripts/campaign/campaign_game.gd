@@ -19,6 +19,8 @@ extends Node2D
 ##   JUMP TO CONTINUE; after the last it is JUMP TO DAWN and the ending card;
 ##   and when the next entry is not built yet, JUMP TO CHAPTERS returns to the
 ##   chapter select, where it waits marked "still being built".
+## - **Each chapter opens on its card**: numeral, name and epigraph from the
+##   catalogue (Campaign.card()), in place of the level's plain title.
 ## - **Sword goes back to the chapter select**, from pause or the complete
 ##   screen (`Game.quit_scene`), not to the title: the campaign is a place.
 
@@ -69,6 +71,10 @@ func _build() -> void:
 	_game.quit_scene = CHAPTER_SELECT
 	_game.level_completed.connect(_on_completed)
 	add_child(_game)
+	# The chapter's own card over the level's plain one, which Game._ready
+	# has just put up: the numeral and the epigraph are the campaign's, not
+	# the level file's, so a level stays playable on its own as it was.
+	_game.hud.show_card(Campaign.card(index))
 
 
 func _advance_label() -> String:

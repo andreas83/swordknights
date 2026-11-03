@@ -15,6 +15,15 @@ extends SceneTree
 ##
 ##     ... --script tools/screenshot.gd -- --level res://levels/level_01.txt \
 ##       --time dusk --out /tmp/dusk --shots 1.0,3.0 --hold move_right
+##
+## --chapter plays The Last Light from entry N of the catalogue (0 is chapter
+## I), as the chapter select would: its card, its sky and its tower, at its
+## hour. An entry still being built is stood in for by its draft's static
+## stand-in in docs/campaign/drafts/, set at the entry's hour, so every card
+## and every sky can be looked at before its level exists. --ending shows the
+## dawn after the last entry.
+##
+##     ... --script tools/screenshot.gd -- --chapter 3 --out /tmp/iv --shots 0.6,1.8
 
 var _scene_path := "res://scenes/game.tscn"
 var _out_dir := "user://shots"
@@ -22,6 +31,8 @@ var _shot_times: Array[float] = [1.0]
 var _hold: Array[String] = []
 var _level_path := ""
 var _time := ""
+var _chapter := -1
+var _ending := false
 
 var _elapsed := 0.0
 var _taken := 0
@@ -30,6 +41,10 @@ var _taken := 0
 func _initialize() -> void:
 	_parse_args()
 
+	if _chapter >= 0 or _ending:
+		_scene_path = "res://scenes/campaign_game.tscn"
+		_stand_in_drafts()
+		Campaign.selected = Campaign.count() - 1 if _ending else _chapter
 	var packed := load(_scene_path) as PackedScene
 	if packed == null:
 		push_error("could not load %s" % _scene_path)
@@ -41,8 +56,12 @@ func _initialize() -> void:
 	var instance := packed.instantiate()
 	if instance is Game and (_level_path != "" or _time != ""):
 		(instance as Game).level_source = _level(instance as Game)
+	if instance is CampaignGame:
+		(instance as CampaignGame).progress_path = "user://screenshot_campaign.cfg"
 	root.add_child(instance)
 	root.set_meta("screenshot_target", instance)
+	if _ending:
+		(instance as CampaignGame).call_deferred("_advance")
 
 	for action: String in _hold:
 		Input.action_press(action)
@@ -90,6 +109,29 @@ func _level(game: Game) -> AsciiLevel:
 	return data
 
 
+## The catalogue with every entry that has no level yet pointed at its
+## draft's stand-in, at the entry's hour. The finale has no draft of its own;
+## it stands in on chapter V's.
+func _stand_in_drafts() -> void:
+	var list: Array[Dictionary] = []
+	var chapter := 1
+	for index: int in Campaign.count():
+		var entry := Campaign.entry(index)
+		if String(entry["numeral"]) != "":
+			chapter = index + 1
+		if not Campaign.is_built(index):
+			var draft := "res://docs/campaign/drafts/chapter_%02d_static.txt" % mini(chapter, 5)
+			var text := FileAccess.get_file_as_string(draft)
+			text += "\n;! time %s\n" % String(entry["time"])
+			var path := "user://screenshot_entry_%d.txt" % index
+			var file := FileAccess.open(path, FileAccess.WRITE)
+			file.store_string(text)
+			file.close()
+			entry["file"] = path
+		list.append(entry)
+	Campaign.use_for_test(list)
+
+
 func _parse_args() -> void:
 	var args := OS.get_cmdline_user_args()
 	var i := 0
@@ -118,5 +160,11 @@ func _parse_args() -> void:
 			"--time":
 				_time = value
 				i += 2
+			"--chapter":
+				_chapter = int(value)
+				i += 2
+			"--ending":
+				_ending = true
+				i += 1
 			_:
 				i += 1
