@@ -112,6 +112,34 @@ static func _ladder_well() -> String:
 	return "\n".join(lines) + "\n"
 
 
+## A lift drawn at the top of an eleven-tile shaft, so it goes down
+## (scripts/mechanisms/lift.gd): the prince steps onto its slab from the
+## ledge and rides it to the bottom.
+static func _lift_shaft() -> String:
+	var bottom := LEDGE_ROW + 11
+	var lines := PackedStringArray(["; Lift shaft"])
+	for row: int in bottom + 3:
+		var line := ""
+		for col: int in WIDTH:
+			var cell := " "
+			if row > bottom:
+				cell = "#"
+			elif col == 3 or col == 4:
+				if row == LEDGE_ROW:
+					cell = "[" if col == 3 else "]"
+				elif row > LEDGE_ROW:
+					cell = "'"
+			elif row >= LEDGE_ROW:
+				cell = "#"
+			elif row == LEDGE_ROW - 1 and col == 1:
+				cell = "@"
+			elif row == LEDGE_ROW - 1 and col == WIDTH - 2:
+				cell = "D"
+			line += cell
+		lines.append(line)
+	return "\n".join(lines) + "\n"
+
+
 ## --- the scene ----------------------------------------------------------------
 
 func _play(text: String) -> void:
@@ -274,6 +302,31 @@ func test_a_ladder_is_not_a_fall() -> void:
 	assert_lt(float(landing.get("height", 0.0)), 4.0 * Tuning.TILE,
 		"but the fall was only from the ladder's foot")
 	assert_true(_game.player.is_alive(), "on his feet at the bottom")
+
+
+func test_a_lift_ride_down_is_not_a_fall() -> void:
+	await _play(_lift_shaft())
+	var top := _game.player.position.y
+	# Onto the slab, and stand still on it.
+	_input.bits = PlayerInput.BIT_RIGHT
+	for _frame: int in 60:
+		await wait_physics_frames(1)
+		if _game.player.position.x >= 3.5 * Tuning.TILE + 2.0:
+			break
+	_input.bits = 0
+	# A ride that never leaves the slab lands nowhere, so the measure itself
+	# is watched: carried down, the fall must stay at nothing all the way.
+	var measured := 0.0
+	for _frame: int in 420:
+		await wait_physics_frames(1)
+		measured = maxf(measured, _game.player.fall_height())
+		if _game.player.position.y - top >= 10.5 * Tuning.TILE and _game.player.is_grounded():
+			break
+	await wait_physics_frames(10)
+	assert_gte(_game.player.position.y - top, 10.5 * Tuning.TILE, "carried eleven tiles down")
+	assert_lt(measured, Tuning.TILE, "the slab held him up the whole way: no fall built up")
+	assert_lt(_deepest(), Tuning.TILE, "and nothing on the ride was a fall")
+	assert_true(_game.player.is_alive(), "standing on the slab at the bottom")
 
 
 func test_a_plunge_is_a_fall() -> void:

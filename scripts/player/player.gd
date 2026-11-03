@@ -633,8 +633,13 @@ func _on_touch_ground(impact: float) -> void:
 ##
 ## What resets it, and so does not count toward a fall:
 ##
-## - **The floor**, and a lift with it: a lift is a floor that moves, and the
-##   feet on it are held up. Only the drop after leaving it counts.
+## - **The floor**, and a lift with it: the lift's slab is a moving floor
+##   (scripts/mechanisms/lift.gd), and the feet on it are held up, so an
+##   eleven-tile ride down is no fall. Only the drop after leaving it counts.
+##   move_and_slide() leaves a body on a floor at rest vertically -- a
+##   slab's motion is the platform's, not the body's velocity -- so the first
+##   clause already holds there; is_grounded() is named anyway, because that
+##   is the engine's promise and the rule should not lean on it unsaid.
 ## - **A ladder**, climbed down or caught in mid-air: the rungs hold him, so a
 ##   long fall caught on one is two short ones, and a long ladder is no fall.
 ##   This one has to be named: climbing down moves him at LADDER_SPEED.
