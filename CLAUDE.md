@@ -92,12 +92,13 @@ far side.
 **New tests should be GUT.** Both naming conventions are load-bearing: a file
 matching neither is silently skipped, which loses the coverage *and* leaves the
 build green. These match neither on purpose — support libraries
-(`duel_support.gd`, `fighter_support.gd`, `level_asserts.gd`), a live network
-harness (`net_live.gd`), and renderers for documentation images
-(`character_poses.gd`, `fighter_poses.gd`, `feel_frames.gd`, `ui_screens.gd`). A new file that is
-none of those and matches neither convention is a test nobody runs.
+(`duel_support.gd`, `fighter_support.gd`, `level_asserts.gd`), GUT's pre-run
+hook (`death_watch.gd`), a live network harness (`net_live.gd`), and renderers
+for documentation images (`character_poses.gd`, `fighter_poses.gd`,
+`feel_frames.gd`, `ui_screens.gd`). A new file that is none of those and
+matches neither convention is a test nobody runs.
 
-A green suite is not evidence on its own. This repository has produced five
+A green suite is not evidence on its own. This repository has produced six
 distinct ways of being green while testing nothing, and each is now a guard:
 
 | Failure | Guard |
@@ -107,8 +108,9 @@ distinct ways of being green while testing nothing, and each is now a guard:
 | A suite is named so the runner never finds it | the two naming conventions above |
 | Every check in a suite is skipped, and it prints PASS | `report()` in the support files fails on zero checks |
 | A comment names a test or doc that does not exist | `test_references_resolve.gd` |
+| A death is hidden by the checkpoint respawn | `death_watch.gd` fails any GUT test whose prince dies unannounced (`DeathWatch.expect_deaths(n)`); `test_death_watch.gd` |
 
-**When you find a sixth, add a guard — do not just fix the symptom.** A test
+**When you find a seventh, add a guard — do not just fix the symptom.** A test
 that measures nothing must fail, and a guard is only trusted once it has been
 seen to fail: break the thing on purpose and watch it go red.
 

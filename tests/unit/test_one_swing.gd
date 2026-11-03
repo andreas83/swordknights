@@ -11,6 +11,7 @@ extends GutTest
 ## Plays the real game scene: the prince a tile from a guard, one press.
 
 const GAME_SCENE := "res://scenes/game.tscn"
+const DeathWatch := preload("res://tests/death_watch.gd")
 
 ## The prince at column 4 facing right, a guard at column 5: 16 px apart,
 ## inside the sword's reach.
@@ -97,6 +98,7 @@ func test_the_next_swing_takes_the_next_heart() -> void:
 
 	# A death after that returns the prince to a checkpoint; the guard he cut
 	# down must not be standing there again.
+	DeathWatch.expect_deaths(1)
 	_game.player.kill()
 	for _frame: int in 120:
 		await wait_physics_frames(1)

@@ -8,6 +8,7 @@ extends GutTest
 ## never fired. These cases go through Player, Game and Hud together.
 
 const GAME_SCENE := "res://scenes/game.tscn"
+const DeathWatch := preload("res://tests/death_watch.gd")
 
 ## The prince at column 1, a relic two tiles to his right.
 const SHRINE := """; Shrine
@@ -84,6 +85,7 @@ func test_a_relic_at_full_health_is_only_a_relic() -> void:
 
 
 func test_healing_is_not_a_revival() -> void:
+	DeathWatch.expect_deaths(1)
 	_game.player.kill()
 	assert_false(_game.player.heal(1), "a body that is down stays down")
 	assert_eq(_game.player.health, 0)

@@ -12,6 +12,8 @@ extends GutTest
 ## return to the same pit.
 
 const GAME_SCENE := "res://scenes/game.tscn"
+## These tests kill the prince on purpose, and say so to the death watch.
+const DeathWatch := preload("res://tests/death_watch.gd")
 
 ## Spawn at column 1, a torch at column 8, the exit at column 18.
 const CORRIDOR := """; Checkpoint Corridor
@@ -104,6 +106,7 @@ func test_death_returns_to_the_last_torch_passed() -> void:
 	await _walk_past(_torch_x() + 24.0)
 	assert_gt(_game.player.position.x, _torch_x() + 16.0, "the walk got past the torch")
 
+	DeathWatch.expect_deaths(1)
 	await _die_and_return()
 
 	assert_true(_game.player.is_alive(), "the character came back")
@@ -115,6 +118,7 @@ func test_death_returns_to_the_last_torch_passed() -> void:
 func test_death_before_any_torch_returns_to_the_spawn() -> void:
 	await _play(CORRIDOR)
 	await _walk_past(_spawn_x() + 20.0)
+	DeathWatch.expect_deaths(1)
 	await _die_and_return()
 	assert_almost_eq(_game.player.position.x, _spawn_x(), 1.0,
 		"no torch passed yet, so the spawn is still the checkpoint")
@@ -128,6 +132,7 @@ func test_a_checkpoint_respawn_keeps_the_clock_and_restores_health() -> void:
 	var clock := _game.elapsed
 	assert_gt(clock, 0.0, "the clock has been running")
 
+	DeathWatch.expect_deaths(1)
 	await _die_and_return()
 
 	assert_gte(_game.elapsed, clock, "a death costs time; it does not hand time back")

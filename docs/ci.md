@@ -137,7 +137,7 @@ have it freed at the end of the test, `await wait_physics_frames(n)` to let
 `assert_is`, `assert_has`, `assert_gt` and friends. Full reference:
 <https://gut.readthedocs.io>.
 
-### Two things that will fail your test for you
+### Three things that will fail your test for you
 
 - **Engine errors and `push_error` fail the test.** `.gutconfig.json` sets
   `failure_error_types` to `["engine", "gut", "push_error"]`, which is GUT's
@@ -147,6 +147,17 @@ have it freed at the end of the test, `await wait_physics_frames(n)` to let
   fails if it reports no tests. This is deliberate: GUT's CLI entry point
   `quit(0)`s if the project's class cache has not been built, so a job checking
   only the exit code would go green having run nothing.
+- **A death you did not announce fails the test.** `.gutconfig.json` installs
+  `tests/death_watch.gd` as GUT's pre-run hook. It counts every death of a
+  prince inside a `Game`, however the test built the scene, and fails the test
+  on the first one it was not told about: the checkpoint respawn brings him
+  back whole, on the floor, so "alive and unhurt" after a few seconds of play
+  proves nothing on its own. A test that kills him on purpose says so first,
+  with the exact count:
+  `const DeathWatch := preload("res://tests/death_watch.gd")` and
+  `DeathWatch.expect_deaths(1)`. Fewer deaths than announced fails too. The
+  editor's GUT panel keeps its own settings; set its pre-run hook to the same
+  file, or `tests/unit/test_death_watch.gd` fails there to say it is missing.
 
 ### Keep a test file under twenty tests
 

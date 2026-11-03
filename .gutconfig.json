@@ -8,5 +8,6 @@
 	"compact_mode": true,
 	"log_level": 1,
 	"disable_colors": false,
-	"failure_error_types": ["engine", "gut", "push_error"]
+	"failure_error_types": ["engine", "gut", "push_error"],
+	"pre_run_script": "res://tests/death_watch.gd"
 }
