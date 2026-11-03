@@ -1,30 +1,49 @@
-name: Deploy web build to Pages
+name: Pages site
+
+# The public page: what the game is, screenshots, the game itself under play/,
+# and a debug APK under download/. On every push to main, and on demand.
+#
+# Four jobs. The first three build and need nothing from the repository's
+# settings; only the last one talks to GitHub Pages:
+#
+#   web     export the Web preset, check it can boot on Pages
+#   apk     export the Android preset as a debug build, check its signature
+#   site    site/assemble.sh: page + play/ + download/ -> the Pages artifact
+#   deploy  publish that artifact (main only)
+#
+# Pages must be switched on by the repository owner before `deploy` can work:
+# Settings -> Pages -> Build and deployment -> Source: "GitHub Actions". Until
+# then `deploy` fails with an error that says exactly that, while the three
+# build jobs still run and stay green -- so a broken export is never hidden
+# behind a missing setting. See docs/ci.md, "What the repository owner must
+# enable".
+#
+# Run it by hand on any branch (Actions -> Pages site -> Run workflow) to build
+# and download the assembled site as the `github-pages` artifact without
+# publishing it; `deploy` only runs for main.
 
 on:
   push:
     branches: [main]
-  # Lets you redeploy the current main without an empty commit.
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  # Required by actions/deploy-pages for its OIDC exchange.
-  id-token: write
 
 # One deployment at a time. Not cancel-in-progress: cancelling midway through
 # a Pages deployment can leave the site on a half-published state.
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 env:
   GODOT_VERSION: '4.5.1'
 
 jobs:
-  build:
+  web:
     name: Export Web
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -75,29 +94,234 @@ jobs:
           fi
           echo "Single-threaded web build confirmed (no worker file)."
 
-      # Pages serves through Jekyll by default, which drops files and folders
-      # whose names begin with an underscore. Godot's output does not use any
-      # today, but one upstream change to the shell would break the site
-      # silently, so opt out for good.
-      - name: Disable Jekyll processing
-        run: touch build/web/.nojekyll
+      # The levels are plain text read with FileAccess, not imported resources,
+      # and an export leaves out whatever its include_filter does not name. A
+      # build without them boots to the menu and then opens an empty world in
+      # Adventure, Feel Lab and both duels, with an export that exited 0.
+      # The pack stores each file's path without the res:// prefix; a script
+      # that merely mentions a level does so with it, hence the look-behind.
+      - name: Verify every level is in the pack
+        run: |
+          set -euo pipefail
+          missing=0
+          for level in levels/*.txt; do
+            if ! grep -aqP "(?<!res://)${level//./\\.}" build/web/index.pck; then
+              echo "::error::${level} is not in the web export's index.pck"
+              missing=1
+            fi
+          done
+          if [[ "${missing}" -ne 0 ]]; then
+            echo "::error::Check include_filter in the Web preset of export_presets.cfg."
+            exit 1
+          fi
+          echo "All $(ls levels/*.txt | wc -l) level files are packed."
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
+      - name: Upload the web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web
+          if-no-files-found: error
+          retention-days: 1
 
-      - name: Upload Pages artifact
+  apk:
+    name: Export Android (debug)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The same steps as android.yml. Duplicated rather than shared because a
+    # workflow cannot call another workflow's jobs without making that one
+    # reusable, and android.yml is also run on its own from the Actions tab.
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Verify the Android SDK is present
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [[ -z "${sdk}" || ! -d "${sdk}" ]]; then
+            echo "::error::No Android SDK on this runner (ANDROID_HOME/ANDROID_SDK_ROOT unset)."
+            exit 1
+          fi
+          test -x "${sdk}/platform-tools/adb"
+          ls -d "${sdk}"/build-tools/*/apksigner >/dev/null
+          echo "ANDROID_HOME=${sdk}" >> "$GITHUB_ENV"
+          echo "Android SDK: ${sdk}"
+
+      - name: Set up Godot ${{ env.GODOT_VERSION }}
+        uses: ./.github/actions/setup-godot
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          templates: 'true'
+
+      - name: Import project
+        run: godot --headless --path . --import
+
+      # Godot keeps the SDK and JDK paths in its editor settings, not in the
+      # project, and on a fresh runner it guesses ~/Android/Sdk. Written after
+      # the import has created the file.
+      - name: Point Godot at the Android SDK and JDK
+        run: |
+          set -euo pipefail
+          settings="${HOME}/.config/godot/editor_settings-${GODOT_VERSION%.*}.tres"
+          test -f "${settings}"
+          for entry in \
+              "export/android/android_sdk_path = \"${ANDROID_HOME}\"" \
+              "export/android/java_sdk_path = \"${JAVA_HOME}\""; do
+            key="${entry%% =*}"
+            if grep -q "^${key} = " "${settings}"; then
+              sed -i "s|^${key} = .*|${entry}|" "${settings}"
+            else
+              echo "${entry}" >> "${settings}"
+            fi
+          done
+          grep -E '^export/android/(android|java)_sdk_path' "${settings}"
+
+      # The standard Android debug identity, generated per run and thrown away.
+      # The page says what that costs: each build is signed differently, so a
+      # new one will not install over the last.
+      - name: Generate a debug keystore
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -noprompt \
+            -keystore "${RUNNER_TEMP}/debug.keystore" \
+            -alias androiddebugkey -storepass android -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Export Android (debug)
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          godot --headless --path . --export-debug "Android" dist/swordknights.apk
+          test -s dist/swordknights.apk
+          ls -l dist/swordknights.apk
+
+      - name: Verify the APK is signed
+        run: |
+          set -euo pipefail
+          apksigner="$(ls -d "${ANDROID_HOME}"/build-tools/*/apksigner | sort -V | tail -1)"
+          "${apksigner}" verify --verbose dist/swordknights.apk
+
+      # Same check as the web job. An APK is a zip; depending on the export
+      # mode the levels sit in it as files or inside an embedded .pck, so look
+      # in both the listing and any pack.
+      - name: Verify every level is in the APK
+        run: |
+          set -euo pipefail
+          contents="${RUNNER_TEMP}/apk-contents"
+          { unzip -l dist/swordknights.apk; unzip -p dist/swordknights.apk '*.pck' 2>/dev/null || true; } \
+            > "${contents}"
+          missing=0
+          for level in levels/*.txt; do
+            if ! grep -aqP "(?<!res://)${level//./\\.}" "${contents}"; then
+              echo "::error::${level} is not in the APK"
+              missing=1
+            fi
+          done
+          if [[ "${missing}" -ne 0 ]]; then
+            echo "::error::Check include_filter in the Android preset of export_presets.cfg."
+            exit 1
+          fi
+          echo "All $(ls levels/*.txt | wc -l) level files are in the APK."
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: dist/swordknights.apk
+          if-no-files-found: error
+          retention-days: 1
+
+  site:
+    name: Assemble the site
+    needs: [web, apk]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Download the web build
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build
+          path: build/web
+
+      - name: Download the APK
+        uses: actions/download-artifact@v4
+        with:
+          name: debug-apk
+          path: build/apk
+
+      # SITE_URL is only for link previews (Open Graph wants absolute URLs).
+      # This is the default address of a project site; with a custom domain,
+      # github.io redirects to it, so previews still resolve.
+      - name: Assemble
+        env:
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          export SITE_URL="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/"
+          site/assemble.sh --web build/web --apk build/apk/swordknights.apk --out build/site
+
+      # Upload only: this action stores an artifact named github-pages and needs
+      # no Pages permissions, so it succeeds whether or not Pages is enabled.
+      - name: Upload the Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: build/web
+          path: build/site
 
   deploy:
     name: Deploy
-    needs: build
+    needs: site
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      # Required by actions/deploy-pages for its OIDC exchange.
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # actions/configure-pages and actions/deploy-pages both fail with a bare
+      # "Not Found" when Pages is off. Ask first, and say what to do about it.
+      - name: Check that Pages is enabled
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          fix='Settings -> Pages -> Build and deployment -> Source: "GitHub Actions"'
+          if response="$(gh api "repos/${GITHUB_REPOSITORY}/pages" 2>&1)"; then
+            build_type="$(jq -r '.build_type // "unknown"' <<<"${response}")"
+            echo "Pages is enabled at $(jq -r '.html_url' <<<"${response}"), build_type ${build_type}."
+            if [[ "${build_type}" == "legacy" ]]; then
+              echo "::error::Pages is set to deploy from a branch, not from this workflow. ${fix}"
+              exit 1
+            fi
+          elif grep -q 'HTTP 404' <<<"${response}"; then
+            echo "${response}"
+            echo "::error::GitHub Pages is not enabled for this repository, so there is nowhere to deploy."
+            echo "::error::The repository owner must set ${fix}, then re-run this job. The build jobs already passed; the site is in this run's github-pages artifact."
+            exit 1
+          else
+            # Not a clear "off": let deploy-pages try, and report its own error.
+            echo "${response}"
+            echo "::warning::Could not read the Pages settings; trying to deploy anyway."
+          fi
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

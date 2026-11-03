@@ -181,6 +181,11 @@ no secrets. To install: open the run, download the artifact, unzip, open the
 `.apk` on the phone and allow installing from that app. A debug build cannot be
 installed over a release build of the same package, or the reverse.
 
+Artifacts need a GitHub login and expire, so this is the build for
+contributors. The public download is the same debug build, made again by
+[`pages.yml`](#pagesyml--the-public-site-on-push-to-main-and-on-demand) and
+published on the site.
+
 Three things every export job needed, found when this one was first run — the
 web deploy had been failing on every push since the pipeline was written:
 
@@ -197,6 +202,17 @@ web deploy had been failing on every push since the pipeline was written:
   project, and on a fresh runner Godot guesses `~/Android/Sdk`. Both Android
   workflows write `ANDROID_HOME` and `JAVA_HOME` into the editor settings after
   the import step.
+
+And a fourth, found when the web build was first played rather than only
+exported:
+
+- **The level files.** `levels/*.txt` are plain text read with `FileAccess`,
+  not imported resources, and `export_filter="all_resources"` packs only
+  resources. Every export so far — web, Android, release — booted to the menu
+  and then opened an empty world in Adventure, Feel Lab and both duels; only
+  Endless, which generates its levels, worked. Every preset now carries
+  `include_filter="levels/*.txt"`, and `pages.yml` fails if any level is
+  missing from the web pack or the APK.
 
 ### `ci.yml` — on push to `main` and on every pull request
 
@@ -234,22 +250,78 @@ Why three separate validation steps rather than one:
 > prints runtime errors but still exits 0, it reads the output rather than
 > trusting the exit code.
 
-### `pages.yml` — on push to `main`, and on demand
+### `pages.yml` — the public site, on push to `main` and on demand
 
-Exports the Web build and deploys it to GitHub Pages. This is how the game gets
-playtested from a link.
+Builds and publishes the project's public page: what the game is, screenshots,
+the web build to play under `play/`, and a debug APK under
+`download/swordknights.apk`. Four jobs:
 
-It also **verifies the export before publishing**: `index.html`, `index.js`,
-`index.wasm` and `index.pck` must all exist and be non-empty, and the build
-must contain no `*.worker.js`. That last check is the guard on the
-[COOP/COEP decision](#the-coopcoep-decision) — a worker file means the threaded
-template was used, which cannot work on Pages, and failing the build is better
-than publishing a game that will not boot.
+| Job | Needs Pages? | Does |
+| --- | --- | --- |
+| `web` | no | exports the Web preset; checks the four files exist, that no `*.worker.js` was emitted, and that every `levels/*.txt` is in `index.pck` |
+| `apk` | no | the same steps as `android.yml` — JDK, SDK check, editor-settings paths, a generated debug keystore — then `apksigner verify` and the same level check on the APK |
+| `site` | no | `site/assemble.sh`: copies `site/public/`, puts the export under `play/` and the APK under `download/`, writes the APK's size and SHA-256, the engine's size and the commit into the page, and uploads the result with `actions/upload-pages-artifact` |
+| `deploy` | **yes** | `main` only: checks that Pages is enabled with Source "GitHub Actions" and says so plainly if not, then `actions/deploy-pages` |
 
-It drops a `.nojekyll` file so Pages does not run the output through Jekyll
-(which strips paths beginning with an underscore).
+The split is deliberate. Until the repository owner enables Pages (see
+[below](#what-the-repository-owner-must-enable)), only `deploy` fails, with an
+error naming the setting; the three build jobs still run and stay green, so a
+broken export is never hidden behind a missing setting, and the finished site
+is downloadable from the run as the `github-pages` artifact. Before this, every
+run died at `actions/configure-pages` with "Get Pages site failed ... Not
+Found" before the web export was ever attempted. `configure-pages` is gone: it
+only reads settings this static site does not use, and its failure explained
+nothing.
 
-`concurrency` is set to one deployment at a time and deliberately **not**
+**Run it on a branch** from the Actions tab (*Run workflow* → pick the branch)
+to build the whole site without publishing it: `deploy` is skipped for
+anything but `main`.
+
+**The page's sources** are in `site/`, which carries a `.gdignore` so the
+engine never imports them and they stay out of the game's pack:
+
+| | |
+| --- | --- |
+| `site/public/` | the page — `index.html`, `style.css`, `site.js`, `img/` — copied as is, apart from the `{{PLACEHOLDERS}}` |
+| `site/assemble.sh` | the one place the page, the export and the APK meet; runs locally too |
+| `site/render_images.sh` | re-renders every image on the page from the game, with `tools/screenshot.gd` |
+| `site/wordmark.py` | sets the title in the game's own bitmap typeface, as an SVG |
+
+The screenshots are committed, not rendered in CI: each one should be looked at
+before it goes on the page. Re-run `site/render_images.sh` after a visual
+change and review the images in the diff. The exports and the APK are never
+committed; they exist only in the workflow's artifacts and on the site.
+
+To preview the site locally, with any file standing in for the APK:
+
+```bash
+godot --headless --path . --export-release "Web" build/web/index.html
+site/assemble.sh --web build/web --apk path/to/any.apk --out build/site
+python3 -m http.server -d build/site 8000
+```
+
+**How the game is embedded.** The site does not mount the engine into its own
+page. `play/` is the export exactly as Godot writes it, and the landing page
+links to it. On a wide screen with a mouse, `site.js` swaps the poster for an
+`<iframe src="play/">` on click; on a phone the link is left alone and the game
+opens full-window, which is how a landscape game with touch controls wants to
+be played. That only works because of the
+[COOP/COEP decision](#the-coopcoep-decision): the single-threaded build needs
+no cross-origin isolation, so a same-origin iframe on GitHub Pages runs it with
+no headers at all. A threaded build would need the isolation headers on the
+landing page as well as on `play/`, which Pages cannot send, and the `web`
+job's worker-file check stops that before it ships. Nothing loads the engine
+until the visitor asks: the page itself is about 100 KB, the engine about
+39 MB.
+
+**The APK** on the site is debug-signed with a key generated in each run, so
+every build has a different signature: Android will not install one over the
+previous one, nor over a release build. The page says so and tells people to
+uninstall first. A stable debug key, kept as a repository secret, would make
+updates install in place; that is a choice for the owner, not something the
+workflow should invent.
+
+`concurrency` is set to one run per branch and deliberately **not**
 `cancel-in-progress`: cancelling a Pages deployment midway can leave the site
 half-published.
 
@@ -308,12 +380,18 @@ Those three move by hand; see
 ## What the repository owner must enable
 
 Three things, all in the repository's own settings. Until the first two are
-done, `pages.yml` will fail.
+done, `pages.yml`'s `deploy` job will fail and the site will not be online.
 
-1. **Pages source must be GitHub Actions.**
+1. **Pages source must be GitHub Actions. This is not done yet.**
    *Settings → Pages → Build and deployment → Source: **GitHub Actions***.
    Not "Deploy from a branch" — this pipeline publishes an artifact, there is
-   no `gh-pages` branch.
+   no `gh-pages` branch. Only someone with admin rights on the repository can
+   do this; no workflow can, because `GITHUB_TOKEN` is not allowed to create a
+   Pages site. Until it is done, every `pages.yml` run ends with `deploy`
+   failing on *"GitHub Pages is not enabled for this repository"*, while
+   `web`, `apk` and `site` pass. After switching it on, re-run the failed
+   `deploy` job (or the whole workflow) and the site appears at
+   `https://<owner>.github.io/swordknights/`.
 
 2. **Workflow permissions.**
    *Settings → Actions → General → Workflow permissions*. The workflows each
@@ -422,6 +500,11 @@ Option 1 was chosen. Verified locally: the exported `index.wasm` is
 byte-identical to `web_nothreads_release.zip`'s `godot.wasm`, and no
 `*.worker.js` is emitted. `pages.yml` re-checks the absence of that worker file
 on every deploy.
+
+It is also what lets the public site embed the game with a plain same-origin
+`<iframe src="play/">`: a document that needs no isolation can be framed by one
+that has none. See
+[how the game is embedded](#pagesyml--the-public-site-on-push-to-main-and-on-demand).
 
 ### What it costs
 

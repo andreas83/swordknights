@@ -8,6 +8,9 @@ keyboard or over the network.
 Built with **Godot 4.5.1**. There are no hand-drawn assets — terrain, skyline,
 characters and effects are all generated or drawn from one small palette.
 
+**[Play it in the browser, or get the Android build](https://andreas83.github.io/swordknights/)**
+— the project's page, rebuilt from `main` on every push.
+
 ![The Sun Terrace](docs/screenshot.png)
 
 ## Running it
