@@ -121,6 +121,13 @@ static func specs() -> Dictionary:
 			"peak": 0.88, "seed": 1305, "pitch_jitter": 0.06, "gain_jitter": 1.0,
 			"min_gap": 0.2, "duck": 4.0,
 		},
+		# Counterweights (docs/campaign.md): a lift's haul and rattle, a gate's
+		# chain, and the five ticks of a counterweight's last second. Short
+		# enough to tick every 12 frames without smearing into one.
+		"chain": {
+			"peak": 0.55, "seed": 1306, "pitch_jitter": 0.08, "gain_jitter": 1.5,
+			"min_gap": 0.05,
+		},
 
 		# --- interface ---
 		"ui_move": {
@@ -277,6 +284,7 @@ static func _render(name: String, rate: int, seed_value: int) -> PackedFloat32Ar
 		"level_complete": return _level_complete(rate, seed_value)
 		"secret": return _secret(rate, seed_value)
 		"masonry": return _masonry(rate, seed_value)
+		"chain": return _chain(rate, seed_value)
 		"ui_move": return _ui_move(rate, seed_value)
 		"ui_confirm": return _ui_arpeggio(rate, seed_value, true)
 		"ui_back": return _ui_arpeggio(rate, seed_value, false)
@@ -659,6 +667,29 @@ static func _masonry(rate: int, seed_value: int) -> PackedFloat32Array:
 			"q": 1.2, "attack": 0.002, "decay": 0.05, "curve": 2.0,
 			"amp": 0.32 - 0.05 * i, "seed": seed_value + 7 * (i + 1),
 		})
+	return buf
+
+
+## Iron over a drum: one link knocking the next. Karplus-Strong on a short
+## delay -- plucks pitched so high their strings are a few dozen samples long
+## -- rings like struck iron and stops dry, two links a hair apart, over a
+## click of grit. No new timbre: the ladder's pluck, an octave and a half up
+## and harder. The cue pitches it: down for a gate's haul, up for a lift's
+## rattle, and a counterweight's last second is five of them.
+static func _chain(rate: int, seed_value: int) -> PackedFloat32Array:
+	var buf := Synth.buffer(0.12, rate)
+	Synth.add_pluck(buf, {
+		"rate": rate, "len": 0.11, "freq": 1180.0, "decay": 0.07,
+		"brightness": 0.95, "amp": 0.5, "seed": seed_value, "release": 0.03,
+	})
+	Synth.add_pluck(buf, {
+		"rate": rate, "start": 0.012, "len": 0.095, "freq": 1730.0, "decay": 0.05,
+		"brightness": 0.9, "amp": 0.32, "seed": seed_value + 5, "release": 0.03,
+	})
+	Synth.add_noise(buf, {
+		"rate": rate, "len": 0.015, "cutoff": 3200.0, "q": 0.9, "decay": 0.012,
+		"curve": 2.0, "amp": 0.25, "seed": seed_value + 9,
+	})
 	return buf
 
 

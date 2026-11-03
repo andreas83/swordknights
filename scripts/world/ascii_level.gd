@@ -62,6 +62,11 @@ var directives: Array[Dictionary] = []
 var declared: Dictionary = {}
 ## Cell -> digit: the mason's marks, each solid stone in the grid.
 var masons_marks: Dictionary = {}
+## Cell -> the glyph that put a mechanism there. One kind can have several
+## glyphs whose places differ: a lift's `[ ]` is its home stop and its `'` its
+## travel, which is how it knows which way it goes. Also on each mechanism
+## mark, as `glyphs`, for its reach hook.
+var mechanism_glyphs: Dictionary = {}
 ## Channel -> `{mode, seconds, phase, period}` from `;! channel` lines.
 var channels: Dictionary = {}
 ## What is wrong with the text, for whoever wrote it. Never an error in play.
@@ -119,6 +124,7 @@ func parse(text: String) -> void:
 	declared.clear()
 	problems.clear()
 	masons_marks.clear()
+	mechanism_glyphs.clear()
 	channels.clear()
 	var number := 0
 	for raw: String in text.split("\n", true):
@@ -179,6 +185,7 @@ func parse(text: String) -> void:
 				if not mechanisms.has(mechanism):
 					mechanisms[mechanism] = []
 				(mechanisms[mechanism] as Array).append(Vector2i(x, y))
+				mechanism_glyphs[Vector2i(x, y)] = glyph
 				_grid[y * cols + x] = Tiles.mechanism_terrain(glyph)
 				continue
 
@@ -346,6 +353,10 @@ func _place_runs(declared_runs: Dictionary, mechanism_runs: Dictionary) -> void:
 	for kind: String in mechanism_runs:
 		for run: Array[Vector2i] in _connected(mechanism_runs[kind]):
 			var mark := _run_mark(kind, run, {})
+			var glyphs := {}
+			for cell: Vector2i in run:
+				glyphs[cell] = mechanism_glyphs[cell]
+			mark["glyphs"] = glyphs
 			entities.append(mark)
 			wired.append(mark)
 	_wire(wired)

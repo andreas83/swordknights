@@ -89,9 +89,13 @@ const SEAL_KIND := {
 ## with three differences: every connected run of glyphs of one kind is ONE
 ## mechanism (a portcullis three cells tall is one gate, and `[` `]` can be one
 ## lift); it is wired by the mason's marks it touches; and its cell parses as
-## MECHANISM_TERRAIN says, empty unless listed. Empty here until the builders
-## register theirs -- the campaign proposes `o ! [ ] ' , x O z i`.
-const MECHANISM_LEGEND := {}
+## MECHANISM_TERRAIN says, empty unless listed. Each builder adds its own,
+## one line each -- the campaign proposes `o ! [ ] ' , x O z i`.
+const MECHANISM_LEGEND := {
+	"[": "lift", ## a lift's platform at its home stop (scripts/mechanisms/lift.gd)
+	"]": "lift",
+	"'": "lift", ## the lift's travel: air, until the slab passes through it
+}
 ## The terrain a mechanism glyph's cell is in the grid. Only for something
 ## that IS terrain and stays it, like a plate, which is a floor stone: the
 ## tilemap draws and collides what is listed, so anything that stops being

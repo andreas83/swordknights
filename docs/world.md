@@ -349,8 +349,11 @@ parses as `Tiles.MECHANISM_TERRAIN` says: empty, unless the mechanism is
 terrain and stays it, like a plate, which is a floor stone. And it is wired by
 the mason's marks it touches.
 
-The legend starts empty; each mechanism's builder adds its glyph, with one
-line in `EntityRegistry.kinds()`. The campaign's proposed glyphs
+Each mechanism's builder adds its glyphs, one line each, with one line in
+`EntityRegistry.kinds()`. A kind can have several glyphs that mean different
+places in one run -- the lift's slab and its shaft -- so the parser keeps
+which glyph is where: `AsciiLevel.mechanism_glyphs`, and `glyphs` on each
+mechanism's mark for its reach hook. The campaign's proposed glyphs
 (`docs/campaign.md`, *Glyphs*) are all free.
 
 ### Mason's marks
@@ -456,6 +459,27 @@ The tilemap, the dressing and the cast shadow are built from the level as
 authored, so a mechanism draws itself and casts no sun shadow. Mechanisms
 are props in the light, like a torch.
 
+### The lift
+
+`[ ]` is a lift's slab at its home stop and `'` the shaft it travels; the
+glyphs are one mechanism (`scripts/mechanisms/lift.gd`), and the end of the
+run furthest from the slab is the other stop, so a lift drawn with its slab at
+the bottom goes up and one drawn at the top goes down. The shaft's top cell is
+in the landing's top row, so the slab arrives flush with it. Unwired, it is
+ridden: it leaves 30 frames after a body's weight is over it, travels at a
+walk's 40 px/s, waits at the far stop, and goes home 180 frames after it is
+empty; a rider must step off before he can send it back. A mason's mark beside
+it wires it instead: at the far stop while the channel is on. It never closes
+on a body, and coming down it waits two tiles above one, room for a hop. At
+rest its cells are stone in the overlay; moving, it is only its kinematic
+body, which the prince and the foes ride as they stand on terrain. To the
+proof an unwired lift is a ladder between its stops with the lower slab as
+floor; a wired one is floor at whichever stop its wire puts it.
+
+Who counts as standing on a plate or a lift is one helper,
+`scripts/mechanisms/weight.gd`: the prince, and any live foe whose
+`has_weight()` is true -- a cat or an owl answers false.
+
 ### Restarts and respawns
 
 A restart rebuilds the level, mechanisms included, on a new bus. **A
@@ -491,6 +515,11 @@ no mechanism is proved exactly as it always was.
   stone plate and a gate on one mark in the game scene, a beat gate keeping
   time with the game, the restart rule, the respawn keeping latches and
   resetting presses, and an unwired mechanism as a problem.
+- `tests/unit/test_lift.gd` — the lift played in the game scene: it leaves 30
+  frames after a rider boards, travels five courses at 40 px/s, goes home 180
+  frames after it is empty, is not ferried back with a rider aboard, waits two
+  tiles over a body in its way, follows a wire, is stone only at rest, is a
+  ladder to the proof and goes home at a respawn.
 - `tests/unit/test_secret_walls.gd`, `tests/unit/test_secret_count.gd` — the
   seals played through the real game scene, and the count.
 - `tests/unit/test_zone_dressing.gd` — the duel's zones: the stitched strip is

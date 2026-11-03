@@ -168,6 +168,13 @@ func impact_point() -> Vector2:
 	return Vector2(global_position.x, bounds().position.y)
 
 
+## Heavy enough that its feet hold a plate down and a lift counts it as a
+## rider: a guard, a Bastion, a Glassbearer. A cat or an owl is too light and
+## answers false (docs/campaign.md, "Counterweights").
+func has_weight() -> bool:
+	return true
+
+
 ## --- the entity protocol (scripts/entities/entity_registry.gd) ---------------
 
 ## How long a warning of `seconds` lasts: a tell, or a window that guards a

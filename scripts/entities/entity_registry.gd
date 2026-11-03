@@ -62,6 +62,7 @@ static func kinds() -> Dictionary:
 		"exit": ExitDoor,
 		"torch": Torch,
 		"patrol": Patrol,
+		"lift": Lift,
 	}
 	out.merge(_for_tests)
 	return out
