@@ -87,6 +87,10 @@ const CUT_HIGH := 18.0
 const HEAR_GAP := 6.0
 ## How far apart two feet can be and still count as the same floor.
 const SAME_FLOOR := 10.0
+## Every guard joins this group, so whatever needs to know whether one is
+## about -- the prince's idle, for one -- asks the tree instead of being handed
+## a list by the scene that spawned them.
+const GROUP := &"guards"
 
 var level: Level
 var facing: int = -1
@@ -108,6 +112,7 @@ func _ready() -> void:
 	up_direction = Vector2.UP
 	collision_layer = 0
 	collision_mask = Tiles.MASK_SOLID | Tiles.MASK_ONE_WAY
+	add_to_group(GROUP)
 
 	var shape := CollisionShape2D.new()
 	var rect := RectangleShape2D.new()

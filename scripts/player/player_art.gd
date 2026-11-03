@@ -92,6 +92,14 @@ const FLASH_TIME := 0.14 ## How long a hit burns the whole figure white.
 var blade_tip := Vector2.ZERO
 var blade_hot: float = 0.0
 
+## --- idle -----------------------------------------------------------------
+##
+## The fidgets and bits the prince plays when left alone are IdleArt
+## (scripts/player/idle_art.gd), a child of this node: it lays its pose over
+## `_idle()` and draws its props over the figure. Null on any other body;
+## nobody idles in a duel.
+var idle_art: IdleArt
+
 var _player: Player
 var _time: float = 0.0
 
@@ -141,6 +149,7 @@ func _bind() -> bool:
 	_player.hurt.connect(_on_hurt)
 	_player.died.connect(_on_died)
 	PlayerFx.attach(_player)
+	idle_art = IdleArt.attach(self, _player)
 	return true
 
 
@@ -644,7 +653,7 @@ func _posture() -> Dictionary:
 ## Barely moving, but never still: the robe breathes and the hood settles.
 func _idle() -> Dictionary:
 	var breath := sin(_time * 2.0)
-	return _pose({
+	var rest := _pose({
 		"squash": 1.0 + breath * 0.012,
 		"bob": breath * 0.22,
 		"lean": 0.5,
@@ -654,6 +663,7 @@ func _idle() -> Dictionary:
 		"cloak_sweep": 0.5 - breath * 0.2,
 		"blade": 2.42, "blade_len": 9.0,
 	})
+	return rest if idle_art == null else idle_art.pose(rest)
 
 
 func _walk(t: float) -> Dictionary:
