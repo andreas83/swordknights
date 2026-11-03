@@ -1,0 +1,109 @@
+name: Android APK (debug)
+
+# An installable APK for trying the game on a phone, on every push to main and
+# on demand from the Actions tab. Debug-signed with a keystore generated inside
+# the run, so it needs no repository secrets at all -- unlike release.yml,
+# which signs with the release key and only runs for a version tag.
+#
+# The APK is the run's artifact: Actions -> this workflow -> the run ->
+# "swordknights-debug-apk". Android will ask to allow installing from the
+# browser or file manager it is opened in. A debug build cannot be installed
+# over a release build of the same package; uninstall one first.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'legacy/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-debug-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: '4.5.1'
+
+jobs:
+  apk:
+    name: Debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Same check as release.yml: the hosted image ships the SDK, and a missing
+      # build-tools directory is the usual cause of an export that fails with
+      # no explanation.
+      - name: Verify the Android SDK is present
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [[ -z "${sdk}" || ! -d "${sdk}" ]]; then
+            echo "::error::No Android SDK on this runner (ANDROID_HOME/ANDROID_SDK_ROOT unset)."
+            exit 1
+          fi
+          test -x "${sdk}/platform-tools/adb"
+          ls -d "${sdk}"/build-tools/*/apksigner >/dev/null
+          echo "ANDROID_HOME=${sdk}" >> "$GITHUB_ENV"
+          echo "Android SDK: ${sdk}"
+
+      - name: Set up Godot ${{ env.GODOT_VERSION }}
+        uses: ./.github/actions/setup-godot
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          templates: 'true'
+
+      - name: Import project
+        run: godot --headless --path . --import
+
+      # The standard Android debug identity. Generated per run and thrown away:
+      # nothing about a debug signature is secret, and generating it here is
+      # what lets this workflow run on a fork or a fresh clone with no setup.
+      - name: Generate a debug keystore
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -noprompt \
+            -keystore "${RUNNER_TEMP}/debug.keystore" \
+            -alias androiddebugkey -storepass android -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Export Android (debug)
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          apk="dist/swordknights-debug-${GITHUB_SHA::7}.apk"
+          godot --headless --path . --export-debug "Android" "${apk}"
+          test -s "${apk}"
+          ls -l "${apk}"
+
+      - name: Verify the APK is signed
+        run: |
+          set -euo pipefail
+          apksigner="$(ls -d "${ANDROID_HOME}"/build-tools/*/apksigner | sort -V | tail -1)"
+          "${apksigner}" verify --verbose dist/*.apk
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: swordknights-debug-apk
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 14
