@@ -21,6 +21,13 @@ var camera: Camera2D
 var dusk: float = 0.0
 
 const _DEPTHS: Array[float] = [0.12, 0.26, 0.46]
+## A flock crosses the far sky once every FLOCK_EVERY seconds and takes
+## FLOCK_CROSS of them to do it: often enough that the city is inhabited,
+## rarely enough that nobody waits for it. Birds are the far plane, so they
+## are drawn in the sky's own crimson, a step darker, and never crisp gold.
+const FLOCK_EVERY := 31.0
+const FLOCK_CROSS := 12.0
+const FLOCK_SIZE := 5
 const _BASELINES: Array[float] = [0.74, 0.82, 0.92]
 
 var _layers: Array = []
@@ -65,6 +72,7 @@ func _draw() -> void:
 
 	var cam := camera.global_position if camera != null else Vector2.ZERO
 	_draw_sun(view, cam)
+	_draw_flock(view, cam)
 
 	var colors: Array[Color] = [
 		Palette.with_alpha(Palette.SHADOW, 0.55).lerp(
@@ -181,3 +189,33 @@ func _draw_arch(x: float, y: float, w: float, h: float, color: Color) -> void:
 		points.append(Vector2(x + w * 0.5 + cos(angle) * radius, y + radius - sin(angle) * radius))
 	points.append(Vector2(x + w, y + h))
 	draw_colored_polygon(points, color)
+
+
+## A loose line of birds crossing behind the city, wings beating in turn. A
+## pure function of the clock and the seed, so nothing is spawned or freed.
+func _draw_flock(view: Vector2, cam: Vector2) -> void:
+	var cycle := floorf(_time / FLOCK_EVERY)
+	var t := (_time - cycle * FLOCK_EVERY) / FLOCK_CROSS
+	if t >= 1.0:
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(Vector2i(seed_value, int(cycle)))
+	var heading := 1.0 if rng.randf() < 0.5 else -1.0
+	var y := view.y * rng.randf_range(0.16, 0.4) - cam.y * 0.05
+	var lead_x := lerpf(-30.0, view.x + 30.0, t)
+	if heading < 0.0:
+		lead_x = view.x - lead_x
+	lead_x -= cam.x * 0.08
+	var color := Palette.with_alpha(Palette.SHADOW_DEEP, 0.8).lerp(Palette.INK, dusk)
+	for i: int in FLOCK_SIZE:
+		var bx := roundf(lead_x - heading * (6.0 + rng.randf() * 4.0) * float(i))
+		var by := roundf(y + absf(float(i) - 1.0) * 2.0 + rng.randf() * 3.0
+			+ sin(_time * 0.9 + float(i)) * 1.5)
+		# Two strokes: wings up, then wings down, four beats a second.
+		var up := int(_time * 8.0 + float(i) * 1.7) % 2 == 0
+		var tip := -1.0 if up else 1.0
+		draw_rect(Rect2(bx - 2.0, by + tip, 1.0, 1.0), color)
+		draw_rect(Rect2(bx - 1.0, by, 1.0, 1.0), color)
+		draw_rect(Rect2(bx, by + (1.0 if up else 0.0), 1.0, 1.0), color)
+		draw_rect(Rect2(bx + 1.0, by, 1.0, 1.0), color)
+		draw_rect(Rect2(bx + 2.0, by + tip, 1.0, 1.0), color)

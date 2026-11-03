@@ -24,8 +24,9 @@ extends RefCounted
 ## with ornament on every surface. Three arches and one long shadow beat a
 ## wall of carving.
 
-## { "mid": { Vector2i: Vector2i }, "fore": { Vector2i: Vector2i } }
-## Cell -> atlas coordinates, split by the plane it is drawn on.
+## { "mid": {...}, "fore": {...}, "props": {...} }, each { Vector2i: Vector2i }:
+## cell -> atlas coordinates, split by the plane it is drawn on. "props" is the
+## room moods' plane, drawn over "mid"; see the end of this file.
 
 const ARCH_PITCH := 3        ## columns between blind arches in an arcade
 const ARCH_MIN_RUN := 5      ## narrower than this and a wall gets no arcade
@@ -76,6 +77,10 @@ static func dress(level: AsciiLevel) -> Dictionary:
 	_resolve_runs(mid, "column_shaft", "column_cap", "column_base")
 	_resolve_runs(fore, "fore_cloth", "fore_cloth", "fore_cloth_tail")
 
+	# Life last: it fills in around the architecture and never displaces it.
+	var props := {}
+	_dress_rooms(level, mid, fore, props, reserved)
+
 	# A duelling arena is mirror-symmetric on purpose (levels/arena_01.txt
 	# explains why, and tests/duel_arena_test.gd pins it). Decoration carries
 	# no collision so it cannot make a match unfair, but a foreground column
@@ -86,7 +91,8 @@ static func dress(level: AsciiLevel) -> Dictionary:
 	if _is_mirror_symmetric(level):
 		_mirror_plane(mid, level.cols)
 		_mirror_plane(fore, level.cols)
-	return {"mid": mid, "fore": fore}
+		_mirror_plane(props, level.cols)
+	return {"mid": mid, "fore": fore, "props": props}
 
 
 static func _is_mirror_symmetric(level: AsciiLevel) -> bool:
@@ -552,3 +558,311 @@ static func _rule_cloth(level: AsciiLevel, fore: Dictionary, taken: Dictionary,
 			_put(fore, taken, head, "fore_cloth")
 			_put(fore, taken, tail, "fore_cloth_tail")
 			break
+
+
+## --- room moods: wear, growth and the things people leave about ------------
+##
+## Architecture alone made every room the same room: the same arcade, the same
+## cornice, the same colonnade, repeated for as long as the level is long. A
+## lived-in city differs street by street, so the level is cut into rooms
+## ROOM_COLS wide and each room is given ONE mood:
+##
+##   GARDEN  ivy over the parapets, grass along the lips, a potted palm, the
+##           planters in flower
+##   STORE   urns and jars stacked against the walls
+##   RUIN    cracked and spalled stone, rubble at the foot of the walls
+##   COURT   latticed windows, lanterns under the overhangs, a rug over a rail
+##
+## One mood per room, not a little of each everywhere, is the restraint rule
+## applied to life: a room reads as "the garden" or "the store" the way a
+## street does. The order the moods come in is shuffled per level from its
+## name, so consecutive rooms never repeat and two levels do not share an
+## order.
+##
+## Everything here goes on the PROPS plane, a second mid-ground layer over the
+## architecture (scripts/world/level.gd), so an urn can stand in front of a
+## cornice and ivy can hang over a frieze without taking the cell from it. The
+## safety argument is the same as for every other mark: no collision, no
+## queried kind, never on a reserved cell. Wear, ivy, moss and windows lie over
+## stone the terrain already has; everything else stands in a cell the terrain
+## left empty.
+
+const ROOM_COLS := 20
+enum Mood { GARDEN, STORE, RUIN, COURT }
+const IVY_PITCH := 5
+const IVY_LONGEST := 4
+const WINDOW_PITCH := 4
+## Courses of sheer face below a window row that make a wall a building.
+const TALL_WALL := 7
+const STOREY := 3
+const LANTERN_PITCH := 5
+## How often a face cracks: in a ruin, and everywhere else.
+const WEAR_RUIN := 0.16
+const WEAR_ELSEWHERE := 0.02
+const GRASS_SHARE := 0.4
+
+## Ids a floor prop may stand in front of. Anything else in the cell -- a
+## column, a balustrade, a planter -- is already standing there.
+const BEHIND_PROPS := ["cornice"]
+## Ids that ivy may hang over. A carved band under vines is a ruin's best
+## look; an arch or a niche under them is a mess.
+const BEHIND_IVY := ["frieze"]
+
+
+## The mood of the room column `x` falls in.
+static func mood_at(level: AsciiLevel, x: int) -> Mood:
+	var order := _mood_order(level)
+	return order[posmod(x / ROOM_COLS, order.size())]
+
+
+static func _mood_order(level: AsciiLevel) -> Array[Mood]:
+	var order: Array[Mood] = [Mood.GARDEN, Mood.STORE, Mood.RUIN, Mood.COURT]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(level.name)
+	for i: int in range(order.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var keep := order[i]
+		order[i] = order[j]
+		order[j] = keep
+	return order
+
+
+## A fixed, cheap hash of a cell, in [0, 1). Not a RandomNumberGenerator:
+## a cell's answer must not depend on how many cells were asked before it.
+static func _noise(x: int, y: int, salt: int) -> float:
+	var h := (x * 73856093) ^ (y * 19349663) ^ (salt * 83492791)
+	h = (h ^ (h >> 13)) * 1274126177
+	h = h ^ (h >> 16)
+	return float(posmod(h, 1000)) / 1000.0
+
+
+static func _dress_rooms(level: AsciiLevel, mid: Dictionary, fore: Dictionary,
+		props: Dictionary, reserved: Dictionary) -> void:
+	_rule_moss(level, mid, props, reserved)
+	_rule_ivy(level, mid, props, reserved)
+	_rule_windows(level, mid, props, reserved)
+	_rule_wear(level, mid, props, reserved)
+	_rule_floor_props(level, mid, props, reserved)
+	_rule_lanterns(level, fore, props, reserved)
+	_rule_room_variants(level, mid)
+
+
+static func _put_prop(props: Dictionary, cell: Vector2i, id: String) -> void:
+	props[cell] = Tiles.DECOR_ATLAS[id]
+
+
+static func _mid_is(mid: Dictionary, cell: Vector2i, ids: Array) -> bool:
+	if not mid.has(cell):
+		return true
+	for id: String in ids:
+		if mid[cell] == Tiles.DECOR_ATLAS[id]:
+			return true
+	return false
+
+
+## Stone that stands in water grows moss, whatever the room.
+static func _rule_moss(level: AsciiLevel, mid: Dictionary, props: Dictionary,
+		reserved: Dictionary) -> void:
+	for y: int in level.rows:
+		for x: int in level.cols:
+			if level.kind_at(x, y) != Tiles.Kind.WATER:
+				continue
+			for d: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, 1),
+					Vector2i(-1, 1), Vector2i(1, 1)]:
+				var cell := Vector2i(x, y) + d
+				if level.is_solid(cell.x, cell.y) and not mid.has(cell) \
+						and not props.has(cell) and not reserved.has(cell):
+					_put_prop(props, cell, "moss")
+
+
+## Ivy comes over the parapet of a garden terrace and down its face.
+static func _rule_ivy(level: AsciiLevel, mid: Dictionary, props: Dictionary,
+		reserved: Dictionary) -> void:
+	for run: Vector3i in _surface_runs(level):
+		var x := run.x + 1 + int(_noise(run.x, run.z, 7) * IVY_PITCH)
+		while x <= run.y - 1:
+			if mood_at(level, x) == Mood.GARDEN:
+				_hang_ivy(level, mid, props, reserved, x, run.z + 1)
+			x += IVY_PITCH
+
+
+static func _hang_ivy(level: AsciiLevel, mid: Dictionary, props: Dictionary,
+		reserved: Dictionary, x: int, top: int) -> void:
+	var want := 2 + int(_noise(x, top, 3) * float(IVY_LONGEST - 1))
+	var cells: Array[Vector2i] = []
+	for y: int in range(top, top + want):
+		var cell := Vector2i(x, y)
+		if not _is_face(level, x, y) or props.has(cell) or reserved.has(cell) \
+				or not _mid_is(mid, cell, BEHIND_IVY):
+			break
+		cells.append(cell)
+	if cells.size() < 2:
+		return
+	for i: int in cells.size():
+		var id := "ivy"
+		if i == 0:
+			id = "ivy_top"
+		elif i == cells.size() - 1:
+			id = "ivy_end"
+		_put_prop(props, cells[i], id)
+
+
+## Latticed windows two courses under the cap. A court has them on every
+## wall; anywhere else only a wall tall enough to be a building gets a storey
+## of them, because a sheer face that high with nothing in it is the
+## placeholder the art direction warns about.
+static func _rule_windows(level: AsciiLevel, mid: Dictionary, props: Dictionary,
+		reserved: Dictionary) -> void:
+	for run: Vector3i in _surface_runs(level):
+		# Storeys every STOREY courses, staggered, for as long as the wall
+		# is still a building below them; a court gets the first storey on
+		# any wall at all.
+		var storey := 0
+		var row := run.z + 2
+		while storey == 0 or _face_depth(level, (run.x + run.y) / 2, row) >= TALL_WALL:
+			var x := run.x + 2 + (storey % 2) * (WINDOW_PITCH / 2)
+			while x <= run.y - 2:
+				var cell := Vector2i(x, row)
+				var wanted := (storey == 0 and mood_at(level, x) == Mood.COURT) \
+					or _face_depth(level, x, row) >= TALL_WALL
+				if wanted and _is_face(level, x, row) and _is_face(level, x, row + 1) \
+						and not mid.has(cell) and not props.has(cell) \
+						and not reserved.has(cell):
+					_put_prop(props, cell, "window")
+				x += WINDOW_PITCH
+			storey += 1
+			row += STOREY
+
+
+## How many courses of wall face run down from `row` before the stone ends or
+## an arcade begins.
+static func _face_depth(level: AsciiLevel, x: int, row: int) -> int:
+	var depth := 0
+	while _is_face(level, x, row + depth):
+		depth += 1
+	return depth
+
+
+## Cracks and spalled blocks: thick in a ruin, rare anywhere else, never two
+## touching.
+static func _rule_wear(level: AsciiLevel, mid: Dictionary, props: Dictionary,
+		reserved: Dictionary) -> void:
+	for y: int in level.rows:
+		for x: int in level.cols:
+			var cell := Vector2i(x, y)
+			if not _is_face(level, x, y) or mid.has(cell) or props.has(cell) \
+					or reserved.has(cell):
+				continue
+			if props.has(cell + Vector2i(-1, 0)) or props.has(cell + Vector2i(0, -1)):
+				continue
+			var n := _noise(x, y, 1)
+			var ruin := mood_at(level, x) == Mood.RUIN
+			if n < (WEAR_RUIN if ruin else WEAR_ELSEWHERE):
+				_put_prop(props, cell, "worn" if ruin and n < WEAR_RUIN * 0.4 else "crack")
+
+
+## Whatever stands on a floor: jars in a store, rubble in a ruin, a palm and
+## grass in a garden. Stacked against walls first, because that is where
+## people put things and where rubble falls.
+static func _rule_floor_props(level: AsciiLevel, mid: Dictionary, props: Dictionary,
+		reserved: Dictionary) -> void:
+	for run: Vector3i in _surface_runs(level):
+		for end: int in [run.x, run.y]:
+			var step := 1 if end == run.x else -1
+			var wall := _surface_row(level, end - step)
+			var against_wall := wall >= 0 and wall < run.z
+			if not against_wall:
+				continue
+			match mood_at(level, end):
+				Mood.STORE:
+					_place_floor(level, mid, props, reserved, end, run.z, "urn")
+					_place_floor(level, mid, props, reserved, end + step, run.z, "jars")
+				Mood.RUIN:
+					_place_floor(level, mid, props, reserved, end, run.z, "rubble")
+		if run.y - run.x + 1 < 6:
+			continue
+		var mood := mood_at(level, (run.x + run.y) / 2)
+		if mood == Mood.GARDEN:
+			var palm_x := run.x + 2 + int(_noise(run.x, run.z, 11) * float(run.y - run.x - 3))
+			_place_palm(level, mid, props, reserved, palm_x, run.z)
+			for x: int in range(run.x, run.y + 1):
+				if _noise(x, run.z, 13) < GRASS_SHARE and mood_at(level, x) == Mood.GARDEN \
+						and not props.has(Vector2i(x - 1, run.z - 1)):
+					_place_floor(level, mid, props, reserved, x, run.z, "grass")
+		elif mood == Mood.STORE:
+			# One stack in the open as well as against the walls: a store
+			# room whose terraces all end in drops would otherwise be empty.
+			var x := run.x + 1 + int(_noise(run.y, run.z, 23) * float(run.y - run.x - 2))
+			if _place_floor(level, mid, props, reserved, x, run.z, "urn"):
+				_place_floor(level, mid, props, reserved, x + 1, run.z, "jars")
+		elif mood == Mood.RUIN and _noise(run.x, run.z, 17) < 0.5:
+			var x := run.x + 1 + int(_noise(run.y, run.z, 19) * float(run.y - run.x - 1))
+			_place_floor(level, mid, props, reserved, x, run.z, "rubble")
+
+
+static func _floor_free(level: AsciiLevel, mid: Dictionary, props: Dictionary,
+		reserved: Dictionary, cell: Vector2i) -> bool:
+	return level.kind_at(cell.x, cell.y) == Tiles.Kind.EMPTY \
+		and level.is_solid(cell.x, cell.y + 1) and not props.has(cell) \
+		and not reserved.has(cell) and _mid_is(mid, cell, BEHIND_PROPS) \
+		and cell.x >= 0 and cell.x < level.cols and cell.y >= 0
+
+
+static func _place_floor(level: AsciiLevel, mid: Dictionary, props: Dictionary,
+		reserved: Dictionary, x: int, surface: int, id: String) -> bool:
+	var cell := Vector2i(x, surface - 1)
+	if not _floor_free(level, mid, props, reserved, cell):
+		return false
+	_put_prop(props, cell, id)
+	return true
+
+
+static func _place_palm(level: AsciiLevel, mid: Dictionary, props: Dictionary,
+		reserved: Dictionary, x: int, surface: int) -> void:
+	var pot := Vector2i(x, surface - 1)
+	var crown := Vector2i(x, surface - 2)
+	if not _floor_free(level, mid, props, reserved, pot):
+		return
+	if level.kind_at(crown.x, crown.y) != Tiles.Kind.EMPTY or mid.has(crown) \
+			or props.has(crown) or reserved.has(crown) or crown.y < 0:
+		return
+	_put_prop(props, pot, "palm_pot")
+	_put_prop(props, crown, "palm_top")
+
+
+## A court hangs lanterns under its overhangs, where the foreground's hanging
+## cloth has not already taken the spot.
+static func _rule_lanterns(level: AsciiLevel, fore: Dictionary, props: Dictionary,
+		reserved: Dictionary) -> void:
+	var next_x := -LANTERN_PITCH
+	for x: int in level.cols:
+		if x < next_x or mood_at(level, x) != Mood.COURT:
+			continue
+		for y: int in range(1, level.rows - 2):
+			var cell := Vector2i(x, y)
+			if not level.is_solid(x, y - 1) or level.kind_at(x, y) != Tiles.Kind.EMPTY:
+				continue
+			if level.kind_at(x, y + 1) != Tiles.Kind.EMPTY or fore.has(cell) \
+					or props.has(cell) or reserved.has(cell):
+				continue
+			_put_prop(props, cell, "lantern")
+			next_x = x + LANTERN_PITCH
+			break
+
+
+## Swaps a few existing architecture tiles for their lived-in variants: the
+## garden's planters bloom, and a court airs one rug per railing.
+static func _rule_room_variants(level: AsciiLevel, mid: Dictionary) -> void:
+	var planter: Vector2i = Tiles.DECOR_ATLAS["planter"]
+	var rail: Vector2i = Tiles.DECOR_ATLAS["balustrade"]
+	for cell: Vector2i in mid.keys():
+		var mood := mood_at(level, cell.x)
+		if mid[cell] == planter and mood == Mood.GARDEN:
+			mid[cell] = Tiles.DECOR_ATLAS["planter_bloom"]
+		elif mid[cell] == rail and mood == Mood.COURT:
+			# The second post of a run, so the rug hangs inside the railing
+			# rather than off its end.
+			var left := cell + Vector2i(-1, 0)
+			var none := Vector2i(-1, -1)
+			if mid.get(left, none) == rail and mid.get(left + Vector2i(-1, 0), none) != rail:
+				mid[cell] = Tiles.DECOR_ATLAS["balustrade_rug"]

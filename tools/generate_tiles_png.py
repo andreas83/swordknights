@@ -31,7 +31,7 @@ from PIL import Image
 
 TILE = 16
 COLUMNS = 16
-LIT_ROWS = 2
+LIT_ROWS = 3
 SHADE_ROW_OFFSET = LIT_ROWS
 ROWS = LIT_ROWS * 2
 
@@ -603,6 +603,259 @@ def fore_cloth_tail(_unused=None) -> Patch:
     return p
 
 
+# --- wear, growth and the things people leave about ------------------------
+#
+# Row two of the atlas. A city that has stood for three hundred years is not
+# clean: stone cracks and spalls, ivy comes over the parapets, moss grows where
+# water stands, and the people who live there leave jars against the wall and
+# a rug over the railing. scripts/world/dresser.gd gives each room ONE of those
+# moods, so that rooms differ from each other rather than all carrying a little
+# of everything.
+#
+# The first seven are OVERLAYS: drawn over a wall face on the props plane with
+# a transparent ground, so the coursing of the stone underneath shows through.
+# The rest stand on a floor or hang from an overhang.
+
+def crack(_unused=None) -> Patch:
+    """A crack running down through two courses, its lower-right lip catching
+    the sun, plus a chipped arris where it leaves a block."""
+    p = Patch(TILE, TILE)
+    path = [(9, 0), (9, 1), (8, 2), (8, 3), (7, 4), (7, 5), (8, 6), (8, 7),
+            (7, 8), (6, 9), (6, 10), (5, 11), (5, 12), (6, 13), (5, 14)]
+    for x, y in path:
+        p.set(x, y, INK)
+    for x, y in path:
+        if p.get(x + 1, y) == CLEAR:
+            p.set(x + 1, y, SHADOW)
+    p.set(10, 2, INK)                             # a hairline branch
+    p.set(11, 3, INK)
+    p.rect(0, 8, 1, 9, INK)                       # chipped corner of a block
+    p.set(2, 9, SHADOW)
+    return p
+
+
+def worn(_unused=None) -> Patch:
+    """One block spalled away: a shallow recess whose lower and right inner
+    walls are lit, with the broken edge still showing."""
+    p = Patch(TILE, TILE)
+    p.rect(5, 9, 11, 14, SHADOW_PIT)
+    p.hline(9, 5, 11, INK)
+    p.vline(5, 9, 14, INK)
+    p.hline(14, 6, 11, SHADOW)
+    p.vline(11, 10, 14, SHADOW)
+    p.set(7, 11, SHADOW_DEEP)
+    p.set(9, 12, SHADOW_DEEP)
+    p.rect(1, 2, 3, 3, SHADOW_PIT)                # a pitted patch higher up
+    p.hline(2, 1, 3, INK)
+    p.set(3, 3, SHADOW)
+    return p
+
+
+IVY_STRANDS = (2, 6, 10, 13)
+
+
+def _leaf(p: Patch, x: int, y: int) -> None:
+    """A 2x2 leaf, lit on its upper left, the way everything is."""
+    p.set(x, y, FOLIAGE)
+    p.set(x + 1, y, FOLIAGE)
+    p.set(x, y + 1, FOLIAGE)
+    p.set(x + 1, y + 1, FOLIAGE_DARK)
+
+
+def _ivy(p: Patch, lengths, leaf_every: int, top_mat: bool) -> None:
+    for i, x in enumerate(IVY_STRANDS):
+        length = lengths[i]
+        for y in range(length):
+            p.set(x, y, FOLIAGE_DARK)
+        for y in range((i * 3) % leaf_every, length - 1, leaf_every):
+            _leaf(p, x - 1 + (y // leaf_every) % 2, y)
+    if top_mat:
+        # The mat spilling over the parapet: dense along the top edge.
+        for x in range(0, TILE, 3):
+            _leaf(p, x, 0)
+            _leaf(p, x + 1, 2 if x % 2 else 1)
+
+
+def ivy_top(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    _ivy(p, (TILE, TILE, TILE, TILE), 4, True)
+    return p
+
+
+def ivy(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    _ivy(p, (TILE, TILE, TILE, TILE), 5, False)
+    return p
+
+
+def ivy_end(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    _ivy(p, (9, 13, 6, 11), 5, False)
+    return p
+
+
+def moss(_unused=None) -> Patch:
+    """Clumps of green in the joints of stone that stands in water: the
+    cistern moss the art direction names as one of the few places green
+    belongs. Clumps, not a pattern -- an even dash along every joint read as
+    netting."""
+    p = Patch(TILE, TILE)
+    for x0, y0, w in ((1, 7, 4), (10, 15, 5), (6, 15, 2), (12, 7, 2)):
+        p.hline(y0, x0, x0 + w - 1, FOLIAGE_DARK)
+        p.hline(y0 - 1, x0 + 1, x0 + w - 2, FOLIAGE)
+    p.set(3, 8, FOLIAGE_DARK)                     # a trail down the stone
+    p.set(3, 9, FOLIAGE_DARK)
+    p.set(11, 14, FOLIAGE_DARK)
+    return p
+
+
+def window(_unused=None) -> Patch:
+    """A latticed window in a wall face: a horseshoe-headed opening filled
+    with turned wood, a lit sill, and two panes of lamplight from the room
+    behind. A wall with a window in it is a house, not a rampart."""
+    p = Patch(TILE, TILE)
+    for y in range(2, 14):
+        for x in range(4, 12):
+            fx, fy = x + 0.5, y + 0.5
+            if fy < 5.5 and (fx - 8.0) ** 2 + (fy - 5.5) ** 2 > 12.5:
+                continue
+            on_grid = (x + y) % 3 == 0 or (x - y) % 3 == 0
+            p.set(x, y, SHADOW_WARM if on_grid else INK)
+    for x, y in ((6, 8), (9, 10)):
+        p.set(x, y, LIGHT_WARM)
+    p.hline(14, 3, 12, LIGHT)                     # the sill's lit top
+    p.hline(15, 3, 12, SHADOW_DEEP)
+    p.vline(12, 4, 13, SHADOW)                    # the reveal the sun reaches
+    return p
+
+
+def urn(_unused=None) -> Patch:
+    """A tall amphora against the wall: terracotta, lit down its left side,
+    with two handles that make it a vessel rather than an egg."""
+    p = Patch(TILE, TILE)
+    profile = {4: 2, 5: 2, 6: 3, 7: 4, 8: 4, 9: 4, 10: 4, 11: 3, 12: 3, 13: 2, 14: 2}
+    for y, half in profile.items():
+        for x in range(8 - half, 8 + half):
+            p.set(x, y, MID if x < 7 else SHADOW_WARM)
+        p.set(8 - half, y, LIGHT_WARM)
+        p.set(7 + half, y, SHADOW)
+    p.rect(6, 2, 9, 3, MID)                       # neck and lip
+    p.hline(2, 6, 9, LIGHT_WARM)
+    p.set(9, 3, SHADOW)
+    p.vline(3, 5, 7, SHADOW_WARM)                 # handles
+    p.vline(12, 5, 7, SHADOW)
+    p.hline(9, 5, 10, SHADOW_DEEP)                # a painted band
+    p.rect(6, 15, 9, 15, SHADOW_DEEP)             # foot
+    return p
+
+
+def jars(_unused=None) -> Patch:
+    p = Patch(TILE, TILE)
+    for x0, top, w in ((1, 9, 6), (8, 11, 5)):
+        for y in range(top, TILE):
+            for x in range(x0, x0 + w):
+                p.set(x, y, MID if x < x0 + w // 2 else SHADOW_WARM)
+            p.set(x0, y, LIGHT_WARM)
+            p.set(x0 + w - 1, y, SHADOW)
+        p.rect(x0 + 1, top - 1, x0 + w - 2, top - 1, LIGHT_WARM)
+        p.hline(TILE - 1, x0, x0 + w - 1, SHADOW_DEEP)
+    p.hline(12, 1, 6, SHADOW_DEEP)
+    return p
+
+
+def rubble(_unused=None) -> Patch:
+    """Fallen stones at the foot of a wall: each block a lit top and a shaded
+    face, the same two planes the terrain is made of."""
+    p = Patch(TILE, TILE)
+    for x0, y0, w, h in ((1, 11, 5, 4), (6, 13, 4, 2), (10, 10, 5, 5), (7, 9, 3, 3)):
+        p.rect(x0, y0, x0 + w - 1, y0 + h - 1, SHADOW)
+        p.hline(y0, x0, x0 + w - 1, LIGHT)
+        p.vline(x0 + w - 1, y0 + 1, y0 + h - 1, SHADOW_DEEP)
+    p.hline(TILE - 1, 0, TILE - 1, SHADOW_DEEP)
+    return p
+
+
+def grass(_unused=None) -> Patch:
+    """Tufts along a lip: a living edge on a stone one. Kept off the
+    standing-caster list -- blades this thin would cast a dotted shadow."""
+    p = Patch(TILE, TILE)
+    for x, h in ((1, 2), (2, 4), (3, 3), (6, 2), (9, 3), (10, 5), (11, 3), (14, 2)):
+        for k in range(h):
+            p.set(x, TILE - 1 - k, FOLIAGE if k == h - 1 or x % 2 else FOLIAGE_DARK)
+    return p
+
+
+def planter_bloom(_unused=None) -> Patch:
+    """The planter, in flower. The blossoms take CLOTH's crimson so the
+    flowers sit inside the palette rather than beside it."""
+    p = planter()
+    for x, y in ((3, 2), (8, 0), (12, 3), (6, 4), (10, 1)):
+        p.set(x, y, CLOTH)
+        p.set(x + 1, y, CLOTH)
+        p.set(x, y + 1, CLOTH_DARK)
+    return p
+
+
+def palm_sheet() -> Patch:
+    """A potted palm, two cells tall. Its fronds stand on the terrace, so a
+    palm throws the one ragged shadow in a world of straight ones."""
+    p = Patch(TILE, TILE * 2)
+    base = TILE * 2 - 1
+    p.rect(4, base - 4, 11, base, SHADOW)         # the pot
+    p.vline(4, base - 4, base, LIGHT_WARM)
+    p.vline(11, base - 4, base, INK)
+    p.hline(base - 5, 3, 12, LIGHT)
+    for y in range(6, base - 5):                  # the trunk, ringed
+        p.set(7, y, SHADOW_WARM)
+        p.set(8, y, SHADOW_DEEP)
+        if y % 3 == 0:
+            p.set(7, y, MID)
+    crown = (7.5, 6.0)
+    for dx, lift, length in ((-1, 2.0, 7), (1, 2.0, 7), (-1, 0.6, 6), (1, 0.6, 6),
+                             (-1, 3.2, 4), (1, 3.4, 4)):
+        for k in range(length):
+            x = int(crown[0] + dx * (k + 0.5))
+            y = int(crown[1] - lift + (k * k) / 7.0)
+            p.set(x, y, FOLIAGE)
+            p.set(x, y + 1, FOLIAGE_DARK)
+    p.rect(7, 4, 8, 6, FOLIAGE_DARK)
+    return p
+
+
+def lantern(_unused=None) -> Patch:
+    """A pierced brass lantern hung from an overhang. The chain is two pixels
+    wide for the same reason a balustrade post is."""
+    p = Patch(TILE, TILE)
+    for y in range(0, 5):
+        p.set(7, y, INK if y % 2 else SHADOW_DEEP)
+        p.set(8, y, SHADOW_DEEP if y % 2 else INK)
+    p.rect(6, 5, 9, 5, LIGHT_WARM)                # cap
+    p.rect(5, 6, 10, 6, LIGHT_WARM)
+    p.rect(5, 7, 10, 11, INK)                     # body
+    for x, y in ((6, 8), (8, 8), (7, 10), (9, 10), (6, 10)):
+        p.set(x, y, LIGHT_SOFT)                   # the flame, through the piercing
+    p.vline(5, 7, 11, LIGHT_WARM)
+    p.rect(5, 12, 10, 12, LIGHT_WARM)
+    p.rect(7, 13, 8, 14, SHADOW_WARM)             # finial
+    return p
+
+
+def balustrade_rug(_unused=None) -> Patch:
+    """A rug hung over the railing to air. Somebody lives here."""
+    p = balustrade()
+    p.rect(3, 2, 12, 13, CLOTH)
+    p.hline(2, 3, 12, CLOTH_DARK)                 # the fold over the rail
+    p.hline(5, 3, 12, LIGHT_WARM)
+    p.hline(10, 3, 12, LIGHT_WARM)
+    for x in range(4, 12, 3):
+        p.set(x, 7, SHADOW_DEEP)
+        p.set(x + 1, 8, SHADOW_DEEP)
+    p.vline(12, 3, 13, CLOTH_DARK)
+    for x in range(3, 13, 2):                     # fringe
+        p.set(x, 14, LIGHT_WARM)
+    return p
+
+
 # --- atlas layout ---------------------------------------------------------
 # Keep in sync with scripts/world/tiles.gd.
 
@@ -617,6 +870,11 @@ NAMES = [
     "arch_leg_l", "arch_leg_r", "fountain_l", "fountain_r",
     "frieze", "banner", "fore_rail", "fore_column",
     "fore_soffit_l", "fore_soffit_r", "fore_cloth", "fore_cloth_tail",
+    # row 2 -- wear, growth and the things people leave about
+    "crack", "worn", "ivy_top", "ivy",
+    "ivy_end", "moss", "window", "urn",
+    "jars", "rubble", "grass", "planter_bloom",
+    "palm_top", "palm_pot", "lantern", "balustrade_rug",
 ]
 
 
@@ -624,6 +882,7 @@ def build_patches() -> dict:
     sheet = arch_sheet()
     basin = fountain_sheet()
     soffit = fore_soffit()
+    palm = palm_sheet()
     out = {
         "solid_capped": solid(True, False),
         "solid_capped_lit": solid(True, True),
@@ -651,6 +910,22 @@ def build_patches() -> dict:
         "fore_soffit_r": soffit.mirror(),
         "fore_cloth": fore_cloth(),
         "fore_cloth_tail": fore_cloth_tail(),
+        "crack": crack(),
+        "worn": worn(),
+        "ivy_top": ivy_top(),
+        "ivy": ivy(),
+        "ivy_end": ivy_end(),
+        "moss": moss(),
+        "window": window(),
+        "urn": urn(),
+        "jars": jars(),
+        "rubble": rubble(),
+        "grass": grass(),
+        "planter_bloom": planter_bloom(),
+        "palm_top": palm.sub(0, 0, TILE, TILE),
+        "palm_pot": palm.sub(0, TILE, TILE, TILE),
+        "lantern": lantern(),
+        "balustrade_rug": balustrade_rug(),
     }
     for i, part in enumerate(("arch_top_l", "arch_top_r", "arch_mid_l",
                               "arch_mid_r", "arch_leg_l", "arch_leg_r")):

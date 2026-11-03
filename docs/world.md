@@ -59,9 +59,9 @@ A surface going into shadow is not that surface darkened. It is the next tone
 down the duotone ramp, which is the art direction's central idea.
 
 The atlas is two halves in register. Every tile has a shade twin
-`Tiles.SHADE_ROW_OFFSET` (2) rows below it. The shader reads the mask and, where
+`Tiles.SHADE_ROW_OFFSET` (3) rows below it. The shader reads the mask and, where
 it says shadow, samples the twin instead: one extra texture fetch, and no second
-pass over the tilemap. The current atlas is 256 × 64 px — 32 tiles and 32 twins.
+pass over the tilemap. The current atlas is 256 × 96 px — 48 tiles and 48 twins.
 
 The atlas and the TileSet are generated:
 
@@ -122,6 +122,54 @@ glyphs are documented in the header of `levels/level_01.txt` and defined in
 `Tiles.DECOR_LEGEND`. Most of level 1 is deliberately *not* marked up: a level
 that needed hand marking would mean generated levels could never look like it.
 
+## Room moods: wear, growth and the things people leave about
+
+Architecture alone made every room the same room. The end of `dresser.gd`
+cuts a level into rooms `ROOM_COLS` (20) wide and gives each **one** mood, in an
+order shuffled per level from its name so that neighbours never repeat:
+
+| Mood | What it adds |
+| --- | --- |
+| garden | ivy over the parapets and down the faces, grass along the lips, a potted palm, the planters in flower |
+| store | urns and jars, against the walls and stacked in the open |
+| ruin | cracked and spalled stone, rubble at the foot of the walls |
+| court | latticed windows, lanterns under overhangs, a rug airing over a railing |
+
+Two things happen everywhere regardless of mood: stone standing in water grows
+moss, and a wall tall enough to be a building (`TALL_WALL` courses of sheer
+face) gets storeys of windows — a sheer face that high with nothing in it is
+the placeholder `art-direction.md` warns about.
+
+One mood per room rather than a little of everything everywhere is the
+restraint rule applied to life: a room reads as *the garden* the way a street
+does. The sixteen tiles are the atlas's third row; their shade twins come from
+the same `SHADE_MAP`, which is why the atlas grew to three lit rows and
+`SHADE_ROW_OFFSET` to 3.
+
+These go on a fourth layer, **Props**, drawn over Decor on the same plane, so
+an urn can stand in front of a cornice and ivy can hang over a frieze without
+taking either's cell. `SunShadow.build()` stamps both planes, so a palm or an
+urn casts its own shadow without erasing the cornice behind it. The safety
+argument is unchanged: no collision, no queried kind, never on a reserved
+cell, and every prop either lies over stone the terrain already has or stands
+in a cell it left empty. `tests/unit/test_room_moods.gd` checks those, that
+neighbouring rooms differ, and that a mirrored arena is dressed as a mirror.
+
+## The air
+
+`scripts/render/ambience.gd`, one node per level. Dust is one pixel of
+`LIGHT_SOFT`, drawn **only where the shadow mask says the air is lit**
+(`SunShadow.last_mask`, the CPU copy of the mask solved at build). A mote
+drifting into a cast shadow vanishes and reappears on the far side, so with a
+few dozen of them moving the shadow's edge is visible in the air at exactly the
+slope the sun throws it — a shaft of light with no haze, no gradient and no
+extra pass. Leaves come down off the ivy, palms and planters, a handful of
+sources per level. Everything is a pure function of the clock: nothing is
+spawned or freed, and none of it is gameplay.
+
+A flock of birds crosses the far sky every thirty-one seconds
+(`ParallaxSky._draw_flock()`), in the sky's own crimson, a step darker.
+
 ## Tests
 
 - `tests/world_shadow_test.gd` — the shadow model: the sun's direction, what
@@ -131,5 +179,7 @@ that needed hand marking would mean generated levels could never look like it.
 - `tests/world_dressing_test.gd` — decoration cannot collide, marks leave
   their cell empty, every shipping and generated level gets architecture, and a
   symmetric level is dressed symmetrically.
+- `tests/unit/test_room_moods.gd` — the props plane: where a prop may sit,
+  that rooms differ, determinism, and mirrored arenas.
 - `tools/world_debug.gd` — not a test. Dumps a level's dressing and shadow mask
   for inspection.

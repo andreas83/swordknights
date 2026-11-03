@@ -78,6 +78,8 @@ const DECOR_LEGEND := {
 const STANDING_DECOR := [
 	"column_shaft", "column_cap", "column_base",
 	"balustrade", "planter", "fountain_l", "fountain_r", "banner",
+	"urn", "jars", "rubble", "planter_bloom", "palm_top", "palm_pot", "lantern",
+	"balustrade_rug",
 ]
 
 ## Which plane a decoration is drawn on. Anything not listed here is
@@ -92,7 +94,7 @@ const FOREGROUND_DECOR := [
 
 const ATLAS_COLUMNS := 16
 ## The shade twin of a tile is this many rows further down the atlas.
-const SHADE_ROW_OFFSET := 2
+const SHADE_ROW_OFFSET := 3
 
 const ATLAS_SOLID_CAPPED := Vector2i(0, 0)
 const ATLAS_SOLID_CAPPED_LIT := Vector2i(1, 0)
@@ -129,6 +131,24 @@ const DECOR_ATLAS := {
 	"fore_soffit_r": Vector2i(13, 1),
 	"fore_cloth": Vector2i(14, 1),
 	"fore_cloth_tail": Vector2i(15, 1),
+	# Wear, growth and the things people leave about. Placed only by the
+	# dresser's room moods, on the props plane (see WorldDresser).
+	"crack": Vector2i(0, 2),
+	"worn": Vector2i(1, 2),
+	"ivy_top": Vector2i(2, 2),
+	"ivy": Vector2i(3, 2),
+	"ivy_end": Vector2i(4, 2),
+	"moss": Vector2i(5, 2),
+	"window": Vector2i(6, 2),
+	"urn": Vector2i(7, 2),
+	"jars": Vector2i(8, 2),
+	"rubble": Vector2i(9, 2),
+	"grass": Vector2i(10, 2),
+	"planter_bloom": Vector2i(11, 2),
+	"palm_top": Vector2i(12, 2),
+	"palm_pot": Vector2i(13, 2),
+	"lantern": Vector2i(14, 2),
+	"balustrade_rug": Vector2i(15, 2),
 }
 
 ## Decorations that have a handed twin. Mirroring a level's dressing has to

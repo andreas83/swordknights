@@ -71,6 +71,10 @@ const LIT_BIT := 0
 ## measurement in the code means the number in the document can be checked
 ## rather than believed.
 static var timings := {}
+## The mask the last build() solved, as a CPU-side image. LevelAmbience reads
+## it to keep dust out of the shade; reading the texture back off the GPU
+## instead would stall, and fail outright under the headless renderer.
+static var last_mask: Image
 
 ## The per-tile opacity bitmaps, keyed by the atlas they came from. The atlas
 ## does not change while the game runs, so this is built once and every level
@@ -80,9 +84,11 @@ static var _mask_cache := {}
 
 ## Solves the shadow for one level and returns the mask texture the world
 ## shader samples. `decor` maps a cell to the atlas coordinates of a
-## mid-ground decoration drawn there.
+## mid-ground decoration drawn there; `props` is the same for the props plane
+## drawn over it. Both are stamped, so an urn in front of a cornice adds its
+## shape without taking the cornice's away.
 static func build(level: AsciiLevel, decor: Dictionary, tile: int,
-		atlas: Image) -> ImageTexture:
+		atlas: Image, props: Dictionary = {}) -> ImageTexture:
 	var width := level.cols * tile
 	var height := level.rows * tile
 	var step := 1
@@ -96,7 +102,8 @@ static func build(level: AsciiLevel, decor: Dictionary, tile: int,
 	timings["atlas"] = _lap(clock)
 
 	clock = Time.get_ticks_usec()
-	var planes := _rasterise_occluders(level, decor, masks, tile, step, mask_w, mask_h)
+	var planes := _rasterise_occluders(level, [decor, props], masks, tile, step, mask_w,
+		mask_h)
 	var geom: PackedByteArray = planes[0]
 	var standing: PackedByteArray = planes[1]
 	timings["rasterise"] = _lap(clock)
@@ -114,6 +121,7 @@ static func build(level: AsciiLevel, decor: Dictionary, tile: int,
 
 	clock = Time.get_ticks_usec()
 	var image := Image.create_from_data(mask_w, mask_h, false, Image.FORMAT_L8, shade)
+	last_mask = image
 	var texture := ImageTexture.create_from_image(image)
 	timings["upload"] = _lap(clock)
 	timings["size"] = Vector2i(mask_w, mask_h)
@@ -175,7 +183,7 @@ static func _standing_terrain(kind: Tiles.Kind) -> bool:
 
 ## Returns [every occluder, the ones that stand on a surface]. The second is
 ## only used to decide where one body ends and the next begins.
-static func _rasterise_occluders(level: AsciiLevel, decor: Dictionary, masks: Dictionary,
+static func _rasterise_occluders(level: AsciiLevel, planes: Array, masks: Dictionary,
 		tile: int, step: int, mask_w: int, mask_h: int) -> Array:
 	var geom := PackedByteArray()
 	geom.resize(mask_w * mask_h)
@@ -192,12 +200,13 @@ static func _rasterise_occluders(level: AsciiLevel, decor: Dictionary, masks: Di
 				if _standing_terrain(kind):
 					_stamp(standing, masks, coords_terrain, x, y, tile, step, mask_w, mask_h)
 			var cell := Vector2i(x, y)
-			if not decor.has(cell):
-				continue
-			var coords: Vector2i = decor[cell]
-			_stamp(geom, masks, coords, x, y, tile, step, mask_w, mask_h)
-			if standing_coords.has(coords):
-				_stamp(standing, masks, coords, x, y, tile, step, mask_w, mask_h)
+			for decor: Dictionary in planes:
+				if not decor.has(cell):
+					continue
+				var coords: Vector2i = decor[cell]
+				_stamp(geom, masks, coords, x, y, tile, step, mask_w, mask_h)
+				if standing_coords.has(coords):
+					_stamp(standing, masks, coords, x, y, tile, step, mask_w, mask_h)
 	return [geom, standing]
 
 

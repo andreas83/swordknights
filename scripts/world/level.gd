@@ -9,6 +9,9 @@ extends Node2D
 ##          one-way are separate physics layers) and the queried "kind".
 ##   Decor  mid-ground architecture: cornices, arcades, balustrades, columns.
 ##          Behind the player, in front of the terrain, no collision.
+##   Props  the room moods (WorldDresser): wear and ivy over the stone, jars,
+##          palms and lanterns in front of the architecture. Same plane as
+##          Decor, one layer up, so an urn does not cost a cornice its cell.
 ##   Fore   the foreground plane: railings, column bases, arch soffits,
 ##          hanging cloth. z_index puts it in FRONT of the player, which is
 ##          the cheapest depth cue there is.
@@ -31,7 +34,10 @@ const FOREGROUND_Z := 10
 var data: AsciiLevel
 var tilemap: TileMapLayer
 var decor_map: TileMapLayer
+var props_map: TileMapLayer
 var foreground_map: TileMapLayer
+## Dust in the light and falling leaves; scripts/render/ambience.gd.
+var ambience: LevelAmbience
 ## Milliseconds the last shadow solve took. Read by tests and docs/world.md.
 var shadow_build_ms: float = 0.0
 
@@ -53,9 +59,10 @@ func build(level: AsciiLevel) -> void:
 
 	tilemap = _ensure_layer(tilemap, "Tiles", true, 0)
 	decor_map = _ensure_layer(decor_map, "Decor", false, 0)
+	props_map = _ensure_layer(props_map, "Props", false, 0)
 	foreground_map = _ensure_layer(foreground_map, "Fore", false, FOREGROUND_Z)
 
-	for layer: TileMapLayer in [tilemap, decor_map, foreground_map]:
+	for layer: TileMapLayer in [tilemap, decor_map, props_map, foreground_map]:
 		layer.clear()
 
 	for y: int in data.rows:
@@ -66,9 +73,17 @@ func build(level: AsciiLevel) -> void:
 
 	var dressing := WorldDresser.dress(data)
 	_paint(decor_map, dressing["mid"])
+	_paint(props_map, dressing["props"])
 	_paint(foreground_map, dressing["fore"])
 
-	_apply_sun(dressing["mid"])
+	_apply_sun(dressing["mid"], dressing["props"])
+
+	# The air last: it needs the solved shadow to know where the light is.
+	if ambience == null:
+		ambience = LevelAmbience.new()
+		ambience.name = "Ambience"
+		add_child(ambience)
+	ambience.setup(data, dressing["props"], SunShadow.last_mask, TILE)
 	level_built.emit(data)
 
 
@@ -92,7 +107,7 @@ static func _paint(layer: TileMapLayer, cells: Dictionary) -> void:
 
 ## Solves the cast shadow and hands the mask to the two planes that receive
 ## it. Everything here happens once per level build and nothing re-runs it.
-func _apply_sun(mid_decor: Dictionary) -> void:
+func _apply_sun(mid_decor: Dictionary, props: Dictionary) -> void:
 	if _atlas_image == null:
 		var atlas := _tile_set.get_source(0) as TileSetAtlasSource
 		if atlas == null or atlas.texture == null:
@@ -101,7 +116,7 @@ func _apply_sun(mid_decor: Dictionary) -> void:
 		_atlas_image = atlas.texture.get_image()
 
 	var started := Time.get_ticks_usec()
-	var mask := SunShadow.build(data, mid_decor, TILE, _atlas_image)
+	var mask := SunShadow.build(data, mid_decor, TILE, _atlas_image, props)
 	shadow_build_ms = float(Time.get_ticks_usec() - started) / 1000.0
 
 	var material := ShaderMaterial.new()
@@ -113,6 +128,7 @@ func _apply_sun(mid_decor: Dictionary) -> void:
 	)
 	tilemap.material = material
 	decor_map.material = material
+	props_map.material = material
 
 
 ## --- geometry queries ------------------------------------------------------
