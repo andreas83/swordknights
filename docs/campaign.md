@@ -1206,21 +1206,25 @@ the mechanism it is designed against.
 
 ---
 
-## For the owner to decide
+## Decided by the owner
 
-1. **The sun disc's side.** Move it to the left, where the light comes from —
-   in Chapter I too?
-2. **Should a long fall kill?** Today no fall hurts. In a tower, a fall from
-   the top is a minute of re-climbing and no death; a death would be half a
-   second and the last torch, which is kinder. The recommendation is yes for
-   falls of ten tiles or more — deeper than any intended drop — with the proof
-   pruning such landings.
-3. **Boss phases kept through deaths.** Recommended; otherwise an 85-second
-   fight restarts from the top on a phone.
-4. **The dawn frame lit from the right.** One frame of the whole game where
-   the sun is in the east. It needs a mirrored shadow solve, once.
-5. **An assist option** — longer tells and holds for players who need them.
-   Not designed here; worth deciding before the timings are pinned in tests.
-6. **The name.** *The Last Light*, for the Adventure.
-7. **Chapter I's sky.** It gains the Mirror Tower and a title-card epigraph;
-   nothing in its level changes.
+All seven questions were put to the owner, who took every recommendation.
+Builders treat these as settled.
+
+1. **The sun disc moves to the left**, where the light comes from — in every
+   chapter, Chapter I included, and in the duel's sky, which is the same
+   `ParallaxSky`.
+2. **A fall of ten tiles or more kills.** Deeper than any intended drop (the
+   rule above is five), so it only ever ends a mistake; the reachability proof
+   prunes such landings, and the Endless generator must never need one.
+3. **Boss phases already won stay won through a death.** The respawn puts the
+   prince back at the start of the phase he is in.
+4. **The dawn epilogue frame is lit from the right**: the one frame in the game
+   where the sun is in the east, with a mirrored shadow solve made once.
+5. **There is an assist option: longer warnings.** One persisted setting that
+   scales every foe's tell and every timed window that guards a death by the
+   same factor, read through one API, so no foe can forget it. Off by default;
+   the numbers in this bible are the unassisted ones.
+6. **The Adventure is called *The Last Light*.**
+7. **Chapter I changes only in presentation**: the Mirror Tower in its sky and
+   the title-card epigraph. Its level file does not change.
