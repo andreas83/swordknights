@@ -1,11 +1,26 @@
 class_name Hud
 extends Control
-## Health crescents, relic tally, the level title card and the pause/complete
-## overlay. Drawn rather than built from Control nodes so it shares the exact
-## palette and shapes as the rest of the game.
+## Health, relics, the level title card and the pause/complete overlay.
+##
+## Drawn rather than built from Control nodes so it shares the exact palette,
+## the exact light direction and the exact geometry as the rest of the game.
+##
+## Two rules it will not break:
+##
+## **It lives inside the safe area.** Health used to sit at a flat 10 units
+## from the corner, which on a notched phone in landscape is underneath the
+## notch. Everything is now placed against `UiLayout.content()`.
+##
+## **Overlays live in the reserved band.** `UiLayout.banner()` is the only
+## place words are allowed when the game is stopped, so the level art knows
+## what it has to keep clear.
 
 const TITLE_HOLD := 2.6
 const TITLE_FADE := 0.9
+
+## Health marks: a 3-unit stroke every 5 units.
+const TALLY_STRIDE := 5.0
+const TALLY_HEIGHT := 9.0
 
 var health: int = Tuning.MAX_HEALTH
 var max_health: int = Tuning.MAX_HEALTH
@@ -17,13 +32,11 @@ var _title_time: float = 999.0
 var _overlay_title: String = ""
 var _overlay_subtitle: String = ""
 
-var _font: Font
-
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	_font = ThemeDB.fallback_font
+	get_viewport().size_changed.connect(queue_redraw)
 
 
 func update_model(hp: int, hp_max: int, got: int, total: int) -> void:
@@ -53,62 +66,70 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var view := size
-	var x := 10.0
-	var y := 10.0
-
-	for i: int in max_health:
-		var cx := x + i * 13.0
-		draw_circle(Vector2(cx, y), 4.6, Palette.with_alpha(Palette.INK, 0.35))
-		if i < health:
-			draw_circle(Vector2(cx, y), 4.0, Palette.LIGHT_SOFT)
-			draw_circle(Vector2(cx + 1.4, y - 0.8), 3.1, Palette.with_alpha(Palette.INK, 0.55))
-		else:
-			draw_arc(Vector2(cx, y), 4.0, 0.0, TAU, 16,
-				Palette.with_alpha(Palette.LIGHT_SOFT, 0.4), 1.0)
-
-	if relics_total > 0:
-		var rx := x + max_health * 13.0 + 8.0
-		draw_colored_polygon(PackedVector2Array([
-			Vector2(rx, y - 4.5), Vector2(rx + 3.2, y),
-			Vector2(rx, y + 4.5), Vector2(rx - 3.2, y),
-		]), Palette.LIGHT)
-		_text("%d/%d" % [relics, relics_total], Vector2(rx + 7.0, y + 3.0), 8, Palette.PAPER)
-
-	if _title != "" and _title_time <= TITLE_HOLD + TITLE_FADE:
-		var alpha := clampf(1.0 - (_title_time - TITLE_HOLD) / TITLE_FADE, 0.0, 1.0)
-		_centered(_title, view.x * 0.5, view.y * 0.33, 15,
-			Palette.with_alpha(Palette.PAPER, alpha), 4.0)
-		draw_rect(Rect2(view.x * 0.5 - 34.0, view.y * 0.33 + 10.0, 68.0, 1.0),
-			Palette.with_alpha(Palette.LIGHT_SOFT, alpha * 0.8))
-
-	if _overlay_title != "":
-		draw_rect(Rect2(Vector2.ZERO, view), Palette.with_alpha(Palette.INK, 0.55))
-		_centered(_overlay_title, view.x * 0.5, view.y * 0.5 - 8.0, 20, Palette.PAPER, 6.0)
-		_centered(_overlay_subtitle, view.x * 0.5, view.y * 0.5 + 14.0, 7,
-			Palette.with_alpha(Palette.LIGHT_SOFT, 0.8), 1.0)
-
-
-func _text(value: String, at: Vector2, font_size: int, color: Color) -> void:
-	draw_string(_font, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
-
-
-## Draws centred text with letter spacing, which the default draw_string lacks.
-func _centered(value: String, cx: float, cy: float, font_size: int,
-		color: Color, tracking: float) -> void:
-	if value == "":
+	if view.x <= 0.0:
 		return
-	var widths: Array[float] = []
-	var total := 0.0
-	for i: int in value.length():
-		var w := _font.get_string_size(
-			value[i], HORIZONTAL_ALIGNMENT_LEFT, -1, font_size
-		).x
-		widths.append(w)
-		total += w + tracking
-	total -= tracking
+	_draw_vitals(UiLayout.content(view))
 
-	var pen := cx - total * 0.5
-	for i: int in value.length():
-		draw_string(_font, Vector2(pen, cy + font_size * 0.35), value[i],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
-		pen += widths[i] + tracking
+	# The title card and the overlay share the reserved band, so only one of
+	# them is ever on it. The overlay wins: the game is stopped.
+	if _overlay_title != "":
+		_draw_overlay(view)
+	elif _title != "" and _title_time <= TITLE_HOLD + TITLE_FADE:
+		var alpha := clampf(1.0 - (_title_time - TITLE_HOLD) / TITLE_FADE, 0.0, 1.0)
+		_draw_title_card(UiLayout.banner(view), alpha)
+
+
+## Health and relics, cut into the top-left corner of the safe area.
+func _draw_vitals(content: Rect2) -> void:
+	var pen := content.position
+	for i: int in max_health:
+		UiMarks.tally(self, Vector2(pen.x + i * TALLY_STRIDE, pen.y),
+			i < health, Palette.LIGHT_SOFT)
+
+	if relics_total <= 0:
+		return
+	var x := pen.x + max_health * TALLY_STRIDE + 7.0
+	var middle := pen.y + TALLY_HEIGHT * 0.5
+	UiMarks.lozenge(self, Vector2(x + 3.0, middle), 4.5,
+		Palette.LIGHT if relics < relics_total else Palette.PAPER, 0.5)
+	UiFont.draw_text(self, "%d/%d" % [relics, relics_total],
+		Vector2(x + 10.0, middle - UiFont.cap(UiFont.Cut.TEXT) * 0.5),
+		UiFont.Cut.TEXT, Palette.PAPER, UiFont.Align.LEFT, 0.6)
+
+
+## The level name, in the reserved band, over the picture rather than in a box.
+func _draw_title_card(band: Rect2, alpha: float) -> void:
+	var cx := band.position.x + band.size.x * 0.5
+	var top := band.position.y + (band.size.y - UiFont.cap(UiFont.Cut.DISPLAY)) * 0.5 - 5.0
+	var wide := UiFont.draw_text(self, _title, Vector2(cx, top), UiFont.Cut.DISPLAY,
+		Palette.with_alpha(Palette.PAPER, alpha), UiFont.Align.CENTER, alpha * 0.75)
+	UiMarks.rule(self, Vector2(cx, top + UiFont.cap(UiFont.Cut.DISPLAY) + 6.0),
+		maxf(24.0, wide * 0.5), Palette.with_alpha(Palette.LIGHT_SOFT, alpha * 0.8))
+
+
+## PAUSED / ESCAPED. The game is stopped, so this one gets weight: a scrim over
+## the world and a carved band across the reserved area.
+func _draw_overlay(view: Vector2) -> void:
+	draw_rect(Rect2(Vector2.ZERO, view), Palette.with_alpha(Palette.INK, 0.62))
+
+	var band := UiLayout.banner(view)
+	draw_rect(band, Palette.with_alpha(Palette.SHADOW_DEEP, 0.55))
+	draw_rect(Rect2(band.position, Vector2(band.size.x, 1.0)),
+		Palette.with_alpha(Palette.LIGHT_WARM, 0.8))
+	draw_rect(Rect2(band.position.x, band.end.y - 1.0, band.size.x, 1.0),
+		Palette.with_alpha(Palette.LIGHT_WARM, 0.5))
+
+	var cx := band.position.x + band.size.x * 0.5
+	var top := band.position.y + 9.0
+	UiFont.draw_text(self, _overlay_title, Vector2(cx, top), UiFont.Cut.DISPLAY,
+		Palette.PAPER, UiFont.Align.CENTER, 0.8)
+
+	var rule_y := top + UiFont.cap(UiFont.Cut.DISPLAY) + 6.0
+	UiMarks.rule(self, Vector2(cx, rule_y), minf(band.size.x * 0.36, 60.0),
+		Palette.with_alpha(Palette.LIGHT_SOFT, 0.55))
+
+	if _overlay_subtitle == "":
+		return
+	UiFont.draw_text(self, _overlay_subtitle, Vector2(cx, rule_y + 8.0),
+		UiFont.Cut.MICRO, Palette.with_alpha(Palette.PAPER, 0.85),
+		UiFont.Align.CENTER, 0.6)
