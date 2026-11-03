@@ -53,6 +53,18 @@ extends CharacterBody2D
 ## resist the prince; a foe asking for one on its own initiative should think
 ## twice.
 ##
+## ## Warnings are read through warn()
+##
+## Every tell a foe gives -- a raise, a draw, a crouch before a pounce -- and
+## every timed window that stands between the prince and a death is read as
+## `warn(seconds)`, never as the bare constant. That is the LONGER WARNINGS
+## assist (scripts/core/assist.gd): off, warn() is the number it was given;
+## on, it is longer by the one factor the player chose. A foe that compares a
+## tell against its own constant has forgotten the assist, so the contract
+## test for a new foe should drive its tell with the assist on, as
+## tests/unit/test_longer_warnings.gd does the sentinel's raise. The cut, the
+## opening after it and everything else a foe does keep their own timing.
+##
 ## ## Projectiles
 ##
 ## `launch()` looses a FoeProjectile: Game adopts it into the level's
@@ -155,6 +167,12 @@ func impact_point() -> Vector2:
 
 
 ## --- the entity protocol (scripts/entities/entity_registry.gd) ---------------
+
+## How long a warning of `seconds` lasts: a tell, or a window that guards a
+## death. The one way a foe reads one (above).
+func warn(seconds: float) -> float:
+	return seconds * Assist.warning_scale()
+
 
 func place(site: EntitySite) -> void:
 	position = site.at

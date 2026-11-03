@@ -12,7 +12,7 @@ extends Control
 ## ## Driven like every other page
 ##
 ## Up/down choose a row, left/right change it, jump steps it forward, sword or
-## pause go back -- the same four actions as the title screen and SOUND, so a
+## pause go back -- the same four actions as the title screen and SETTINGS, so a
 ## keyboard, a gamepad and the on-screen stick all work with no plumbing.
 ## Rows can also be tapped: the left half of a value steps it back, the right
 ## half forward. The list is on the left on purpose. The touch buttons own the

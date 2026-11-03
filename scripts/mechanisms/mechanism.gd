@@ -39,6 +39,14 @@ extends Node2D
 ## latched wire must come back open, which is `bus.is_on(channel)`, not an
 ## assumption that every wire starts off.
 ##
+## ## Warnings
+##
+## A trap with a clock in it -- a slab's fuse once it is stood on, a blade's
+## draw before its cut -- reads every interval that stands between the prince
+## and a death through `warn(seconds)`, the same LONGER WARNINGS assist the
+## foe contract applies (scripts/core/assist.gd). A beat's period is the
+## level's rhythm and is not a warning; the tell inside it is.
+##
 ## ## Telling the proof
 ##
 ## `static func reach(mark, model)` describes, to the reachability proof, how
@@ -148,6 +156,12 @@ func current_kind() -> Tiles.Kind:
 ## A cell of the level, in world units.
 static func cell_rect(cell: Vector2i) -> Rect2:
 	return Rect2(Vector2(cell) * TILE, Vector2(TILE, TILE))
+
+
+## How long a warning of `seconds` lasts, with the assist as the player set
+## it (above).
+func warn(seconds: float) -> float:
+	return seconds * Assist.warning_scale()
 
 
 ## The prince is standing on one of this mechanism's cells: grounded, his body

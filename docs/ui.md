@@ -320,7 +320,8 @@ drawn at the bottom are the two respawn rings, which are marks, not words.
 
 A sub-screen of the menu, not a mode: it is not something you play, and
 `ModeRegistry` is the list of things you play. **`scripts/core/mode_registry.gd`
-is unchanged.**
+is unchanged.** The row and the page are called SETTINGS; they were SOUND
+until the page gained a switch that is not about sound.
 
 Master / music / SFX volume and mute, written through
 `AudioDirector.set_volume()` and `AudioDirector.toggle_mute()`, both of which
@@ -340,6 +341,14 @@ reporting a bug needs it, and they will look for it where the settings are.
 Volume is a ten-cell gauge, and a step snaps to the grid. Driven by the same
 four actions as the menu: up/down to choose, left/right to set, jump to
 confirm, sword to go back.
+
+**LONGER WARNINGS** is the one assist (`scripts/core/assist.gd`): every foe's
+tell, and every timed window that guards a death, lasts half as long again.
+It is here rather than on a page of its own because this is where a player
+looks for anything they can set. Off by default, saved at once to
+`user://assist.cfg`, and loaded at boot only — so a test or a tool that never
+boots the game plays unassisted, whatever a developer last chose. Six rows
+made the pitch 15 rather than 16, or the build line landed on the rail's hint.
 
 ### Wardrobe
 

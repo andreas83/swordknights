@@ -217,6 +217,18 @@ that survives restarts; `defeated` makes Game remember it, and a respawn puts
 back every foe whose post it does not remember, whole, at its post. A foe
 brought in at runtime with `summon()` has no post: a respawn clears it.
 
+**Warnings go through `warn()`.** Every tell — a raise, a draw, a crouch
+before a pounce — and every timed window that stands between the prince and
+a death is read as `warn(seconds)`, never as the bare constant. That is the
+LONGER WARNINGS assist (`scripts/core/assist.gd`, an owner decision in
+`docs/campaign.md`): off, `warn()` returns what it was given, exactly; on, the
+one factor the player chose. The cut, the opening after it and everything
+else keep their own timing. A foe that compares a tell against its own
+constant has forgotten the assist, so its tests should drive the tell with
+the assist on, as `tests/unit/test_longer_warnings.gd` does the sentinel's
+raise (`Patrol.windup_time()`). A mechanism with a clock in it has the same
+`warn()`.
+
 **Projectiles.** `launch(FoeProjectile)` hands an arrow, a knife or a stone
 to the level (`scripts/entities/foe_projectile.gd`). It is a danger to the
 prince until a parry sends it back, faster, at which point it is his: the

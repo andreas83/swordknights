@@ -61,7 +61,8 @@ const MAX_HEALTH := 2
 ## instantly is a ping-pong ball, one that stops and looks is somebody.
 const LOOK_TIME := 0.5
 ## The telegraph. 27 frames: longer than a human reaction, so it is a warning,
-## short enough that standing still in front of it is a decision.
+## short enough that standing still in front of it is a decision. Read through
+## windup_time(), which the LONGER WARNINGS assist stretches.
 const WINDUP_TIME := 0.45
 ## The cut is live for this long.
 const STRIKE_TIME := 0.15
@@ -136,6 +137,13 @@ func strike_rect() -> Rect2:
 
 func is_dangerous() -> bool:
 	return state == State.STRIKE
+
+
+## How long the raise lasts: WINDUP_TIME, through the foe contract's warn(),
+## so the LONGER WARNINGS assist reaches it. The art reads it too, so a longer
+## raise is drawn across its whole length.
+func windup_time() -> float:
+	return warn(WINDUP_TIME)
 
 
 ## Raising, cutting or getting his blade back: a fight is on.
@@ -221,7 +229,7 @@ func tick(delta: float, grounded: bool) -> void:
 				_enter(State.WALK)
 		State.WINDUP:
 			velocity.x = 0.0
-			if state_time >= WINDUP_TIME:
+			if state_time >= windup_time():
 				_enter(State.STRIKE)
 				struck.emit()
 				cue.emit(&"sword", {"pitch": 0.78})

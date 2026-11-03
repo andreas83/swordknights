@@ -528,7 +528,7 @@ func _look(t: float) -> Dictionary:
 ## and a star of light runs up the blade. Built to be unmissable, because it is
 ## the only warning the guard gives.
 func _windup(t: float) -> Dictionary:
-	var p := clampf(t / Patrol.WINDUP_TIME, 0.0, 1.0)
+	var p := clampf(t / _guard.windup_time(), 0.0, 1.0)
 	var e := smoothstep(0.0, 0.55, p)
 	var tremble := sin(_time * 60.0) * 0.25 * smoothstep(0.6, 1.0, p)
 	return _pose({

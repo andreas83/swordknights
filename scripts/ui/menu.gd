@@ -43,7 +43,7 @@ const REPEAT_DELAY := 0.26
 ## Depth of the lintel across the top, before its scalloped fringe.
 const LINTEL_HEIGHT := 9.0
 const SETTINGS_ID := "settings"
-## The figure editor. Like SOUND it is not a mode -- nothing is played there --
+## The figure editor. Like SETTINGS it is not a mode -- nothing is played there --
 ## so it is a row of this menu rather than an entry in ModeRegistry.
 const WARDROBE_SCENE := "res://scenes/wardrobe.tscn"
 ## Horizontal room for the plaque's text either side of it. The touch pause and
@@ -145,8 +145,8 @@ func _build_rows() -> Array[Dictionary]:
 	})
 	out.append({
 		"id": SETTINGS_ID,
-		"title": "SOUND",
-		"subtitle": "VOLUME AND SILENCE",
+		"title": "SETTINGS",
+		"subtitle": "SOUND AND ASSISTS",
 		"scene": "",
 		"enabled": true,
 	})

@@ -1,9 +1,14 @@
 class_name SettingsPanel
 extends Control
-## Volume, and the one switch that silences the game.
+## Volume, the one switch that silences the game, and the one assist.
 ##
 ## A sub-screen of the menu rather than a mode: it is not something you play,
 ## and ModeRegistry is the list of things you play.
+##
+## LONGER WARNINGS is here because this is where a player looks for anything
+## they can set, and a page of its own for one switch would be a page nobody
+## opens. It writes through Assist.set_longer_warnings(), which saves for
+## itself (scripts/core/assist.gd).
 ##
 ## Everything here already existed — AudioDirector persists master, music, SFX
 ## and mute to user://audio.cfg — and only a keyboard `M` could reach any of
@@ -31,7 +36,11 @@ const REPEAT_DELAY := 0.22
 const REPEAT_FIRST := 0.42
 const STEP := 0.1
 const GAUGE_CELLS := 10
-const ROW_HEIGHT := 16.0
+## Fifteen, not sixteen, since LONGER WARNINGS made it six rows: at sixteen
+## the build line under the list landed on the rail's hint.
+const ROW_HEIGHT := 15.0
+## From the top of the title to the first row.
+const LIST_DROP := 34.0
 const COLUMN_WIDTH := 168.0
 
 enum Kind { GAUGE, TOGGLE, ACTION }
@@ -47,6 +56,7 @@ var _rows: Array[Dictionary] = [
 	{"id": "music", "label": "MUSIC", "kind": Kind.GAUGE, "bus": &"Music"},
 	{"id": "sfx", "label": "SWORDS", "kind": Kind.GAUGE, "bus": &"SFX"},
 	{"id": "mute", "label": "MUTE", "kind": Kind.TOGGLE, "bus": &""},
+	{"id": "warnings", "label": "LONGER WARNINGS", "kind": Kind.TOGGLE, "bus": &""},
 	{"id": "back", "label": "BACK", "kind": Kind.ACTION, "bus": &""},
 ]
 
@@ -86,9 +96,17 @@ func value_of(row: Dictionary) -> float:
 		Kind.GAUGE:
 			return _settings.linear_for(row["bus"])
 		Kind.TOGGLE:
-			return 0.0 if _settings.muted else 1.0
+			return 1.0 if is_on(row) else 0.0
 		_:
 			return 0.0
+
+
+## Whether a toggle row is switched on: MUTE when the game is silent, LONGER
+## WARNINGS when the assist is on.
+func is_on(row: Dictionary) -> bool:
+	if String(row["id"]) == "warnings":
+		return Assist.longer_warnings()
+	return _settings.muted
 
 
 func move(by: int) -> void:
@@ -110,10 +128,10 @@ func adjust(by: int) -> void:
 			_set_volume(row["bus"], next)
 			_play("ui_move")
 		Kind.TOGGLE:
-			# Right turns the switch on, left turns it off; the row is MUTE,
-			# so "on" is silence.
-			if (by > 0) != _settings.muted:
-				_toggle_mute()
+			# Right turns the switch on, left turns it off; on the MUTE row
+			# "on" is silence.
+			if (by > 0) != is_on(row):
+				_flip(row)
 		_:
 			return
 	queue_redraw()
@@ -127,7 +145,7 @@ func confirm() -> void:
 			_play("ui_back")
 			closed.emit()
 		Kind.TOGGLE:
-			_toggle_mute()
+			_flip(row)
 			queue_redraw()
 		_:
 			# A gauge has nothing to confirm; nudge it so the press is felt.
@@ -177,6 +195,16 @@ func _set_volume(bus: StringName, value: float) -> void:
 				_settings.master = value
 
 
+func _flip(row: Dictionary) -> void:
+	if String(row["id"]) != "warnings":
+		_toggle_mute()
+		return
+	var err := Assist.set_longer_warnings(not Assist.longer_warnings())
+	if err != OK:
+		push_warning("assist: could not save: %s" % error_string(err))
+	_play("ui_confirm")
+
+
 func _toggle_mute() -> void:
 	if audio != null:
 		audio.toggle_mute()
@@ -206,12 +234,12 @@ func _draw() -> void:
 	var cx := column.position.x + column.size.x * 0.5
 
 	var top := content.position.y + 10.0
-	UiFont.draw_text(self, "SOUND", Vector2(cx, top), UiFont.Cut.DISPLAY,
+	UiFont.draw_text(self, "SETTINGS", Vector2(cx, top), UiFont.Cut.DISPLAY,
 		Palette.PAPER, UiFont.Align.CENTER, 0.8)
 	UiMarks.rule(self, Vector2(cx, top + UiFont.cap(UiFont.Cut.DISPLAY) + 6.0),
 		minf(column.size.x * 0.5, 54.0), Palette.with_alpha(Palette.LIGHT_SOFT, 0.7))
 
-	var list_top := top + 40.0
+	var list_top := top + LIST_DROP
 	for i: int in _rows.size():
 		_draw_row(_rows[i], column, list_top + i * ROW_HEIGHT, i == _index)
 
@@ -252,11 +280,10 @@ func _draw_row(row: Dictionary, column: Rect2, y: float, selected: bool) -> void
 			UiMarks.gauge(self, Vector2(right - wide - 2.0, y), GAUGE_CELLS, cell,
 				value_of(row), Palette.LIGHT_SOFT, selected)
 		Kind.TOGGLE:
-			var word := "ON" if _settings.muted else "OFF"
-			UiFont.draw_text(self, word, Vector2(right - 2.0, y + 1.0),
+			var on := is_on(row)
+			UiFont.draw_text(self, "ON" if on else "OFF", Vector2(right - 2.0, y + 1.0),
 				UiFont.Cut.MICRO,
-				Palette.CLOTH if _settings.muted
-					else Palette.with_alpha(Palette.PAPER, 0.55),
+				Palette.CLOTH if on else Palette.with_alpha(Palette.PAPER, 0.55),
 				UiFont.Align.RIGHT, 0.5)
 		_:
 			pass
