@@ -17,6 +17,7 @@ func _initialize() -> void:
 	_apply_settings()
 	_apply_input_map()
 	_apply_audio() # audio branch — see the marked section at the end of the file
+	_apply_duel_input() # fighter branch — see the marked section at the end
 
 	var err := ProjectSettings.save()
 	if err != OK:
@@ -183,3 +184,37 @@ func _apply_audio() -> void:
 
 	print("audio — AudioDirector autoload, audio_mute bound to M")
 ## --- END AUDIO --------------------------------------------------------------
+
+
+## --- DUEL FIGHTER -----------------------------------------------------------
+## Everything the Nidhogg-style fighter needs from project.godot lives in this
+## one function, on purpose: it is the only part of this file the fighter
+## branch touches, so it cannot collide with actions being added elsewhere.
+##
+## The fighter needs seven buttons — left, right, up, down, jump, attack and
+## THROW — and the frame is still one byte, because the three sword stances are
+## driven by up and down and cost no bit at all. Throw takes bit 7, which the
+## duel's retired guard button used to carry, so it is bound to the same keys:
+## PlayerInput.bits_from_actions() reads `throw` and `guard` onto that one bit
+## and the old duel keeps working while it still exists.
+func _apply_duel_input() -> void:
+	var throws := {
+		"throw": [[KEY_Q, KEY_L], [JOY_BUTTON_RIGHT_SHOULDER]],
+		"throw_p1": [[KEY_G], []],
+		"throw_p2": [[KEY_L, KEY_KP_2], []],
+	}
+	for action: String in throws:
+		var events: Array[InputEvent] = []
+		var spec: Array = throws[action]
+		for key: int in spec[0]:
+			var key_event := InputEventKey.new()
+			key_event.physical_keycode = key
+			events.append(key_event)
+		for button: int in spec[1]:
+			var pad_event := InputEventJoypadButton.new()
+			pad_event.button_index = button
+			events.append(pad_event)
+		ProjectSettings.set_setting("input/" + action, {"deadzone": 0.4, "events": events})
+
+	print("duel — throw bound for the shared set and both local seats")
+## --- END DUEL FIGHTER -------------------------------------------------------

@@ -8,6 +8,19 @@ extends RefCounted
 ## tests.
 ##
 ## The bitmask encoding is the wire format: eight bits per player per frame.
+##
+## THE DUEL'S SEVEN BUTTONS. Nidhogg needs left, right, up, down, jump, attack
+## and throw — seven, and the byte has eight bits, so no widening is needed and
+## none is allowed: the frame stays one byte because that is what the wire,
+## the replays and the press-edge memory are built on.
+##
+## Bit 7 is the one that changed hands. It carried the duel's GUARD button when
+## the duel had a guard state; the fighter replaced that state with the three
+## sword stances, which are driven by up and down and cost no bit at all, so
+## bit 7 now carries THROW. `BIT_GUARD`, `guard` and `just_pressed_guard`
+## remain as aliases of the same bit, because scripts/player/player.gd still
+## has the old guard state and the pre-fighter duel still drives it; retiring
+## the names is a change to those files, not to this one.
 
 const BIT_LEFT := 1 << 0
 const BIT_RIGHT := 1 << 1
@@ -16,8 +29,10 @@ const BIT_DOWN := 1 << 3
 const BIT_JUMP := 1 << 4
 const BIT_ATTACK := 1 << 5
 const BIT_WALK := 1 << 6
-## --- duel (additive) --- the eighth and last bit: raise the sword to block.
-const BIT_GUARD := 1 << 7
+## The eighth and last bit: let go of the sword.
+const BIT_THROW := 1 << 7
+## Deprecated alias of BIT_THROW. See the class docstring.
+const BIT_GUARD := BIT_THROW
 
 var left := false
 var right := false
@@ -26,13 +41,12 @@ var down := false
 var jump := false
 var attack := false
 var walk := false
-## --- duel (additive) ---
-var guard := false
+var throw := false
 
 var just_pressed_jump := false
 var just_pressed_attack := false
-## --- duel (additive) --- a parry is a press edge, so the duel needs this one.
-var just_pressed_guard := false
+## A throw is a press edge: holding the button does not keep throwing swords.
+var just_pressed_throw := false
 
 var _previous_bits := 0
 
@@ -44,6 +58,15 @@ var axis_x: int:
 var axis_y: int:
 	get:
 		return (1 if down else 0) - (1 if up else 0)
+
+## Deprecated aliases of `throw` and `just_pressed_throw`, on the same bit.
+var guard: bool:
+	get:
+		return throw
+
+var just_pressed_guard: bool:
+	get:
+		return just_pressed_throw
 
 
 ## Refresh from the source. The base class holds whatever was last applied.
@@ -60,7 +83,7 @@ func to_bits() -> int:
 	if jump: bits |= BIT_JUMP
 	if attack: bits |= BIT_ATTACK
 	if walk: bits |= BIT_WALK
-	if guard: bits |= BIT_GUARD # --- duel (additive) ---
+	if throw: bits |= BIT_THROW
 	return bits
 
 
@@ -73,11 +96,11 @@ func apply_bits(bits: int) -> void:
 	jump = bits & BIT_JUMP != 0
 	attack = bits & BIT_ATTACK != 0
 	walk = bits & BIT_WALK != 0
-	guard = bits & BIT_GUARD != 0 # --- duel (additive) ---
+	throw = bits & BIT_THROW != 0
 
 	just_pressed_jump = jump and (_previous_bits & BIT_JUMP) == 0
 	just_pressed_attack = attack and (_previous_bits & BIT_ATTACK) == 0
-	just_pressed_guard = guard and (_previous_bits & BIT_GUARD) == 0 # --- duel ---
+	just_pressed_throw = throw and (_previous_bits & BIT_THROW) == 0
 	_previous_bits = bits
 
 
@@ -86,7 +109,7 @@ func clear() -> void:
 	_previous_bits = 0
 
 
-## --- duel (additive) ------------------------------------------------------
+## --- duel -----------------------------------------------------------------
 ##
 ## The duel rewinds and replays frames, so the edge-detection memory has to be
 ## part of the saved state — otherwise a rolled-back frame would re-fire a press
@@ -103,10 +126,13 @@ func restore_previous_bits(bits: int) -> void:
 ## Reads one frame of intent straight off the input map for a given binding set.
 ##
 ## LocalInput keeps its own copy for the adventure actions; this is the version
-## the duel uses, because it also reads the guard binding and because it has to
+## the duel uses, because it also reads the eighth bit and because it has to
 ## produce the whole frame in one shot (applying bits twice would eat the press
 ## edges). `suffix` selects the binding set: "" for the shared actions, "_p1"
 ## and "_p2" for the two seats on one keyboard.
+##
+## Bit 7 is read from BOTH bindings: `throw`, which is what the fighter wants,
+## and `guard`, which the pre-fighter duel still binds. One bit, either key.
 static func bits_from_actions(suffix: String = "") -> int:
 	var bits := 0
 	if Input.is_action_pressed("move_left" + suffix): bits |= BIT_LEFT
@@ -116,5 +142,14 @@ static func bits_from_actions(suffix: String = "") -> int:
 	if Input.is_action_pressed("jump" + suffix): bits |= BIT_JUMP
 	if Input.is_action_pressed("attack" + suffix): bits |= BIT_ATTACK
 	if Input.is_action_pressed("walk" + suffix): bits |= BIT_WALK
-	if Input.is_action_pressed("guard" + suffix): bits |= BIT_GUARD
+	if _pressed_any(["throw" + suffix, "guard" + suffix]): bits |= BIT_THROW
 	return bits
+
+
+## Any of these actions, skipping the ones this build has no binding for: a
+## project.godot that predates the throw binding must not spam errors.
+static func _pressed_any(actions: Array) -> bool:
+	for action: String in actions:
+		if InputMap.has_action(action) and Input.is_action_pressed(action):
+			return true
+	return false
