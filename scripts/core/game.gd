@@ -64,6 +64,9 @@ var _impact_cooldown: float = 0.0
 var _checkpoint_cells: Array[Vector2i] = []
 var _guard_posts: Array[Vector2] = []
 var _guards_down: Dictionary = {}
+# Guards the current swing has already wounded, by instance id. Cleared when a
+# new swing starts. See _resolve_guard().
+var _struck: Dictionary = {}
 
 
 func _ready() -> void:
@@ -83,6 +86,7 @@ func _ready() -> void:
 	checkpoint = level.spawn_world_position()
 	player.respawn(checkpoint)
 	player.landed.connect(_on_landed)
+	player.attacked.connect(func() -> void: _struck.clear())
 	player.hurt.connect(func(_h: int) -> void: camera.shake(2.4, 0.26))
 	player.died.connect(_on_died)
 
@@ -262,11 +266,18 @@ func _resolve_interactions() -> void:
 ## One guard against the prince. A guard hurts only with its blade, and only
 ## while the blade is live (Patrol.strike_rect()); walking into one is free.
 ## A dying guard is scenery and is skipped entirely.
+##
+## A swing wounds a given guard once. The sword's rect is live for about eight
+## frames and this runs on every one; a hit knocks the guard back about two
+## pixels a frame, which does not clear a fourteen-pixel blade, so without
+## `_struck` the next live frame hit him again and one swing took both hearts.
 func _resolve_guard(guard: Patrol, body: Rect2, attack: Rect2, has_attack: bool) -> void:
 	guard.target_rect = body if player.is_alive() else Rect2()
 	if not guard.is_alive():
 		return
-	if has_attack and attack.intersects(guard.bounds()):
+	var id := guard.get_instance_id()
+	if has_attack and not _struck.has(id) and attack.intersects(guard.bounds()):
+		_struck[id] = true
 		guard.hit(player.global_position.x)
 		GameAudio.cue("guard_hit")
 		# --- feel/flow (additive) ---

@@ -122,6 +122,11 @@ Two rules keep it from compounding:
   without a cooldown a single swing spends the budget two or three times over
   and the frame appears to freeze for a fifth of a second. The filmstrip
   caught exactly that before the cooldown existed.
+- **One swing wounds a guard once.** The cooldown only rationed the
+  *hitstop*; the wound itself was still dealt on every live frame, so one
+  swing took both of a guard's hearts. `Game` now remembers which guards the
+  current swing has hit and forgets on the next `attacked`
+  (`tests/unit/test_one_swing.gd`).
 
 While a hitstop holds, `Game` stops stepping the player and the entities,
 `GameCamera` holds its position and does not re-roll the shake, and `PlayerFx`
