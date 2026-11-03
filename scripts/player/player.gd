@@ -16,6 +16,9 @@ signal landed(impact_speed: float)
 signal grabbed_ledge()
 signal attacked()
 signal hurt(remaining_health: int)
+## A heart came back. Only fired when one actually did: a relic picked up at
+## full health heals nothing and says nothing.
+signal healed(health: int)
 signal died()
 
 enum State {
@@ -410,6 +413,18 @@ func damage(amount: int = 1, from_x: float = NAN) -> bool:
 		_hurt_timer = 0.32
 		_enter(State.HURT)
 		hurt.emit(health)
+	return true
+
+
+## Gives back up to `amount` hearts, never past MAX_HEALTH. Returns whether
+## anything was restored, so a caller can tell a heal from a pickup at full
+## health. A body that is down stays down: healing is not a revival, and the
+## respawn is the only way back from DEAD.
+func heal(amount: int = 1) -> bool:
+	if state == State.DEAD or health >= Tuning.MAX_HEALTH or amount <= 0:
+		return false
+	health = mini(Tuning.MAX_HEALTH, health + amount)
+	healed.emit(health)
 	return true
 
 

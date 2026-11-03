@@ -18,8 +18,9 @@ extends Control
 const TITLE_HOLD := 2.6
 const TITLE_FADE := 0.9
 ## How long the corner answers a change: a relic count that pops, a health
-## mark that burns white and then goes dark. A number that silently changes
-## in the corner is a number nobody saw change.
+## mark that burns white and then goes dark, or one that burns white and then
+## stays lit. A number that silently changes in the corner is a number nobody
+## saw change.
 const PULSE_TIME := 0.45
 
 ## Health marks: a 3-unit stroke every 5 units.
@@ -37,6 +38,7 @@ var _overlay_title: String = ""
 var _overlay_subtitle: String = ""
 var _relic_pulse: float = 0.0
 var _hurt_pulse: float = 0.0
+var _heal_pulse: float = 0.0
 
 
 func _ready() -> void:
@@ -45,13 +47,22 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(queue_redraw)
 
 
-func update_model(hp: int, hp_max: int, got: int, total: int) -> void:
+## `refill` is the level starting over -- a restart, a respawn at a torch.
+## Health jumps back to full then, which is neither a heal nor news, so the
+## corner takes the numbers without answering. Without it a heart regained
+## and a level restarted would look the same from here.
+func update_model(hp: int, hp_max: int, got: int, total: int, refill: bool = false) -> void:
 	# Only a gain pops and only a loss burns: a restart resets both counts
 	# and should not celebrate it.
-	if got > relics and total == relics_total:
-		_relic_pulse = PULSE_TIME
-	if hp < health and hp_max == max_health:
-		_hurt_pulse = PULSE_TIME
+	if not refill:
+		if got > relics and total == relics_total:
+			_relic_pulse = PULSE_TIME
+		if hp < health and hp_max == max_health:
+			_hurt_pulse = PULSE_TIME
+			_heal_pulse = 0.0
+		if hp > health and hp_max == max_health:
+			_heal_pulse = PULSE_TIME
+			_hurt_pulse = 0.0
 	health = hp
 	max_health = hp_max
 	relics = got
@@ -74,9 +85,10 @@ func _process(delta: float) -> void:
 	if _title_time <= TITLE_HOLD + TITLE_FADE:
 		_title_time += delta
 		queue_redraw()
-	if _relic_pulse > 0.0 or _hurt_pulse > 0.0:
+	if _relic_pulse > 0.0 or _hurt_pulse > 0.0 or _heal_pulse > 0.0:
 		_relic_pulse = maxf(0.0, _relic_pulse - delta)
 		_hurt_pulse = maxf(0.0, _hurt_pulse - delta)
+		_heal_pulse = maxf(0.0, _heal_pulse - delta)
 		queue_redraw()
 
 
@@ -99,11 +111,8 @@ func _draw() -> void:
 func _draw_vitals(content: Rect2) -> void:
 	var pen := content.position
 	for i: int in max_health:
-		# The mark just lost stays lit, burning white, for a few blinks.
-		var burning := i == health and _hurt_pulse > 0.0 \
-			and int(_hurt_pulse * 16.0) % 2 == 0
 		UiMarks.tally(self, Vector2(pen.x + i * TALLY_STRIDE, pen.y),
-			i < health or burning, Palette.PAPER if burning else Palette.LIGHT_SOFT)
+			_tally_lit(i), Palette.PAPER if _tally_burning(i) else Palette.LIGHT_SOFT)
 
 	if relics_total <= 0:
 		return
@@ -119,6 +128,32 @@ func _draw_vitals(content: Rect2) -> void:
 		Vector2(x + 10.0 + pop, middle - UiFont.cap(UiFont.Cut.TEXT) * 0.5),
 		UiFont.Cut.TEXT, Palette.LIGHT_SOFT if _relic_pulse > 0.0 else Palette.PAPER,
 		UiFont.Align.LEFT, 0.6)
+
+
+## The mark just lost and the mark just gained answer the same way, mirrored:
+## both blink white at the same rate for the same PULSE_TIME. The lost one
+## then goes dark and the gained one stays lit, so the blink says "this one
+## changed" and what is left afterwards says which way.
+func _tally_burning(i: int) -> bool:
+	if _hurt_pulse > 0.0 and i == health:
+		return _blink_on(_hurt_pulse)
+	if _heal_pulse > 0.0 and i == health - 1:
+		return _blink_on(_heal_pulse)
+	return false
+
+
+func _tally_lit(i: int) -> bool:
+	if _tally_burning(i):
+		return true
+	# Between the gained mark's blinks it is dark, exactly as the lost mark
+	# is between its own, or the blink would be a flicker of colour instead.
+	if _heal_pulse > 0.0 and i == health - 1:
+		return false
+	return i < health
+
+
+static func _blink_on(pulse: float) -> bool:
+	return int(pulse * 16.0) % 2 == 0
 
 
 ## The level name, in the reserved band, over the picture rather than in a box.

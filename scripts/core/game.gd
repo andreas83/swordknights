@@ -87,7 +87,8 @@ func _ready() -> void:
 	player.respawn(checkpoint)
 	player.landed.connect(_on_landed)
 	player.attacked.connect(func() -> void: _struck.clear())
-	player.hurt.connect(func(_h: int) -> void: camera.shake(2.4, 0.26))
+	player.hurt.connect(_on_hurt)
+	player.healed.connect(func(_h: int) -> void: _update_hud())
 	player.died.connect(_on_died)
 
 	camera.setup(player, level.world_size())
@@ -322,13 +323,22 @@ func _restart() -> void:
 	_death_timer = 0.0
 	_impact_cooldown = 0.0 # --- feel/flow (additive) ---
 	_set_phase(Phase.PLAYING)
-	_update_hud()
+	_update_hud(true)
 
 
+## A relic is a heart as well as a shard: the level's optional objective pays
+## for itself in the one currency the prince runs short of. At full health it
+## is only a shard. Nothing is banked and nothing is converted into a score --
+## the game keeps none, and the relic tally on the complete screen is already
+## the reward for taking the detour. A heal you could store would turn every
+## relic into a reason to stand still in front of a guard.
 func _on_relic_collected() -> void:
 	GameAudio.cue("relic")
 	relics += 1
-	_update_hud()
+	# heal() reports through `healed`, which refreshes the HUD with both counts
+	# at once; a pickup at full health has to refresh it here instead.
+	if not player.heal(1):
+		_update_hud()
 
 
 # --- feel/flow (additive) --- one place for "something connected": a few
@@ -353,6 +363,14 @@ func _on_landed(impact: float) -> void:
 	camera.settle(Tuning.impact_weight(impact))
 
 
+## Every heart lost reaches the corner. Before this the HUD was told only about
+## deaths, restarts and relics, so a hit that did not kill left three marks lit
+## and the loss flash in Hud never fired in play -- only its unit test saw it.
+func _on_hurt(_remaining: int) -> void:
+	camera.shake(2.4, 0.26)
+	_update_hud()
+
+
 func _on_died() -> void:
 	camera.shake(3.0, 0.4)
 	deaths += 1
@@ -361,8 +379,10 @@ func _on_died() -> void:
 	_update_hud()
 
 
-func _update_hud() -> void:
-	hud.update_model(player.health, Tuning.MAX_HEALTH, relics, relics_total)
+## `refill` marks the level starting over -- a restart or a respawn -- which
+## the HUD takes silently rather than as a gain or a loss.
+func _update_hud(refill: bool = false) -> void:
+	hud.update_model(player.health, Tuning.MAX_HEALTH, relics, relics_total, refill)
 
 
 ## --- checkpoints ------------------------------------------------------------
@@ -457,4 +477,4 @@ func _respawn() -> void:
 	_death_timer = 0.0
 	_impact_cooldown = 0.0
 	_set_phase(Phase.PLAYING)
-	_update_hud()
+	_update_hud(true)

@@ -245,8 +245,21 @@ A count that silently changes in the corner is a count nobody saw change. So
 the corner answers for `Hud.PULSE_TIME` (0.45 s): a relic gained pops the
 lozenge two units larger and steps it back in whole units, the count lit; a
 health mark lost stays lit and burns white for a few blinks before it goes
-dark. Only a gain pops and only a loss burns — a restart that resets both counts
-sets off neither (`tests/unit/test_pickup_feedback.gd`).
+dark. A heart regained answers the same way, mirrored: the mark burns white
+for the same blinks at the same rate and then stays lit, so the blink says
+which mark changed and what is left afterwards says which way. Only a gain
+pops and only a change burns — a restart or a respawn at a torch refills
+health and resets counts, and `Game` reports it to `Hud.update_model()` as a
+refill, which sets off nothing (`tests/unit/test_pickup_feedback.gd`,
+`tests/unit/test_relic_heals.gd`).
+
+A relic is worth a heart. At full health it is only a relic: it still counts
+toward the tally on the complete screen, nothing is banked and nothing becomes
+a score — the game keeps none, and a heal you could store would make every
+relic a reason to stand still in front of a guard. The heart comes back
+through `Player.heal()`, which emits `healed`; `Game` refreshes the corner on
+that and on `hurt`. Before, the corner heard only about deaths, so a hit that
+did not kill left three marks lit and the loss flash never fired in play.
 
 The relic itself answers in the world: it bursts into a star and six sparks for
 `Relic.BURST_TIME` instead of vanishing, and is no longer collectable from the

@@ -9,6 +9,11 @@ extends Node2D
 ## node goes. Hard pixels and flat tones throughout, the same vocabulary as a
 ## sword hit, because a pickup is a small impact.
 ##
+## Taking one also gives back a heart, up to the maximum; at full health it is
+## only a shard. That rule lives in `Game._on_relic_collected()`, not here: the
+## relic does not know the prince exists, which is what lets a test collect
+## one with nobody standing in it.
+##
 ## A shard that has been taken is no longer collectable even while it is still
 ## on screen: `bounds()` goes empty and `collect()` does nothing, so standing
 ## in the burst cannot count it twice.
