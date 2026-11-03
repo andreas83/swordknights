@@ -88,13 +88,16 @@
 <section id="android" class="band" aria-labelledby="android-title">
 	<h2 id="android-title">Android</h2>
 	<div class="download">
-		<a class="button" href="download/swordknights.apk" download>Download the APK</a>
-		<p class="download-meta">{{APK_SIZE}} &middot; debug build of <a href="https://github.com/andreas83/swordknights/commit/{{COMMIT}}"><code>{{COMMIT_SHORT}}</code></a>, {{BUILD_DATE}}</p>
+		<a class="button" href="{{APK_URL}}">Download the APK</a>
+		<p class="download-meta">the newest development build &middot;
+		<a href="{{RELEASE_URL}}">build number, commit and checksum</a></p>
 	</div>
-	<p>This is a <strong>debug build</strong>, rebuilt from the latest commit on
-	<code>main</code> every time it changes and signed with a throwaway debug key. It is for
-	trying the game on a phone, not a release: it is not in any store and it does not update
-	itself. It runs on ARM phones and tablets, 32- and 64-bit.</p>
+	<p>This is a <strong>development build</strong>, rebuilt from the latest commit on
+	<code>main</code> every time it changes and signed with a debug key. It is for trying the
+	game on a phone, not a release: it is not in any store. It does know when it is out of
+	date: when a newer build is published, its title screen says
+	<b>UPDATE AVAILABLE</b>, and tapping that downloads the new one. It runs on ARM phones and
+	tablets, 32- and 64-bit.</p>
 
 	<h3>Installing it</h3>
 	<ol class="steps">
@@ -104,11 +107,13 @@
 		<li>Tap <b>Install</b>. Android may warn that the app is from an unknown source; that is
 		what any APK from outside a store looks like.</li>
 	</ol>
-	<p><strong>Uninstall any earlier copy first.</strong> Every build is signed with a fresh
-	debug key, and Android refuses to install an app over one signed differently &mdash; so a
-	new debug build will not install over an older one, nor over a release build of the same
-	game, and the other way round. Uninstalling clears the game's saved settings.</p>
-	<p class="checksum">SHA-256 <code>{{APK_SHA256}}</code></p>
+	<p>After that, updates install over the game in place: tap <b>UPDATE AVAILABLE</b> on the
+	title screen, then <b>Update</b> when Android asks. Every development build is signed with
+	the same key, which is what lets one install over the last.</p>
+	<p>If Android says the app is <strong>not installed</strong> or <strong>conflicts with an
+	existing package</strong>, the copy on the phone was signed with a different key &mdash; an
+	older download from this page, or a release build. Uninstall it once, then install again.
+	Uninstalling clears the game's saved settings.</p>
 </section>
 
 <section id="game" class="band" aria-labelledby="game-title">
@@ -216,7 +221,7 @@
 	<a href="https://github.com/andreas83/swordknights">github.com/andreas83/swordknights</a>.</p>
 	<p>Original prototype by Andreas, with support from Harald P. and Michael W.
 	Licensed GPL-3.0-or-later.</p>
-	<p class="build">This page and both builds: commit <code>{{COMMIT_SHORT}}</code>, {{BUILD_DATE}}.</p>
+	<p class="build">This page and the web build: commit <code>{{COMMIT_SHORT}}</code>, {{BUILD_DATE}}.</p>
 </footer>
 </body>
 </html>

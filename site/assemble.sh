@@ -1,44 +1,51 @@
 #!/usr/bin/env bash
 #
-# Assemble the public site: the page from site/public/, the web export under
-# play/, and the debug APK under download/.
+# Assemble the public site: the page from site/public/ and the web export under
+# play/.
 #
 # Usage, from the repository root:
-#   site/assemble.sh --web build/web --apk dist/swordknights.apk --out build/site
+#   site/assemble.sh --web build/web --out build/site
 #
 # Environment (all optional):
 #   SITE_URL    absolute URL the site is served from, with a trailing slash. Only
 #               link previews need it (Open Graph wants absolute URLs); when it is
 #               unset those two tags are dropped, which is right for a local
 #               preview.
-#   COMMIT      full commit hash the builds came from. Default: git HEAD.
+#   COMMIT      full commit hash the web build came from. Default: git HEAD.
 #   BUILD_DATE  date shown on the page. Default: today, UTC.
+#   REPOSITORY  OWNER/REPO whose `dev` pre-release the Android button links to.
+#               Default: andreas83/swordknights.
 #
-# This is the one place the three parts meet, and it is a script rather than
+# The APK is not part of the site. The download button points at the stable
+# asset of the rolling `dev` pre-release that android.yml publishes,
+#   https://github.com/OWNER/REPO/releases/download/dev/swordknights-dev.apk
+# so the site and the app's own update check are one channel, and an APK
+# fetched from the page is one the game will later offer to update.
+#
+# This is the one place the parts meet, and it is a script rather than
 # workflow YAML so that what Pages publishes can be built and looked at on a
-# laptop: export the web build, drop any file in as the APK, run this, and serve
-# the output with `python3 -m http.server -d build/site`.
+# laptop: export the web build, run this, and serve the output with
+# `python3 -m http.server -d build/site`.
 #
-# The page carries the facts that only exist after the build -- the APK's size
-# and checksum, the engine's download size, the commit -- as {{PLACEHOLDERS}}
-# filled in here. Any placeholder left over fails the script, so a typo cannot
+# The page carries the facts that only exist after the build -- the engine's
+# download size, the commit, the APK's address -- as {{PLACEHOLDERS}} filled in
+# here. Any placeholder left over fails the script, so a typo cannot
 # publish a page that says "{{APK_SIZE}}".
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-web="" apk="" out=""
+web="" out=""
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		--web) web="$2"; shift 2 ;;
-		--apk) apk="$2"; shift 2 ;;
 		--out) out="$2"; shift 2 ;;
 		*) echo "assemble: unknown argument $1" >&2; exit 2 ;;
 	esac
 done
-if [[ -z "$web" || -z "$apk" || -z "$out" ]]; then
-	echo "usage: site/assemble.sh --web DIR --apk FILE --out DIR" >&2
+if [[ -z "$web" || -z "$out" ]]; then
+	echo "usage: site/assemble.sh --web DIR --out DIR" >&2
 	exit 2
 fi
 
@@ -48,10 +55,13 @@ for f in index.html index.js index.wasm index.pck; do
 		exit 1
 	fi
 done
-if [[ ! -s "$apk" ]]; then
-	echo "assemble: no APK at $apk" >&2
+repository="${REPOSITORY:-andreas83/swordknights}"
+if [[ ! "$repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+	echo "assemble: REPOSITORY '${repository}' is not OWNER/REPO" >&2
 	exit 1
 fi
+release_url="https://github.com/${repository}/releases/tag/dev"
+apk_url="https://github.com/${repository}/releases/download/dev/swordknights-dev.apk"
 
 commit="${COMMIT:-$(git rev-parse HEAD)}"
 build_date="${BUILD_DATE:-$(date -u '+%-d %B %Y')}"
@@ -63,14 +73,11 @@ megabytes() {
 }
 
 rm -rf "$out"
-mkdir -p "$out/play" "$out/download"
+mkdir -p "$out/play"
 cp -R site/public/. "$out/"
 cp icon.svg "$out/icon.svg"
 cp -R "$web/." "$out/play/"
-cp "$apk" "$out/download/swordknights.apk"
 
-apk_bytes="$(stat -c%s "$out/download/swordknights.apk")"
-apk_sha="$(sha256sum "$out/download/swordknights.apk" | cut -d' ' -f1)"
 play_bytes="$(cat "$out/play/index.wasm" "$out/play/index.pck" "$out/play/index.js" | wc -c)"
 
 page="$out/index.html"
@@ -80,8 +87,8 @@ else
 	sed -i '/{{SITE_URL}}/d' "$page"
 fi
 sed -i \
-	-e "s|{{APK_SIZE}}|$(megabytes "$apk_bytes")|g" \
-	-e "s|{{APK_SHA256}}|${apk_sha}|g" \
+	-e "s|{{APK_URL}}|${apk_url}|g" \
+	-e "s|{{RELEASE_URL}}|${release_url}|g" \
 	-e "s|{{PLAY_SIZE}}|$(megabytes "$play_bytes")|g" \
 	-e "s|{{COMMIT_SHORT}}|${commit:0:7}|g" \
 	-e "s|{{COMMIT}}|${commit}|g" \
@@ -96,5 +103,4 @@ fi
 echo "assembled $out:"
 printf '  %-28s %s\n' "page" "$page"
 printf '  %-28s %s (%s bytes)\n' "play/" "$(megabytes "$play_bytes")" "$play_bytes"
-printf '  %-28s %s (%s bytes)\n' "download/swordknights.apk" "$(megabytes "$apk_bytes")" "$apk_bytes"
-printf '  %-28s %s\n' "apk sha256" "$apk_sha"
+printf '  %-28s %s\n' "android button" "$apk_url"

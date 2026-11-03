@@ -25,6 +25,37 @@ godot --headless --path . --import   # import assets / rebuild the class cache
 The engine binary is not vendored. Get 4.5.1 from the
 [Godot releases page](https://github.com/godotengine/godot/releases/tag/4.5.1-stable).
 
+## Installing development builds
+
+Every push to `main` that touches the game builds a debug APK and publishes it
+to the rolling **`dev` pre-release**, always at the same address:
+
+**<https://github.com/andreas83/swordknights/releases/download/dev/swordknights-dev.apk>**
+
+([release page](https://github.com/andreas83/swordknights/releases/tag/dev),
+with the build number, the commit and its notes.)
+
+Once, on the phone:
+
+1. Open that link in the phone's browser. When the download finishes, open it.
+2. Android asks to allow installing apps from the browser: **Settings → Allow
+   from this source**, then back, then **Install**. (Later: *Settings → Apps →
+   Special app access → Install unknown apps* → your browser.)
+3. If Android says *App not installed* or that it *conflicts with an existing
+   package*, the copy already on the phone was signed with a different key — an
+   older build signed before the current key existed, or a release build.
+   Uninstall the game once and install again.
+
+After that, an update is one tap: when a newer build is published, the title
+screen shows **UPDATE AVAILABLE · BUILD n** at the top. Tap it, open the
+download, tap **Update**. The settings page (SOUND) shows which build is
+running.
+
+Only development builds check for updates; release builds never do. How the
+channel, the build numbers and the signing key work, and the one thing the
+repository owner should set up (the `DEBUG_KEYSTORE_B64` secret), is in
+[`docs/ci.md`](docs/ci.md#the-dev-channel-one-tap-updates-on-the-phone).
+
 ## Controls
 
 | Action      | Keyboard            | Gamepad       | Touch                      |

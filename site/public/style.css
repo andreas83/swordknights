@@ -374,15 +374,6 @@ h3 {
 	font-weight: 700;
 }
 
-.checksum {
-	color: var(--text-quiet);
-	font-size: 0.9rem;
-}
-
-.checksum code {
-	word-break: break-all;
-}
-
 /* ---------- The game ---------- */
 
 .columns {
