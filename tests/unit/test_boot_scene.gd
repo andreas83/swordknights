@@ -36,6 +36,15 @@ func test_boot_scene_instantiates_and_runs_ready() -> void:
 	)
 	assert_eq(boot.name, &"Boot", "boot scene root is expected to be named Boot")
 
+	# The boot hands off with change_scene_to_file(), so the menu is now the
+	# tree's current scene -- outside autofree, alive for the rest of the run,
+	# and answering every input a later test sends. It once started the
+	# Adventure in the middle of test_endless_descent.gd. Take it down here.
+	var handed_off := get_tree().current_scene
+	if handed_off != null and handed_off != boot:
+		handed_off.queue_free()
+		await wait_physics_frames(1)
+
 
 func test_boot_script_declares_the_menu_scene_it_hands_off_to() -> void:
 	# boot.gd deliberately degrades to a warning when the menu scene is absent,

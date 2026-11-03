@@ -14,10 +14,10 @@ var _endless: GeneratedGame
 
 
 ## The press below goes through the real input pipeline, so every scene in the
-## tree hears it. test_boot_scene.gd leaves the boot's hand-off — the menu — as
-## the tree's current scene, and a jump press there starts the Adventure, whose
-## wipe then owns the screen and swallows this test's. A stray scene at the
-## root is not part of this test, so it goes.
+## tree hears it. A menu left at the root by an earlier test would start the
+## Adventure on that press, whose wipe then owns the screen and swallows this
+## test's. test_boot_scene.gd now cleans up its own hand-off; this stays as
+## the belt to that brace, because a stray scene is not part of this test.
 func before_all() -> void:
 	for child: Node in get_tree().root.get_children():
 		if child.scene_file_path in ["res://scenes/menu.tscn", "res://scenes/game.tscn"]:
