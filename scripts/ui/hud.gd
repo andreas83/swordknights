@@ -17,6 +17,10 @@ extends Control
 
 const TITLE_HOLD := 2.6
 const TITLE_FADE := 0.9
+## How long the corner answers a change: a relic count that pops, a health
+## mark that burns white and then goes dark. A number that silently changes
+## in the corner is a number nobody saw change.
+const PULSE_TIME := 0.45
 
 ## Health marks: a 3-unit stroke every 5 units.
 const TALLY_STRIDE := 5.0
@@ -31,6 +35,8 @@ var _title: String = ""
 var _title_time: float = 999.0
 var _overlay_title: String = ""
 var _overlay_subtitle: String = ""
+var _relic_pulse: float = 0.0
+var _hurt_pulse: float = 0.0
 
 
 func _ready() -> void:
@@ -40,6 +46,12 @@ func _ready() -> void:
 
 
 func update_model(hp: int, hp_max: int, got: int, total: int) -> void:
+	# Only a gain pops and only a loss burns: a restart resets both counts
+	# and should not celebrate it.
+	if got > relics and total == relics_total:
+		_relic_pulse = PULSE_TIME
+	if hp < health and hp_max == max_health:
+		_hurt_pulse = PULSE_TIME
 	health = hp
 	max_health = hp_max
 	relics = got
@@ -62,6 +74,10 @@ func _process(delta: float) -> void:
 	if _title_time <= TITLE_HOLD + TITLE_FADE:
 		_title_time += delta
 		queue_redraw()
+	if _relic_pulse > 0.0 or _hurt_pulse > 0.0:
+		_relic_pulse = maxf(0.0, _relic_pulse - delta)
+		_hurt_pulse = maxf(0.0, _hurt_pulse - delta)
+		queue_redraw()
 
 
 func _draw() -> void:
@@ -83,18 +99,26 @@ func _draw() -> void:
 func _draw_vitals(content: Rect2) -> void:
 	var pen := content.position
 	for i: int in max_health:
+		# The mark just lost stays lit, burning white, for a few blinks.
+		var burning := i == health and _hurt_pulse > 0.0 \
+			and int(_hurt_pulse * 16.0) % 2 == 0
 		UiMarks.tally(self, Vector2(pen.x + i * TALLY_STRIDE, pen.y),
-			i < health, Palette.LIGHT_SOFT)
+			i < health or burning, Palette.PAPER if burning else Palette.LIGHT_SOFT)
 
 	if relics_total <= 0:
 		return
 	var x := pen.x + max_health * TALLY_STRIDE + 7.0
 	var middle := pen.y + TALLY_HEIGHT * 0.5
-	UiMarks.lozenge(self, Vector2(x + 3.0, middle), 4.5,
-		Palette.LIGHT if relics < relics_total else Palette.PAPER, 0.5)
+	# A gain pops the lozenge two units larger and steps it back, in whole
+	# units: a smooth scale on a pixel mark is a shimmer, not a pop.
+	var pop := ceilf(2.0 * _relic_pulse / PULSE_TIME)
+	var lit := relics >= relics_total or _relic_pulse > 0.0
+	UiMarks.lozenge(self, Vector2(x + 3.0, middle), 4.5 + pop,
+		Palette.PAPER if lit else Palette.LIGHT, 0.5)
 	UiFont.draw_text(self, "%d/%d" % [relics, relics_total],
-		Vector2(x + 10.0, middle - UiFont.cap(UiFont.Cut.TEXT) * 0.5),
-		UiFont.Cut.TEXT, Palette.PAPER, UiFont.Align.LEFT, 0.6)
+		Vector2(x + 10.0 + pop, middle - UiFont.cap(UiFont.Cut.TEXT) * 0.5),
+		UiFont.Cut.TEXT, Palette.LIGHT_SOFT if _relic_pulse > 0.0 else Palette.PAPER,
+		UiFont.Align.LEFT, 0.6)
 
 
 ## The level name, in the reserved band, over the picture rather than in a box.

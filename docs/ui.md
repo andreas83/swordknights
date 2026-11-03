@@ -219,6 +219,20 @@ settings page). When the on-screen stick is up, a sword button covers the right
 end of that rail, so the hint moves to the left end and says less — the buttons
 are lettered and are the instruction at that point.
 
+### The HUD answers
+
+A count that silently changes in the corner is a count nobody saw change. So
+the corner answers for `Hud.PULSE_TIME` (0.45 s): a relic gained pops the
+lozenge two units larger and steps it back in whole units, the count lit; a
+health mark lost stays lit and burns white for a few blinks before it goes
+dark. Only a gain pops and only a loss burns — a restart that resets both counts
+sets off neither (`tests/unit/test_pickup_feedback.gd`).
+
+The relic itself answers in the world: it bursts into a star and six sparks for
+`Relic.BURST_TIME` instead of vanishing, and is no longer collectable from the
+moment it is taken, so standing in the burst cannot count it twice. Still no
+hitstop on a pickup — `docs/feel.md` explains why.
+
 ### Settings
 
 A sub-screen of the menu, not a mode: it is not something you play, and
