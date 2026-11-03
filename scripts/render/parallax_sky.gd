@@ -29,6 +29,17 @@ const FLOCK_EVERY := 31.0
 const FLOCK_CROSS := 12.0
 const FLOCK_SIZE := 5
 const _BASELINES: Array[float] = [0.74, 0.82, 0.92]
+## The sun's place across the view, at noon and at dusk. On the left, where
+## the light comes from: every shadow in the world falls down and to the right
+## (docs/world.md, "One sun"), and a disc on the right stood behind the
+## shadows it cast. Dusk draws it in toward the middle as it sinks.
+const SUN_NOON_X := 0.28
+const SUN_DUSK_X := 0.36
+## It drifts left as the camera runs right, at the far skyline's rate, and
+## stops here: a 170-column ruin, or the duel's strip, would otherwise carry it
+## off the edge of the sky it lights.
+const SUN_LEFT_MOST := 0.1
+const SUN_DRIFT := 0.04
 
 var _layers: Array = []
 var _time: float = 0.0
@@ -129,10 +140,10 @@ func _sky_at(y: float, view: Vector2) -> Color:
 ## down behind the city, which is drawn after it. Low enough to set, high
 ## enough that the burning disc itself is seen and not only its glow.
 func _draw_sun(view: Vector2, cam: Vector2) -> void:
-	var x := view.x * lerpf(0.72, 0.64, dusk) - cam.x * 0.04
-	var y := view.y * lerpf(0.28, 0.44, dusk)
+	var at := sun_center(view, cam)
+	var x := at.x
+	var y := at.y
 	var pulse := 1.0 + sin(_time * lerpf(0.6, 1.4, dusk)) * lerpf(0.02, 0.035, dusk)
-	var at := Vector2(x, y)
 	draw_circle(at, lerpf(52.0, 96.0, dusk) * pulse,
 		Palette.with_alpha(Palette.LIGHT_WARM, 0.10).lerp(
 			Palette.with_alpha(Palette.SHADOW_WARM, 0.32), dusk))
@@ -151,6 +162,12 @@ func _draw_sun(view: Vector2, cam: Vector2) -> void:
 		var half := sqrt(maxf(0.0, core * core - (band_y - y) * (band_y - y)))
 		draw_rect(Rect2(x - half - 1.0, band_y, half * 2.0 + 2.0, thick),
 			_sky_at(band_y, view))
+
+
+## Where the disc is drawn, in the view, with the camera at `cam`.
+func sun_center(view: Vector2, cam: Vector2) -> Vector2:
+	var x := view.x * lerpf(SUN_NOON_X, SUN_DUSK_X, dusk) - cam.x * SUN_DRIFT
+	return Vector2(maxf(x, view.x * SUN_LEFT_MOST), view.y * lerpf(0.28, 0.44, dusk))
 
 
 func _draw_building(b: Dictionary, x: float, baseline: float, color: Color) -> void:
