@@ -118,7 +118,7 @@ One screen each, one set piece each, and the stake rises toward either end
 
 | Zone | | Set piece | Stake |
 | --- | --- | --- | --- |
-| 3 | the Mirror Court | a raised tower over an arcade, a ladder either side | none: the start |
+| 3 | the Mirror Court | flat floor wall to wall, a low gallery in the middle | none: the start |
 | 2, 4 | the Cistern Court | a spike pit three tiles wide, a stepping stone over it | a hazard with help |
 | 1, 5 | the Gates | the arch, the crowd, and a moat of open water one jump out | a hazard with none, at dusk |
 

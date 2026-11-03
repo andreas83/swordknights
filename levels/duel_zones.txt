@@ -23,7 +23,7 @@
 ; Each zone is one screen with one set piece, and the stake rises toward each
 ; end, as it does across a Nidhogg level:
 ;
-;   zone 3  the Mirror Court   the start; a raised tower, two ladders, no hazard
+;   zone 3  the Mirror Court   the start; flat, a low gallery, no hazard
 ;   zone 2  the Cistern Court  spikes, with a stepping stone to cross on
 ;   zone 1  the West Gate      bare water one jump from the gate, at dusk
 ;
