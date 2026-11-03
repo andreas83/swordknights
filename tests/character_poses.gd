@@ -12,6 +12,11 @@ extends SceneTree
 ## The frames are 1280x720 (the 320x180 viewport at the 4x window scale), with
 ## the character's feet pinned to FEET so a fixed crop lands on it every time.
 ## tests/character_contact_sheet.py turns the frames into docs/character-states.png.
+##
+## `--figure heroine` dresses the player as the heroine (CharacterLook) instead
+## of the prince, so both figures are rendered through every pose in this one
+## table -- a pose added here is a pose checked on both. Those two runs side by
+## side are docs/heroine-poses.png.
 
 const FEET := Vector2(160.0, 124.0)
 ## Long enough for the cloth lag and the squash spring to settle on the pose.
@@ -21,6 +26,7 @@ const SETTLE_FRAMES := 14
 const EFFECT_LEAD := 3
 
 var _out_dir := "user://poses"
+var _figure := "prince"
 var _poses: Array[Dictionary] = []
 var _index := 0
 var _settle := 0
@@ -45,6 +51,7 @@ func _initialize() -> void:
 	root.add_child(_player)
 	_player.set_physics_process(false)
 	_player.position = FEET
+	_dress()
 
 	_poses = _pose_table()
 	_enter(_poses[0])
@@ -160,8 +167,19 @@ func _parse_args() -> void:
 		if args[i] == "--out" and i + 1 < args.size():
 			_out_dir = args[i + 1]
 			i += 2
+		elif args[i] == "--figure" and i + 1 < args.size():
+			_figure = args[i + 1]
+			i += 2
 		else:
 			i += 1
+
+
+## The default look of the named figure. The saved wardrobe is never read here:
+## a contact sheet must not depend on what someone last chose in the editor.
+func _dress() -> void:
+	var look := CharacterLook.new()
+	look.take_ids({"figure": _figure})
+	look.dress(_player.get_node(^"PlayerArt") as PlayerArt)
 
 
 ## A stand-in for terrain: flat bands in the game's palette plus a few niches,

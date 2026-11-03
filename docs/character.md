@@ -1,7 +1,7 @@
 # The character
 
-How the prince is drawn, how he is posed, and what the tuning numbers behind
-him are for.
+How the prince and the heroine are drawn, how they are posed, and what the
+tuning numbers behind them are for.
 
 ![every state, before and after](character-states.png)
 
@@ -149,6 +149,9 @@ table, which is where the game tells a player what the buttons do.
 3. Add a row to `_pose_table()` in `tests/character_poses.gd` and re-render the
    contact sheet (below). If it does not read at 1:1 in the inset, it does not
    read.
+4. Render it as the heroine too (`--figure heroine`, below). The pose is hers
+   already; what to look at is whether her braid, ribbons and short hem read
+   in it, and whether a new field you added means something to her costume.
 
 ## Secondary motion
 
@@ -392,11 +395,130 @@ because a sweeping fighter keeps its full-height hurtbox; and a downed fighter
 sits back inside its small box instead of lying full length past it.
 
 Seat two wears `Palette.WATER_DEEP`, `WATER_SHADE` and `WATER_NIGHT` in place of
-the prince's crimson steps.
+the prince's crimson steps, whatever figure or look either player chose (see the
+heroine, below).
 
 ```bash
 xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1280x720 \
   --script tests/fighter_poses.gd -- --out docs/fighter-poses.png [--hitboxes]
+```
+
+## The heroine: a second figure on the same skeleton
+
+There are two figures, the prince and the heroine, and one skeleton. What a
+player chooses in the wardrobe (`docs/ui.md`) is a **look** — a figure and a
+few palette colours, `scripts/player/character_look.gd` — and the look puts a
+**costume** on `PlayerArt`. Gameplay never sees either: the body, its hitbox,
+its tuning and its reach are the prince's whichever figure is drawn.
+
+![the prince and the heroine through every pose](heroine-poses.png)
+
+### Why a costume layer and not a second PlayerArt
+
+`PlayerArt` does three jobs. It turns a state into a pose (`_posture()`), the
+pose into a rig of points (`_rig()`), and draws planes on the rig. Only the
+third differs between the two figures, and everything that makes a pose
+*read* — the lean, the stride, the arm angles, the sword's arc, the squash of
+a landing — lives in the first two. A forked `HeroineArt` would have drifted
+from the first new pose; a `FighterArt` per figure would have doubled again.
+So a costume (`scripts/player/costume.gd`) replaces whole **layers** of the
+drawing and nothing else:
+
+| Layer | When | The prince | The heroine |
+| --- | --- | --- | --- |
+| back | behind the legs | the cloak | the braid and two sash ribbons |
+| body | over the legs and back arm | robe and sash | belted knee-length tunic |
+| head | over everything | the hood | hair, a lit face, a headband |
+
+Legs, arms, hands, the sword, the ledge grip and the contact shadow are shared.
+The base `Costume` *is* the prince and draws nothing: each `draw_*` returns
+false and `PlayerArt` draws his layer with the helpers it always had, so the
+default figure is pixel for pixel what it was. `HeroineCostume` returns true
+and draws her own. The hook in `player_art.gd` is three `if not
+costume.draw_*()` lines in `_draw()` and one `costume.tick()` in `_process()`.
+
+The consequence that matters: **a pose added to `player_art.gd` or
+`sword_poses.gd` is the heroine's too, with no change to her file.** The air
+slash, the plunge, its landing and the parry arrived after her costume was
+written and she wears all four, and so the idle ladder (below). `tests/unit/test_figure_poses.gd` draws every
+`Player.State` and every `Fighter.State` as both figures, reading the states
+from the enums, so a new state is covered the moment it exists. It fails on a
+plane Godot cannot triangulate (a polygon that folds over in some pose) and on
+a plane that leaves the box a 22 px figure can occupy.
+
+One rule follows for whoever adds a pose field: a field that a *costume layer*
+consumes (the cloak and hood fields: `cloak_*`, `hood_*`, `hem_*`) has to mean
+something to every costume. Read it in `HeroineCostume` too, or say in the
+field's comment that she ignores it and why.
+
+### Who she is at 22 px
+
+At tile scale a figure is a silhouette and a value pattern, so each of the
+prince's three strongest cues is answered by its opposite:
+
+- **Head.** His is a pale cowl with a dark hole for a face and a forward peak.
+  Hers is dark hair with a lit face, the value structure of the head inverted,
+  round where he is pointed, with one accent band across the hair. The face is
+  always the lit skin tone: strictly the sun should put it in shade when she
+  faces right, and the first render did, and the shade steps of the skin ramp
+  are the terrain's own oranges, so her face vanished into the wall.
+- **Hem.** His robe reaches the floor and hides his legs; her tunic stops at
+  the knee and flares, so legs and boots show. A figure with a waist and a
+  stride where his is a cone.
+- **What trails.** His cloak is one broad dark plane. Hers is lines — a braid
+  down the back and two narrow ribbons from the belt. Only the near ribbon is
+  the accent colour: two bright ribbons crossing on a fall read as an X,
+  louder than the figure.
+
+### Her secondary motion
+
+The cloak lags the body on an exponential chase and never overshoots. The
+braid is a **pendulum**: an under-damped spring on one angle, held in *world*
+space. It swings past where it is going and back, flicks forward on a landing
+and back on a jump (it takes the same kick as the squash spring), and on a turn
+it crosses her back to the new side instead of mirroring there. The ribbons
+flutter at their own rate, harder the faster she moves. Like the cloth lag,
+all of it is cosmetic, lives in `_process`, and settles within a second.
+
+### In the duel
+
+`FighterArt.dress(fighter, seat, look)` puts the look on and then the seat's
+colour over it, and `_bind()` re-imposes the seat again, so the robe, the
+sleeves and the back plane are always crimson for seat one and sea-green for
+seat two — the outfit row is the adventure's. Her silhouette fits the fighter's
+hurtbox the way his does; the braid and ribbons reach past it as his cloak
+does, and are cloth.
+
+![the heroine in every duel state, with the hurtbox overlay](heroine-fighter-poses.png)
+
+```bash
+# Both figures through the pose table, and the sheet above.
+xvfb-run -a godot --path . --rendering-driver opengl3 \
+  --script tests/character_poses.gd -- --out /tmp/poses/prince
+xvfb-run -a godot --path . --rendering-driver opengl3 \
+  --script tests/character_poses.gd -- --out /tmp/poses/heroine --figure heroine
+python3 tests/character_contact_sheet.py docs/heroine-poses.png \
+  "prince=/tmp/poses/prince" "heroine=/tmp/poses/heroine"
+
+xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1280x720 \
+  --script tests/fighter_poses.gd -- --out docs/heroine-fighter-poses.png \
+  --figure heroine [--hitboxes]
+```
+
+The renderers dress the figure's *default* look and never read the saved
+wardrobe, so a contact sheet does not depend on what someone last chose.
+
+The idle ladder is hers too. Its fidgets and bits are keyframes over the shared
+pose fields and IdleArt attaches to any PlayerArt bound to a Player, so the
+heroine glances, sits, tosses the sword and dozes with no line in her costume
+about it. Where a bit turns the head away (`hood_face` negative) her face goes
+to the far side and the back of her head, dark hair, is what shows.
+
+![the idle ladder on the heroine](heroine-idle-poses.png)
+
+```bash
+xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 3072x720 \
+  --script tools/idle_poses.gd -- --out docs/heroine-idle-poses.png --figure heroine
 ```
 
 ## The sentinel

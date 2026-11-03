@@ -11,7 +11,9 @@ extends SceneTree
 ##       --script tests/fighter_poses.gd -- --out docs/fighter-poses.png [--hitboxes]
 ##
 ## `--hitboxes` overlays the hurtbox and blade rect, to check that the figure
-## and the sword sit where the simulation says they are.
+## and the sword sit where the simulation says they are. `--figure heroine`
+## dresses every fighter as the heroine (CharacterLook), in the seat colours as
+## always; that sheet is docs/heroine-fighter-poses.png.
 
 const COLS := 4
 const ROWS := 4
@@ -22,6 +24,7 @@ const SETTLE_FRAMES := 20
 const FIGHTER_SCENE: PackedScene = preload("res://scenes/fighter.tscn")
 
 var _out := "user://fighter-poses.png"
+var _look := CharacterLook.new()
 var _frames := 0
 var _labels: Array[Dictionary] = []
 
@@ -31,6 +34,9 @@ func _initialize() -> void:
 	var at := args.find("--out")
 	if at >= 0 and at + 1 < args.size():
 		_out = args[at + 1]
+	var figure := args.find("--figure")
+	if figure >= 0 and figure + 1 < args.size():
+		_look.take_ids({"figure": args[figure + 1]})
 
 	var backdrop := Sheet.new()
 	backdrop.labels = _labels
@@ -61,7 +67,7 @@ func _place(pose: Dictionary, feet: Vector2, index: int) -> void:
 	var fighter := FIGHTER_SCENE.instantiate() as Fighter
 	root.add_child(fighter)
 	fighter.setup(index % 2, null)
-	FighterArt.dress(fighter, index % 2)
+	FighterArt.dress(fighter, index % 2, _look)
 	fighter.respawn_at(feet, 1)
 	fighter.grounded = true
 	fighter.state = pose.get("state", Fighter.State.IDLE)

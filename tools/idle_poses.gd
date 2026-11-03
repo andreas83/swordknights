@@ -13,6 +13,8 @@ extends SceneTree
 ##
 ## `--silhouette` paints every figure flat black, for the two-tone check in
 ## docs/art-direction.md: a bit that does not read as a shape does not read.
+## `--figure heroine` plays the same ladder on the heroine: the bits are pose
+## keyframes over the shared skeleton, so they are hers too (docs/character.md).
 
 ## Two tall rows rather than three short ones: the high toss goes 22 px over
 ## the hand, and in a 60 px row it landed in the cell above.
@@ -25,6 +27,7 @@ const PLAYER_SCENE: PackedScene = preload("res://scenes/player.tscn")
 
 var _out := "user://idle-poses.png"
 var _silhouette := false
+var _look := CharacterLook.new()
 var _frames := 0
 var _labels: Array[Dictionary] = []
 ## [prince, feet, pose] for every cell, re-pinned each frame until capture.
@@ -37,6 +40,9 @@ func _initialize() -> void:
 	if at >= 0 and at + 1 < args.size():
 		_out = args[at + 1]
 	_silhouette = args.has("--silhouette")
+	var figure := args.find("--figure")
+	if figure >= 0 and figure + 1 < args.size():
+		_look.take_ids({"figure": args[figure + 1]})
 
 	var backdrop := Sheet.new()
 	backdrop.labels = _labels
@@ -51,6 +57,7 @@ func _initialize() -> void:
 		root.add_child(prince)
 		prince.position = feet
 		prince.facing = 1
+		_look.dress(prince.get_node(^"PlayerArt") as PlayerArt)
 		if _silhouette:
 			prince.modulate = Color.BLACK
 		_pins.append([prince, feet, pose])

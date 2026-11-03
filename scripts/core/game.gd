@@ -85,6 +85,9 @@ func _ready() -> void:
 	player.level = level
 	checkpoint = level.spawn_world_position()
 	player.respawn(checkpoint)
+	# Player one's saved look (scripts/player/wardrobe.gd). A costume and some
+	# colours on the art node; the body, its hitbox and its tuning are the same.
+	Wardrobe.open().look(Wardrobe.PLAYER_ONE).dress(player.get_node(^"PlayerArt") as PlayerArt)
 	player.landed.connect(_on_landed)
 	player.attacked.connect(func() -> void: _struck.clear())
 	player.hurt.connect(_on_hurt)

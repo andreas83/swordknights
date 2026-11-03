@@ -25,6 +25,10 @@ extends Node2D
 ##
 ## Adding a state means adding one case to `_posture()`. See docs/character.md.
 ##
+## The cloak, robe, sash and hood helpers below are the prince's costume. A
+## `costume` (scripts/player/costume.gd) may draw those three layers instead --
+## the heroine's does -- over the same rig, so a new pose is every figure's.
+##
 ## ## Coordinates
 ##
 ## The parent's origin is at the character's FEET, so everything is drawn in
@@ -46,6 +50,13 @@ extends Node2D
 @export var cloth_dark: Color = Palette.CLOTH_DARK
 @export var cloak_shade: Color = Palette.SHADOW_DEEP
 @export var ink: Color = Palette.INK
+## The one warm accent on the figure: the sash, and the crest of the hood.
+@export var accent: Color = Palette.LIGHT_WARM
+
+## What the figure wears over the rig. The base Costume is the prince and draws
+## nothing of its own, so a bare PlayerArt draws exactly what it always has; see
+## costume.gd for why the second figure is a costume and not a second PlayerArt.
+var costume := Costume.new()
 
 ## --- proportions -----------------------------------------------------------
 ##
@@ -201,6 +212,7 @@ func _process(delta: float) -> void:
 		var motion := _body_motion()
 		var target := Vector2(clampf(motion.x, -1.5, 1.5), clampf(motion.y, -1.2, 1.2))
 		_sway = _sway.lerp(target, 1.0 - exp(-delta * CLOTH_CHASE))
+		costume.tick(self, delta)
 	queue_redraw()
 
 
@@ -253,7 +265,8 @@ func _draw() -> void:
 
 	if _grounded():
 		_draw_contact_shadow()
-	_draw_cloak(pose)
+	if not costume.draw_back(self, pose):
+		_draw_cloak(pose)
 	# Both legs go behind the robe: a hem that reaches the floor has to be able
 	# to hide them, and a hem that rides up has to be what reveals them.
 	_draw_leg(_knee_back, _foot_back, _c(cloak_shade))
@@ -264,12 +277,14 @@ func _draw() -> void:
 	var swinging := _blade_in_front()
 	if not swinging:
 		_draw_weapon(pose)
-	_draw_robe(pose)
-	_draw_sash()
+	if not costume.draw_body(self, pose):
+		_draw_robe(pose)
+		_draw_sash()
 	_draw_arm(_hand_front, _c(cloth))
 	if swinging:
 		_draw_weapon(pose)
-	_draw_hood(pose)
+	if not costume.draw_head(self, pose):
+		_draw_hood(pose)
 	if _show_grip():
 		_draw_grip()
 
@@ -332,7 +347,7 @@ func _draw_sash() -> void:
 	draw_colored_polygon(PackedVector2Array([
 		Vector2(_waist.x - w, _waist.y - 0.3), Vector2(_waist.x + w, _waist.y + 0.3),
 		Vector2(_waist.x + w, _waist.y + 1.3), Vector2(_waist.x - w, _waist.y + 0.7),
-	]), Palette.LIGHT_WARM)
+	]), accent)
 
 
 func _draw_leg(knee: Vector2, foot: Vector2, color: Color) -> void:
@@ -389,7 +404,7 @@ func _draw_hood(pose: Dictionary) -> void:
 		Vector2(top.x - top.z, top.y + RIM * 0.9), Vector2(top.x - top.z * 0.1, top.y),
 		Vector2(top.x + top.z * 0.5, top.y + RIM * 0.6),
 		Vector2(top.x - top.z * 0.2, top.y + RIM * 1.1),
-	]), Palette.LIGHT_WARM)
+	]), accent)
 
 	# The face: a void. One glint is the whole performance.
 	var brow := c.y - HOOD_HH * 0.52

@@ -37,6 +37,9 @@ const MANIFEST := "res://levels/duel_zones.txt"
 
 var strip: ZoneStrip
 var demo := false
+## Where the seats' looks are read from. A seam for a test, which must never
+## read or write the real save.
+var wardrobe_path := Wardrobe.PATH
 
 var _gates: Array[GateArt] = []
 var _paused := false
@@ -62,13 +65,7 @@ func _ready() -> void:
 
 	_start_in_zone_argument()
 
-	# Seat two wears steel and sea-green; teal is player two's colour and no one
-	# else's (docs/art-direction.md). Presentation, so it is set here and not
-	# in the match, which must not know what a fighter looks like.
-	for slot: int in fight.seats.size():
-		var fighter := fight.seats[slot].node as Fighter
-		if fighter != null:
-			FighterArt.dress(fighter, slot)
+	dress_fighters()
 
 	camera.framing_width = _framing_argument()
 	camera.setup(fight)
@@ -86,6 +83,28 @@ func _ready() -> void:
 	fight.fighter_respawned.connect(_on_fighter_respawned)
 	fight.leader_consumed.connect(_on_leader_consumed)
 	fight.match_over.connect(_on_match_over)
+
+
+## Puts each seat in its look. Seat two wears sea-green whatever look it has;
+## teal is player two's colour and no one else's (docs/art-direction.md, and
+## FighterArt.dress). Presentation, so it is set here and not in the match,
+## which must not know what a fighter looks like. Public so a scene that learns
+## who is who later -- an online match, once seated -- can dress them again.
+func dress_fighters() -> void:
+	for slot: int in fight.seats.size():
+		var fighter := fight.seats[slot].node as Fighter
+		if fighter != null:
+			FighterArt.dress(fighter, slot, look_for(slot))
+
+
+## The look a seat wears: on one keyboard, the wardrobe's player one in the
+## crimson seat and player two in the sea-green. The attract demo wears the
+## defaults, so a screenshot of it never depends on what someone last chose in
+## the wardrobe. match_online.gd answers this differently.
+func look_for(slot: int) -> CharacterLook:
+	if demo:
+		return CharacterLook.new()
+	return Wardrobe.open(wardrobe_path).look(slot)
 
 
 ## Dusk over the gate zone at each end of the strip. See MatchDusk.

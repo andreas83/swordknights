@@ -29,6 +29,8 @@ var session: NetSession
 
 var _online := false
 var _local := false
+## The seat this phone was given, once seated; -1 before and after.
+var _my_slot := -1
 
 
 func _ready() -> void:
@@ -154,9 +156,27 @@ func _on_link_changed(link: NetTransport.Link, detail: String) -> void:
 
 func _on_seated(slot: int) -> void:
 	lobby.visible = false
+	_my_slot = slot
+	dress_fighters()
 	hud.your_slot = slot
 	hud.footer = "YOU ARE %s  ·  PAUSE TO LEAVE" % ("CRIMSON" if slot == 0 else "SEA-GREEN")
 	camera.setup(fight)
+
+
+## --- who wears what ---------------------------------------------------------
+
+## Online, each phone shows its own player in the look chosen on it -- player
+## one's, since a phone is one player -- and the other seat in that seat's
+## default: the prince, in the seat's colour. The protocol carries inputs and
+## nothing else, and a look is not worth a protocol change (docs/netplay.md,
+## open items). Until seated, both seats are the defaults; played locally from
+## the lobby, it is the one-keyboard duel's two looks.
+func look_for(slot: int) -> CharacterLook:
+	if _local:
+		return super.look_for(slot)
+	if _online and slot == _my_slot:
+		return Wardrobe.open(wardrobe_path).look(Wardrobe.PLAYER_ONE)
+	return CharacterLook.new()
 
 
 ## --- giving up --------------------------------------------------------------
@@ -169,11 +189,13 @@ func _offer_fallback(reason: String) -> void:
 	lobby.show_menu()
 	lobby.set_status(reason if reason != "" else "could not connect")
 	hud.footer = "WAITING FOR A SECOND PLAYER"
+	dress_fighters()
 
 
 func _play_locally() -> void:
 	_teardown()
 	_local = true
+	dress_fighters()
 	lobby.visible = false
 	hud.footer = "TWO PLAYERS, ONE KEYBOARD  ·  PAUSE TO QUIT"
 
@@ -184,6 +206,7 @@ func _teardown() -> void:
 		session = null
 	hud.session = null
 	hud.your_slot = -1
+	_my_slot = -1
 	if transport != null:
 		transport.close()
 		transport = null

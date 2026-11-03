@@ -376,6 +376,20 @@ Honestly, and in roughly the order I would fix them.
   pulling it down each frame instead. On the strip's flat, axis-aligned tiles
   the two agree, and the tests say so, but a sloped or stepped zone would want
   snapping put back — deterministically, inside `_move()`.
+- **The opponent's look is not sent.** Each phone shows its own seat in the
+  look chosen on it (the wardrobe's player one, in that seat's team colour) and
+  the other seat in the seat's default: the prince, crimson or sea-green.
+  `NetSession`'s protocol carries inputs, snapshots and checksums, and a look
+  is presentation that no checksum may see, so it was left out rather than
+  bolted on. Sending it would be one more field in `HELLO` and in `WELCOME`
+  (five short ids, validated on arrival by `CharacterLook.take_ids()`, which
+  already falls back field by field), applied in `match_online.gd`'s
+  `look_for()`; the seat colour is imposed after any look, so a peer could not
+  use it to wear the other team's colour. Until then the two players see
+  different pictures of the same match, which is harmless — the duel is
+  decided by rectangles both of them agree on — but it means you cannot see
+  what your opponent chose. `tests/unit/test_duel_seats_distinct.gd` holds the
+  current behaviour.
 - **No bandwidth adaptation.** The snapshot rate is a constant.
 - **The clock sync is crude.** One-way latency is taken as half the round trip,
   which is wrong on an asymmetric connection.

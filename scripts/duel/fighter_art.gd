@@ -21,6 +21,12 @@ extends PlayerArt
 
 ## Seat one keeps the crimson prince; seat two is sea-green, the colour that is
 ## player two's and nobody else's (docs/art-direction.md).
+##
+## These three planes are the seat's whatever figure and look a player chose:
+## the setter below runs after a look is put on (dress()) and again when the
+## art binds to its fighter, so an outfit can never stand in for a team colour.
+## The look's other colours are drawn from steps neither team uses
+## (CharacterLook), which is the other half of keeping the seats apart.
 const SEAT_CLOTH: Array[Color] = [Palette.CLOTH, Palette.WATER_DEEP]
 const SEAT_CLOTH_DARK: Array[Color] = [Palette.CLOTH_DARK, Palette.WATER_SHADE]
 const SEAT_CLOAK: Array[Color] = [Palette.SHADOW_DEEP, Palette.WATER_NIGHT]
@@ -38,14 +44,19 @@ var seat := 0:
 var _fighter: Fighter
 
 
-## Attaches the art to a fighter. The match may call this, or the scene may
-## carry a FighterArt child and set `seat` -- neither changes the simulation.
-static func dress(fighter: Fighter, which: int) -> FighterArt:
+## Attaches the art to a fighter, in `look` if one is given (the prince in the
+## seat's colours if not). The match may call this, or the scene may carry a
+## FighterArt child and set `seat` -- neither changes the simulation: a look is
+## a costume and four colours, read by nothing but _draw().
+static func dress(fighter: Fighter, which: int, look: CharacterLook = null) -> FighterArt:
 	var art := fighter.get_node_or_null("FighterArt") as FighterArt
 	if art == null:
 		art = FighterArt.new()
 		art.name = "FighterArt"
 		fighter.add_child(art)
+	if look != null:
+		look.dress(art)
+	# Last, so the seat's colour wins over the look's outfit.
 	art.seat = which
 	return art
 
