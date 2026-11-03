@@ -117,6 +117,11 @@ func is_hanging() -> bool:
 	return state == State.HANG or state == State.CLIMB_UP
 
 
+## On a ladder: the camera follows the climb as it follows a body on its feet.
+func is_climbing() -> bool:
+	return state == State.LADDER
+
+
 ## Body rect in world space, origin at the feet.
 func body_rect() -> Rect2:
 	var h := _height()

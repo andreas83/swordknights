@@ -145,12 +145,15 @@ static func fall_lead(fall_speed: float, grounded: bool, hanging: bool) -> float
 ## Where the frame rests vertically.
 ##
 ## Grounded, it is the floor the character is standing on, which is what keeps
-## a jump from panning the view. Hanging, it lifts onto the ledge. Falling, it
-## follows down — with `FALL_SLACK` of give, so the drop reads as a drop — and
-## it never follows back up, because that is what jumping is.
+## a jump from panning the view. On a ladder it is the feet on the rung, up and
+## down: a climb is a ledge taken one rung at a time, and a frame that held
+## still for it put the prince's head out of the top of a five-tile ladder.
+## Hanging, it lifts onto the ledge. Falling, it follows down — with
+## `FALL_SLACK` of give, so the drop reads as a drop — and it never follows
+## back up, because that is what jumping is.
 static func anchor_for(previous: float, foot_y: float, fall_speed: float,
-		grounded: bool, hanging: bool) -> float:
-	if grounded:
+		grounded: bool, hanging: bool, climbing: bool = false) -> float:
+	if grounded or climbing:
 		return foot_y
 	if hanging:
 		return foot_y - GRAB_LIFT
@@ -198,7 +201,8 @@ func _physics_process(delta: float) -> void:
 		fall_lead(fall_speed, grounded, hanging),
 		1.0 - exp(-FALL_LEAD_SMOOTHING * delta)
 	)
-	_anchor_y = anchor_for(_anchor_y, target.position.y, fall_speed, grounded, hanging)
+	_anchor_y = anchor_for(_anchor_y, target.position.y, fall_speed, grounded, hanging,
+		target.is_climbing())
 
 	var desired := Vector2(target.position.x + _look_ahead_current, _anchor_y + _fall_lead)
 	global_position.x = desired.x

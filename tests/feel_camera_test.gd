@@ -96,6 +96,15 @@ func _check_anchor() -> void:
 	_true(is_equal_approx(120.0 - lifted, GameCamera.GRAB_LIFT),
 		"by exactly GRAB_LIFT")
 
+	# A ladder is climbed with the frame, rung by rung: held still, the top of
+	# the Sun Terrace's cistern ladder put the prince's head out of the frame.
+	var rung := 120.0
+	for i: int in 5:
+		rung = GameCamera.anchor_for(rung, 120.0 - float(i + 1) * Tuning.TILE,
+			-Tuning.LADDER_SPEED, false, false, true)
+	_true(is_equal_approx(rung, 120.0 - 5.0 * Tuning.TILE),
+		"on a ladder the frame rises with the climb (%.1f)" % rung)
+
 	# A fall followed by a recovery must not snap back: the anchor only ever
 	# descends while airborne.
 	var walked := 120.0

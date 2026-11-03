@@ -73,10 +73,12 @@ falling and hanging at the same time" without standing in front of a ledge.
   faster than the arc of a plain hop. Derived from the tuning rather than
   picked, so retuning the landings moves the camera's idea of "a real fall"
   with them.
-- **The anchor** is the floor underfoot when grounded, the ledge when hanging,
-  and while falling it follows down with 8 px of slack. It never climbs back
-  up on its own — that is what jumping is, and it is the behaviour the camera
-  always had.
+- **The anchor** is the floor underfoot when grounded, the rung underfoot on
+  a ladder, the ledge when hanging, and while falling it follows down with
+  8 px of slack. It never climbs back up on its own — that is what jumping is,
+  and it is the behaviour the camera always had. A ladder is the exception
+  that was missing: the frame held still for a whole climb, so the top of the
+  Sun Terrace's five-tile cistern ladder put the prince's head out of it.
 - **Settle** is an impulse scaled by `Tuning.impact_weight()`, the same number
   the dust and the character art scale off, so the three cannot disagree about
   how hard a landing was. It decays; it does not overshoot.
@@ -310,10 +312,21 @@ low chime plays, and the next death comes back there.
 | --- | --- |
 | A torch counts only if `LevelReachability.verify_from()` routes from it to the exit | a torch in a dead-end pit would make every death a return to the same pit |
 | Forward only, measured toward the exit door | walking back past an earlier torch cannot cost you progress |
+| `;! checkpoints route` measures "toward" along the proved route instead | a tower's climb zig-zags away from the door's column and back, and by the column its higher torch would be refused |
 | Relics stay picked up; guards you killed stay dead | the level remembers what you did |
 | Guards still standing go back to their posts | a respawn is never into the fight that killed you |
 | 0.9 s of grace (`INVULNERABLE_TIME`) after the respawn | a torch can stand on a guard's beat |
 | The clock keeps running | a death costs the seconds since the torch, and nothing more |
+
+With `;! checkpoints route`, "further on" is the length of the shortest
+route the proof knows from the torch to the door, in tiles
+(`scripts/levels/reach_route.gd`): one flood from the spawn over the proof's
+own states, then one walk back from the door. Each move costs the tiles it
+crosses; counting moves instead would make a torch at the far end of its
+ledge as far on as one at the near end. `tests/unit/test_route_checkpoints.gd`
+climbs a zig-zag tower whose higher torch the door's column refuses. A level
+that does not ask keeps the column, which every shipping level was proved
+with.
 
 `Game.checkpoint_cells()` proves the torches once per level, from the door
 backwards: each torch only has to reach one already proved, so ten torches

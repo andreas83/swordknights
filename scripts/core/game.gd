@@ -86,6 +86,9 @@ var _impact_cooldown: float = 0.0
 # entities come back at a respawn -- foes and mechanisms, with their order
 # among their kind -- and the posts cleared for good.
 var _checkpoint_cells: Array[Vector2i] = []
+## --- checkpoints --- with `;! checkpoints route`, the moves left to the door
+## from each cell (ReachRoute); empty, and "further" is the door's column.
+var _route: Dictionary = {}
 var _returning: Array[Dictionary] = []
 var _down: Dictionary = {}
 # --- mechanisms --- the wiring of the mechanisms now placed. A new one every
@@ -112,6 +115,9 @@ func _ready() -> void:
 
 	level.build(data)
 	_checkpoint_cells = checkpoint_cells(data)
+	var order: PackedStringArray = data.directive("checkpoints").get("args", PackedStringArray())
+	if order.size() == 1 and order[0] == "route":
+		_route = ReachRoute.remaining(data)
 	_entities = Node2D.new()
 	_entities.name = "Entities"
 	add_child(_entities)
@@ -736,9 +742,15 @@ func _offer_checkpoint(at: Vector2) -> bool:
 	return true
 
 
-## Larger is closer to the exit. Levels run toward their door, which is the one
-## direction every level in the game agrees on.
+## Larger is closer to the exit. Levels run toward their door, which is the
+## direction every level agrees on -- until a tower, whose climb zig-zags away
+## from the door's column and back. A level that says `;! checkpoints route`
+## measures it as the moves left to the door along the proved route instead
+## (ReachRoute); a place the route does not know is never further on.
 func _progress(at: Vector2) -> float:
+	if not _route.is_empty():
+		var cell := Vector2i(floori(at.x / Level.TILE), floori(at.y / Level.TILE) - 1)
+		return -float(_route.get(cell, INF))
 	if not _has_goal:
 		return at.x
 	return -absf(_goal.x - at.x)
