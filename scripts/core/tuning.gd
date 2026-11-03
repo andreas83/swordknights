@@ -98,6 +98,14 @@ const KNOCKBACK_Y := 150.0
 const ATTACK_TIME := 0.24
 const ATTACK_REACH := 14.0
 const ATTACK_HEIGHT := 14.0
+## The air slash is the ground swing's timing -- ATTACK_TIME, the same live
+## window, so one swing reads the same wherever it is thrown -- on a steeper
+## arc whose band runs from the chest to 4 px below the feet. That depth is
+## what lets a tapped hop (about 21 px) cut a guard standing in front of it
+## for the whole live window; at 18 px the window passed over his head. It
+## changes no velocity (Player._steer() says why), so it adds nothing to the
+## grammar.
+const AIR_SLASH_HEIGHT := 21.0
 
 # Landing.
 #

@@ -72,8 +72,33 @@ does not care:
 | `CLIMB_UP` | a knee driven onto the ledge, then standing up over it, interpolated by the climb's own progress |
 | `LADDER` | foreshortened shoulders, hood nearly edge on, hands and feet alternating; JUMP leaves it as a `JUMP` |
 | `ATTACK` | wind up back, lunge through, recover; the blade's arc matches `Player.attack_rect()`'s active window |
+| `AIR_SLASH` | the opposite of `ATTACK` on both counts the eye uses: knees drawn up off the floor instead of planted wide, and the blade coming *down* from overhead past the feet instead of *across* |
 | `HURT` | thrown back and tilted, hood knocked away, whole figure burned white for 0.14 s |
 | `DEAD` | toppled: the robe keeps its shape, the figure does not |
+
+## The sword in the air
+
+A sword press in a jump or a fall used to sit in the buffer until the feet
+came down. It now slashes there and then: `AIR_SLASH`, the ground swing's
+timing (`ATTACK_TIME`, the same live window) on a steeper arc whose band runs
+from the chest to 4 px below the feet (`AIR_SLASH_HEIGHT`), so a tapped hop
+cuts a guard standing in front of it. It wounds through exactly the code a
+ground swing does — `Player.attack_rect()` feeds `Game._resolve_guard()`, and
+the `attacked` signal that clears the one-swing-one-heart memory fires once
+per slash. A slash that lands soft finishes on the feet as `ATTACK` at the
+same phase without re-firing `attacked`, so it is still one swing; a landing
+heavy enough to cost recovery takes over, as it does for every state.
+
+**It does not touch momentum,** and that is a decision rather than an
+omission. The slash is steered by the same `_steer()` as `JUMP` and `FALL`,
+keeps gravity and the jump cut, and so a jump with a slash in it traces the
+same arc, frame for frame, as the same jump without
+(`tests/unit/test_air_slash.gd` compares them). A slash that hung at the apex
+or carried the prince forward would stretch every gap past `Tuning.gap_tiles()`
+— a second derivation of the grammar hiding in the moveset — and one that
+braked would drop a swing thrown half way across a gap into the pit, on a
+phone where SWORD sits next to JUMP. The one thing it costs is a ledge: a
+slashing prince is holding a sword, so the grab probe is off until it ends.
 
 ## Adding a state
 

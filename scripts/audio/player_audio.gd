@@ -35,6 +35,7 @@ const CLOTH_ON_ENTER := {
 	Player.State.HANG: -4.0,
 	Player.State.CLIMB_UP: -3.0,
 	Player.State.ATTACK: -5.0,
+	Player.State.AIR_SLASH: -4.0,
 }
 
 ## Below this impact a landing is inaudible — stepping off a kerb should not

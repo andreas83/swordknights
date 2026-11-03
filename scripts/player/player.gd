@@ -21,11 +21,14 @@ signal hurt(remaining_health: int)
 signal healed(health: int)
 signal died()
 
+## New states go on the end, so a state's number never changes under anything
+## that has stored one.
 enum State {
 	IDLE, WALK, RUN, TURN, CROUCH,
 	JUMP, FALL, LAND,
 	HANG, CLIMB_UP, LADDER,
 	ATTACK, HURT, DEAD,
+	AIR_SLASH,
 }
 
 const TILE := 16.0
@@ -56,6 +59,10 @@ var _climb_to := Vector2.ZERO
 var _climb_progress: float = 0.0
 var _crouched := false
 var _ladder_lockout: float = 0.0
+## Seconds since the current rise began. The jump cut reads this rather than
+## state_time, so an air slash in the middle of a jump does not restart the
+## MIN_JUMP_HOLD clock: see _enter().
+var _rise_time: float = 0.0
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 
@@ -98,8 +105,13 @@ func body_rect() -> Rect2:
 
 
 ## Sword hitbox for this frame, or a zero-size rect when not connecting.
+##
+## The ground swing and the air slash share the live window and the reach;
+## they differ only in the band. In the air the blade comes down steeply, so
+## its band runs from the chest to just past the feet, which is where a guard
+## is when the prince is jumping at him.
 func attack_rect() -> Rect2:
-	if state != State.ATTACK:
+	if state != State.ATTACK and state != State.AIR_SLASH:
 		return Rect2()
 	var phase := state_time / Tuning.ATTACK_TIME
 	if phase < 0.25 or phase > 0.8:
@@ -107,7 +119,14 @@ func attack_rect() -> Rect2:
 	var w := Tuning.ATTACK_REACH
 	var half := Tuning.BODY_WIDTH * 0.5
 	var x := (position.x + half) if facing > 0 else (position.x - half - w)
+	if state == State.AIR_SLASH:
+		return Rect2(x, position.y - _height() + 5.0, w, Tuning.AIR_SLASH_HEIGHT)
 	return Rect2(x, position.y - _height() + 3.0, w, Tuning.ATTACK_HEIGHT)
+
+
+## The blade is moving and drawn in front of the body: the trail follows it.
+func is_striking() -> bool:
+	return state == State.ATTACK or state == State.AIR_SLASH
 
 
 func _physics_process(delta: float) -> void:
@@ -118,6 +137,7 @@ func _physics_process(delta: float) -> void:
 	_drop_through = maxf(0.0, _drop_through - delta)
 	_attack_buffer = maxf(0.0, _attack_buffer - delta)
 	_ladder_lockout = maxf(0.0, _ladder_lockout - delta)
+	_rise_time += delta
 	if input.just_pressed_jump:
 		_jump_buffer = Tuning.JUMP_BUFFER
 	if input.just_pressed_attack:
@@ -163,6 +183,11 @@ func _update_free(delta: float) -> void:
 			velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * delta)
 			if state_time >= Tuning.ATTACK_TIME:
 				_enter(State.IDLE if grounded else State.FALL)
+		State.AIR_SLASH:
+			# Steered by the same code as a jump: see _steer().
+			_steer(delta, want_x, walking, false)
+			if state_time >= Tuning.ATTACK_TIME:
+				_enter(State.JUMP if velocity.y < 0.0 else State.FALL)
 		State.LAND:
 			_land_timer -= delta
 			velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * delta)
@@ -193,7 +218,7 @@ func _update_free(delta: float) -> void:
 	_apply_gravity(delta)
 
 	# Coyote time plus a buffered press means both a late and an early tap work.
-	var can_jump := _coyote > 0.0 and state != State.ATTACK and state != State.CROUCH
+	var can_jump := _coyote > 0.0 and _jump_allowed()
 	if can_jump and _jump_buffer > 0.0:
 		_jump_buffer = 0.0
 		_coyote = 0.0
@@ -202,9 +227,11 @@ func _update_free(delta: float) -> void:
 		jumped.emit()
 
 	# Not before MIN_JUMP_HOLD: a tap, or a buffered press already released by
-	# the frame it fires, is a short hop rather than a twitch.
-	var cut_allowed := state_time >= Tuning.MIN_JUMP_HOLD
-	if state == State.JUMP and velocity.y < 0.0 and not input.jump and cut_allowed:
+	# the frame it fires, is a short hop rather than a twitch. An air slash is
+	# still the same jump, so letting go cuts it exactly as it would have.
+	var cut_allowed := _rise_time >= Tuning.MIN_JUMP_HOLD
+	var rising := state == State.JUMP or state == State.AIR_SLASH
+	if rising and velocity.y < 0.0 and not input.jump and cut_allowed:
 		velocity.y *= Tuning.JUMP_CUT_MULTIPLIER
 
 	if grounded and input.down and input.just_pressed_jump:
@@ -222,10 +249,7 @@ func _update_free(delta: float) -> void:
 func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) -> void:
 	# Buffered, like jump: a press from the end of a fall, a turn, a landing or
 	# the tail of the last swing comes out here, on the first frame it can.
-	if grounded and _attack_buffer > 0.0:
-		_attack_buffer = 0.0
-		_enter(State.ATTACK)
-		attacked.emit()
+	if _attack_buffer > 0.0 and _start_sword(delta, want_x, walking, grounded):
 		return
 
 	var reaching := (input.up or input.down) and _ladder_lockout <= 0.0
@@ -247,15 +271,9 @@ func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) ->
 		_enter(State.TURN)
 		return
 
-	var top_speed := Tuning.WALK_SPEED if walking else Tuning.RUN_SPEED
-	var accel := Tuning.GROUND_ACCEL if grounded else Tuning.AIR_ACCEL
-	var friction := Tuning.GROUND_FRICTION if grounded else Tuning.AIR_FRICTION
-
 	if want_x != 0:
 		facing = want_x
-		velocity.x = move_toward(velocity.x, want_x * top_speed, accel * delta)
-	else:
-		velocity.x = move_toward(velocity.x, 0.0, friction * delta)
+	_steer(delta, want_x, walking, grounded)
 
 	if grounded:
 		var speed := absf(velocity.x)
@@ -265,6 +283,55 @@ func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) ->
 			_enter(State.WALK)
 		else:
 			_enter(State.RUN)
+
+
+## The sword button. On the ground it swings; in a jump or a fall it slashes
+## there and then, where it used to wait in the buffer for the landing. False
+## when the sword cannot come out from this state, so the press stays buffered.
+func _start_sword(delta: float, want_x: int, walking: bool, grounded: bool) -> bool:
+	if grounded:
+		_attack_buffer = 0.0
+		_enter(State.ATTACK)
+		attacked.emit()
+		return true
+	if state != State.JUMP and state != State.FALL:
+		return false
+	_attack_buffer = 0.0
+	_enter(State.AIR_SLASH)
+	# The press frame is an airborne frame like any other: steered, not held.
+	_steer(delta, want_x, walking, false)
+	attacked.emit()
+	return true
+
+
+## Horizontal speed toward the stick, or friction toward rest.
+##
+## Shared by the free states and the air slash on purpose. The slash changes no
+## velocity -- no hang at the apex, no brake, no lunge -- so a jump with a
+## slash in it traces the same arc, frame for frame, as the same jump without
+## (tests/unit/test_air_slash.gd). That is the decision, and two arguments
+## made it. A slash that stalled or carried the prince would stretch every gap
+## past Tuning.gap_tiles(), which is derived from the plain arc and must stay
+## the only derivation. And a slash that braked would drop a swing thrown
+## halfway across a gap into the pit: on a phone, SWORD sits next to JUMP.
+func _steer(delta: float, want_x: int, walking: bool, grounded: bool) -> void:
+	var top_speed := Tuning.WALK_SPEED if walking else Tuning.RUN_SPEED
+	var accel := Tuning.GROUND_ACCEL if grounded else Tuning.AIR_ACCEL
+	var friction := Tuning.GROUND_FRICTION if grounded else Tuning.AIR_FRICTION
+	if want_x != 0:
+		velocity.x = move_toward(velocity.x, want_x * top_speed, accel * delta)
+	else:
+		velocity.x = move_toward(velocity.x, 0.0, friction * delta)
+
+
+## Whether a jump may fire from the current state: not out of a swing, a slash
+## or a crouch.
+func _jump_allowed() -> bool:
+	match state:
+		State.ATTACK, State.AIR_SLASH, State.CROUCH:
+			return false
+		_:
+			return true
 
 
 func _apply_gravity(delta: float) -> void:
@@ -279,6 +346,14 @@ func _on_touch_ground(impact: float) -> void:
 		return
 	last_impact = impact
 	landed.emit(impact)
+	if state == State.AIR_SLASH and impact < Tuning.SOFT_LAND_SPEED:
+		# A slash that lands finishes on the feet: the same swing at the same
+		# phase, now planted. Not re-entered, so the clock carries on and Game
+		# sees no new swing -- one swing still wounds a guard once. A landing
+		# heavy enough to cost recovery takes over instead: the fall's weight
+		# wins, as it does for every other state.
+		state = State.ATTACK
+		return
 	if impact >= Tuning.HARD_LAND_SPEED:
 		_land_timer = Tuning.LAND_RECOVER_TIME * 1.6
 		_enter(State.LAND)
@@ -288,8 +363,13 @@ func _on_touch_ground(impact: float) -> void:
 
 
 func _resolve_air_state() -> void:
-	if is_grounded() or state == State.ATTACK or state == State.HURT:
+	if is_grounded():
 		return
+	# A swing or a hit is not interrupted by the arc it happens in, and a slash
+	# keeps its hands off ledges: they are holding a sword.
+	match state:
+		State.ATTACK, State.AIR_SLASH, State.HURT:
+			return
 	if velocity.y > 0.0:
 		if state != State.FALL:
 			_enter(State.FALL)
@@ -504,6 +584,11 @@ func _set_crouched(crouched: bool) -> void:
 func _enter(next: State) -> void:
 	if state == next:
 		return
+	# A slash that ends while still rising hands back a jump that has been in
+	# the air all along, so the jump-cut clock carries on rather than starting
+	# again; anything else entering JUMP is a new rise.
+	if next == State.JUMP and state != State.AIR_SLASH:
+		_rise_time = 0.0
 	state = next
 	state_time = 0.0
 

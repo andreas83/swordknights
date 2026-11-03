@@ -176,7 +176,7 @@ func _step_scuffs(delta: float) -> void:
 func _step_trail(delta: float) -> void:
 	if _player == null:
 		return
-	if _player.state == Player.State.ATTACK and _art != null and _art.blade_hot > 0.0:
+	if _player.is_striking() and _art != null and _art.blade_hot > 0.0:
 		_trail.append(_art.to_global(_art.blade_tip))
 		while _trail.size() > TRAIL_POINTS:
 			_trail.remove_at(0)

@@ -108,7 +108,7 @@ weight in the game and the easiest to overspend, so it has a budget:
 
 | Event | Frames | Why |
 | --- | --- | --- |
-| sword connects | `HIT_FRAMES` = 4 | enough to register, short enough to swing again |
+| sword connects (ground swing or air slash) | `HIT_FRAMES` = 4 | enough to register, short enough to swing again |
 | stomp | `STOMP_FRAMES` = 5 | heavier: the whole body is behind it |
 | player takes a hit | `HURT_FRAMES` = 3 | the player needs control back, not a lesson |
 | death | 0 | death has its own beat, below |
