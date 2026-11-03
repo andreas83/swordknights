@@ -24,6 +24,15 @@ extends Node2D
 ## to be and costs nothing: the little RNG is seeded from the frame, the seat
 ## and the place of death, all of which both peers already agree about.
 ##
+## A STAIN CAN BE TAKEN BACK
+## An online client spills on its own prediction, and the host may then say the
+## kill never happened, or happened two frames later a pixel to the left. Each
+## decal remembers which death it belongs to -- the seat and the frame, which
+## identify a death because a fighter is down for two seconds between deaths --
+## and wipe() takes that death's blood off the floor. The match decides when
+## (DuelMatch.death_retracted); this only does it. Blood for a death that did
+## not happen would be a record that lies, and the floor is a record.
+##
 ## CRIMSON AND TEAL
 ## Seat one bleeds crimson and seat two bleeds teal, the same two colours
 ## scripts/duel/fighter_art.gd dresses them in. After a few exchanges the floor is
@@ -77,18 +86,34 @@ func spill(at: Vector2, slot: int, seed_from: int) -> void:
 		return
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(Vector3(float(seed_from), float(slot), snappedf(at.x, 0.25)))
+	var death := Vector2i(seed_from, slot)
 
 	for i: int in SPLATS_PER_KILL:
 		var angle := rng.randf_range(-PI, 0.0) # thrown up and out, not down
 		var thrown := at + Vector2.RIGHT.rotated(angle) * rng.randf_range(6.0, THROW)
 		var landed := _settle(thrown)
-		_add(landed, _splat(rng, landed, slot))
+		_add(landed, _splat(rng, landed, slot), death)
 
 	# One wide pool where the body fell, which is what actually reads at this
 	# size; the thrown splats are the texture around it.
 	var pool := _settle(at + Vector2(0.0, -2.0))
-	_add(pool, _pool(rng, pool, slot))
+	_add(pool, _pool(rng, pool, slot), death)
 	queue_redraw()
+
+
+## Takes back the blood of the death `spill(_, slot, seed_from)` drew. Returns
+## how many decals came off; none if that death had no blood here.
+func wipe(slot: int, seed_from: int) -> int:
+	var death := Vector2i(seed_from, slot)
+	var removed := 0
+	for list: Array in _zones:
+		for i: int in range(list.size() - 1, -1, -1):
+			if (list[i] as Dictionary).get("death") == death:
+				list.remove_at(i)
+				removed += 1
+	if removed > 0:
+		queue_redraw()
+	return removed
 
 
 ## Walks a splat out of the air: against a wall if it meets one, otherwise down
@@ -135,10 +160,11 @@ func _pool(rng: RandomNumberGenerator, at: Vector2, slot: int) -> Dictionary:
 	}
 
 
-func _add(at: Vector2, decal: Dictionary) -> void:
+func _add(at: Vector2, decal: Dictionary, death: Vector2i) -> void:
 	var zone := strip.zone_of_x(at.x)
 	if zone < 0 or zone >= _zones.size():
 		return
+	decal["death"] = death
 	var list: Array = _zones[zone]
 	list.append(decal)
 	# The bound, enforced where it is cheapest: oldest stain out, newest in.

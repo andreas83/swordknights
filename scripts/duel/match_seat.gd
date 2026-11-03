@@ -113,6 +113,18 @@ func on_died(handler: Callable) -> void:
 	node.connect("died", handler)
 
 
+## Passes the match's `replaying` on to a fighter that has presentation signals
+## of its own (the real one: disarm, clash, throw, knockdown, catch). The
+## placeholder has none and no such property, which is not an error. Set by
+## name, so read back: a fighter that kept ringing through a replay would be
+## exactly the bug the flag exists to prevent.
+func set_replaying(on: bool) -> bool:
+	if not ("replaying" in node):
+		return true
+	node.set("replaying", on)
+	return bool(node.get("replaying")) == on
+
+
 func simulate(delta: float) -> void:
 	node.call("simulate", delta)
 

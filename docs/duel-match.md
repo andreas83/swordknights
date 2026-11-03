@@ -19,6 +19,7 @@ Rings are respawn timers, the track at the top is zone and initiative.*
 | `scripts/duel/match.gd` (`DuelMatch`) | initiative, scroll, respawn timers, win condition, snapshot, checksum |
 | `scripts/duel/match_sim.gd` (`DuelSim`) | the surface the network session drives; the match implements it |
 | `scripts/duel/match_seat.gd` (`DuelSeat`) | the **only** place that touches a fighter |
+| `scripts/duel/match_ledger.gd` (`MatchLedger`) | what the scene has been told, against what the history holds; presentation only |
 | `scripts/duel/zones.gd` (`ZoneStrip`) | the zones as data, and every collision question |
 | `scripts/duel/zones_view.gd` | streams the zones' drawn layers near the camera, dressed and lit |
 | `scripts/duel/gore.gd` (`GoreField`) | decals, presentation only |
@@ -142,8 +143,11 @@ Five zones are about fifty kilobytes and no VRAM, against tens of megabytes for
 a render target on a phone. The list survives a zone being streamed out and
 back because it is not in the tilemap. Shapes are seeded from the frame and the
 seat, so both screens show the same splatter — without it being simulation.
-The match does not emit `fighter_died` while replaying a corrected frame, so a
-reconciling client does not paint the same death twice.
+The blood is fed by `death_recorded` and `death_retracted`, not by the beat
+(`fighter_died`): a reconciling client paints each death once, takes back the
+blood of a predicted kill the host never had, and moves a kill the correction
+moved to the host's frame and place. `docs/netplay.md`, "Corrected outcomes",
+has the rule and the argument for it.
 
 ## Tests
 

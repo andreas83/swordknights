@@ -4,8 +4,9 @@ extends Node2D
 ##
 ## `scripts/net/session.gd` reconciles the tug-of-war match
 ## (`scripts/duel/match.gd`), and needs exactly six things from it, the six
-## below. They were pulled out into a base class so the round duel the session
-## was first written for and the match could coexist during the changeover;
+## below, plus the bracket it puts around the frames it steps again. They
+## were pulled out into a base class so the round duel the session was first
+## written for and the match could coexist during the changeover;
 ## the round duel is retired, and the seam is kept because it is the whole of
 ## what the session is allowed to know about a duel.
 ##
@@ -25,16 +26,26 @@ extends Node2D
 ##   match_length()        the one integer the host dictates about the shape of
 ##                         the match — rounds to win, or zones in the strip.
 ##
-## `replaying` is the other half of purity: a reconciled frame must not
-## re-trigger a sound, a screen shake or a blood splatter that already played,
-## so subclasses record what happened in `events` and suppress their signals
-## while it is set.
+## REPLAYS, the other half of purity
+##
+##   begin_replay()        the session is about to step frames it has stepped
+##                         before -- a rewind to the host's state and a replay
+##                         of everything since. Nothing stepped from here on
+##                         may ring a sound, shake the screen or spill blood.
+##   end_replay()          the correction is over. The subclass now reconciles
+##                         what it has shown with what its corrected history
+##                         holds, once, in _replay_ended().
+##
+## NetSession brackets every frame it re-steps this way, and steps nothing else
+## inside the bracket. A frame stepped inside it is still the same frame: the
+## flag may silence signals and nothing more. It is not in write_state(), not in
+## the checksum, and no step may read it to decide anything that is.
 
 ## Advances one frame. See the class docstring: pure, and inside a physics frame.
 var frame: int = 0
 
-## Set while frames are being replayed after a correction, so the presentation
-## layer is not told about things it has already shown.
+## Set between begin_replay() and end_replay(). Read by the presentation half
+## of a step; never by the simulation half.
 var replaying := false
 
 ## What happened during the last step(). Cleared at the top of every step.
@@ -62,6 +73,22 @@ func checksum() -> int:
 
 func reset_match() -> void:
 	push_error("DuelSim.reset_match is abstract")
+
+
+## The session is about to step frames again. See the class docstring.
+func begin_replay() -> void:
+	replaying = true
+
+
+## The re-stepping is over. Concrete, so a stand-in duel need not care; a duel
+## that presents anything settles it in _replay_ended().
+func end_replay() -> void:
+	replaying = false
+	_replay_ended()
+
+
+func _replay_ended() -> void:
+	pass
 
 
 ## How many bytes write_state() produces. The session does not need it; the

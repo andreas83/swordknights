@@ -62,6 +62,14 @@ func flash(text: String, terse: String = "") -> void:
 	_flash = FLASH_TIME
 
 
+## Takes `text` off the band if it is still showing. For a word that a network
+## correction has made untrue -- "ONE DOWN" over a fighter the host says is
+## standing -- and only for that one: a newer flash is left alone.
+func withdraw(text: String) -> void:
+	if not _flash_options.is_empty() and _flash_options[0] == text:
+		_flash = 0.0
+
+
 func _process(delta: float) -> void:
 	_time += delta
 	_flash = maxf(0.0, _flash - delta)

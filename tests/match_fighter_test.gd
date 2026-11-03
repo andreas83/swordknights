@@ -321,7 +321,10 @@ func _duellist(fight: DuelMatch, seat: int, rng: RandomNumberGenerator) -> int:
 ## then the whole exchange is replayed from before the throw, and again from a
 ## snapshot taken with the blade in the air and B's hands open. All three must
 ## agree byte for byte and checksum for checksum, and the catch must happen in
-## each -- announced once, and not again while replaying.
+## each -- announced once, and not again while replaying, nor when the replay
+## ends and the match settles what it has told the scene against what the
+## replays found: the same catch on the same frame, which is no news. That last
+## is what the scene's old CATCH_ECHO guard was for.
 func _a_catch_survives_a_snapshot_and_a_rewind() -> void:
 	var fight := _open_match()
 	if fight == null:
@@ -389,7 +392,7 @@ func _a_catch_survives_a_snapshot_and_a_rewind() -> void:
 		b.state = Fighter.State.SNATCH
 		_s.check(fight.checksum() != real, "the checksum covers the catch state")
 
-	fight.replaying = true
+	fight.begin_replay()
 	_s.equal(_replay(fight, before, script, 0, states, sums), -1,
 		"replayed from before the throw: identical state, frame for frame")
 	_s.check(b.is_armed() and not a.is_armed(), "and the replay caught it too")
@@ -398,6 +401,8 @@ func _a_catch_survives_a_snapshot_and_a_rewind() -> void:
 			"replayed from mid-flight: identical state, frame for frame")
 		_s.check(b.is_armed() and not a.is_armed(), "and that replay caught it too")
 	_s.equal(announced, [1] as Array[int], "replaying did not announce it again")
+	fight.end_replay()
+	_s.equal(announced, [1] as Array[int], "nor did the end of the replay")
 	fight.free()
 
 

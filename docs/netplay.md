@@ -145,6 +145,7 @@ scripts/duel/
   match.gd           the simulation: initiative, the strip, respawns, gates, and
                      step(bits_a, bits_b) — the one function that matters
   match_seat.gd      one fighter as the match sees it, and the referee
+  match_ledger.gd    what the screen was told against what the history holds
   fighter.gd         the fighter; its own slide loop over move_and_collide()
   zones.gd           the strip of zones, read as one world
   duel_rules.gd      the step, the countdown, the seat names
@@ -184,7 +185,7 @@ guest                         host
   |  INPUT (first_frame, bits[6])     every frame, a redundant window
   |--------------------------->|
   |      SNAPSHOT (frame, checksum, applied input, state)
-  |<---------------------------|      every 2 frames, about 260 bytes
+  |<---------------------------|      every 2 frames, about 280 bytes
   |                            |
   |  PING / PONG               |      every 20 frames, both ways
   |<-------------------------->|
@@ -192,8 +193,21 @@ guest                         host
   |<-------------------------->|
 ```
 
-Bandwidth: roughly **8 kB/s** from host to client and **0.7 kB/s** back. The
+Bandwidth: roughly **8.5 kB/s** from host to client and **0.7 kB/s** back. The
 looks are about 45 bytes each way, once.
+
+The applied input on a snapshot is the host's last **twelve** frames, not only
+the two since the snapshot before (`NetSession.SNAPSHOT_INPUTS`). The client
+can check a snapshot, and replay the frames behind it on the host's own input,
+only if it holds the host's input for every frame since the last snapshot it
+*received*; with two frames a snapshot, one lost snapshot was a hole in that
+input. With twelve it takes six lost in a row. It costs twenty bytes a snapshot
+and changes nothing on the wire -- the count was always there, and an older
+client files the extra frames exactly where it filed the first two. On the
+lossy link in `tests/match_net_test.gd` the client's verified snapshots went
+from 427 to 504 of the 510 or so that arrive; it matters below, too, because
+the frames the client can replay are the ones whose blood it can put where the
+host's was.
 
 The snapshot is *exact*. A 44-byte match header (frame, phase, initiative,
 zone, kills, and the timers and scroll as doubles) and a 100-byte block per
@@ -380,6 +394,104 @@ not silently drift, and it does not pretend to be fine.
 
 ---
 
+## Corrected outcomes
+
+A client shows every frame twice over: once on its prediction, and again --
+sometimes three times -- when the host's snapshot rewinds it and it steps the
+same frames on the host's word. The screen must hear of a kill once, not once
+per pass. And sometimes the second pass is not the same: the prediction had a
+kill the host never had, or the host had one the prediction missed. This is how
+those are presented, and why.
+
+**A replay rings nothing.** `NetSession` steps every frame it has stepped before
+between `duel.begin_replay()` and `duel.end_replay()` (the `DuelSim` interface,
+`scripts/duel/match_sim.gd`), and only through `_restep()`, which refuses
+outside that bracket. While it is set nothing is announced: not by the match,
+and not by the fighters, which the match passes the flag on to (a disarm, a
+clash, the figure's death flash). The flag never reaches the simulation -- it is
+not in the snapshot or the checksum and no step decides anything on it -- and
+`tests/unit/test_duel_replay_presentation.gd` steps 600 frames inside the
+bracket and out of it and requires the two matches identical, byte for byte.
+
+**The match keeps a ledger** (`scripts/duel/match_ledger.gd`): what the scene
+has been told, against what the history now holds. Nothing in a step emits a
+signal; what happened goes into the ledger, and after every fresh step, and once
+at the end of every correction, the match tells the scene the difference. Two
+events are the same event if they are of one kind, about one seat, and within
+`SAME_BEAT` (30) frames of each other -- half a second, more than a correction
+moves any exchange and less than any two real events of one kind about one
+seat can be apart, since a fallen fighter is down for two seconds.
+
+**The rule: the beat rings once, when the screen first shows the event; the
+record follows the history.**
+
+| The correction...                               | Beat (shake, sound, word) | Blood                         |
+| ----------------------------------------------- | ------------------------- | ----------------------------- |
+| changed nothing                                 | nothing                   | nothing                       |
+| moved a kill a few frames, or a few pixels      | nothing                   | moved to the host's frame and place |
+| found a kill the prediction did not have        | rung now, late, once      | spilled at the host's frame and place |
+| took away a kill the prediction had             | already spent; the **DOWN** word is withdrawn if still up | wiped, once the history has run 30 frames past it without it |
+
+Why each, against the alternatives:
+
+- *A newly found kill rings late rather than not at all.* The fighter does not
+  die late on screen: the correction drops them to a corpse *now*, at the end
+  of the replay. A beat now is in step with what the player sees; a body that
+  drops silently, with blood appearing under it, reads as a bug. The beat is
+  late only against the host's clock, which nobody is watching.
+- *A kill taken away loses its blood.* The floor is the match's record of who
+  died where (`docs/duel-match.md`); blood for a death that did not happen is a
+  record that lies, for the rest of the match, and the two phones would no
+  longer show the same floor. The shake and the sound cannot be unrung -- they
+  were brief, and they marked a moment the screen really did show -- but the
+  word is still on the screen, saying something untrue, so it comes off.
+- *It waits half a second before wiping.* A correction usually moves a kill
+  rather than removing it: the host's input arrives a frame or two off the
+  prediction and the cut lands a frame or two later. Wiping at once would then
+  wipe, re-spill and ring a second beat for one death -- the echo this was all
+  for. So a kill the history has not yet re-produced stays until the history
+  has run `SAME_BEAT` frames past it; if it comes back in that time it is a move,
+  silent, and if not it is gone.
+- *A moved kill is redrawn, silently, on the host's frame.* The splatter is
+  seeded from the death's frame and place; both peers agree on those once the
+  host has spoken, so both draw the same stain.
+- *The other beats follow the same rule* -- initiative, respawn, the gate, the
+  catch, the end -- once each, late if found late. None of them leaves a record
+  but the HUD word, and the rope, which reads the state and so is never wrong
+  for longer than the state is.
+
+**The state outranks a stale replay.** The ledger's history is only as good as
+the frames the client could step again. When a run of the host's input is lost
+the client loads the host's state without replaying the frames behind it, and
+for those frames the ledger holds a guess -- in one lossy run the guess had the
+kill two frames early, then a later replay lost it, and the client wiped the
+blood of a kill that had happened. The state itself is not a guess: a fallen
+fighter's respawn timer names the frame they fell on, exactly, on both peers.
+So at every settle the match hands the ledger what the timers say about the
+last two seconds, and the ledger makes its history agree: a death the timers
+deny is struck out, and one they report that the history lacks is put in -- at
+the place the player was shown if there was one, and where the body lies if
+not. Whether and when a fighter died is therefore always the host's answer.
+*Where* is the host's answer whenever the client could replay the frame, which
+the twelve frames of input on each snapshot make nearly always; otherwise it is
+the client's best picture, a few pixels off.
+
+`tests/match_net_test.gd` holds two live sessions to this under the clean,
+laggy and lossy links: no frame stepped twice outside the bracket; every death
+the host had rung exactly once on the client; no death rung twice; every client
+beat accounted for as a host death, a kill since taken back, or one the host has
+not yet ruled on; and the client's floor, once settled, holding blood for
+exactly the host's deaths at the host's frame and place.
+`tests/unit/test_duel_replay_presentation.gd` stages each row of the table, and
+the stale-replay case, by hand.
+
+This replaced a guard in `match_scene.gd`, `CATCH_ECHO`, that dropped a second
+catch by the same seat inside thirty frames. It was the right instinct in the
+wrong place: it guarded one signal of seven, it measured the echo against
+whatever frame the replay happened to be on, and it could not tell a moved catch
+from a new one. The ledger is the same idea -- one event within half a second is
+one event -- applied to all of them, against the history.
+
 ## Testing
 
 The netplay tests are standalone headless scripts rather than GUT tests,
@@ -411,6 +523,8 @@ seats a guest that sends no look at all.
 
 The looks' own tests are GUT tests, because nothing in them steps a match:
 `tests/unit/test_net_look_wire.gd` and `tests/unit/test_net_look_session.gd`.
+So is `tests/unit/test_duel_replay_presentation.gd`, which steps one on the
+placeholder fighter, which is not a physics body.
 
 ---
 
@@ -455,11 +569,16 @@ Honestly, and in roughly the order I would fix them.
   pulling it down each frame instead. On the strip's flat, axis-aligned tiles
   the two agree, and the tests say so, but a sloped or stepped zone would want
   snapping put back — deterministically, inside `_move()`.
-- **Replayed frames ring their presentation again.** `NetSession` re-steps
-  corrected frames without setting the match's `replaying`, so a corrected kill
-  or catch fires its signal twice. The catch guards itself in `match_scene.gd`
-  (`CATCH_ECHO`). The others do not yet; setting `replaying` around
-  `_replay_to()` in `session.gd` would fix all of them.
+- **The prediction kills the other player more often than the host does.**
+  The client guesses the host's input by repeating the last byte, and a fighter
+  running at a pit keeps running in the guess after the real player has
+  jumped. On the laggy link in `tests/match_net_test.gd` (100 ms each way) the
+  client showed the host's fighter falling seven times in twenty seconds that
+  the host never had. *Corrected outcomes* above makes each one honest -- one
+  beat, the blood wiped half a second later -- but the body on screen is the
+  prediction, and it falls. That is a prediction problem, not a presentation
+  one: rollback, an input delay option, or a guess that does not walk into
+  hazards would each reduce it.
 - **No bandwidth adaptation.** The snapshot rate is a constant.
 - **The clock sync is crude.** One-way latency is taken as half the round trip,
   which is wrong on an asymmetric connection.

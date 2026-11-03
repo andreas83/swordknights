@@ -69,7 +69,12 @@ func _bind() -> bool:
 		return false
 	z_index = 1
 	seat = seat
-	_fighter.died.connect(func(_v: int, _k: int) -> void: _on_died())
+	# `died` is the one fighter signal that rings through a replay, because the
+	# match's bookkeeping hangs on it. The flash does not: a figure that flashed
+	# once per correction would be telling the player about the network.
+	_fighter.died.connect(func(_v: int, _k: int) -> void:
+		if not _fighter.replaying:
+			_on_died())
 	_fighter.disarmed.connect(func(_v: int, _b: int) -> void: _on_hurt(0))
 	_fighter.clashed.connect(func(_at: Vector2) -> void: _kick(0.16))
 	_fighter.knocked_down.connect(func(_v: int) -> void: _kick(-0.3))

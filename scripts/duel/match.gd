@@ -28,6 +28,19 @@ extends DuelSim
 ## had; one presentation field hiding INSIDE it would be just as bad, because it
 ## would make the splatter pattern a thing two peers could diverge over.
 ##
+## HOW THE SCENE IS TOLD, AND WHY NOT FROM INSIDE THE STEP
+## Nothing in the step emits a signal. What happened goes into `events`, the
+## step hands that to a MatchLedger, and the ledger says what the scene has not
+## been told yet -- after every fresh step, and once at the end of a replay
+## (DuelSim.end_replay). A frame NetSession steps again therefore rings nothing
+## a second time, and a correction that changes what happened -- a predicted
+## kill the host never had, or one it had that the client never predicted --
+## is settled as the rule in scripts/duel/match_ledger.gd says: a new kill is
+## told late, a kill that never happened has its blood taken back
+## (`death_retracted`), and a kill the correction merely moved is moved without
+## a second beat. The beats (`fighter_died` and the rest) ring once per real
+## event; the record (`death_recorded`, `death_retracted`) follows the history.
+##
 ## THE WINDOW, AND WHY IT IS NOT A ZONE INDEX THAT JUMPS
 ## The playable window is one zone wide and slides continuously. The leader drags
 ## it: it is positioned to hold them at its centre, and it may only ever move in
@@ -42,7 +55,14 @@ extends DuelSim
 
 signal initiative_changed(leader: int) ## -1 for neutral, otherwise a seat
 signal zone_changed(index: int)
+## The beat of a death: shake, word, sound. Once per death, when first known.
 signal fighter_died(victim: int, killer: int, at: Vector2)
+## The record of a death: where its blood goes. `frame` is the frame it happened
+## on in the history as now known, which both peers agree on and seed the
+## splatter from. A correction that moves a death retracts it and records it
+## again; one that undoes it only retracts it.
+signal death_recorded(victim: int, at: Vector2, frame: int)
+signal death_retracted(victim: int, frame: int)
 signal fighter_respawned(slot: int, at: Vector2, facing: int)
 signal leader_consumed(winner: int, at: Vector2)
 signal match_over(winner: int)
@@ -119,6 +139,17 @@ var _ground: TileMapLayer
 var _fighter_bytes := 0
 var _scratch := PackedByteArray()
 var _built := false
+## What the scene has been told, against what the history now holds. Not
+## simulation: never in the snapshot, the checksum, or a step's decisions.
+var _ledger := MatchLedger.new()
+## Inside step(). Something that happens outside one -- a scripted kill, a
+## test's -- waits in `_between` and is the next step's: that step is where its
+## consequences (the respawn timer running down) begin, so that is the frame
+## the state will say it happened on.
+var _stepping := false
+var _between: Array[Dictionary] = []
+## What the fighters were last told about `replaying`.
+var _fighters_replaying := false
 
 
 ## --- construction ----------------------------------------------------------
@@ -217,6 +248,8 @@ func reset_match() -> void:
 	kills = PackedInt32Array([0, 0])
 	winner = DuelRules.DRAW
 	events.clear()
+	_between.clear()
+	_ledger.clear()
 
 	@warning_ignore("integer_division")
 	var middle := strip.zone_count() / 2
@@ -238,9 +271,12 @@ func reset_match() -> void:
 ## One frame. Pure in this object's state and the two input bytes, and must be
 ## called from inside a physics frame: a fighter is a body in the physics space.
 func step(bits_a: int, bits_b: int) -> void:
-	events.clear()
+	events.assign(_between)
+	_between.clear()
 	if not _built:
 		return
+	_stepping = true
+	_pass_replaying_on()
 
 	# Outside the fight the fighters stand still. Zeroing the input rather than
 	# skipping the simulation keeps the step uniform — gravity still runs, a
@@ -253,8 +289,6 @@ func step(bits_a: int, bits_b: int) -> void:
 	seats[0].simulate(DT)
 	seats[1].simulate(DT)
 	events.append_array(DuelSeat.referee(seats[0], seats[1], strip))
-	if not replaying:
-		_announce_catches()
 
 	if phase != Phase.MATCH_OVER:
 		_advance_respawns()
@@ -266,16 +300,99 @@ func step(bits_a: int, bits_b: int) -> void:
 
 	_advance_phase()
 	_refresh_streaming()
+	_ledger.record(frame, events)
 	frame += 1
+	_stepping = false
+	if not replaying:
+		_settle()
 
 
-## Turns the referee's catch events into the signal the scene listens to. The
-## event list is the record; the signal is only the scene's doorbell, and like
-## every other signal here it stays quiet while frames are being replayed.
-func _announce_catches() -> void:
-	for event: Dictionary in events:
-		if event.get("kind", "") == "catch":
+## --- telling the scene -----------------------------------------------------
+
+## Something happened. Into `events`, which is the record of this frame; the
+## ledger decides when the scene hears of it.
+func _happened(event: Dictionary) -> void:
+	if _stepping:
+		events.append(event)
+	else:
+		_between.append(event)
+
+
+func _replay_ended() -> void:
+	_pass_replaying_on()
+	_settle()
+
+
+## The fighters ring their own small beats -- a disarm, a clash, a knockdown --
+## and must hold them during a replay as the match does.
+func _pass_replaying_on() -> void:
+	if _fighters_replaying == replaying:
+		return
+	_fighters_replaying = replaying
+	for seat: DuelSeat in seats:
+		if not seat.set_replaying(replaying):
+			push_error("seat %d's fighter would not take replaying = %s"
+				% [seat.slot, replaying])
+
+
+## Tells the scene what it has not heard, takes back what did not happen, and
+## moves what moved. See MatchLedger for the rule.
+func _settle() -> void:
+	var change := _ledger.settle(frame, _evidence())
+	for event: Dictionary in change["retracted"]:
+		if event["kind"] == "died":
+			death_retracted.emit(int(event["victim"]), int(event["frame"]))
+	for pair: Array in change["revised"]:
+		var was: Dictionary = pair[0]
+		var now: Dictionary = pair[1]
+		if now["kind"] == "died":
+			death_retracted.emit(int(was["victim"]), int(was["frame"]))
+			death_recorded.emit(int(now["victim"]), now["at"] as Vector2, int(now["frame"]))
+	for event: Dictionary in change["told"]:
+		_tell(event)
+
+
+## What the state says about recent deaths, for the ledger to hold the
+## timeline to. A respawn timer is set on the frame a fighter falls and runs
+## down by one frame's worth every step after, so it names that frame exactly,
+## and it is in the snapshot, so both peers read the same frame off it. It
+## covers the two seconds it runs for, less a frame each end for rounding, and
+## not at all once the match is over, when the timers stop.
+func _evidence() -> Dictionary:
+	if phase == Phase.MATCH_OVER:
+		return {}
+	var down := []
+	for slot: int in seats.size():
+		if respawn[slot] <= 0.0:
+			down.append({})
+			continue
+		var ago := roundi((RESPAWN_DELAY - respawn[slot]) / DT)
+		down.append({"frame": frame - ago, "at": seats[slot].position()})
+	return {"since": frame - roundi(RESPAWN_DELAY / DT) + 2, "seats": down}
+
+
+func _tell(event: Dictionary) -> void:
+	match String(event["kind"]):
+		"died":
+			var victim := int(event["victim"])
+			var at: Vector2 = event["at"]
+			death_recorded.emit(victim, at, int(event["frame"]))
+			fighter_died.emit(victim, int(event["killer"]), at)
+		"respawned":
+			fighter_respawned.emit(
+				int(event["slot"]), event["at"] as Vector2, int(event["facing"]))
+		"initiative":
+			initiative_changed.emit(int(event["leader"]))
+		"zone":
+			zone_changed.emit(int(event["index"]))
+		"catch":
 			blade_caught.emit(int(event["by"]), int(event["from"]), event["at"] as Vector2)
+		"consumed":
+			leader_consumed.emit(int(event["winner"]), event["at"] as Vector2)
+		"over":
+			match_over.emit(int(event["winner"]))
+		_:
+			pass
 
 
 ## --- initiative ------------------------------------------------------------
@@ -312,8 +429,7 @@ func _take_initiative(slot: int) -> void:
 	if next == initiative:
 		return
 	initiative = next
-	if not replaying:
-		initiative_changed.emit(slot)
+	_happened({"kind": "initiative", "leader": slot})
 
 
 ## The killer takes initiative.
@@ -337,13 +453,9 @@ func _on_fighter_died(victim: int, killer: int) -> void:
 
 	respawn[victim] = RESPAWN_DELAY
 	var at := seats[victim].position()
-	events.append({
-		"kind": "died", "victim": victim, "killer": killer, "at": at,
-	})
-	if not replaying:
-		# The gore layer listens to this one. It is the only thing it listens
-		# to, and it is one-way: nothing it does comes back into the step.
-		fighter_died.emit(victim, killer, at)
+	# The gore layer hears of this one, by way of the ledger, and only of this
+	# one; and it is one-way: nothing it does comes back into the step.
+	_happened({"kind": "died", "victim": victim, "killer": killer, "at": at})
 
 
 ## --- respawn ---------------------------------------------------------------
@@ -360,9 +472,7 @@ func _advance_respawns() -> void:
 		var at: Vector2 = plan["position"]
 		var facing: int = int(plan["facing"])
 		seats[slot].respawn_at(at, facing)
-		events.append({"kind": "respawned", "slot": slot, "at": at})
-		if not replaying:
-			fighter_respawned.emit(slot, at, facing)
+		_happened({"kind": "respawned", "slot": slot, "at": at, "facing": facing})
 
 
 ## Where a fighter will come back, as a pure function of the current state.
@@ -455,9 +565,7 @@ func _advance_window() -> void:
 	var was := zone_index
 	zone_index = strip.zone_of_x(scroll + strip.zone_width() * 0.5)
 	if zone_index != was:
-		events.append({"kind": "zone", "index": zone_index})
-		if not replaying:
-			zone_changed.emit(zone_index)
+		_happened({"kind": "zone", "index": zone_index})
 
 
 ## Keeps the fight on the screen.
@@ -523,9 +631,7 @@ func _check_endpoint() -> void:
 
 	winner = leader
 	_set_phase(Phase.CONSUMED)
-	events.append({"kind": "consumed", "winner": leader, "at": at})
-	if not replaying:
-		leader_consumed.emit(leader, at)
+	_happened({"kind": "consumed", "winner": leader, "at": at})
 
 
 func _advance_phase() -> void:
@@ -537,9 +643,7 @@ func _advance_phase() -> void:
 		Phase.CONSUMED:
 			if phase_time >= CONSUMED_TIME:
 				_set_phase(Phase.MATCH_OVER)
-				events.append({"kind": "over", "winner": winner})
-				if not replaying:
-					match_over.emit(winner)
+				_happened({"kind": "over", "winner": winner})
 		_:
 			pass
 
@@ -668,6 +772,9 @@ func read_state(bytes: PackedByteArray) -> bool:
 
 	seats[0].read_state(bytes, HEADER_BYTES)
 	seats[1].read_state(bytes, HEADER_BYTES + _fighter_bytes)
+	# Presentation bookkeeping, not state: from here on the history has not
+	# happened yet, and will be recorded again as it is stepped.
+	_ledger.rewind(frame)
 	return true
 
 

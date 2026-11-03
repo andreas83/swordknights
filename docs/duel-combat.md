@@ -246,9 +246,11 @@ new number.
   guard's steel-on-steel, pitched up) and the word **CAUGHT** in the HUD band.
 - **There is no frozen frame.** In a duel that would be a correctness bug, not a
   taste; see `docs/feel.md`. The beat is presentation only.
-- `NetSession` re-steps the frames it corrects without setting `replaying`. A
-  correction that lands on a catch would ring it twice, so the scene presents
-  each seat's catch once within `CATCH_ECHO` frames.
+- A catch rings once, however often `NetSession` re-steps its frame: the
+  session marks every re-stepped frame as a replay, and the match tells the
+  scene of each catch once, through the ledger every presented event goes
+  through (`docs/netplay.md`, "Corrected outcomes"). The scene's own
+  `CATCH_ECHO` guard that stood in for this is gone.
 
 ### Netplay
 

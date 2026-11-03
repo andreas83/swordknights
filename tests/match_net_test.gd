@@ -14,6 +14,19 @@ extends SceneTree
 ## ground and never with another fighter, and both matches build the same
 ## ground in the same place.
 ##
+## AND WHAT THE CLIENT'S SCREEN IS TOLD
+## A client steps every frame on its guess and then steps it again, often
+## twice, when the host corrects it. The screen must hear of each thing that
+## happened once, not once per pass. So each scenario also watches the
+## client's presentation, as the scene would, and asks:
+##   - no frame is stepped twice outside NetSession's replay bracket (the
+##     session's half: every re-stepped frame is marked as one);
+##   - every death the host had rang exactly one beat on the client, and no
+##     beat rang twice for one death (the whole of it: beats once per kill);
+##   - the client's floor ends up with blood for exactly the host's deaths, at
+##     the host's frame and place (the record follows the corrected history);
+##   - and the host, which never replays, retracts nothing.
+##
 ##     godot --headless --path . --script res://tests/match_net_test.gd
 
 const Support := preload("res://tests/duel_support.gd")
@@ -33,6 +46,70 @@ const CLIENT_LOOK := {"figure": "prince", "outfit": "wine", "accent": "ink",
 var _s := Support.new()
 var _strip: ZoneStrip
 var _warm := 0
+
+
+## The real match, with a note of every frame it was asked to step outside a
+## replay. A frame stepped there twice is a frame whose presentation rang twice.
+class WatchedMatch:
+	extends DuelMatch
+
+	var fresh := {} # frame -> times stepped outside a replay
+
+	func step(bits_a: int, bits_b: int) -> void:
+		if not replaying:
+			fresh[frame] = int(fresh.get(frame, 0)) + 1
+		super.step(bits_a, bits_b)
+
+	func stepped_twice() -> int:
+		var twice := 0
+		for at: int in fresh.keys():
+			if int(fresh[at]) > 1:
+				twice += 1
+		return twice
+
+
+## Listens to one match as the scene does: the beats, and the blood.
+class Witness:
+	extends RefCounted
+
+	var fight: DuelMatch
+	## {victim, frame}: each beat, and the match frame it rang on.
+	var beats: Array[Dictionary] = []
+	## Vector2i(death frame, victim) -> where: the blood on the floor now.
+	var blood := {}
+	var retractions := 0
+	## Retractions that were half of a move: put straight back down elsewhere.
+	var moves := 0
+	var _just_taken := Vector2i(-1, -1) # (match frame, victim) of the last one
+
+	func _init(watched: DuelMatch) -> void:
+		fight = watched
+		fight.fighter_died.connect(func(victim: int, _k: int, _at: Vector2) -> void:
+			beats.append({"victim": victim, "frame": fight.frame}))
+		fight.death_recorded.connect(func(victim: int, at: Vector2, frame: int) -> void:
+			if _just_taken == Vector2i(fight.frame, victim):
+				moves += 1
+			_just_taken = Vector2i(-1, -1)
+			blood[Vector2i(frame, victim)] = at)
+		fight.death_retracted.connect(func(victim: int, frame: int) -> void:
+			retractions += 1
+			_just_taken = Vector2i(fight.frame, victim)
+			blood.erase(Vector2i(frame, victim)))
+
+	## Deaths told and then taken back for good: a kill the prediction showed
+	## and the host never had.
+	func phantoms() -> int:
+		return retractions - moves
+
+	## The blood of deaths up to `last`, as sorted [key, place] pairs.
+	func floor_until(last: int) -> Array:
+		var out := []
+		var keys := blood.keys()
+		keys.sort()
+		for key: Vector2i in keys:
+			if key.x <= last:
+				out.append([key, blood[key]])
+		return out
 
 
 func _initialize() -> void:
@@ -60,6 +137,8 @@ func _scenario(label: String, latency: int, jitter: int, loss: float, seed_value
 	var client_match := _open_match("Client")
 	if host_match == null or client_match == null:
 		return
+	var host_saw := Witness.new(host_match)
+	var client_saw := Witness.new(client_match)
 
 	var ends := LoopbackTransport.pair(seed_value)
 	var host_end: LoopbackTransport = ends[0]
@@ -116,7 +195,63 @@ func _scenario(label: String, latency: int, jitter: int, loss: float, seed_value
 		label, host_match.frame - start, client.corrections, client.verifications,
 		host_match.kills[0], host_match.kills[1], client.desync_count,
 	])
+	_presentation(label, host_match, client_match, host_saw, client_saw, client)
 	_close([host, client], [host_match, client_match])
+
+
+## The client's screen against the host's history. See the docstring.
+func _presentation(label: String, host_match: WatchedMatch, client_match: WatchedMatch,
+		host_saw: Witness, client_saw: Witness, client: NetSession) -> void:
+	_s.equal(client_match.stepped_twice(), 0,
+		"%s: no frame was stepped twice outside a replay (%d stepped fresh)"
+			% [label, client_match.fresh.size()])
+	_s.equal(host_match.stepped_twice(), 0, "%s: nor on the host" % label)
+	_s.equal(host_saw.retractions, 0, "%s: the host retracts nothing" % label)
+
+	# Deaths the client has had every chance to settle: older than the newest
+	# snapshot by more than the ledger waits before it retracts.
+	var settled := client_match.frame - client.predicted_ahead - MatchLedger.SAME_BEAT - 1
+	var real := host_saw.floor_until(settled)
+	_s.check(real.size() > 0, "%s: the host had deaths to compare (%d)" % [label, real.size()])
+	_s.equal(client_saw.floor_until(settled), real,
+		"%s: the client's blood is the host's deaths, frame and place" % label)
+
+	for death: Array in real:
+		var key: Vector2i = death[0]
+		var rang := 0
+		for beat: Dictionary in client_saw.beats:
+			var after := int(beat["frame"]) - key.x
+			if int(beat["victim"]) == key.y and after >= -MatchLedger.SAME_BEAT \
+					and after <= 2 * MatchLedger.SAME_BEAT:
+				rang += 1
+		_s.equal(rang, 1, "%s: seat %d's death on frame %d rang once on the client"
+			% [label, key.y, key.x])
+	var echoes := 0
+	for i: int in client_saw.beats.size():
+		for j: int in range(i + 1, client_saw.beats.size()):
+			var a: Dictionary = client_saw.beats[i]
+			var b: Dictionary = client_saw.beats[j]
+			if a["victim"] == b["victim"] \
+					and absi(int(b["frame"]) - int(a["frame"])) <= MatchLedger.SAME_BEAT:
+				echoes += 1
+	_s.equal(echoes, 0, "%s: no death rang twice on the client" % label)
+	# And every beat is accounted for: a host death the client has, a predicted
+	# death since taken back for good, or one still on the client's floor that
+	# the host has not ruled on yet. Nothing rang that is in none of those.
+	var shared := 0
+	var unconfirmed := 0
+	for key: Vector2i in client_saw.blood.keys():
+		if host_saw.blood.has(key):
+			shared += 1
+		else:
+			unconfirmed += 1
+	_s.equal(client_saw.beats.size(), shared + client_saw.phantoms() + unconfirmed,
+		"%s: beats = %d shared deaths + %d taken back + %d unconfirmed" % [
+			label, shared, client_saw.phantoms(), unconfirmed])
+	print("  %-6s beats=%d host deaths=%d taken back=%d moved=%d fresh frames=%d" % [
+		label, client_saw.beats.size(), host_saw.blood.size(), client_saw.phantoms(),
+		client_saw.moves, client_match.fresh.size(),
+	])
 
 
 ## A crude duellist for one seat: always closing on the other fighter, with
@@ -143,8 +278,8 @@ func _bot(fight: DuelMatch, seat: int, seed_value: int) -> Callable:
 		return bits
 
 
-func _open_match(label: String) -> DuelMatch:
-	var fight := DuelMatch.new()
+func _open_match(label: String) -> WatchedMatch:
+	var fight := WatchedMatch.new()
 	fight.name = label
 	fight.fighter_scene = FIGHTER_SCENE
 	root.add_child(fight)

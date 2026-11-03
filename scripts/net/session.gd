@@ -40,6 +40,17 @@ extends RefCounted
 ## The client needs no second simulation to do this: it reuses the one duel it
 ## has, because reconciliation is about to overwrite it anyway.
 ##
+## A FRAME STEPPED AGAIN RINGS NOTHING
+## Every frame the client steps a second time -- the verifier's replay from the
+## last authoritative state, and the replay from the new one up to where the
+## prediction had got -- is stepped between duel.begin_replay() and
+## duel.end_replay(), and only through _restep(), which refuses to step outside
+## that bracket. The player has already heard the predicted frame's kill; a
+## replay that rang it again would be the network talking. What a correction
+## CHANGES is settled once, at end_replay(), by the duel (DuelMatch's ledger,
+## and docs/netplay.md, "Corrected outcomes"). The flag never reaches the
+## simulation, so the replayed frame is still the same frame.
+##
 ## THE LOOKS
 ## Each side's look rides on its half of the handshake -- the guest's on HELLO,
 ## the host's on WELCOME -- and is kept here as ids for the scene to dress the
@@ -67,6 +78,17 @@ const SNAPSHOT_INTERVAL := 2
 ## How many recent input frames the client repeats in every INPUT message. Free
 ## over TCP; the point is that an unreliable transport can be dropped in.
 const INPUT_REDUNDANCY := 6
+## How many frames of applied input the host repeats in every SNAPSHOT: the
+## last six snapshots' worth, not only the two since the last one. The client
+## can only check a snapshot -- and replay the frames behind it on the host's
+## input, which is what puts a kill's blood where the host's kill was -- if it
+## has the host's input for every frame since the last snapshot it received.
+## Sending only the frames since the last snapshot SENT makes one lost
+## snapshot a hole in that input; this makes it take six in a row. Twenty
+## bytes more on a 260-byte message, and wire-compatible both ways: the count
+## is already on the wire, and a client files the extra frames where it filed
+## the first two.
+const SNAPSHOT_INPUTS := 12
 ## Round trip measurement.
 const PING_INTERVAL := 20
 ## How far ahead of the newest snapshot the client runs, on top of the measured
@@ -138,10 +160,10 @@ var _pending_pings := {} # id -> sent usec
 var _lead := MIN_LEAD
 var _arena_hash := 0
 
-## host: client input by frame, and the pairs applied since the last snapshot
+## host: client input by frame, and the last SNAPSHOT_INPUTS pairs it applied
 var _remote_inputs := {} # frame -> int bits
 var _last_remote_bits := 0
-var _since_snapshot: Array[Vector2i] = []
+var _recent_pairs: Array[Vector2i] = []
 
 ## client: our own input by frame, the host's input by frame as we learn it,
 ## and the last authoritative state we were handed
@@ -231,7 +253,9 @@ func _host_frame() -> void:
 		input_starved += 1
 
 	var pair := _pair(mine, theirs)
-	_since_snapshot.append(pair)
+	_recent_pairs.append(pair)
+	if _recent_pairs.size() > SNAPSHOT_INPUTS:
+		_recent_pairs.remove_at(0)
 	duel.step(pair.x, pair.y)
 	_trim(_remote_inputs, duel.frame - HISTORY)
 
@@ -294,8 +318,10 @@ func _absorb_snapshots() -> void:
 	# is what makes the authoritative replay possible.
 	var queue := _pending_snapshots
 	_pending_snapshots = []
+	duel.begin_replay()
 	for snapshot: Dictionary in queue:
 		_apply_snapshot(snapshot)
+	duel.end_replay()
 
 
 func _apply_snapshot(snapshot: Dictionary) -> void:
@@ -360,8 +386,7 @@ func _verify_against_authority(at: int, checksum: int) -> void:
 	if not duel.read_state(_auth_state):
 		return
 	for f: int in range(_auth_frame, at):
-		var pair: Vector2i = _auth_inputs[f]
-		duel.step(pair.x, pair.y)
+		_restep(_auth_inputs[f])
 
 	var recomputed := duel.checksum()
 	verifications += 1
@@ -390,19 +415,26 @@ func _replay_to(target: int) -> void:
 			pair = _auth_inputs[at]
 		else:
 			pair = _pair(int(_local_inputs.get(at, 0)), _predicted_remote_bits(at))
-		duel.step(pair.x, pair.y)
+		_restep(pair)
 		_predicted[at + 1] = duel.checksum()
+
+
+## The only way a frame is stepped a second time. Outside the replay bracket it
+## refuses, loudly: a re-step that could ring the scene is the bug this exists
+## to make impossible, and a silent fallback would only hide it.
+func _restep(pair: Vector2i) -> void:
+	if not duel.replaying:
+		push_error("NetSession re-stepped frame %d outside a replay" % duel.frame)
+		return
+	duel.step(pair.x, pair.y)
 
 
 ## --- sending ----------------------------------------------------------------
 
 func _send_snapshot() -> void:
-	if _since_snapshot.size() > 255:
-		_since_snapshot = _since_snapshot.slice(_since_snapshot.size() - 255)
 	transport.send(NetProtocol.snapshot(
-		duel.frame, duel.checksum(), duel.write_state(), _since_snapshot
+		duel.frame, duel.checksum(), duel.write_state(), _recent_pairs
 	))
-	_since_snapshot = []
 	snapshots_sent += 1
 
 

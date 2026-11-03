@@ -41,13 +41,7 @@ var demo := false
 ## read or write the real save.
 var wardrobe_path := Wardrobe.PATH
 
-## Frames inside which a second catch by the same seat is a replayed echo of
-## the first rather than a new one. See _on_blade_caught().
-const CATCH_ECHO := 30
-
 var _gates: Array[GateArt] = []
-## seat -> the match frame its last catch was presented on.
-var _caught_at := {}
 var _paused := false
 var _demo_frame := 0
 
@@ -85,6 +79,8 @@ func _ready() -> void:
 	hud.footer = "PAUSE TO QUIT" if not demo else strip.name.to_upper()
 
 	fight.fighter_died.connect(_on_fighter_died)
+	fight.death_recorded.connect(_on_death_recorded)
+	fight.death_retracted.connect(_on_death_retracted)
 	fight.initiative_changed.connect(_on_initiative_changed)
 	fight.fighter_respawned.connect(_on_fighter_respawned)
 	fight.leader_consumed.connect(_on_leader_consumed)
@@ -233,12 +229,34 @@ func _to_menu() -> void:
 
 
 ## --- reactions --------------------------------------------------------------
+##
+## Each of these is rung once per thing that happened, by the match's ledger,
+## and never by a frame NetSession steps again -- see DuelMatch and
+## docs/netplay.md, "Corrected outcomes". So nothing here has to guard itself
+## against an echo. The one reaction that is a record rather than a beat, the
+## blood, has its own pair of signals, because a correction can take it back.
 
-func _on_fighter_died(victim: int, _killer: int, at: Vector2) -> void:
-	# The dead fighter's colour, and it stays for the match.
-	gore.spill(at, victim, fight.frame)
+func _on_fighter_died(victim: int, _killer: int, _at: Vector2) -> void:
 	camera.shake(3.6, 0.42)
-	hud.flash("%s DOWN" % DuelRules.slot_label(victim))
+	hud.flash(_down(victim))
+
+
+## The dead fighter's colour, and it stays for the match -- unless the host
+## says the death did not happen, or happened elsewhere.
+func _on_death_recorded(victim: int, at: Vector2, frame: int) -> void:
+	gore.spill(at, victim, frame)
+
+
+## A kill the host never had. The shake and the sound are spent; the blood
+## comes off the floor and the word off the band, because both would go on
+## saying something untrue.
+func _on_death_retracted(victim: int, frame: int) -> void:
+	gore.wipe(victim, frame)
+	hud.withdraw(_down(victim))
+
+
+func _down(victim: int) -> String:
+	return "%s DOWN" % DuelRules.slot_label(victim)
 
 
 func _on_initiative_changed(leader: int) -> void:
@@ -264,16 +282,7 @@ func _on_leader_consumed(winner: int, _at: Vector2) -> void:
 ## its host, which docs/feel.md calls a correctness question rather than a taste
 ## one. So the beat is in the camera alone, a short hard shake, and the
 ## simulation never sees it. See docs/duel-combat.md.
-##
-## Each seat's catch is presented once. NetSession re-steps frames it has
-## corrected, and a correction that lands on a catch would otherwise ring it
-## again; a second catch by the same seat inside CATCH_ECHO frames is that echo,
-## since a real one needs the other fighter to have re-armed and thrown again.
-func _on_blade_caught(catcher: int, _thrower: int, _at: Vector2) -> void:
-	var last := int(_caught_at.get(catcher, -CATCH_ECHO))
-	if absi(fight.frame - last) < CATCH_ECHO:
-		return
-	_caught_at[catcher] = fight.frame
+func _on_blade_caught(_catcher: int, _thrower: int, _at: Vector2) -> void:
 	camera.shake(1.6, 0.14)
 	GameAudio.cue(&"catch", {"pitch": 1.15})
 	hud.flash("CAUGHT")
