@@ -20,7 +20,7 @@ Rings are respawn timers, the track at the top is zone and initiative.*
 | `scripts/duel/match_sim.gd` (`DuelSim`) | the surface the network session drives; the match implements it |
 | `scripts/duel/match_seat.gd` (`DuelSeat`) | the **only** place that touches a fighter |
 | `scripts/duel/zones.gd` (`ZoneStrip`) | the zones as data, and every collision question |
-| `scripts/duel/zones_view.gd` | streams tilemap cells near the camera |
+| `scripts/duel/zones_view.gd` | streams the zones' drawn layers near the camera, dressed and lit |
 | `scripts/duel/gore.gd` (`GoreField`) | decals, presentation only |
 | `scripts/duel/match_camera.gd`, `match_hud.gd`, `match_gate.gd` | presentation |
 | `levels/duel_zones.txt`, `levels/zone_0*.txt` | the strip: a manifest and five zones |
@@ -183,8 +183,15 @@ The five items that stood between the match and replacing the round duel:
    drawn exactly on the simulation's blade rect. See
    [`character.md`](character.md#the-duel-fighter-wears-the-same-figure) and
    `docs/fighter-poses.png`.
-3. **The zones are bare.** `zones_view.gd` builds its own tilemap, so the
-   architecture and cast shadows in [`world.md`](world.md) do not run on them.
+3. ~~The zones are bare.~~ **The zones are dressed and lit by the level
+   path** ([`world.md`](world.md#the-duels-zones)). `ZoneView` dresses the
+   whole strip once with `WorldDresser`, solves a full-resolution shadow mask
+   per zone with `SunShadow`, and draws each streamed zone with `Level`'s own
+   layers and shader material. Presentation only: every layer has collision
+   off, the strip's identity does not change, and
+   `tests/unit/test_zone_dressing.gd` holds both, plus a per-zone shadow
+   that matches a solve over everything to its west pixel for pixel. In a
+   duel the foreground plane is drawn at 55% so it never hides a fighter.
 4. ~~The HUD is on the fallback font.~~ **The HUD is set in Alcazar**, on
    `UiFont`, `UiLayout` and `UiMarks` like every other screen
    ([`ui.md`](ui.md#duel-hud)): chrome at the top of the safe area, words for

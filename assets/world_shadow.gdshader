@@ -16,6 +16,10 @@ render_mode unshaded;
 uniform sampler2D shadow_mask : filter_nearest, repeat_disable, hint_default_black;
 // Level size in world pixels; the mask covers exactly this rectangle.
 uniform vec2 level_px = vec2(1.0, 1.0);
+// Where that rectangle's top-left sits in the world. Zero for a level, which
+// starts at the origin; a duel zone's mask starts a few columns west of it
+// (scripts/duel/zones_view.gd).
+uniform vec2 mask_origin = vec2(0.0, 0.0);
 // Atlas rows to the shade half, as a fraction of the texture height.
 uniform float shade_v = 0.5;
 
@@ -30,6 +34,6 @@ void fragment() {
 	vec4 shade = texture(TEXTURE, UV + vec2(0.0, shade_v));
 	// Hard edge. No smoothstep here, ever: the line between lit and unlit is
 	// the composition.
-	float s = step(0.5, texture(shadow_mask, world_px / level_px).r);
+	float s = step(0.5, texture(shadow_mask, (world_px - mask_origin) / level_px).r);
 	COLOR = vec4(mix(lit.rgb, shade.rgb, s), lit.a);
 }

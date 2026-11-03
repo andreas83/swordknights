@@ -12,17 +12,18 @@ extends DuelWorld
 ## WHAT IS CONTINUOUS AND WHAT IS NOT
 ## The GEOMETRY is continuous and always complete. `kind_at` takes a strip
 ## coordinate and answers from whichever zone owns it, and a fighter crossing a
-## boundary is not a special case anywhere in this file. Five 40x23 grids are
+## boundary is not a special case anywhere in this file. Five 30x23 grids are
 ## about four thousand integers, so there is nothing to gain by paging them and
 ## everything to lose: a simulation whose collision answers depended on what had
 ## been loaded would be a simulation that two peers could disagree about.
 ##
-## What IS streamed is the TileMapLayer — the rendering and the physics bodies —
-## and that is scripts/duel/zones_view.gd's job, not this file's.
+## What IS streamed is the drawing -- the tile layers, dressed and lit -- and
+## that is scripts/duel/zones_view.gd's job, not this file's. The physics a
+## fighter stands on is DuelMatch's ground, built whole.
 ##
 ## COORDINATES
 ##   cell     (0,0) is the top-left cell of zone 0; x runs across the whole
-##            strip, so cell x=41 is column 1 of zone 1.
+##            strip, so cell x=31 is column 1 of zone 1.
 ##   world    cell * TILE. A fighter's position is at its FEET, so the standing
 ##            surface of a solid cell at row r is y = r * TILE.
 ## Out-of-strip columns read as SOLID, the same convention AsciiLevel uses for
@@ -421,3 +422,43 @@ func describe() -> String:
 	return "%s — %d zones, %dx%d cells each" % [
 		name, zones.size(), zone_cols, zone_rows,
 	]
+
+
+## The strip, or columns [from_col, to_col) of it, as one AsciiLevel: the zones
+## stitched side by side, with their decoration marks, torches, gates and the
+## first seat's start mark carried across in the new coordinates.
+##
+## For drawing, never for the simulation. WorldDresser and SunShadow take an
+## AsciiLevel, and handing them the stitched strip is how a duel zone is
+## dressed and lit by the same code as every other level (scripts/duel/
+## zones_view.gd). The copy is built fresh and read-only to everything here.
+func as_level(from_col: int = 0, to_col: int = -1) -> AsciiLevel:
+	if to_col < 0:
+		to_col = cols()
+	from_col = clampi(from_col, 0, cols())
+	to_col = clampi(to_col, from_col, cols())
+
+	var rows_text := PackedStringArray()
+	rows_text.resize(zone_rows)
+	for zone: AsciiLevel in zones:
+		var lines := zone.to_text().split("\n")
+		for y: int in zone_rows:
+			var line: String = lines[y] if y < lines.size() else ""
+			rows_text[y] += line.rpad(zone_cols)
+	for y: int in zone_rows:
+		rows_text[y] = rows_text[y].substr(from_col, to_col - from_col)
+
+	var level := AsciiLevel.new()
+	level.parse("\n".join(rows_text))
+	level.name = name
+	var shift := Vector2i(from_col, 0)
+	var marks: Array[Dictionary] = props.duplicate()
+	marks.append({"kind": "exit", "cell": gates[0]})
+	marks.append({"kind": "exit", "cell": gates[1]})
+	for mark: Dictionary in marks:
+		var cell: Vector2i = mark["cell"]
+		if cell.x >= from_col and cell.x < to_col:
+			level.entities.append({"kind": mark["kind"], "cell": cell - shift})
+	var start: Vector2i = start_cells[0]
+	level.spawn_point = start - shift
+	return level

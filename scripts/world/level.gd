@@ -22,6 +22,10 @@ extends Node2D
 ##
 ## The logical queries read the tilemap's custom "kind" data, so a level hand
 ## edited in the Godot editor works exactly like a parsed or generated one.
+##
+## The duel's zones are drawn by this same path, a zone at a time: the layers,
+## the paint and the sun's material are the static helpers below, and
+## scripts/duel/zones_view.gd calls them rather than keeping a second copy.
 
 signal level_built(level: AsciiLevel)
 
@@ -41,9 +45,12 @@ var ambience: LevelAmbience
 ## Milliseconds the last shadow solve took. Read by tests and docs/world.md.
 var shadow_build_ms: float = 0.0
 
-var _tile_set: TileSet = preload("res://assets/tiles.tres")
-var _shader: Shader = preload("res://assets/world_shadow.gdshader")
-var _atlas_image: Image
+const TILE_SET: TileSet = preload("res://assets/tiles.tres")
+const SUN_SHADER: Shader = preload("res://assets/world_shadow.gdshader")
+
+## The atlas as an image, which the shadow solve reads tile opacity from. The
+## atlas does not change while the game runs, so it is read once.
+static var _atlas_image: Image
 
 
 func _ready() -> void:
@@ -72,9 +79,9 @@ func build(level: AsciiLevel) -> void:
 				tilemap.set_cell(Vector2i(x, y), 0, coords)
 
 	var dressing := WorldDresser.dress(data)
-	_paint(decor_map, dressing["mid"])
-	_paint(props_map, dressing["props"])
-	_paint(foreground_map, dressing["fore"])
+	paint(decor_map, dressing["mid"])
+	paint(props_map, dressing["props"])
+	paint(foreground_map, dressing["fore"])
 
 	_apply_sun(dressing["mid"], dressing["props"])
 
@@ -91,16 +98,24 @@ func _ensure_layer(layer: TileMapLayer, layer_name: String, collide: bool,
 		z: int) -> TileMapLayer:
 	if layer != null:
 		return layer
-	var made := TileMapLayer.new()
-	made.name = layer_name
-	made.tile_set = _tile_set
-	made.collision_enabled = collide
-	made.z_index = z
+	var made := new_layer(layer_name, collide, z)
 	add_child(made)
 	return made
 
 
-static func _paint(layer: TileMapLayer, cells: Dictionary) -> void:
+## One drawn plane on the shared tile set. Only a level's own terrain collides;
+## decoration has no collision to give, and a duel zone's terrain is drawn here
+## and collided with elsewhere.
+static func new_layer(layer_name: String, collide: bool, z: int) -> TileMapLayer:
+	var made := TileMapLayer.new()
+	made.name = layer_name
+	made.tile_set = TILE_SET
+	made.collision_enabled = collide
+	made.z_index = z
+	return made
+
+
+static func paint(layer: TileMapLayer, cells: Dictionary) -> void:
 	for cell: Vector2i in cells:
 		layer.set_cell(cell, 0, cells[cell])
 
@@ -108,27 +123,46 @@ static func _paint(layer: TileMapLayer, cells: Dictionary) -> void:
 ## Solves the cast shadow and hands the mask to the two planes that receive
 ## it. Everything here happens once per level build and nothing re-runs it.
 func _apply_sun(mid_decor: Dictionary, props: Dictionary) -> void:
-	if _atlas_image == null:
-		var atlas := _tile_set.get_source(0) as TileSetAtlasSource
-		if atlas == null or atlas.texture == null:
-			push_error("Level: tile set has no atlas texture; no shadows")
-			return
-		_atlas_image = atlas.texture.get_image()
+	var atlas := atlas_image()
+	if atlas == null:
+		return
 
 	var started := Time.get_ticks_usec()
-	var mask := SunShadow.build(data, mid_decor, TILE, _atlas_image, props)
+	var mask := SunShadow.build(data, mid_decor, TILE, atlas, props)
 	shadow_build_ms = float(Time.get_ticks_usec() - started) / 1000.0
 
-	var material := ShaderMaterial.new()
-	material.shader = _shader
-	material.set_shader_parameter("shadow_mask", mask)
-	material.set_shader_parameter("level_px", world_size())
-	material.set_shader_parameter(
-		"shade_v", float(Tiles.SHADE_ROW_OFFSET * TILE) / float(_atlas_image.get_height())
-	)
+	var material := sun_material(mask, Rect2(Vector2.ZERO, world_size()))
 	tilemap.material = material
 	decor_map.material = material
 	props_map.material = material
+
+
+## The atlas image the shadow solve reads, or null with an error.
+static func atlas_image() -> Image:
+	if _atlas_image == null:
+		var atlas := TILE_SET.get_source(0) as TileSetAtlasSource
+		if atlas == null or atlas.texture == null:
+			push_error("Level: tile set has no atlas texture; no shadows")
+			return null
+		_atlas_image = atlas.texture.get_image()
+	return _atlas_image
+
+
+## The world shader over a solved mask. `covers` is the rectangle of the world,
+## in pixels, the mask was solved for: the whole level from the origin for a
+## level, one duel zone and its western lead for a zone.
+static func sun_material(mask: Texture2D, covers: Rect2) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = SUN_SHADER
+	material.set_shader_parameter("shadow_mask", mask)
+	material.set_shader_parameter("mask_origin", covers.position)
+	material.set_shader_parameter("level_px", covers.size)
+	var atlas := atlas_image()
+	if atlas != null:
+		material.set_shader_parameter(
+			"shade_v", float(Tiles.SHADE_ROW_OFFSET * TILE) / float(atlas.get_height())
+		)
+	return material
 
 
 ## --- geometry queries ------------------------------------------------------

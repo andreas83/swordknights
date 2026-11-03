@@ -170,8 +170,40 @@ spawned or freed, and none of it is gameplay.
 A flock of birds crosses the far sky every thirty-one seconds
 (`ParallaxSky._draw_flock()`), in the sky's own crimson, a step darker.
 
+## The duel's zones
+
+The tug-of-war strip (`levels/duel_zones.txt`) is drawn by the same path, a
+zone at a time, by `scripts/duel/zones_view.gd`. Two things differ from a
+level, both because the strip is streamed and wider than one texture:
+
+- **Dressed once, whole.** `ZoneStrip.as_level()` stitches the five zones into
+  one `AsciiLevel`, and `WorldDresser` runs over that at setup. A terrace
+  across a seam gets one colonnade rather than two halves, and since the strip
+  mirrors about its centre, so does its dressing.
+- **Lit per zone.** The strip is 2400 px wide, over `MAX_MASK_PX`, so one mask
+  would be half resolution. Each zone's mask is solved over the zone plus
+  `ZoneView.SHADOW_LEAD` (8) columns to its west — shadows fall east and stop
+  after `REACH_TILES` — and the shader's `mask_origin` places it.
+  `tests/unit/test_zone_dressing.gd` compares each against a solve over
+  everything west of it, pixel for pixel; with no lead, two zones disagree.
+
+Measured at setup in the same container as the table above: about 15 ms to
+dress the strip and 130–180 ms to solve the five masks, once per match, before
+the countdown. Streaming a zone in writes cells and nothing else.
+
+In a duel the foreground plane is drawn at 55% (`ZoneView.FORE_ALPHA`): a
+column in front of the prince costs nothing, a column in front of the other
+fighter hides the stance you are reading.
+
+The room moods are **not** run on the duel's zones: `ZoneView` draws the
+architecture and the foreground the dresser returns and leaves its `props`
+plane out, as the art pass intended for the duelling ground.
+
 ## Tests
 
+- `tests/unit/test_zone_dressing.gd` — the duel's zones: the stitched strip is
+  the strip, every zone is dressed, the dressing mirrors, each zone's shadow
+  matches the whole strip's, and none of it reaches the simulation.
 - `tests/world_shadow_test.gd` — the shadow model: the sun's direction, what
   casts, the two sparing rules, that shipping levels are neither blank nor
   black, and that the mask fits a texture. The shade-twin lookup itself has no
