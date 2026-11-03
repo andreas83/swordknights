@@ -37,6 +37,14 @@ var level: Level
 var checkpoint := false
 ## The level's mechanism wiring (scripts/mechanisms/channel_bus.gd).
 var bus: ChannelBus
+## What this post remembers across a checkpoint respawn: the one dictionary
+## Game keeps for it, handed to whatever is placed there again, and emptied
+## only by a restart. A foe is put back whole at a respawn, which is right for
+## a guard and wrong for a boss whose won phases must stay won
+## (docs/campaign.md, "Decided by the owner"); what it writes here is the part
+## of it that outlives the body. Nothing else is kept, so nothing else can
+## leak from one attempt into the next.
+var memory: Dictionary = {}
 
 ## Bound by Game: a relic taken. Connect `collected` to it.
 var relic_taken := Callable()

@@ -154,6 +154,18 @@ static func specs() -> Dictionary:
 		# --- ambience ---
 		# Half the mix rate: the wind carries nothing above 5 kHz, so this
 		# halves the resident memory of the longest sample in the game.
+		# The kept sun (scripts/entities/eclipse.gd). One rising tone for every
+		# time the King gathers light: at pitch 1 it is the finale's 54-frame
+		# gather, at 2 a bolt's 27-frame charge, so the long tell is heard as
+		# the short one held twice as long.
+		"sun_gather": {
+			"peak": 0.62, "seed": 1601, "pitch_jitter": 0.0, "gain_jitter": 0.0,
+			"min_gap": 0.2,
+		},
+		"sunrise": {
+			"peak": 0.8, "seed": 1602, "pitch_jitter": 0.0, "gain_jitter": 0.0,
+			"min_gap": 2.0, "duck": 6.0,
+		},
 		"wind": {
 			"peak": 0.30, "db": -13.0, "seed": 1501, "rate": 11025, "loop": true,
 			"pitch_jitter": 0.0, "gain_jitter": 0.0, "min_gap": 0.0,
@@ -291,6 +303,8 @@ static func _render(name: String, rate: int, seed_value: int) -> PackedFloat32Ar
 		"pause_in": return _pause(rate, seed_value, true)
 		"pause_out": return _pause(rate, seed_value, false)
 		"wind": return _wind(rate, seed_value)
+		"sun_gather": return _sun_gather(rate, seed_value)
+		"sunrise": return _sunrise(rate, seed_value)
 		_: return PackedFloat32Array()
 
 
@@ -766,3 +780,61 @@ static func _wind(rate: int, seed_value: int) -> PackedFloat32Array:
 		"seed": seed_value + 101,
 	})
 	return Synth.crossfade_loop(buf, 0.9, rate)
+
+
+## Light being gathered: the disc rung once, then a sine and its fifth
+## climbing two octaves together over a swell, with a band of air rising under
+## them, and cut off clean a breath before the end -- the blow lands into
+## that silence. A rising pitch is the one thing in the catalogue that means
+## "about to".
+static func _sun_gather(rate: int, seed_value: int) -> PackedFloat32Array:
+	var length := 0.9
+	var rise := 0.8
+	var buf := Synth.buffer(length, rate)
+	Synth.add_pluck(buf, {
+		"rate": rate, "len": 0.5, "freq": 440.0, "decay": 0.3, "brightness": 0.7,
+		"amp": 0.5, "seed": seed_value, "release": 0.1,
+	})
+	Synth.add_tone(buf, {
+		"rate": rate, "len": rise, "freq": 220.0, "freq_end": 880.0, "sweep_curve": 1.6,
+		"env": "asr", "attack": 0.6, "release": 0.04, "amp": 0.3,
+	})
+	Synth.add_tone(buf, {
+		"rate": rate, "len": rise, "freq": 330.0, "freq_end": 1320.0, "sweep_curve": 1.6,
+		"shape": Synth.SHAPE_TRIANGLE, "env": "asr", "attack": 0.7, "release": 0.04,
+		"amp": 0.14,
+	})
+	Synth.add_noise(buf, {
+		"rate": rate, "len": rise, "cutoff": 900.0, "cutoff_end": 4200.0, "q": 1.4,
+		"env": "asr", "attack": 0.7, "release": 0.04, "amp": 0.12, "seed": seed_value + 1,
+	})
+	return buf
+
+
+## The kept sun let go: the relic's brass climbing the D chord, and under it
+## the chord itself swelling up out of nothing, its top voice reaching the
+## octave as the sun rises out of the Well, then letting go to silence. The
+## release before the door, and the one long sound the adventure makes.
+static func _sunrise(rate: int, seed_value: int) -> PackedFloat32Array:
+	var length := 2.8
+	var buf := Synth.buffer(length, rate)
+	var notes := [587.33, 739.99, 880.0, 1174.66]
+	for i: int in notes.size():
+		var start := float(i) * 0.09
+		Synth.add_pluck(buf, {
+			"rate": rate, "start": start, "len": 1.6 - start, "freq": float(notes[i]),
+			"decay": 1.0, "brightness": 0.8, "amp": 0.3, "seed": seed_value + i,
+			"release": 0.3,
+		})
+	var chord := [73.42, 110.0, 146.83, 220.0, 293.66]
+	for i: int in chord.size():
+		Synth.add_tone(buf, {
+			"rate": rate, "start": 0.15, "len": 2.3, "freq": float(chord[i]),
+			"shape": Synth.SHAPE_TRIANGLE if i < 2 else Synth.SHAPE_SINE,
+			"env": "asr", "attack": 0.8, "release": 1.2, "amp": 0.15,
+		})
+	Synth.add_tone(buf, {
+		"rate": rate, "start": 0.3, "len": 2.0, "freq": 369.99, "freq_end": 587.33,
+		"sweep_curve": 0.7, "env": "asr", "attack": 0.7, "release": 1.1, "amp": 0.12,
+	})
+	return buf

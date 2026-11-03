@@ -92,7 +92,8 @@ far side.
 **New tests should be GUT.** Both naming conventions are load-bearing: a file
 matching neither is silently skipped, which loses the coverage *and* leaves the
 build green. These match neither on purpose — support libraries
-(`duel_support.gd`, `fighter_support.gd`, `level_asserts.gd`, `cpu_support.gd`), GUT's pre-run
+(`duel_support.gd`, `fighter_support.gd`, `level_asserts.gd`, `cpu_support.gd`,
+`eclipse_support.gd`), GUT's pre-run
 hook (`death_watch.gd`), a live network harness (`net_live.gd`), and renderers
 for documentation images (`character_poses.gd`, `fighter_poses.gd`,
 `feel_frames.gd`, `ui_screens.gd`). A new file that is none of those and

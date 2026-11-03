@@ -91,6 +91,10 @@ var _checkpoint_cells: Array[Vector2i] = []
 var _route: Dictionary = {}
 var _returning: Array[Dictionary] = []
 var _down: Dictionary = {}
+# --- checkpoints --- post -> the memory handed to whatever stands there
+# (EntitySite.memory). Survives a respawn, as `_down` does; a restart empties
+# it, as it does `_down`.
+var _kept: Dictionary = {}
 # --- mechanisms --- the wiring of the mechanisms now placed. A new one every
 # time they are placed again, so one on its way out never hears the next.
 var _bus := ChannelBus.new()
@@ -308,6 +312,9 @@ func _site_for(mark: Dictionary, ordinal: int) -> EntitySite:
 	site.params = mark.get("params", {})
 	site.at = level.entity_world_position(site.cell)
 	site.post = EntitySite.post_of(site.kind, site.cell)
+	if not _kept.has(site.post):
+		_kept[site.post] = {}
+	site.memory = _kept[site.post]
 	site.ordinal = ordinal
 	site.level = level
 	site.checkpoint = _checkpoint_cells.has(site.cell)
@@ -577,6 +584,7 @@ func _restart() -> void:
 			_entities.remove_child(node)
 		node.queue_free()
 	_down.clear()
+	_kept.clear()
 	_bus = ChannelBus.for_level(level.data)
 	secrets.reseal() # --- secrets --- behind the wipe, like the rest
 	_spawn_entities(level.data)
@@ -702,6 +710,11 @@ func _update_hud(refill: bool = false) -> void:
 ##   persists is safe by construction: relics never touch passability, foes
 ##   being down only removes danger, and found secrets are proved never-a-trap
 ##   in every combination (audit_secrets).
+## - **A post can remember.** Whatever is placed at a post is handed the same
+##   dictionary every time (EntitySite.memory), and only a restart empties it.
+##   The guards ignore it; the Eclipse writes the phase he has lost there, so
+##   a death puts the prince back at the start of the phase he was in with
+##   every phase before it still won (scripts/entities/eclipse.gd).
 
 ## Torch cells in `data` that a character could respawn on and still finish.
 ##

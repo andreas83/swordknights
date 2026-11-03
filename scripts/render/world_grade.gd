@@ -19,8 +19,27 @@ extends CanvasModulate
 ## Presentation only, like MatchDusk: nothing here reaches the simulation. An
 ## afternoon level gets no grade at all -- `install()` adds nothing -- so the
 ## game as it always looked is the game as it always was, pixel for pixel.
+##
+## ## Put out for a while
+##
+## `dim` takes the hour further down, toward DARK times its own multiply, and
+## the lift goes up with it, so the lit group stays exactly as bright while the
+## city around it goes nearly black. The Eclipse's third phase is this: the
+## vault put out, with the prince, the corona, the crown and the torches lifted
+## out of it (docs/campaign.md, "How he uses the light"), so the dark never
+## hides what must be read. A grade is found by GROUP rather than handed round:
+## whoever darkens the world for a moment is presentation too, and has no
+## business holding Game's nodes.
+
+## Every installed grade joins this.
+const GROUP := &"world_grade"
+## The multiply at full `dim`, as a share of the hour's own. Not zero: the
+## lift is its inverse, and a little of the room should still be there.
+const DARK := 0.2
 
 var grade: Dictionary = {}
+## How far the world is put out past its hour: 0 none, 1 DARK.
+var dim := 0.0
 
 
 ## Grades `game`'s world and `sky` for `level`'s hour. Returns the node, or
@@ -33,6 +52,7 @@ static func install(game: Node, level: AsciiLevel, sky: ParallaxSky) -> WorldGra
 	node.name = "WorldGrade"
 	node.grade = grade
 	node.color = grade["world"]
+	node.add_to_group(GROUP)
 	if sky != null:
 		sky.dusk = float(grade["sky"])
 		sky.night = float(grade["night"])
@@ -45,7 +65,15 @@ func lift() -> Color:
 	return Color(1.0 / color.r, 1.0 / color.g, 1.0 / color.b)
 
 
+## The world's multiply with `dim` applied: the hour's own at 0.
+func multiply() -> Color:
+	var hour: Color = grade.get("world", Color.WHITE)
+	var k := lerpf(1.0, DARK, clampf(dim, 0.0, 1.0))
+	return Color(hour.r * k, hour.g * k, hour.b * k)
+
+
 func _process(_delta: float) -> void:
+	color = multiply()
 	var back := lift()
 	for node: Node in get_tree().get_nodes_in_group(MatchDusk.LIT):
 		var item := node as CanvasItem

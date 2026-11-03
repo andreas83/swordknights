@@ -1,0 +1,54 @@
+; The Eclipse
+;
+; The finale of The Last Light: the Vault of the kept sun, at the bottom of
+; the Sun Well (docs/campaign.md, "The Eclipse -- the boss"). Its own level
+; rather than the end of Chapter V's, so that its checkpoint is the
+; antechamber and the King's won phases outlive a death.
+;
+;! time night
+;
+; The antechamber (columns 1-5, rows 4-5): the start, and torch 4 one step
+; on. Its lip drops five tiles onto the west gallery -- no further, and too
+; far to climb back: once you are down, you are in it.
+;
+; The Vault (columns 6-31): a floor 26 tiles wide, which a 440-unit screen
+; holds whole and a 320-unit screen pans a little. A gallery slab five tiles
+; long at each end, four tiles up: high enough to plunge from, low enough to
+; grab back onto from the floor at its lip. A heart on each, taken once.
+; Under the dome the kept sun hangs on its chains over the King's post (K
+; over E, one column), the only light down here.
+;
+; The King's four phases, each a lesson from an earlier chapter:
+;   1. The Shield (the Bastion): he walks the floor lip to lip; plunge his
+;      crown from a gallery as he pauses under it.
+;   2. The Burning (the Glassbearer): volleys of sunbolts from under the
+;      sun; parry them back into his chest.
+;   3. The Eclipse (the Caracal): the vault goes dark and he pounces out of
+;      it; backstep the leap and cut him while he skids.
+;   4. The finale (the parry): the whole kept sun as one beam; parry it back
+;      into the disc.
+; A death comes back to the antechamber, with every phase already won kept.
+;
+; Dawn's door is in the east wall, under the east gallery. It stays shut
+; while he stands; when he falls the kept sun rises up the Well, and the
+; door fills with it and opens.
+;
+; Legend: E the Eclipse, K the kept sun; the rest as ever.
+;
+######################################
+#############            #############
+#########                    #########
+#######                        #######
+#                               ######
+# @ t                           ######
+######                          ######
+######            K             ######
+######                          ######
+######                          ######
+######  *                    *  ######
+###########                ###########
+######                          ######
+######                           #####
+######            E             D#####
+######################################
+######################################

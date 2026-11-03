@@ -57,6 +57,8 @@ const ENTITY_LEGEND := {
 	"D": "exit",
 	"t": "torch",
 	"p": "patrol",
+	"E": "eclipse", ## the King, the finale's boss: scripts/entities/eclipse.gd
+	"K": "kept_sun", ## the light he hoards, over his post: scripts/entities/kept_sun.gd
 	"L": "inscription", ## words cut into a wall; spawned by SecretKeeper
 }
 

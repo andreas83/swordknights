@@ -75,7 +75,8 @@ static func entries() -> Array[Dictionary]:
 		_entry("aqueduct", "III", "The Aqueduct", "The old stone is tired", "sunset"),
 		_entry("mirror_tower", "IV", "The Mirror Tower", "Catch the last light", "dusk"),
 		_entry("sun_well", "V", "The Sun Well", "What the city kept", "night"),
-		_entry("eclipse", "", "The Eclipse", "", "night", "", true),
+		_entry("eclipse", "", "The Eclipse", "", "night",
+			"res://levels/chapter_06_eclipse.txt", true),
 	]
 
 
