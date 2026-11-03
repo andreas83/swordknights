@@ -41,6 +41,10 @@ Ledge grabs happen automatically when you fall past a grabbable corner while
 moving into it; press up (or jump) to mantle, down to let go. Hold down and
 press jump to drop through a one-way platform.
 
+Every torch you reach on foot is a checkpoint: the flame flares, and a death
+sends you back there rather than to the start. Relics you picked up and guards
+you cut down stay that way; the clock keeps running.
+
 The local duel is a tug of war in the spirit of *Nidhogg*: one hit kills, and
 every kill sends the world scrolling toward the killer's gate. Both players
 share one keyboard; a Godot action cannot tell two gamepads apart, so these

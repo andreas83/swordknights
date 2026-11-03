@@ -24,6 +24,10 @@ const DEATH_SKIP_DELAY := 0.1
 # over and the frame appears to freeze for a fifth of a second.
 const IMPACT_COOLDOWN := 0.16
 const MENU_SCENE := "res://scenes/menu.tscn"
+# --- checkpoints --- how close, either side of a torch, the feet have to pass
+# to claim it. Wider than one frame of full-speed running, so it cannot be
+# skipped, and narrow enough that it reads as "I reached the torch".
+const CHECKPOINT_REACH := 10.0
 
 @export_file("*.txt") var level_path: String = "res://levels/level_01.txt"
 ## Set instead of level_path to run a generated level without writing a file.
@@ -39,6 +43,10 @@ var phase: Phase = Phase.PLAYING
 var elapsed: float = 0.0
 var relics: int = 0
 var relics_total: int = 0
+## --- checkpoints --- deaths since the level was (re)started, and where the
+## next one comes back. See _respawn().
+var deaths: int = 0
+var checkpoint := Vector2.ZERO
 
 var _death_timer: float = 0.0
 var _entities: Node2D
@@ -47,6 +55,11 @@ var _exit: ExitDoor
 # freeze is applied on the edge rather than re-asserted every frame.
 var _hitstopped := false
 var _impact_cooldown: float = 0.0
+# --- checkpoints --- torch cells proved to route to the exit, the guards'
+# posts in spawn order, and which of those posts have been cleared for good.
+var _checkpoint_cells: Array[Vector2i] = []
+var _guard_posts: Array[Vector2] = []
+var _guards_down: Dictionary = {}
 
 
 func _ready() -> void:
@@ -56,13 +69,15 @@ func _ready() -> void:
 		return
 
 	level.build(data)
+	_checkpoint_cells = checkpoint_cells(data)
 	_entities = Node2D.new()
 	_entities.name = "Entities"
 	add_child(_entities)
 	_spawn_entities(data)
 
 	player.level = level
-	player.respawn(level.spawn_world_position())
+	checkpoint = level.spawn_world_position()
+	player.respawn(checkpoint)
 	player.landed.connect(_on_landed)
 	player.hurt.connect(func(_h: int) -> void: camera.shake(2.4, 0.26))
 	player.died.connect(_on_died)
@@ -122,7 +137,7 @@ func _physics_process(delta: float) -> void:
 				and _death_timer <= DEATH_HOLD - DEATH_SKIP_DELAY
 			)
 			if (_death_timer <= 0.0 or skipped) and not Flow.busy():
-				Flow.wipe(self, _restart, Flow.Pace.FAST)
+				Flow.wipe(self, _respawn, Flow.Pace.FAST)
 		Phase.PLAYING:
 			elapsed += delta
 			# --- feel/flow (additive) --- spent in live frames, so a held
@@ -176,6 +191,7 @@ func _spawn_entities(data: AsciiLevel) -> void:
 	relics = 0
 	relics_total = 0
 	_exit = null
+	_guard_posts.clear()
 
 	for mark: Dictionary in data.entities:
 		var at: Vector2 = level.entity_world_position(mark["cell"])
@@ -194,16 +210,24 @@ func _spawn_entities(data: AsciiLevel) -> void:
 			"torch":
 				var torch := Torch.new()
 				torch.position = at
+				torch.checkpoint = _checkpoint_cells.has(mark["cell"])
 				_entities.add_child(torch)
 			"patrol":
-				var guard := Patrol.new()
-				guard.position = at
-				guard.level = level
-				# The raise is the warning, so it is heard as well as seen:
-				# a guard about to cut off-screen is still a guard about to cut.
-				guard.alerted.connect(func() -> void: GameAudio.cue("cloth", {"pitch": 0.7}))
-				guard.struck.connect(func() -> void: GameAudio.cue("sword", {"pitch": 0.78}))
-				_entities.add_child(guard)
+				_guard_posts.append(at)
+				_spawn_guard(_guard_posts.size() - 1)
+
+
+func _spawn_guard(post: int) -> void:
+	var guard := Patrol.new()
+	guard.position = _guard_posts[post]
+	guard.level = level
+	# The raise is the warning, so it is heard as well as seen:
+	# a guard about to cut off-screen is still a guard about to cut.
+	guard.alerted.connect(func() -> void: GameAudio.cue("cloth", {"pitch": 0.7}))
+	guard.struck.connect(func() -> void: GameAudio.cue("sword", {"pitch": 0.78}))
+	# --- checkpoints --- a guard cut down stays down after a respawn.
+	guard.defeated.connect(func() -> void: _guards_down[post] = true)
+	_entities.add_child(guard)
 
 
 func _resolve_interactions() -> void:
@@ -220,6 +244,8 @@ func _resolve_interactions() -> void:
 	for node: Node in _entities.get_children():
 		if node is Relic and body.intersects((node as Relic).bounds()):
 			(node as Relic).collect()
+		elif node is Torch:
+			_try_claim(node as Torch, body)
 		elif node is Patrol:
 			_resolve_guard(node as Patrol, body, attack, has_attack)
 
@@ -269,8 +295,11 @@ func _complete() -> void:
 func _restart() -> void:
 	for node: Node in _entities.get_children():
 		node.queue_free()
+	_guards_down.clear()
 	_spawn_entities(level.data)
-	player.respawn(level.spawn_world_position())
+	checkpoint = level.spawn_world_position()
+	deaths = 0
+	player.respawn(checkpoint)
 	camera.setup(player, level.world_size())
 	elapsed = 0.0
 	_death_timer = 0.0
@@ -309,6 +338,7 @@ func _on_landed(impact: float) -> void:
 
 func _on_died() -> void:
 	camera.shake(3.0, 0.4)
+	deaths += 1
 	_death_timer = DEATH_HOLD
 	phase = Phase.DYING
 	_update_hud()
@@ -316,3 +346,98 @@ func _on_died() -> void:
 
 func _update_hud() -> void:
 	hud.update_model(player.health, Tuning.MAX_HEALTH, relics, relics_total)
+
+
+## --- checkpoints ------------------------------------------------------------
+##
+## A death used to rebuild the whole level and put the character back on the
+## spawn. On the Sun Terrace that is a minute of replay for one missed jump; on
+## a 170-column Endless ruin it is two, and the player relearns nothing in
+## either: they just walk it again. The torches are already where a person
+## would put a checkpoint, on the ground and on the main line, and the
+## generator spaces them out, so a torch is a checkpoint, claimed by reaching
+## it on your feet. Three rules keep that from going wrong:
+##
+## - **Proved, not assumed.** A torch counts only if `LevelReachability` routes
+##   from its cell to the exit. A torch in a dead-end pit is still a torch; it
+##   is just never somewhere a death sends you back to, so a respawn can never
+##   be a soft lock.
+## - **Forward only.** Walking back past an earlier torch does not move the
+##   checkpoint backwards. "Further" is measured toward the exit door.
+## - **The level remembers what you did.** Relics you picked up stay picked up
+##   and guards you cut down stay down; a guard still standing goes back to its
+##   post, so the respawn is never into the middle of the fight that killed
+##   you. The clock keeps running: a death costs the seconds since the torch,
+##   which is the point, and nothing more.
+
+## Torch cells in `data` that a character could respawn on and still finish.
+##
+## Proved from the door backwards: each torch only has to reach one already
+## proved, so the searches are short hops between torches rather than one
+## crossing of the whole level per torch. On a 170-column ruin that is the
+## difference between about 300 ms of loading and under 100, on a desktop.
+static func checkpoint_cells(data: AsciiLevel) -> Array[Vector2i]:
+	var exit_x := 0.0
+	var torches: Array[Vector2i] = []
+	for mark: Dictionary in data.entities:
+		match String(mark["kind"]):
+			"exit":
+				exit_x = float((mark["cell"] as Vector2i).x)
+			"torch":
+				torches.append(mark["cell"])
+	torches.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return absf(float(a.x) - exit_x) < absf(float(b.x) - exit_x))
+
+	var proved: Array[Vector2i] = []
+	for cell: Vector2i in torches:
+		if bool(LevelReachability.verify_from(data, cell, proved)["ok"]):
+			proved.append(cell)
+	# Back in the level's own order, which is what a caller printing it expects.
+	var out: Array[Vector2i] = []
+	for mark: Dictionary in data.entities:
+		if proved.has(mark["cell"]) and String(mark["kind"]) == "torch":
+			out.append(mark["cell"])
+	return out
+
+
+func _try_claim(torch: Torch, body: Rect2) -> void:
+	if not torch.checkpoint or torch.claimed or not player.is_grounded():
+		return
+	if absf(body.get_center().x - torch.position.x) > CHECKPOINT_REACH:
+		return
+	# On the torch's own floor, not jumping past it or on a ledge above it.
+	if absf(player.position.y - torch.position.y) > 1.0:
+		return
+	if _progress(torch.position) <= _progress(checkpoint):
+		return
+	checkpoint = torch.position
+	torch.claim()
+	GameAudio.cue("relic", {"pitch": 0.72})
+
+
+## Larger is closer to the exit. Levels run toward their door, which is the one
+## direction every level in the game agrees on.
+func _progress(at: Vector2) -> float:
+	if _exit == null:
+		return at.x
+	return -absf(_exit.position.x - at.x)
+
+
+## Back on the last checkpoint, behind the cover of the wipe.
+func _respawn() -> void:
+	for node: Node in _entities.get_children():
+		if node is Patrol:
+			_entities.remove_child(node)
+			node.queue_free()
+	for post: int in _guard_posts.size():
+		if not _guards_down.has(post):
+			_spawn_guard(post)
+	player.respawn(checkpoint)
+	# The same grace as after a hit: a torch can stand on a guard's beat, and
+	# the first half-second back is for reading the room, not for paying again.
+	player.invulnerable = Tuning.INVULNERABLE_TIME
+	camera.setup(player, level.world_size())
+	_death_timer = 0.0
+	_impact_cooldown = 0.0
+	_set_phase(Phase.PLAYING)
+	_update_hud()

@@ -218,6 +218,16 @@ is that `tests/level_envelope_test.gd` verifies `levels/level_01.txt`, a level
 a person designed and played. A model that could not route through it would be
 too strict to generate anything good.
 
+### From somewhere other than the spawn
+
+`verify_from(level, start, proved)` runs the same proof from any standing
+cell, and treats arriving at any cell in `proved` as arriving at the door.
+`Game.checkpoint_cells()` uses it to decide which torches are checkpoints
+(see `docs/feel.md`): a place the player has stood is reachable by
+definition, but the exit is not necessarily reachable *from* it, and a
+checkpoint in a dead end would be a soft lock. Torches are proved from the
+door backwards, each one only as far as the last one proved.
+
 ### Retries
 
 `LevelGenerator.build()` verifies every candidate. A rejected one is retried

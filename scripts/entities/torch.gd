@@ -1,7 +1,7 @@
 class_name Torch
 extends Node2D
-## Pure decoration: a standing brazier whose fire is the one thing in the
-## world lit from inside rather than by the sun.
+## A standing brazier whose fire is the one thing in the world lit from
+## inside rather than by the sun -- and the level's checkpoint.
 ##
 ## ## Drawn the way the rest of the world is
 ##
@@ -25,16 +25,40 @@ const FLAME_FPS := 12.0
 const EMBERS := 3
 const EMBER_RISE := 16.0
 
+## ## The checkpoint
+##
+## `Game` decides which torches count (only those the exit can be reached
+## from) and when one is claimed; this file only shows it. The claim is a
+## single flare that dies back to the ordinary flame, not a torch that
+## changes state for good: every torch is already lit, and a level full of
+## torches that look "off" until touched would look unfinished. The flare is
+## the same flat discs at integer radii as the glow, so it steps like the
+## flame rather than swelling smoothly.
+
+## How long the flare takes to die back to the ordinary flame.
+const FLARE_TIME := 0.7
+
+## Set by Game when the exit is reachable from here.
+var checkpoint := false
+var claimed := false
+
 var _phase: float = 0.0
 var _time: float = 0.0
+var _flare: float = 0.0
 
 
 func _ready() -> void:
 	_phase = fmod(global_position.x * 0.37 + global_position.y * 0.11, TAU)
 
 
+func claim() -> void:
+	claimed = true
+	_flare = 1.0
+
+
 func _process(delta: float) -> void:
 	_time += delta
+	_flare = maxf(0.0, _flare - delta / FLARE_TIME)
 	queue_redraw()
 
 
@@ -43,6 +67,10 @@ func _draw() -> void:
 	var frame := floorf(_time * FLAME_FPS + _phase * 3.0)
 	var flicker := 0.78 + 0.12 * sin(frame * 1.7 + _phase) + 0.08 * sin(frame * 3.1)
 	var sway := roundf(sin(frame * 0.9 + _phase) * 1.0)
+	flicker *= 1.0 + _flare * _flare * 0.9
+	if _flare > 0.0:
+		draw_circle(Vector2(0.0, TOP + 1.0), roundf(18.0 * flicker),
+			Palette.with_alpha(Palette.LIGHT_SOFT, 0.12 * _flare))
 
 	_draw_glow(flicker)
 	_draw_stand()

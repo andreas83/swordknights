@@ -47,6 +47,26 @@ const MAX_STATES := 200000
 static func verify(level: AsciiLevel) -> Dictionary:
 	if level == null:
 		return _fail("no level data", 0)
+	return verify_from(level, level.spawn_point)
+
+
+## The same proof from somewhere other than the spawn: can a character standing
+## in `start` still reach the exit?
+##
+## This is what makes a checkpoint safe to respawn on. A place the player has
+## stood is reachable by definition, but nothing guarantees the exit is
+## reachable *from* it — a dead-end pit with a torch in it would turn every
+## death into a return to the same pit. `Game` adopts a torch as a checkpoint
+## only when this says yes, so a respawn can never be a soft lock.
+##
+## `proved` is cells already shown to reach the exit. Arriving at one of them
+## is as good as arriving at the door, because reachability is transitive, and
+## it turns a search across the whole level into a search to the next torch:
+## proving ten torches costs about what proving one used to.
+static func verify_from(level: AsciiLevel, start: Vector2i,
+		proved: Array[Vector2i] = []) -> Dictionary:
+	if level == null:
+		return _fail("no level data", 0)
 
 	var exits: Array[Vector2i] = []
 	for mark: Dictionary in level.entities:
@@ -57,7 +77,7 @@ static func verify(level: AsciiLevel) -> Dictionary:
 
 	var solver := Solver.new(level)
 
-	var spawn := level.spawn_point
+	var spawn := start
 	if not solver.is_stand(spawn.x, spawn.y):
 		return _fail("spawn %s is not standing on clear solid ground" % str(spawn), 0)
 
@@ -72,6 +92,7 @@ static func verify(level: AsciiLevel) -> Dictionary:
 		goals.append(cell + Vector2i.UP)
 	if not grounded_exit:
 		return _fail("exit door %s is not standing on clear solid ground" % str(exits[0]), 0)
+	goals.append_array(proved)
 
 	var report := solver.search(spawn, goals)
 	report["spawn"] = spawn

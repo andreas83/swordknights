@@ -226,7 +226,7 @@ calls `change_scene_to_file` directly — the menu, today.
 | pause → menu | `menu.tscn` | normal |
 | complete → replay | same level, rebuilt behind the cover | normal |
 | complete → menu | `menu.tscn` | normal |
-| death → respawn | same level, rebuilt behind the cover | **fast** |
+| death → respawn | the last torch, behind the cover | **fast** |
 
 ---
 
@@ -243,7 +243,7 @@ costs about half a second, and the half second is *readable*:
 | 0–300 ms | `DEATH_HOLD`. The beat. You can see what killed you |
 | from 100 ms | `DEATH_SKIP_DELAY` has passed — **jump skips the rest** |
 | 300–388 ms | the shadow sweeps in, fast pace |
-| **388 ms** | full cover. The level is rebuilt and the character respawned **here** |
+| **388 ms** | full cover. The character is respawned at the last torch **here** |
 | 388–427 ms | the hold: one covered frame, and nobody saw the teleport |
 | 427–537 ms | the shadow lifts off a character who has been playable since 388 ms |
 
@@ -251,6 +251,28 @@ The two numbers that matter are 300 ms of beat and the fact that the
 restart happens *behind* the cover rather than after it. The player is in
 control again while the shadow is still clearing, which is the thing that
 makes a retry feel instant rather than merely short.
+
+### Checkpoints: the torches
+
+Half a second of retry is worth nothing if the retry starts at the spawn. A
+missed jump near the end of the Sun Terrace used to cost the whole level; on
+a 170-column Endless ruin, two minutes of walking back. So **every torch is a
+checkpoint**, claimed by reaching it on your feet — the flame flares once, a
+low chime plays, and the next death comes back there.
+
+| Rule | Why |
+| --- | --- |
+| A torch counts only if `LevelReachability.verify_from()` routes from it to the exit | a torch in a dead-end pit would make every death a return to the same pit |
+| Forward only, measured toward the exit door | walking back past an earlier torch cannot cost you progress |
+| Relics stay picked up; guards you killed stay dead | the level remembers what you did |
+| Guards still standing go back to their posts | a respawn is never into the fight that killed you |
+| 0.9 s of grace (`INVULNERABLE_TIME`) after the respawn | a torch can stand on a guard's beat |
+| The clock keeps running | a death costs the seconds since the torch, and nothing more |
+
+`Game.checkpoint_cells()` proves the torches once per level, from the door
+backwards: each torch only has to reach one already proved, so ten torches
+cost about what one full-level search does. Jump-to-replay on the complete
+screen is still a full restart — clock, relics, guards and checkpoint.
 
 Completing a level is unchanged in substance — the overlay, the relic count,
 the time — except that jump-to-replay and sword-to-menu now wipe instead of
