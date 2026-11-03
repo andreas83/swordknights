@@ -1,0 +1,17 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://ddu2716h71vsv"
+path="res://.godot/imported/font_alcazar_display.fnt-194e92bb5f9de86ec0addaca0203cd70.fontdata"
+
+[deps]
+
+source_file="res://assets/font_alcazar_display.fnt"
+dest_files=["res://.godot/imported/font_alcazar_display.fnt-194e92bb5f9de86ec0addaca0203cd70.fontdata"]
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2

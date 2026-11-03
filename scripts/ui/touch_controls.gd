@@ -37,21 +37,22 @@ func _layout() -> void:
 	var view := _surface.size
 	if view == Vector2.ZERO:
 		view = get_viewport().get_visible_rect().size
-	# The safe area is reported in physical pixels; convert to our canvas units.
-	var window := Vector2(DisplayServer.window_get_size())
-	var scale := view.x / maxf(1.0, window.x)
-	var safe := DisplayServer.get_display_safe_area()
-	var inset_right := (window.x - (safe.position.x + safe.size.x)) * scale
-	var inset_bottom := (window.y - (safe.position.y + safe.size.y)) * scale
-	var inset_top := safe.position.y * scale
-
-	var right := view.x - inset_right
-	var bottom := view.y - inset_bottom
+	# UiLayout converts the physical-pixel safe area into canvas units and
+	# refuses to believe a desktop-sized inset, which used to push these
+	# buttons clean off the right edge of a windowed build.
+	var safe := UiLayout.safe(view)
+	var right := safe.end.x
+	var bottom := safe.end.y
 
 	_buttons = [
-		{"action": "jump", "label": "JUMP", "at": Vector2(right - 40.0, bottom - 38.0), "r": 24.0},
-		{"action": "attack", "label": "SWORD", "at": Vector2(right - 88.0, bottom - 26.0), "r": 19.0},
-		{"action": "pause", "label": "II", "at": Vector2(right - 16.0, inset_top + 16.0), "r": 11.0},
+		{"id": "jump", "action": "jump", "label": "JUMP", "mark": "",
+			"at": Vector2(right - 34.0, bottom - 34.0), "r": 24.0},
+		{"id": "attack", "action": "attack", "label": "SWORD", "mark": "",
+			"at": Vector2(right - 82.0, bottom - 22.0), "r": 19.0},
+		{"id": "pause", "action": "pause", "label": "", "mark": "pause",
+			"at": Vector2(right - 12.0, safe.position.y + 12.0), "r": 10.0},
+		{"id": "mute", "action": "", "label": "", "mark": "sound",
+			"at": Vector2(right - 34.0, safe.position.y + 12.0), "r": 10.0},
 	]
 	_surface.queue_redraw()
 
@@ -73,8 +74,13 @@ func _on_touch(event: InputEventScreenTouch) -> void:
 		_surface.visible = true
 		var button := _button_at(point)
 		if not button.is_empty():
-			_held[event.index] = button["action"]
-			_press(button["action"])
+			if String(button["id"]) == "mute":
+				# Not an input action: the only touch-reachable way to silence
+				# the game, short of the settings screen.
+				AudioDirector.toggle_mute()
+			else:
+				_held[event.index] = button["action"]
+				_press(button["action"])
 		elif _stick_index < 0 and point.x < _surface.size.x * 0.55:
 			_stick_index = event.index
 			_stick_origin = point
@@ -161,23 +167,51 @@ func _to_canvas(screen_position: Vector2) -> Vector2:
 
 
 func draw_surface() -> void:
-	var font := ThemeDB.fallback_font
 	for button: Dictionary in _buttons:
 		var at: Vector2 = button["at"]
 		var r: float = button["r"]
-		var held: bool = Input.is_action_pressed(button["action"])
+		var action := String(button["action"])
+		var held := action != "" and Input.is_action_pressed(action)
 		_surface.draw_circle(at, r, Palette.with_alpha(Palette.INK, 0.4 if held else 0.22))
 		_surface.draw_arc(at, r, 0.0, TAU, 32,
 			Palette.with_alpha(Palette.LIGHT_SOFT, 0.85 if held else 0.45), 1.2)
-		var label: String = button["label"]
-		var font_size: int = 7 if r > 14.0 else 6
-		var width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-		_surface.draw_string(font, at + Vector2(-width * 0.5, font_size * 0.35), label,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size,
-			Palette.with_alpha(Palette.PAPER, 1.0 if held else 0.7))
+
+		var ink := Palette.with_alpha(Palette.PAPER, 1.0 if held else 0.75)
+		var label := String(button["label"])
+		if label != "":
+			UiFont.draw_text(_surface, label,
+				Vector2(at.x, at.y - UiFont.cap(UiFont.Cut.MICRO) * 0.5),
+				UiFont.Cut.MICRO, ink, UiFont.Align.CENTER)
+		match String(button["mark"]):
+			"pause":
+				_surface.draw_rect(Rect2(at.x - 3.0, at.y - 4.0, 2.0, 8.0), ink)
+				_surface.draw_rect(Rect2(at.x + 1.0, at.y - 4.0, 2.0, 8.0), ink)
+			"sound":
+				_draw_sound_mark(at, ink)
+			_:
+				pass
 
 	if _stick_index >= 0:
 		var delta := _stick_point - _stick_origin
 		var knob := _stick_origin + delta.limit_length(STICK_RADIUS)
 		_surface.draw_circle(_stick_origin, STICK_RADIUS, Palette.with_alpha(Palette.INK, 0.18))
 		_surface.draw_circle(knob, 11.0, Palette.with_alpha(Palette.LIGHT_SOFT, 0.55))
+
+
+## A horn, and a bar struck through it when the game is silent. Drawn rather
+## than lettered: "SOUND" and "MUTED" are the same width at five pixels and
+## nobody reads a label on a button they are tapping with a thumb.
+func _draw_sound_mark(at: Vector2, ink: Color) -> void:
+	_surface.draw_colored_polygon(PackedVector2Array([
+		Vector2(at.x - 4.0, at.y - 2.0), Vector2(at.x - 1.0, at.y - 2.0),
+		Vector2(at.x + 2.0, at.y - 5.0), Vector2(at.x + 2.0, at.y + 5.0),
+		Vector2(at.x - 1.0, at.y + 2.0), Vector2(at.x - 4.0, at.y + 2.0),
+	]), ink)
+	if AudioDirector.settings.muted:
+		_surface.draw_line(Vector2(at.x - 5.0, at.y + 5.0),
+			Vector2(at.x + 5.0, at.y - 5.0), Palette.CLOTH, 1.6)
+	else:
+		for i: int in 2:
+			var radius := 4.0 + i * 2.5
+			_surface.draw_arc(Vector2(at.x + 2.0, at.y), radius,
+				-PI * 0.3, PI * 0.3, 8, Palette.with_alpha(ink, 0.8 - i * 0.25), 1.0)
