@@ -53,6 +53,12 @@ func _apply_settings() -> void:
 		"display/window/handheld/orientation": 4, # sensor landscape
 		"display/window/vsync/vsync_mode": 1,
 
+		# Android's exporter refuses to export at all without this -- an error
+		# it prints with an empty reason when run headless. The game's textures
+		# are pixel art imported lossless, so it changes nothing they look like;
+		# it only lets the mobile exports run.
+		"rendering/textures/vram_compression/import_etc2_astc": true,
+
 		# The simulation must advance in constant slices so jump arcs are
 		# identical on 60 Hz and 120 Hz devices, and so lockstep netplay stays
 		# in step. Everything gameplay-related lives in _physics_process.

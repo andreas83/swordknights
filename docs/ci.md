@@ -170,6 +170,34 @@ Two files, twelve tests, which exist to prove the harness works end to end:
 
 ## The workflows
 
+### `android.yml` — a debug APK on every push to `main`
+
+For trying the game on a phone. Exports the Android preset as a **debug**
+build on every push to `main` (documentation-only pushes aside) and on demand
+from the Actions tab, signs it with the standard Android debug identity
+generated inside the run, verifies the signature with `apksigner`, and uploads
+it as the run's artifact `swordknights-debug-apk`, kept fourteen days. It needs
+no secrets. To install: open the run, download the artifact, unzip, open the
+`.apk` on the phone and allow installing from that app. A debug build cannot be
+installed over a release build of the same package, or the reverse.
+
+Three things every export job needed, found when this one was first run — the
+web deploy had been failing on every push since the pipeline was written:
+
+- **Template directory name.** Godot looks for its export templates under
+  `export_templates/4.5.1.stable` — a dot before the suffix — and writes the
+  same into `version.txt`. `setup-godot` installed them under the dashed
+  release name, `4.5.1-stable`, and compared the two spellings.
+- **ETC2/ASTC.** Godot's Android exporter refuses to export unless
+  `rendering/textures/vram_compression/import_etc2_astc` is on, and headless
+  it says so with an empty list of reasons. It is set in
+  `tools/configure_project.gd`; the pixel art is imported lossless, so it
+  changes nothing on screen.
+- **SDK and JDK paths.** These live in Godot's editor settings, not the
+  project, and on a fresh runner Godot guesses `~/Android/Sdk`. Both Android
+  workflows write `ANDROID_HOME` and `JAVA_HOME` into the editor settings after
+  the import step.
+
 ### `ci.yml` — on push to `main` and on every pull request
 
 Two jobs, run in parallel.
