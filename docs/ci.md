@@ -117,8 +117,10 @@ far better failure messages. Once `tests/` holds no `*_test.gd` files, phase
 two becomes a no-op and the block in `run_tests.sh` can go.
 
 Selection is configured once, in `.gutconfig.json` at the repository root, so
-the script, the raw runner and the editor panel all agree on what the suite is.
-Prefer adding a file over editing that config.
+the script and the raw runner agree on what the suite is. The editor's GUT
+panel keeps its own settings and does not read that file: set its pre-run hook
+to `res://tests/death_watch.gd` there, or the tests that announce a death fail
+in the panel. Prefer adding a file over editing that config.
 
 ### A worked example
 
