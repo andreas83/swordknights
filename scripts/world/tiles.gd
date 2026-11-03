@@ -6,6 +6,19 @@ extends RefCounted
 ## Levels are authored as ASCII art; this is the legend. Keeping the atlas
 ## coordinates here too means tools/build_tileset.gd and the level builder can
 ## never drift apart.
+##
+## There are three kinds of glyph:
+##
+##   LEGEND         terrain — fills the cell, may collide, is queried by the
+##                  character (solid, platform, spikes, water, ladder).
+##   ENTITY_LEGEND  a thing that spawns in the cell; the cell stays empty.
+##   DECOR_LEGEND   architecture — a cornice, an arch, a railing. Never
+##                  collides and is never queried, so a level's difficulty
+##                  cannot change by decorating it. The cell stays empty.
+##
+## The atlas has a lit half and a shade half in register: the shade twin of a
+## tile is SHADE_ROW_OFFSET rows below it, which is how the world shader picks
+## between them. See tools/generate_tiles_png.py and docs/world.md.
 
 enum Kind {
 	EMPTY = 0,
@@ -37,7 +50,50 @@ const ENTITY_LEGEND := {
 	"p": "patrol",
 }
 
-## Atlas coordinates — must match the NAMES order in generate_tiles_png.py.
+## Architecture marks. The value is the decoration id WorldDresser plants.
+## Each leaves the tile empty, so marking a level up cannot change what the
+## character can and cannot reach.
+const DECOR_LEGEND := {
+	"A": "arch", ## anchor: bottom-left cell of a 2x3 opening
+	"n": "niche",
+	"|": "column", ## a vertical run; the ends become capital and base
+	"_": "cornice",
+	"b": "balustrade",
+	"V": "planter",
+	"f": "fountain", ## anchor: left cell of a 2-wide basin
+	"F": "frieze",
+	"B": "banner",
+	"r": "fore_rail",
+	"I": "fore_column",
+	"S": "fore_soffit_l",
+	"s": "fore_soffit_r",
+	"c": "fore_cloth", ## a vertical run; the last cell becomes the fringe
+}
+
+## Decorations that STAND ON a surface rather than being carved into it.
+## scripts/render/sun_shadow.gd treats these as their own body, so a column
+## throws a shadow across the terrace it is standing on. Everything not listed
+## is part of the stone it is drawn over — a cornice or a frieze must not
+## shade the floor it belongs to, or every gold cap in the game goes crimson.
+const STANDING_DECOR := [
+	"column_shaft", "column_cap", "column_base",
+	"balustrade", "planter", "fountain_l", "fountain_r", "banner",
+]
+
+## Which plane a decoration is drawn on. Anything not listed here is
+## mid-ground: behind the character, in front of the terrain.
+const FOREGROUND_DECOR := [
+	"fore_rail", "fore_column", "fore_soffit_l", "fore_soffit_r",
+	"fore_cloth", "fore_cloth_tail",
+]
+
+## --- atlas -----------------------------------------------------------------
+## Must match the NAMES order in tools/generate_tiles_png.py.
+
+const ATLAS_COLUMNS := 16
+## The shade twin of a tile is this many rows further down the atlas.
+const SHADE_ROW_OFFSET := 2
+
 const ATLAS_SOLID_CAPPED := Vector2i(0, 0)
 const ATLAS_SOLID_CAPPED_LIT := Vector2i(1, 0)
 const ATLAS_SOLID_BURIED := Vector2i(2, 0)
@@ -46,9 +102,46 @@ const ATLAS_PLATFORM := Vector2i(4, 0)
 const ATLAS_SPIKES := Vector2i(5, 0)
 const ATLAS_WATER := Vector2i(6, 0)
 const ATLAS_LADDER := Vector2i(7, 0)
-const ATLAS_BACKDROP := Vector2i(0, 1)
+const ATLAS_BACKDROP := Vector2i(8, 0)
 
-const ALL_ATLAS_COORDS: Array[Vector2i] = [
+## Architecture. Never collides, so these never appear in kind_of_atlas().
+const DECOR_ATLAS := {
+	"cornice": Vector2i(9, 0),
+	"balustrade": Vector2i(10, 0),
+	"column_shaft": Vector2i(11, 0),
+	"column_cap": Vector2i(12, 0),
+	"column_base": Vector2i(13, 0),
+	"planter": Vector2i(14, 0),
+	"niche": Vector2i(15, 0),
+	"arch_top_l": Vector2i(0, 1),
+	"arch_top_r": Vector2i(1, 1),
+	"arch_mid_l": Vector2i(2, 1),
+	"arch_mid_r": Vector2i(3, 1),
+	"arch_leg_l": Vector2i(4, 1),
+	"arch_leg_r": Vector2i(5, 1),
+	"fountain_l": Vector2i(6, 1),
+	"fountain_r": Vector2i(7, 1),
+	"frieze": Vector2i(8, 1),
+	"banner": Vector2i(9, 1),
+	"fore_rail": Vector2i(10, 1),
+	"fore_column": Vector2i(11, 1),
+	"fore_soffit_l": Vector2i(12, 1),
+	"fore_soffit_r": Vector2i(13, 1),
+	"fore_cloth": Vector2i(14, 1),
+	"fore_cloth_tail": Vector2i(15, 1),
+}
+
+## Decorations that have a handed twin. Mirroring a level's dressing has to
+## swap these or the arches come out inside-out.
+const MIRROR_PAIRS := {
+	"arch_top_l": "arch_top_r",
+	"arch_mid_l": "arch_mid_r",
+	"arch_leg_l": "arch_leg_r",
+	"fountain_l": "fountain_r",
+	"fore_soffit_l": "fore_soffit_r",
+}
+
+const TERRAIN_ATLAS_COORDS: Array[Vector2i] = [
 	ATLAS_SOLID_CAPPED,
 	ATLAS_SOLID_CAPPED_LIT,
 	ATLAS_SOLID_BURIED,
@@ -71,6 +164,14 @@ const MASK_ONE_WAY := 2
 const CUSTOM_DATA_KIND := "kind"
 
 
+## Every tile the TileSet must carry: terrain first, then architecture.
+static func all_atlas_coords() -> Array[Vector2i]:
+	var out: Array[Vector2i] = TERRAIN_ATLAS_COORDS.duplicate()
+	for name: String in DECOR_ATLAS:
+		out.append(DECOR_ATLAS[name])
+	return out
+
+
 static func kind_of_atlas(coords: Vector2i) -> Kind:
 	match coords:
 		ATLAS_SOLID_CAPPED, ATLAS_SOLID_CAPPED_LIT, ATLAS_SOLID_BURIED, ATLAS_SOLID_BURIED_LIT:
@@ -91,3 +192,26 @@ static func kind_of_atlas(coords: Vector2i) -> Kind:
 
 static func is_deadly(kind: Kind) -> bool:
 	return kind == Kind.SPIKES or kind == Kind.WATER
+
+
+static func is_foreground(decor_id: String) -> bool:
+	return FOREGROUND_DECOR.has(decor_id)
+
+
+## The atlas tile that is this one seen in a mirror, or the tile itself.
+static func mirror_atlas(coords: Vector2i) -> Vector2i:
+	for left: String in MIRROR_PAIRS:
+		var right: String = MIRROR_PAIRS[left]
+		if DECOR_ATLAS[left] == coords:
+			return DECOR_ATLAS[right]
+		if DECOR_ATLAS[right] == coords:
+			return DECOR_ATLAS[left]
+	return coords
+
+
+static func standing_atlas_coords() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for id: String in STANDING_DECOR:
+		if DECOR_ATLAS.has(id):
+			out.append(DECOR_ATLAS[id])
+	return out

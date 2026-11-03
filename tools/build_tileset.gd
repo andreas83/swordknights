@@ -6,6 +6,11 @@ extends SceneTree
 ## and the custom "kind" data all derive from scripts/world/tiles.gd and cannot
 ## drift away from the gameplay queries that read them.
 ##
+## Architecture tiles are in the same atlas and go through the same loop: they
+## report Kind.EMPTY from Tiles.kind_of_atlas(), so they are created with no
+## collision and no queried kind. Decorating a level therefore cannot change
+## what the character can reach.
+##
 ##     python3 tools/generate_tiles_png.py
 ##     godot --headless --script tools/build_tileset.gd
 
@@ -42,9 +47,27 @@ func _initialize() -> void:
 	var source := TileSetAtlasSource.new()
 	source.texture = load(TEXTURE)
 	source.texture_region_size = TILE_SIZE
+	# Padding OFF, and this is load-bearing rather than a tidy-up.
+	#
+	# With it on (the default) Godot does not hand the atlas to the GPU at
+	# all. It builds a private copy containing only the tiles that were
+	# create_tile()d, each surrounded by a pixel of bleed, and that copy is
+	# what a shader's TEXTURE samples. The atlas's bottom half is the shade
+	# twin of every tile and is deliberately NOT created as placeable tiles,
+	# so with padding on it is simply absent: assets/world_shadow.gdshader
+	# fetched transparent black for every shadowed pixel and the world went
+	# pure black wherever a shadow fell. Nothing errors; it just renders
+	# wrong, which is why it is written down here.
+	#
+	# The padding only exists to stop neighbouring tiles bleeding into each
+	# other under linear filtering. This project is nearest-filtered
+	# throughout (project.godot: default_texture_filter=0), so it buys
+	# nothing and costs the shade half.
+	source.use_texture_padding = false
 	tile_set.add_source(source, 0)
 
-	for coords: Vector2i in Tiles.ALL_ATLAS_COORDS:
+	var coords_list := Tiles.all_atlas_coords()
+	for coords: Vector2i in coords_list:
 		source.create_tile(coords)
 		var data := source.get_tile_data(coords, 0)
 		var kind := Tiles.kind_of_atlas(coords)
@@ -67,5 +90,5 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	print("wrote %s — %d tiles, 2 physics layers" % [OUTPUT, Tiles.ALL_ATLAS_COORDS.size()])
+	print("wrote %s — %d tiles, 2 physics layers" % [OUTPUT, coords_list.size()])
 	quit(0)
