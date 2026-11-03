@@ -55,7 +55,8 @@ const RISE := 1
 
 ## How far a shadow reaches before it is cut, in tiles of horizontal travel.
 ## Unbounded shadows are physically honest and look terrible: a six-tile wall
-## would black out half a terrace. This is the one art constant in the model.
+## would black out half a terrace. This is the one art constant in the model,
+## and the afternoon's: a lower sun reaches further (TimeOfDay.light_of()).
 const REACH_TILES := 3.0
 
 ## Above this, the mask is solved and stored at half resolution. GL ES3
@@ -87,8 +88,13 @@ static var _mask_cache := {}
 ## mid-ground decoration drawn there; `props` is the same for the props plane
 ## drawn over it. Both are stamped, so an urn in front of a cornice adds its
 ## shape without taking the cornice's away.
+##
+## The light is the level's own hour (TimeOfDay.light_of()): how far the
+## shadows reach, a horizon row below which everything is in the far city's
+## shadow, and at night no sun at all -- the mask all shade, and no solve.
 static func build(level: AsciiLevel, decor: Dictionary, tile: int,
 		atlas: Image, props: Dictionary = {}) -> ImageTexture:
+	var light := TimeOfDay.light_of(level)
 	var width := level.cols * tile
 	var height := level.rows * tile
 	var step := 1
@@ -97,6 +103,8 @@ static func build(level: AsciiLevel, decor: Dictionary, tile: int,
 
 	var mask_w := maxi(1, width / step)
 	var mask_h := maxi(1, height / step)
+	if not bool(light["sun"]):
+		return _sunless(mask_w, mask_h, step)
 	var clock := Time.get_ticks_usec()
 	var masks := _cached_masks(atlas, tile)
 	timings["atlas"] = _lap(clock)
@@ -116,8 +124,11 @@ static func build(level: AsciiLevel, decor: Dictionary, tile: int,
 	timings["depth"] = _lap(clock)
 
 	clock = Time.get_ticks_usec()
-	var shade := _sweep(geom, depth, mask_w, mask_h, first, step, tile)
+	var shade := _sweep(geom, depth, mask_w, mask_h, first, step, tile, float(light["reach"]))
 	timings["sweep"] = _lap(clock)
+	var horizon := int(light["horizon"])
+	if horizon >= 0:
+		_below_horizon(shade, mask_w, mask_h, horizon * tile / step)
 
 	clock = Time.get_ticks_usec()
 	var image := Image.create_from_data(mask_w, mask_h, false, Image.FORMAT_L8, shade)
@@ -127,6 +138,25 @@ static func build(level: AsciiLevel, decor: Dictionary, tile: int,
 	timings["size"] = Vector2i(mask_w, mask_h)
 	timings["step"] = step
 	return texture
+
+
+## Night: every pixel in shade, and nothing solved -- which is also half a
+## second saved on a mask as large as Chapter V's.
+static func _sunless(mask_w: int, mask_h: int, step: int) -> ImageTexture:
+	var shade := PackedByteArray()
+	shade.resize(mask_w * mask_h)
+	shade.fill(SHADOW_BIT)
+	var image := Image.create_from_data(mask_w, mask_h, false, Image.FORMAT_L8, shade)
+	last_mask = image
+	timings = {"size": Vector2i(mask_w, mask_h), "step": step, "sunless": true}
+	return ImageTexture.create_from_image(image)
+
+
+## Everything from mask row `from` down is in the far city's shadow.
+static func _below_horizon(shade: PackedByteArray, mask_w: int, mask_h: int, from: int) -> void:
+	for y: int in range(clampi(from, 0, mask_h), mask_h):
+		for x: int in mask_w:
+			shade[y * mask_w + x] = SHADOW_BIT
 
 
 static func _lap(from_usec: int) -> float:
@@ -296,13 +326,14 @@ static func _run_depth(geom: PackedByteArray, standing: PackedByteArray, mask_w:
 ## --- step 3: the sweep ------------------------------------------------------
 
 static func _sweep(geom: PackedByteArray, depth: PackedByteArray, mask_w: int,
-		mask_h: int, first: int, step: int, tile: int) -> PackedByteArray:
+		mask_h: int, first: int, step: int, tile: int,
+		reach_tiles: float = REACH_TILES) -> PackedByteArray:
 	var shade := PackedByteArray()
 	shade.resize(mask_w * mask_h)
 
 	# Shadow length, counted in lane steps. Each step travels RUN pixels
 	# across, so the reach in tiles divides out by that.
-	var reach := int(REACH_TILES * float(tile) / float(RUN * step))
+	var reach := int(reach_tiles * float(tile) / float(RUN * step))
 
 	# Lanes are x - RUN*y. Walking a lane means x += RUN, y += 1, so a lane is
 	# fixed by where it crosses y = 0: every integer x from -RUN*(mask_h-1)

@@ -49,6 +49,11 @@ var _spent := false
 
 
 ## Where it is, in world units, centred on its position.
+## A shot is a danger, so the hour never dims it (WorldGrade).
+func _ready() -> void:
+	add_to_group(MatchDusk.LIT)
+
+
 func rect() -> Rect2:
 	return Rect2(global_position - size * 0.5, size)
 

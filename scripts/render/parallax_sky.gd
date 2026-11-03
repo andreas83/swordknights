@@ -17,8 +17,11 @@ var camera: Camera2D
 
 ## 0 at noon, 1 at the last room's dusk: the sky goes to ink, the sun sinks to
 ## the horizon and burns, and the city becomes a silhouette in front of it.
-## Driven by MatchDusk; nothing else sets it.
+## Driven by MatchDusk in the duel and by WorldGrade from a level's hour.
 var dusk: float = 0.0
+## 0 by day, 1 at night: the bands go on from dusk to Palette.NIGHT_SKY_STOPS
+## and there is no sun. Set by WorldGrade; the duel never does.
+var night: float = 0.0
 
 const _DEPTHS: Array[float] = [0.12, 0.26, 0.46]
 ## A flock crosses the far sky once every FLOCK_EVERY seconds and takes
@@ -82,7 +85,8 @@ func _draw() -> void:
 	_draw_sky(view)
 
 	var cam := camera.global_position if camera != null else Vector2.ZERO
-	_draw_sun(view, cam)
+	if shows_sun():
+		_draw_sun(view, cam)
 	_draw_flock(view, cam)
 
 	var colors: Array[Color] = [
@@ -93,7 +97,8 @@ func _draw() -> void:
 		Palette.MID.lerp(Palette.INK, dusk),
 	]
 	var haze := Palette.with_alpha(Palette.MID, 0.35).lerp(
-		Palette.with_alpha(Palette.SHADOW_WARM, 0.5), dusk)
+		Palette.with_alpha(Palette.SHADOW_WARM, 0.5), dusk).lerp(
+		Palette.with_alpha(Palette.SHADOW_PIT, 0.55), night)
 
 	for index: int in _layers.size():
 		var depth := _DEPTHS[index]
@@ -120,9 +125,15 @@ func _draw_sky(view: Vector2) -> void:
 		draw_rect(Rect2(0.0, top, view.x, bottom - top + 1.0), _band(i))
 
 
-## The colour of sky band `index`, between noon and dusk.
+## The colour of sky band `index`, between noon and dusk, and on to night.
 func _band(index: int) -> Color:
-	return Palette.SKY_STOPS[index].lerp(Palette.DUSK_SKY_STOPS[index], dusk)
+	var day := Palette.SKY_STOPS[index].lerp(Palette.DUSK_SKY_STOPS[index], dusk)
+	return day.lerp(Palette.NIGHT_SKY_STOPS[index], night)
+
+
+## Whether the disc is drawn: not at night.
+func shows_sun() -> bool:
+	return night < 0.5
 
 
 ## The sky colour behind height `y`, for cutting the sun's heat stripes.

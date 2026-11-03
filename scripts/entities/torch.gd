@@ -54,6 +54,8 @@ var _flare: float = 0.0
 
 func _ready() -> void:
 	_phase = fmod(global_position.x * 0.37 + global_position.y * 0.11, TAU)
+	# A light, so the hour never dims it (WorldGrade).
+	add_to_group(MatchDusk.LIT)
 
 
 ## --- the entity protocol (scripts/entities/entity_registry.gd) ---------------

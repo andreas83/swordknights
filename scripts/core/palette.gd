@@ -50,6 +50,9 @@ const SKY_STOPS: Array[Color] = [SHADOW_DEEP, SHADOW, MID, LIGHT_WARM]
 const SKY_OFFSETS: Array[float] = [0.0, 0.45, 0.78, 1.0]
 ## The same bands at the last room's dusk: ink overhead, fire at the horizon.
 const DUSK_SKY_STOPS: Array[Color] = [INK, INK, SHADOW_DEEP, SHADOW_WARM]
+## And at night: ink all the way down to the last of the glow on the horizon
+## (TimeOfDay, docs/campaign.md "Time of day").
+const NIGHT_SKY_STOPS: Array[Color] = [INK, INK, INK, SHADOW_PIT]
 
 
 static func with_alpha(color: Color, alpha: float) -> Color:

@@ -268,6 +268,10 @@ xvfb-run -a godot --path . --rendering-driver opengl3 \
   --scene res://scenes/game.tscn --out /tmp/shots --shots 1,3,6 --hold move_right
 ```
 
+`--level <file>` plays another level in the game scene, and `--time <stop>`
+plays it at an hour of the time-of-day grade (`docs/world.md`, *Time of day*)
+without editing the file.
+
 ## Documentation
 
 | | |

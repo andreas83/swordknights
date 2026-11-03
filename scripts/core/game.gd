@@ -146,6 +146,8 @@ func _ready() -> void:
 	camera.setup(player, level.world_size())
 	sky.camera = camera
 	sky.seed_value = hash(data.name)
+	# The level's hour, `;! time`: nothing at all for an afternoon.
+	WorldGrade.install(self, data, sky)
 
 	hud.show_title(data.name)
 	_update_hud()

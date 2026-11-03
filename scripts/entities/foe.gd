@@ -104,11 +104,13 @@ var target_rect := Rect2()
 
 ## On no collision layer, so the prince's body passes through and every
 ## meeting is the referee's, by rectangles; standing on the terrain's two
-## layers, like him.
+## layers, like him. Lit: a level's hour never dims a foe, because a tell that
+## dims is a death that cannot be read (WorldGrade).
 func _ready() -> void:
 	collision_layer = 0
 	collision_mask = Tiles.MASK_SOLID | Tiles.MASK_ONE_WAY
 	add_to_group(GROUP)
+	add_to_group(MatchDusk.LIT)
 
 
 ## --- the contract -----------------------------------------------------------

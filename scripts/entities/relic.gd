@@ -32,6 +32,8 @@ var _taken_at: float = -1.0
 
 func place(site: EntitySite) -> void:
 	position = site.at
+	# Something to find reads at full light at any hour (WorldGrade).
+	add_to_group(MatchDusk.LIT)
 	site.count_relic()
 	if site.relic_taken.is_valid():
 		collected.connect(site.relic_taken)

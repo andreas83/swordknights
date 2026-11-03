@@ -54,6 +54,46 @@ reads as a dotted line instead of a shadow. A two-pixel post covers both
 parities. That is why balustrade posts in `tools/generate_tiles_png.py` are two
 pixels wide, and why any new thin standing decoration should be too.
 
+## Time of day
+
+A level is set at an hour with `;! time <stop>` (`scripts/render/time_of_day.gd`),
+and the hour is a grade over the same atlas, palette and solve — never a second
+set of tiles, as `docs/art-direction.md` requires. The axis is the duel's:
+`MatchDusk.DUSK`, a multiply that keeps red and takes green and blue, with the
+sky painting its own dusk instead of being multiplied down. The campaign walks
+it by stops and goes one past it for night:
+
+| Stop | World multiply | Sky (`ParallaxSky.dusk`) | Shadow reach | Sun |
+| --- | --- | --- | --- | --- |
+| `afternoon` (no directive) | none | 0 | 3 tiles | as it was |
+| `golden` | `DUSK` at 25% | 0.25 | 3.5 | |
+| `sunset` | `DUSK` at 55% | 0.6 | 4 | |
+| `dusk` | `DUSK` | 1.0 | 5 | |
+| `night` | `TimeOfDay.NIGHT` (0.50, 0.30, 0.46) | `NIGHT_SKY_STOPS`, no disc | — | none: the mask is all shade and nothing is solved |
+
+A number from 0 to 1 is a point between the afternoon and dusk.
+`;! horizon <row>` puts every row from that one down in the far city's shadow,
+one fill after the solve. Only the reach moves with the hour; the sun's slope is
+(2, 1) at every stop, because any other integer slope dots every two-pixel
+caster's shadow (*Why thin casters are two pixels wide*).
+
+`WorldGrade` (`scripts/render/world_grade.gd`) is MatchDusk held still: a
+`CanvasModulate` with the stop's multiply, the sky's dusk and night set from
+the table, and every node in `MatchDusk.LIT` lifted back out by the inverse of
+the multiply. The prince, every foe (in `Foe._ready`, so a new foe is lifted by
+the contract), every projectile, the torches and the relics join that group:
+a tell drawn in `LIGHT` that dims at dusk is a death that cannot be read, so
+the grade falls on the city and not on what you fight. An afternoon level gets
+no `WorldGrade` at all — the game as it always looked.
+
+`tools/screenshot.gd --level <file> --time <stop>` plays any level at any hour
+without editing it, which is how a chapter is judged at its stop:
+
+```bash
+xvfb-run -a godot --path . --rendering-driver opengl3 --script tools/screenshot.gd -- \
+  --level res://levels/level_01.txt --time dusk --out /tmp/dusk --shots 3,5.5 --hold move_right
+```
+
 ## Shade twins
 
 A surface going into shadow is not that surface darkened. It is the next tone

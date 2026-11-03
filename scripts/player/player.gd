@@ -88,6 +88,8 @@ func _ready() -> void:
 	collision_layer = 0
 	collision_mask = Tiles.MASK_SOLID | Tiles.MASK_ONE_WAY
 	_set_crouched(false)
+	# Read at full light under any hour a level is set at (WorldGrade).
+	add_to_group(MatchDusk.LIT)
 
 
 func respawn(at: Vector2) -> void:
