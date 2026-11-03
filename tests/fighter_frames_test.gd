@@ -1,5 +1,5 @@
 extends SceneTree
-## The three windows the duel is actually played in, frame by frame.
+## The four windows the duel is actually played in, frame by frame.
 ##
 ##     godot --headless --script tests/fighter_frames_test.gd
 ##
@@ -8,6 +8,8 @@ extends SceneTree
 ##     with NO invulnerability — a LOW thrust kills a rolling fighter
 ##   * the disarm: a read that only pays inside the opening frames of the
 ##     opponent's thrust, and never pays against someone who is not attacking
+##   * the catch: an empty hand's snatch is open for its first six frames, and
+##     the edges of when a snatch takes a thrown sword are played, not assumed
 ##
 ## These are closed intervals over Fighter.state_frame, which is why they can
 ## be asserted at all: the physics tick is a fixed 60 Hz, so one frame is one
@@ -39,6 +41,8 @@ func _physics_process(_delta: float) -> bool:
 	_the_disarm_window_is_the_opening_of_the_thrust()
 	_a_held_stance_parries_where_a_changed_one_disarms()
 	_an_opponent_who_is_not_attacking_cannot_be_disarmed()
+	_the_snatch_opens_the_hands_for_its_first_frames()
+	_the_catch_window_edges()
 
 	quit(_s.report("fighter_frames"))
 	return true
@@ -215,3 +219,139 @@ func _an_opponent_who_is_not_attacking_cannot_be_disarmed() -> void:
 	_s.check(stage.b.is_armed(), "and the waving fighter keeps its own sword")
 	_s.check(not stage.saw("disarm"), "nothing was reported as a disarm")
 	stage.dispose()
+
+
+## --- the catch --------------------------------------------------------------
+
+## Far enough that a throw takes a few frames to reach the hands, so a snatch
+## can be early, on time or late; the same gap combat_sword_test throws across.
+const CATCH_GAP := 40.0
+
+
+## THROW with an empty hand is a snatch: open hands on frames 1..catch_window,
+## then recovery to snatch_frames, then free. With a sword in hand the same
+## button throws it, and never opens the hands.
+func _the_snatch_opens_the_hands_for_its_first_frames() -> void:
+	var stage := Support.build(root)
+	stage.place(CLEAR)
+	var tuning := stage.tuning
+	var fighter := stage.a
+	fighter.disarm(1)
+	stage.run(tuning.disarmed_frames + 2, 0, 0)
+	_s.check(fighter.is_free() and not fighter.is_armed(), "A is free and empty-handed")
+	_s.check(
+		tuning.catch_window < tuning.snatch_frames,
+		"the snatch is longer than its window (%d of %d)"
+			% [tuning.catch_window, tuning.snatch_frames]
+	)
+
+	stage.run(1, Support.THROW, 0)
+	for frame: int in range(1, tuning.snatch_frames + 1):
+		if frame > 1:
+			stage.run(1, 0, 0)
+		var open := frame <= tuning.catch_window
+		_s.equal(fighter.state, Fighter.State.SNATCH, "frame %d is still the snatch" % frame)
+		_s.equal(fighter.state_frame, frame, "the snatch is on frame %d" % frame)
+		_s.equal(fighter.hands_open(), open, "frame %d: the hands are open: %s" % [frame, open])
+		_s.equal(
+			fighter.catch_rect().size.x > 0.0, open,
+			"frame %d: the hands %s" % [frame, "reach" if open else "reach nothing"]
+		)
+	stage.run(1, 0, 0)
+	_s.equal(
+		fighter.state, Fighter.State.IDLE,
+		"the %dth frame is free again" % (tuning.snatch_frames + 1)
+	)
+
+	stage.run(1, 0, Support.THROW)
+	_s.check(stage.b.state != Fighter.State.SNATCH, "an armed fighter's THROW never snatches")
+	_s.equal(stage.b.blade.mode, DuelBlade.Mode.FLYING, "it throws")
+	_s.check(not stage.b.hands_open(), "and its hands are not open")
+	stage.dispose()
+
+
+## The edges of the catch, by playing them. A throws across CATCH_GAP on frame
+## 0; B, empty-handed, snatches on frame `press`; every press from too early to
+## too late is tried in a fresh stage.
+##
+## First a run with no snatch says where the window has to sit: on which frame
+## the blade first touches the hands' rect, and on which it reaches the body and
+## kills. Then the rule, derived rather than chosen:
+##
+##   * the hands are open on frames press .. press + catch_window - 1
+##   * they catch if they are open on any frame the blade is in them, up to and
+##     including the frame it reaches the body -- the tie goes to the hands
+##
+## so the presses that catch are exactly first_hands - catch_window + 1 through
+## first_body. One earlier and the hands have closed before the blade arrives,
+## and the fighter dies in the recovery; one later and the fighter is dead.
+func _the_catch_window_edges() -> void:
+	var tuning := DuelTuning.new()
+	var control := _catch_run(9999)
+	var first_hands := int(control["hands"])
+	var first_body := int(control["body"])
+	_s.check(first_hands > 0, "the blade reaches the hands' rect in flight (frame %d)"
+		% first_hands)
+	_s.check(first_body > first_hands, "and the body after it (frame %d)" % first_body)
+	_s.check(bool(control["dead"]), "with no snatch the throw kills")
+
+	var earliest := first_hands - tuning.catch_window + 1
+	var latest := first_body
+	var wrong: Array[String] = []
+	var caught := 0
+	for press: int in range(earliest - 3, latest + 3):
+		var run := _catch_run(press)
+		var expected := press >= earliest and press <= latest
+		if bool(run["caught"]):
+			caught += 1
+		if bool(run["caught"]) != expected:
+			wrong.append("press %d caught=%s" % [press, run["caught"]])
+		elif not expected and not bool(run["dead"]):
+			wrong.append("press %d neither caught nor died" % press)
+	_s.equal(wrong, [] as Array[String], "every press from frame %d to %d catches, no other"
+		% [earliest, latest])
+	_s.equal(caught, latest - earliest + 1, "the catching presses are one unbroken run")
+	_s.equal(
+		caught, first_body - first_hands + tuning.catch_window,
+		"as wide as the window plus the frames the blade spends in the hands"
+	)
+
+	var early := _catch_run(earliest - 1)
+	_s.check(
+		bool(early["dead"]) and not bool(early["caught"]),
+		"one frame early: the hands closed before it came, and the snatch's recovery dies"
+	)
+	var tie := _catch_run(latest)
+	_s.check(
+		bool(tie["caught"]) and not bool(tie["dead"]),
+		"on the very frame it reaches the body the open hands still take it"
+	)
+
+
+## One throw at an empty-handed B who snatches on frame `press` (never, for a
+## press past the end). Returns the frame the blade first touched the hands'
+## rect, the frame B died (-1 if not), whether B caught it, and whether B died.
+func _catch_run(press: int) -> Dictionary:
+	var stage := Support.build(root)
+	stage.place(CATCH_GAP)
+	stage.b.disarm(0)
+	stage.run(stage.tuning.disarmed_frames + 2, 0, 0)
+	var hands_rect := stage.tuning.catch_rect(stage.b.position, stage.b.facing)
+	var out := {"hands": -1, "body": -1, "caught": false, "dead": false}
+	for frame: int in range(mini(press, 0), 30):
+		stage.step(
+			Support.THROW if frame == 0 else 0, Support.THROW if frame == press else 0
+		)
+		if frame < 0:
+			continue
+		var blade := stage.a.blade
+		var touching := blade.mode != DuelBlade.Mode.HELD \
+			and blade.rect(stage.tuning).intersects(hands_rect)
+		if int(out["hands"]) < 0 and (touching or stage.saw("catch")):
+			out["hands"] = frame
+		if not stage.b.is_alive() and int(out["body"]) < 0:
+			out["body"] = frame
+	out["caught"] = stage.saw("catch")
+	out["dead"] = not stage.b.is_alive()
+	stage.dispose()
+	return out

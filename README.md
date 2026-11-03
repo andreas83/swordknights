@@ -121,13 +121,17 @@ bindings are keyboard-only by design:
 | Jump                   | `Space` / `V` | `K` / numpad `0`       |
 | Thrust                 | `F`           | `J` / numpad `1`       |
 | Throw the sword        | `G`           | `L` / numpad `2`       |
+| Catch a thrown sword   | `G` with an empty hand, as it arrives | `L` / numpad `2`, the same |
 | Roll / dive kick       | down + jump, on the ground / in the air | same |
 
 Holding neither up nor down is the middle stance. Meet a thrust at its height
 and the blades clash; move your sword *into* its height just as it starts and
 you disarm the attacker. Up + throw angles the throw upward. An empty-handed
 fighter sweeps on the ground and stamps from the air, and picks a sword up by
-holding down over it.
+holding down over it. It can also snatch a thrown sword out of the air: press
+throw just as the blade arrives, and it is yours. Snatch too early and you stand
+there with open hands; a low throw cannot be caught at all
+([`docs/duel-combat.md`](docs/duel-combat.md#the-catch)).
 
 Two players do not fit on one phone, so on phones each plays on their own:
 **Duel Online** → *Host on this Wi-Fi* on one phone shows a short code, and the

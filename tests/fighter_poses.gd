@@ -2,10 +2,11 @@ extends SceneTree
 ## Renders every duel fighter state as one contact sheet, at the scale it ships.
 ##
 ## A live match cannot reach a roll, a dive kick or a downed fighter on demand,
-## and the figure is posed from state, so this freezes sixteen fighters -- one
-## per state, the three stances, and both ends of a thrust -- and captures them
-## in a single frame. The simulation is not stepped: FighterArt reads state,
-## frame, stance and velocity, and those are set directly.
+## and the figure is posed from state, so this freezes twenty fighters -- one
+## per state, the three stances, both ends of a thrust and of a snatch, and the
+## catch at its two heights -- and captures them in a single frame. The
+## simulation is not stepped: FighterArt reads state, frame, stance and
+## velocity, and those are set directly.
 ##
 ##     xvfb-run -a godot --path . --rendering-driver opengl3 \
 ##       --script tests/fighter_poses.gd -- --out docs/fighter-poses.png [--hitboxes]
@@ -15,9 +16,11 @@ extends SceneTree
 ## dresses every fighter as the heroine (CharacterLook), in the seat colours as
 ## always; that sheet is docs/heroine-fighter-poses.png.
 
-const COLS := 4
+## Five across and four down: the viewport is 180 units tall, which is exactly
+## four rows, so a twentieth pose had to go sideways rather than below.
+const COLS := 5
 const ROWS := 4
-const CELL := Vector2(80.0, 45.0)
+const CELL := Vector2(64.0, 45.0)
 ## Feet sit this far down a cell, leaving room for the label under them.
 const FEET_Y := 34.0
 const SETTLE_FRAMES := 20
@@ -77,6 +80,12 @@ func _place(pose: Dictionary, feet: Vector2, index: int) -> void:
 	fighter.grounded = bool(pose.get("grounded", true))
 	if pose.get("ducked", false):
 		fighter.set("_ducked", true)
+	if pose.has("incoming"):
+		# A sword in the air, a few pixels short of the open hands, flying at
+		# them: what the snatch is for, drawn where the simulation would have it.
+		fighter.blade.mode = DuelBlade.Mode.FLYING
+		fighter.blade.position = feet + (pose["incoming"] as Vector2)
+		fighter.blade.velocity = Vector2(-fighter.tuning.throw_speed, 0.0)
 	if pose.get("drop_blade", false):
 		fighter.blade.drop(
 			fighter.tuning.hand_position(feet, 1, fighter.stance), fighter.stance, -1,
@@ -112,6 +121,13 @@ func _poses() -> Array[Dictionary]:
 			"drop_blade": true},
 		{"label": "DOWNED", "state": Fighter.State.DOWNED, "frame": 20},
 		{"label": "DEAD", "state": Fighter.State.DEAD, "frame": 40},
+		{"label": "SNATCH", "state": Fighter.State.SNATCH, "frame": 3,
+			"incoming": Vector2(24.0, -14.0)},
+		{"label": "MISSED", "state": Fighter.State.SNATCH, "frame": 14,
+			"drop_blade": true},
+		{"label": "CAUGHT", "state": Fighter.State.CATCH, "frame": 2},
+		{"label": "CATCH HI", "state": Fighter.State.CATCH, "frame": 4,
+			"stance": DuelTuning.Stance.HIGH},
 	]
 
 

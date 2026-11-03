@@ -39,7 +39,7 @@ Transitions are **prioritised**: `DEAD` overrides every other state.
 | IDLE / RUNNING | Stance may change freely between HIGH, MID and LOW. **Zero frames of animation lock.** |
 | THRUSTING | 12–15 frames total. Frames 1–4 the blade hitbox extends forward (active). Frames 5–15 are recovery and the fighter is vulnerable if the thrust missed. The fighter drifts slightly forward during the thrust. |
 | ROLLING | 25 frames. Hurtbox compressed to ~30% of standing height, which passes under HIGH and MID attacks and under thrown swords. **No invulnerability** — a LOW thrust kills a rolling fighter. |
-| DISARMED / UNARMED | Its own sub-machine. Leg sweep knocks the opponent down; ground pound finishes a downed opponent. Standing over a dropped sword and pressing down picks it up in one frame. |
+| DISARMED / UNARMED | Its own sub-machine. Leg sweep knocks the opponent down; ground pound finishes a downed opponent. Standing over a dropped sword and pressing down picks it up in one frame. Throw with an empty hand snatches a thrown sword out of the air (implemented; see the sword throw below). |
 
 ## 2. Combat matrix
 
@@ -79,6 +79,14 @@ function resolveSwordCollision(p1, p2) {
   with `up` + throw.
 - Lethal on contact with any unguarded hurtbox.
 - Countered by ducking, rolling, or a thrust that deflects the flying blade.
+- **Caught out of the air by an empty hand, as in Nidhogg.** *Added at the
+  owner's request; implemented.* Only an unarmed fighter catches, and only
+  with a timed snatch: THROW with nothing to throw opens the hands for six
+  frames, and a HIGH or MID blade flying into them is caught. A LOW throw
+  cannot be. The catcher is armed with that blade at once and the thrower stays
+  unarmed. When the hands and the body are touched on the same frame, the hands
+  win. The rule, the numbers, the ties and why it is a timed snatch rather than
+  a catch on contact are in [`duel-combat.md`](duel-combat.md#the-catch).
 
 ## 3. Initiative and zones
 

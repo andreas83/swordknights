@@ -51,6 +51,7 @@ func _physics_process(_delta: float) -> bool:
 	_the_gate_moat_is_a_stake_not_a_wall()
 	_two_runs_on_the_same_inputs_agree()
 	_a_rewind_replays_the_same_frames()
+	_a_catch_survives_a_snapshot_and_a_rewind()
 
 	quit(_s.report("match_fighter"))
 	return true
@@ -291,9 +292,16 @@ func _a_rewind_replays_the_same_frames() -> void:
 ## seeds tried, so a death here is a property of the input rather than of the
 ## seed. The inputs are recorded, so the replay does not read positions; only
 ## the first pass does.
+##
+## THROW is pressed only while the seat holds a sword. An empty hand's THROW is
+## a snatch, and a bot that snatched at random would spend the stretch standing
+## in snatches instead of sweeping: a death on five seeds of eight, not eight.
+## Before the catch an empty hand's THROW did nothing, so masking it then would
+## have played the same duel; that is what it plays now. The catch has its own
+## rewind below, which is where it is meant to be exercised.
 func _duellist(fight: DuelMatch, seat: int, rng: RandomNumberGenerator) -> int:
 	var bits := rng.randi() & 0xff
-	if rng.randi() % 8 != 0:
+	if rng.randi() % 8 != 0 or not (fight.seats[seat].node as Fighter).is_armed():
 		bits &= ~PlayerInput.BIT_THROW
 	bits &= ~PlayerInput.BIT_ATTACK
 	if rng.randi() % 3 == 0:
@@ -304,6 +312,106 @@ func _duellist(fight: DuelMatch, seat: int, rng: RandomNumberGenerator) -> int:
 	if absf(them.x - me.x) > 6.0:
 		bits |= PlayerInput.BIT_RIGHT if them.x > me.x else PlayerInput.BIT_LEFT
 	return bits
+
+
+## The catch moves a sword record from one fighter's snapshot block into the
+## other's in the middle of a frame, and puts the catcher in two states the
+## snapshot had never carried. So: A throws at an empty-handed B, B snatches,
+## and every frame of that exchange is written, read back and written again;
+## then the whole exchange is replayed from before the throw, and again from a
+## snapshot taken with the blade in the air and B's hands open. All three must
+## agree byte for byte and checksum for checksum, and the catch must happen in
+## each -- announced once, and not again while replaying.
+func _a_catch_survives_a_snapshot_and_a_rewind() -> void:
+	var fight := _open_match()
+	if fight == null:
+		return
+	var a := fight.seats[0].node as Fighter
+	var b := fight.seats[1].node as Fighter
+	var announced: Array[int] = []
+	fight.blade_caught.connect(
+		func(by: int, _from: int, _at: Vector2) -> void: announced.append(by))
+
+	var closed := false
+	for i: int in 300:
+		if b.position.x - a.position.x <= 40.0:
+			closed = true
+			break
+		fight.step(PlayerInput.BIT_RIGHT, PlayerInput.BIT_LEFT)
+	_s.check(closed, "the two close to throwing range")
+	b.disarm(0)
+	for i: int in a.tuning.disarmed_frames + 4:
+		fight.step(0, 0)
+	_s.check(not b.is_armed() and b.is_free(), "B is empty-handed and free")
+	_s.equal(b.facing, -1, "B faces A")
+
+	# A throws; B opens its hands on the same frame, so the window covers the
+	# whole of a short flight whatever the exact gap the walk left.
+	var script: Array[Vector2i] = []
+	for i: int in 24:
+		var press := PlayerInput.BIT_THROW if i == 0 else 0
+		script.append(Vector2i(press, press))
+
+	var before := fight.write_state()
+	var states: Array[PackedByteArray] = []
+	var sums: Array[int] = []
+	var mid := PackedByteArray()
+	var caught_on := -1
+	var round_trips := 0
+	for i: int in script.size():
+		fight.step(script[i].x, script[i].y)
+		if caught_on < 0 and b.is_armed():
+			caught_on = i
+			_s.equal(b.state, Fighter.State.CATCH, "B is in the catch on the frame it caught")
+		if i == 0 and not b.is_armed():
+			mid = fight.write_state()
+			_s.equal(b.state, Fighter.State.SNATCH, "the mid-flight snapshot has B snatching")
+			_s.equal(a.blade.mode, DuelBlade.Mode.FLYING, "and A's sword in the air")
+		var bytes := fight.write_state()
+		var sum := fight.checksum()
+		if fight.read_state(bytes) and fight.write_state() == bytes \
+				and fight.checksum() == sum:
+			round_trips += 1
+		states.append(bytes)
+		sums.append(sum)
+
+	_s.check(caught_on > 0, "B caught the sword in flight (frame %d)" % caught_on)
+	_s.check(b.is_armed() and not a.is_armed(), "B is armed and A is not")
+	_s.check(a.is_alive() and b.is_alive(), "nobody died")
+	_s.equal(round_trips, script.size(), "every frame of the exchange read back exactly")
+	_s.equal(announced, [1] as Array[int], "the catch was announced once, for B")
+
+	# The checksum sees the catch: the same bytes with B's state put back to the
+	# snatch it came out of must hash differently.
+	if caught_on >= 0:
+		fight.read_state(states[caught_on])
+		var real := fight.checksum()
+		b.state = Fighter.State.SNATCH
+		_s.check(fight.checksum() != real, "the checksum covers the catch state")
+
+	fight.replaying = true
+	_s.equal(_replay(fight, before, script, 0, states, sums), -1,
+		"replayed from before the throw: identical state, frame for frame")
+	_s.check(b.is_armed() and not a.is_armed(), "and the replay caught it too")
+	if _s.check(not mid.is_empty(), "a mid-flight snapshot was taken"):
+		_s.equal(_replay(fight, mid, script, 1, states, sums), -1,
+			"replayed from mid-flight: identical state, frame for frame")
+		_s.check(b.is_armed() and not a.is_armed(), "and that replay caught it too")
+	_s.equal(announced, [1] as Array[int], "replaying did not announce it again")
+	fight.free()
+
+
+## Loads `from`, steps script[first..] and returns the first index whose state or
+## checksum differs from the recorded pass, or -1.
+func _replay(fight: DuelMatch, from: PackedByteArray, script: Array[Vector2i], first: int,
+		states: Array[PackedByteArray], sums: Array[int]) -> int:
+	if not fight.read_state(from):
+		return first
+	for i: int in range(first, script.size()):
+		fight.step(script[i].x, script[i].y)
+		if fight.write_state() != states[i] or fight.checksum() != sums[i]:
+			return i
+	return -1
 
 
 func _random_run(seed_value: int) -> PackedInt64Array:

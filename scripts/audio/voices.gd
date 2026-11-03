@@ -169,6 +169,9 @@ static func aliases() -> Dictionary:
 		"death": "die",
 		"died": "die",
 		"pickup": "relic",
+		# A thrown sword slapped into a palm: the guard's steel-on-steel thunk,
+		# which the duel scene pitches up a little so it is not heard as a parry.
+		"catch": "guard_hit",
 		"door": "exit",
 		"complete": "level_complete",
 		"menu_move": "ui_move",

@@ -46,6 +46,9 @@ signal fighter_died(victim: int, killer: int, at: Vector2)
 signal fighter_respawned(slot: int, at: Vector2, facing: int)
 signal leader_consumed(winner: int, at: Vector2)
 signal match_over(winner: int)
+## A thrown sword was caught out of the air. Presentation only: the catch itself
+## happened in DuelCombat and is in both fighters' state already.
+signal blade_caught(catcher: int, thrower: int, at: Vector2)
 
 enum Phase {
 	COUNTDOWN, ## Both on their marks in the middle zone. Inputs ignored.
@@ -250,6 +253,8 @@ func step(bits_a: int, bits_b: int) -> void:
 	seats[0].simulate(DT)
 	seats[1].simulate(DT)
 	events.append_array(DuelSeat.referee(seats[0], seats[1], strip))
+	if not replaying:
+		_announce_catches()
 
 	if phase != Phase.MATCH_OVER:
 		_advance_respawns()
@@ -262,6 +267,15 @@ func step(bits_a: int, bits_b: int) -> void:
 	_advance_phase()
 	_refresh_streaming()
 	frame += 1
+
+
+## Turns the referee's catch events into the signal the scene listens to. The
+## event list is the record; the signal is only the scene's doorbell, and like
+## every other signal here it stays quiet while frames are being replayed.
+func _announce_catches() -> void:
+	for event: Dictionary in events:
+		if event.get("kind", "") == "catch":
+			blade_caught.emit(int(event["by"]), int(event["from"]), event["at"] as Vector2)
 
 
 ## --- initiative ------------------------------------------------------------

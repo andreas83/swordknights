@@ -33,23 +33,32 @@ extends CharacterBody2D
 
 ## The only thing the match layer needs to hear. killer_id is -1 for a hazard.
 signal died(victim_id: int, killer_id: int)
-## Presentation, suppressed while `replaying`. The match may ignore all three.
+## Presentation, suppressed while `replaying`. The match may ignore all of them.
 signal disarmed(victim_id: int, by_id: int)
 signal clashed(at: Vector2)
 signal blade_thrown(thrower_id: int)
 signal knocked_down(victim_id: int)
+signal caught(catcher_id: int, thrower_id: int)
 
 ## IDLE, RUNNING, JUMPING and DUCKING are the free states: the only ones that
 ## read the stance buttons or start anything. ROLLING, THRUSTING, DIVEKICK,
-## SWEEP and POUND are commitments — they ignore input entirely until they run
-## out. DISARMED, SWEEP, POUND and DOWNED are the unarmed sub-machine (plus the
-## free states with an empty hand, where attack sweeps instead of thrusting).
+## SWEEP, POUND, SNATCH and CATCH are commitments — they ignore input entirely
+## until they run out. DISARMED, SWEEP, POUND, DOWNED and SNATCH are the unarmed
+## sub-machine (plus the free states with an empty hand, where attack sweeps
+## instead of thrusting and throw snatches instead of throwing). CATCH is the
+## moment a snatched blade is taken into the hand.
 ## DEAD overrides every other state and is left only by respawn_at().
+##
+## SNATCH and CATCH come after DEAD rather than beside the other unarmed states
+## because the state travels in the snapshot as its ordinal: appending them left
+## every older state's number, and so the layout docs/netplay.md describes,
+## exactly as it was.
 enum State {
 	IDLE, RUNNING, JUMPING, DUCKING,
 	ROLLING, THRUSTING, DIVEKICK,
 	DISARMED, SWEEP, POUND, DOWNED,
 	DEAD,
+	SNATCH, CATCH,
 }
 
 ## What the fighter's feet or fists are doing this frame, for DuelCombat.
@@ -281,7 +290,9 @@ func _update_stance() -> void:
 ##
 ##   1. a commitment that has run out ends, and the fighter is free this frame
 ##   2. a commitment that has not is immune to input: nothing below is read
-##   3. throw          — the sword leaves the hand; costs no frames
+##   3. throw          — the sword leaves the hand; costs no frames. With an
+##                       empty hand the same button is a SNATCH: the hands
+##                       open for a thrown sword, and nothing below is read
 ##   4. attack         — THRUSTING armed, SWEEP or POUND empty-handed
 ##   5. down + jump    — ROLLING on the ground, DIVEKICK in the air
 ##   6. jump           — JUMPING
@@ -291,7 +302,10 @@ func _decide() -> void:
 	_expire()
 	if not is_free():
 		return
-	if input.just_pressed_throw and blade.is_held():
+	if input.just_pressed_throw:
+		if not blade.is_held():
+			_snatch()
+			return
 		_throw()
 	if input.just_pressed_attack and _begin_attack():
 		return
@@ -321,6 +335,12 @@ func _expire() -> void:
 		State.DOWNED:
 			if state_frame > tuning.downed_frames:
 				_leave_roll()
+		State.SNATCH:
+			if state_frame > tuning.snatch_frames:
+				_enter_free()
+		State.CATCH:
+			if state_frame > tuning.catch_settle:
+				_enter_free()
 		State.DIVEKICK, State.POUND:
 			if _commit == 0:
 				_enter_free()
@@ -346,7 +366,7 @@ func _advance(dt: float) -> void:
 			_dive(dt, Vector2(facing * tuning.divekick_speed_x, tuning.divekick_speed_y))
 		State.POUND:
 			_dive(dt, Vector2(0.0, tuning.pound_speed_y))
-		State.SWEEP, State.DISARMED, State.DOWNED:
+		State.SWEEP, State.DISARMED, State.DOWNED, State.SNATCH, State.CATCH:
 			velocity.x = move_toward(velocity.x, 0.0, tuning.ground_friction * dt)
 			_apply_gravity(dt)
 		_:
@@ -442,6 +462,16 @@ func _jump() -> void:
 	_sync_shape()
 
 
+## Both hands open in front of the chest, for a sword in flight. It stands the
+## fighter up out of a duck -- you cannot catch at the chest from a crouch --
+## and plants them, so a snatch at nothing is twelve frames standing still in
+## front of whatever comes next. DuelCombat._resolve_flight() does the catching.
+func _snatch() -> void:
+	_ducked = false
+	_enter(State.SNATCH)
+	_sync_shape()
+
+
 func _throw() -> void:
 	blade.launch(
 		tuning.hand_position(position, facing, stance), stance, facing, id, tuning, input.up
@@ -476,6 +506,21 @@ func disarm(by_id: int = -1) -> void:
 	_sync_shape()
 	if not replaying:
 		disarmed.emit(id, by_id)
+
+
+## A thrown sword taken out of the air. DuelCombat has already put the record in
+## this hand; this is the fighter's half of it. Armed at once, at the height the
+## blade came in at, and committed for `catch_settle` frames while the hands
+## close on it -- the blade is not up to parry with until they have.
+func catch_blade(at_stance: int, thrower_id: int) -> void:
+	if state == State.DEAD or not blade.is_held():
+		return
+	stance = at_stance
+	_ducked = false
+	_enter(State.CATCH)
+	_sync_shape()
+	if not replaying:
+		caught.emit(id, thrower_id)
 
 
 ## Swept or kicked off the feet. Keeps the sword — losing it as well would make
@@ -561,6 +606,22 @@ func posture() -> int:
 
 func is_armed() -> bool:
 	return blade.is_held()
+
+
+## True only on the opening frames of a snatch, with nothing already in hand.
+## The window is a closed interval over state_frame like every other one.
+func hands_open() -> bool:
+	return (
+		state == State.SNATCH and state_frame <= tuning.catch_window and not blade.is_held()
+	)
+
+
+## Where the open hands can take a thrown blade, or an empty rect when they are
+## not open. See DuelTuning.catch_rect() for why it stops above LOW.
+func catch_rect() -> Rect2:
+	if not hands_open():
+		return Rect2()
+	return tuning.catch_rect(position, facing)
 
 
 ## True only in the frames where the blade is extended and lethal.

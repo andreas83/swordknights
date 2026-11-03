@@ -133,6 +133,27 @@ const DUCKED := 3
 ## A dropped sword does fall, and settles where it lands.
 @export var blade_fall_gravity: float = 1200.0
 
+# --- the catch ---------------------------------------------------------------
+#
+# THROW with an empty hand opens both hands in front of the chest: a SNATCH.
+# A sword flying into them while they are open is caught. docs/duel-combat.md
+# argues each number; tests/fighter_frames_test.gd pins the window frame by
+# frame and tests/combat_sword_test.gd plays it.
+
+## The whole snatch, a commitment like the thrust: the hands are open on frames
+## 1..catch_window and the rest is recovery, standing, unable to duck, roll or
+## jump. A snatch at nothing leaves you twelve frames in front of a throw.
+@export var snatch_frames: int = 18
+@export var catch_window: int = 6
+## How far past the body edge the open hands reach. Not less than one frame of a
+## throw's travel (throw_speed / 60 = 5.5 px), or a blade could step from clear
+## air straight into the body between two samples without ever being in the
+## hands. tests/unit/test_duel_catch.gd holds that.
+@export var catch_reach: float = 8.0
+## Frames spent taking the caught blade into the hand before the fighter is free
+## to use it -- the thrower's one chance to get away or sweep.
+@export var catch_settle: int = 6
+
 
 ## The default profile. A match may load a .tres over it; nothing in the
 ## fighter reads anything but the resource it is handed.
@@ -162,6 +183,25 @@ func blade_rect(feet: Vector2, facing: int, stance: int, reach: float) -> Rect2:
 	var half := body_width * 0.5
 	var x := (feet.x + half) if facing > 0 else (feet.x - half - reach)
 	return Rect2(x, feet.y - band.x, reach, band.x - band.y)
+
+
+## Where the open hands of a snatch can take a thrown blade: in front of the
+## body, `catch_reach` deep, from the top of the HIGH band down to the bottom of
+## MID. Not LOW. Hands catch at the chest and the face, not at the ankles, so a
+## LOW throw cannot be caught and has to be jumped -- which is the thrower's
+## answer to a fighter waiting with open hands. Geometry, like the duck and the
+## roll: the rect says it, and no rule has to.
+func catch_rect(feet: Vector2, facing: int) -> Rect2:
+	var half := body_width * 0.5
+	var x := (feet.x + half) if facing > 0 else (feet.x - half - catch_reach)
+	return Rect2(x, feet.y - band_high_top, catch_reach, band_high_top - band_mid_bottom)
+
+
+## The stance a blade caught at `height` px above the feet is held in: HIGH if
+## it came in over the MID band, otherwise MID. Never LOW, which the hands do
+## not reach.
+func catch_stance(height: float) -> int:
+	return Stance.HIGH if height > band_high_bottom else Stance.MID
 
 
 ## A sword lying on the floor or in flight, centred on its own position.

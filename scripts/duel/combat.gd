@@ -1,6 +1,6 @@
 class_name DuelCombat
 extends RefCounted
-## The combat matrix, the clash, the disarm, the throw and the pickup.
+## The combat matrix, the clash, the disarm, the throw, the catch and the pickup.
 ##
 ## Everything here is static and reads nothing but the two fighters it is
 ## handed, so one call is one frame of fighting and that frame is reproducible
@@ -63,7 +63,8 @@ static func step(a: Fighter, b: Fighter, bits_a: int, bits_b: int, dt: float) ->
 
 
 ## Sword against sword, sword against body, feet against body, thrown sword
-## against everything, and hands against a sword on the floor.
+## against everything (open hands included), and hands against a sword on the
+## floor.
 ##
 ## Returns what happened, for a HUD, a sound or a spray of gore — all of which
 ## are presentation and none of which may enter the snapshot.
@@ -204,28 +205,59 @@ static func _apply_strike(att: Fighter, def: Fighter, kind: int, events: Array[D
 ## --- thrown swords ----------------------------------------------------------
 
 ## Lethal on contact with any unguarded hurtbox; countered by ducking, rolling
-## (both of which the band geometry already handles) or by a thrust that
-## deflects the flying blade out of the air.
+## (both of which the band geometry already handles), by a thrust that deflects
+## the flying blade out of the air, or -- by an empty hand only -- by catching it.
+##
+## THE ORDER, for each blade in flight, and every step is deterministic:
+##
+##   1. a live thrust in its path bats it away: the deflect, unchanged
+##   2. open hands in its path take it: the catch
+##   3. a body in its path dies
+##
+## A CATCH AND A KILL ON THE SAME FRAME. A frame is a sample of continuous
+## motion. A blade flying INTO open hands has to pass them to reach the body
+## behind them, so a frame on which it touches both is a frame on which it met
+## the hands first: the catch wins, exactly as a parry wins over a cut on the
+## diagonal of the matrix (_probe), where two blades meet before either reaches
+## a body. The direction is what earns it -- a blade overtaking a fighter from
+## behind reaches the back first, and kills, open hands or not. And a fighter
+## already cut down this frame by a thrust or finished by a pound catches
+## nothing: blades and feet are resolved before flight, so a body that is dead
+## has no hands. docs/duel-combat.md has the argument and the alternatives.
+##
+## The blades in flight are listed before any is resolved, and each is found
+## again by identity. A catch swaps records between the two fighters (as a
+## pickup does), so walking the two slots instead would skip a blade that had
+## just moved into a slot already visited, and would make the outcome depend
+## on which fighter is slot A.
 static func _resolve_flight(a: Fighter, b: Fighter, events: Array[Dictionary]) -> void:
-	for owner: Fighter in [a, b]:
-		if owner.blade.mode != DuelBlade.Mode.FLYING:
+	var flying: Array[DuelBlade] = []
+	for slot: Fighter in [a, b]:
+		if slot.blade.mode == DuelBlade.Mode.FLYING:
+			flying.append(slot.blade)
+	for record: DuelBlade in flying:
+		if record.mode != DuelBlade.Mode.FLYING:
 			continue
-		var flying := owner.blade.rect(owner.tuning)
-		var deflector := _deflector(a, b, flying)
+		var owner := a if a.blade == record else b
+		var rect := record.rect(owner.tuning)
+		var deflector := _deflector(a, b, rect)
 		if deflector != null:
-			var away := signf(owner.blade.velocity.x)
-			owner.blade.mode = DuelBlade.Mode.LOOSE
-			owner.blade.velocity = Vector2(-away * 60.0, -60.0)
-			events.append({"kind": "deflect", "by": deflector.id, "at": owner.blade.position})
+			var away := signf(record.velocity.x)
+			record.mode = DuelBlade.Mode.LOOSE
+			record.velocity = Vector2(-away * 60.0, -60.0)
+			events.append({"kind": "deflect", "by": deflector.id, "at": record.position})
 			continue
 		for target: Fighter in [a, b]:
-			if not target.is_alive() or target.id == owner.blade.thrown_by:
+			if not target.is_alive() or target.id == record.thrown_by:
 				continue
-			if not flying.intersects(target.hurt_rect()):
+			if _catches(target, record, rect):
+				_catch(target, owner, events)
+				break
+			if not rect.intersects(target.hurt_rect()):
 				continue
-			var killer := owner.blade.thrown_by
-			owner.blade.mode = DuelBlade.Mode.LOOSE
-			owner.blade.velocity = Vector2.ZERO
+			var killer := record.thrown_by
+			record.mode = DuelBlade.Mode.LOOSE
+			record.velocity = Vector2.ZERO
 			target.kill(killer)
 			events.append({
 				"kind": "kill", "victim": target.id, "killer": killer, "at": target.position,
@@ -238,6 +270,35 @@ static func _deflector(a: Fighter, b: Fighter, flying: Rect2) -> Fighter:
 		if guard.is_attacking() and guard.blade_rect().intersects(flying):
 			return guard
 	return null
+
+
+## Whether `target`'s open hands take this blade this frame: an empty hand in
+## the opening frames of a snatch (Fighter.hands_open), the blade coming at the
+## front of the body rather than overtaking it, and the blade inside the hands'
+## reach -- which stops above LOW, so a low throw is never caught.
+static func _catches(target: Fighter, record: DuelBlade, rect: Rect2) -> bool:
+	if not target.hands_open():
+		return false
+	if int(signf(record.velocity.x)) != -target.facing:
+		return false
+	return rect.intersects(target.catch_rect())
+
+
+## The catcher takes the record that was flying, the way a pickup does: the
+## two records swap so the count stays two, and the thrower keeps whatever the
+## catcher's record held -- the sword the catcher lost earlier, lying wherever
+## it fell. The thrower stays empty-handed.
+static func _catch(catcher: Fighter, owner: Fighter, events: Array[Dictionary]) -> void:
+	var record := owner.blade
+	var thrower := record.thrown_by
+	var at := record.position
+	var height := catcher.position.y - record.position.y
+	if owner != catcher:
+		owner.blade = catcher.blade
+		catcher.blade = record
+	record.hold()
+	catcher.catch_blade(catcher.tuning.catch_stance(height), thrower)
+	events.append({"kind": "catch", "by": catcher.id, "from": thrower, "at": at})
 
 
 ## --- picking a sword back up ------------------------------------------------

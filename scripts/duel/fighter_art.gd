@@ -73,6 +73,7 @@ func _bind() -> bool:
 	_fighter.disarmed.connect(func(_v: int, _b: int) -> void: _on_hurt(0))
 	_fighter.clashed.connect(func(_at: Vector2) -> void: _kick(0.16))
 	_fighter.knocked_down.connect(func(_v: int) -> void: _kick(-0.3))
+	_fighter.caught.connect(func(_by: int, _from: int) -> void: _kick(-0.22))
 	return true
 
 
@@ -100,9 +101,10 @@ func _skip_frame() -> bool:
 	return false
 
 
-## The blade is the read. Whenever it is up it is drawn over the robe.
+## The blade is the read. Whenever it is up it is drawn over the robe, and so
+## is a blade just caught, which is held up before the face to be seen.
 func _blade_in_front() -> bool:
-	return _blade_shown()
+	return _blade_shown() or _fighter.state == Fighter.State.CATCH
 
 
 func _show_grip() -> bool:
@@ -144,6 +146,10 @@ func _posture() -> Dictionary:
 			return _pound()
 		Fighter.State.DOWNED:
 			return _downed()
+		Fighter.State.SNATCH:
+			return _snatch()
+		Fighter.State.CATCH:
+			return _catch()
 		Fighter.State.DEAD:
 			return _dead(t)
 	return _guard()
@@ -354,6 +360,62 @@ func _pound() -> Dictionary:
 	})
 
 
+## Both hands out in front of the chest, open, weight forward onto the front
+## foot: the snatch. The hands sit inside the simulation's catch rect -- from
+## the face down to the bottom of MID and a few pixels past the body -- so a
+## blade seen arriving at them is a blade that will be caught. Over the
+## recovery they sag and the body settles back, and a fighter still standing
+## there with empty hands half-raised is SEEN to have snatched at nothing, as a
+## missed thrust is.
+func _snatch() -> Dictionary:
+	var tuning := _fighter.tuning
+	var frame := _fighter.state_frame
+	var back := 0.0 if frame <= tuning.catch_window else float(frame - tuning.catch_window) \
+		/ float(maxi(1, tuning.snatch_frames - tuning.catch_window))
+	var reach := 1.0 - clampf(back, 0.0, 1.0)
+	return _pose({
+		"squash": 0.97,
+		"lean": lerpf(0.2, 1.6, reach),
+		"stride": lerpf(0.8, 2.2, reach),
+		"stance": 1.5,
+		"knee": -0.9,
+		"hem_spread": 1.2,
+		"hem_fwd": 0.6 * reach,
+		"hood_tilt": lerpf(0.3, -0.1, reach),
+		"hood_push": 0.4 * reach,
+		"arm_a": lerpf(1.25, 0.2, reach), "arm_a_len": 6.6,
+		"arm_b": lerpf(1.5, 0.35, reach), "arm_b_len": 6.2,
+		"cloak_sweep": lerpf(0.7, 1.4, reach), "cloak_flare": 1.15,
+	})
+
+
+## The catch: the blade pulled in and stood up point-first before the face, the
+## body rocked back on its heels by the weight of it arriving, the edge flashing
+## on the first frames. Held for catch_settle frames, which is exactly how long
+## the simulation keeps the new blade out of play -- so the pose is the window.
+func _catch() -> Dictionary:
+	var tuning := _fighter.tuning
+	var settle := float(_fighter.state_frame) / float(maxi(1, tuning.catch_settle))
+	var jolt := 1.0 - clampf(settle, 0.0, 1.0)
+	return _pose({
+		"squash": 1.0 - 0.04 * jolt,
+		"lean": lerpf(0.4, -1.2, jolt),
+		"stance": 1.6,
+		"knee": -0.7,
+		"hem_spread": 1.0,
+		"hem_fwd": -0.8 * jolt,
+		"hood_tilt": -0.2 * jolt,
+		# The front hand where the blade was taken: up by the face for a HIGH
+		# catch, before the chest for a MID one. The held stance is the height.
+		"arm_a": -1.05 if _fighter.stance == DuelTuning.Stance.HIGH else -0.55,
+		"arm_a_len": 5.0,
+		"arm_b": 0.6, "arm_b_len": 4.8,
+		"cloak_sweep": lerpf(0.7, -0.3, jolt), "cloak_rise": 0.8 * jolt, "cloak_flare": 1.25,
+		"blade": -1.3, "blade_len": 9.0,
+		"blade_hot": 1.0 if _fighter.state_frame <= 2 else 0.0,
+	})
+
+
 ## --- the blade --------------------------------------------------------------
 
 ## The simulation's blade rect in this node's space, or an empty rect.
@@ -424,9 +486,21 @@ func _draw() -> void:
 	if not _has_body():
 		return
 	super._draw()
+	_draw_open_hands()
 	_draw_loose()
 	if show_hitboxes:
 		_draw_hitboxes()
+
+
+## Two open palms on the live frames of a snatch, fingers up: the read that the
+## hands are ready, and the one thing that tells a snatch from a reel at a
+## glance. Gone the frame the window closes, as the catch rect is.
+func _draw_open_hands() -> void:
+	if not _fighter.hands_open():
+		return
+	for hand: Vector2 in [_hand_back, _hand_front]:
+		draw_rect(Rect2(hand.x - 0.9, hand.y - 2.2, 1.8, 2.8), _c(ink))
+		draw_rect(Rect2(hand.x - 0.9, hand.y - 2.2, 1.8, 0.7), Palette.LIGHT_SOFT)
 
 
 ## A sword that is not in a hand: flying, or on the floor. Drawn along the
@@ -457,3 +531,6 @@ func _draw_hitboxes() -> void:
 	var strike := _fighter.strike_rect()
 	if strike.size != Vector2.ZERO:
 		draw_rect(Rect2(strike.position - origin, strike.size), Palette.WATER, false, 0.5)
+	var hands := _fighter.catch_rect()
+	if hands.size != Vector2.ZERO:
+		draw_rect(Rect2(hands.position - origin, hands.size), Palette.LIGHT_WARM, false, 0.5)

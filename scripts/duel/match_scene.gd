@@ -41,7 +41,13 @@ var demo := false
 ## read or write the real save.
 var wardrobe_path := Wardrobe.PATH
 
+## Frames inside which a second catch by the same seat is a replayed echo of
+## the first rather than a new one. See _on_blade_caught().
+const CATCH_ECHO := 30
+
 var _gates: Array[GateArt] = []
+## seat -> the match frame its last catch was presented on.
+var _caught_at := {}
 var _paused := false
 var _demo_frame := 0
 
@@ -83,6 +89,7 @@ func _ready() -> void:
 	fight.fighter_respawned.connect(_on_fighter_respawned)
 	fight.leader_consumed.connect(_on_leader_consumed)
 	fight.match_over.connect(_on_match_over)
+	fight.blade_caught.connect(_on_blade_caught)
 
 
 ## Puts each seat in its look. Seat two wears sea-green whatever look it has;
@@ -249,6 +256,27 @@ func _on_leader_consumed(winner: int, _at: Vector2) -> void:
 	camera.shake(2.2, 0.6)
 	var who := DuelRules.slot_label(winner)
 	hud.flash("%s REACHES THE GATE" % who, "%s AT THE GATE" % who)
+
+
+## The catch: a camera beat, the steel, and the word. No frozen frame. The
+## adventure holds its actors still on a hit, but the duel's tick is the
+## network's: a peer that held still for four frames would be four frames off
+## its host, which docs/feel.md calls a correctness question rather than a taste
+## one. So the beat is in the camera alone, a short hard shake, and the
+## simulation never sees it. See docs/duel-combat.md.
+##
+## Each seat's catch is presented once. NetSession re-steps frames it has
+## corrected, and a correction that lands on a catch would otherwise ring it
+## again; a second catch by the same seat inside CATCH_ECHO frames is that echo,
+## since a real one needs the other fighter to have re-armed and thrown again.
+func _on_blade_caught(catcher: int, _thrower: int, _at: Vector2) -> void:
+	var last := int(_caught_at.get(catcher, -CATCH_ECHO))
+	if absi(fight.frame - last) < CATCH_ECHO:
+		return
+	_caught_at[catcher] = fight.frame
+	camera.shake(1.6, 0.14)
+	GameAudio.cue(&"catch", {"pitch": 1.15})
+	hud.flash("CAUGHT")
 
 
 func _on_match_over(_winner: int) -> void:

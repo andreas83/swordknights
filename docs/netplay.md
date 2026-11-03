@@ -204,6 +204,13 @@ was already held, and nothing the simulation compares against a threshold is
 rounded on the way: rounding a timer to 32 bits moves a transition by a whole
 frame often enough to matter, and in a duel that is a sword landing or missing.
 
+The catch ([`duel-combat.md`](duel-combat.md#the-catch)) added no bytes. Its two
+states, `SNATCH` and `CATCH`, are appended to the fighter's state enum after
+`DEAD`, so every older state keeps its number. The snatch window is the frame
+count already carried. A caught sword is a record that was already in one of
+the two blocks; the catch swaps the records, as a pickup does.
+`tests/match_fighter_test.gd` round-trips and replays every frame of a catch.
+
 The client runs ahead of the newest snapshot by the measured one-way latency
 plus two frames of slack, so its input reaches the host before the host needs
 it. Drift is corrected by stepping twice in a frame, or not at all — never by
@@ -267,6 +274,15 @@ in the lobby to protect a field neither side needs to duel. Anything that
 changes a field the duel depends on still bumps the version. A future change to
 the look itself bumps the look's own format byte, which an older build reads as
 "no look".
+
+The catch did not bump the version either, and that is a gap rather than an
+argument. Its snapshot has the same shape, so nothing in the handshake tells a
+build that has the catch from one that does not. Two such builds would agree
+until an empty hand pressed throw, and then the desync detector would say so,
+mid-match. The catch changes what the duel does with the bytes it already
+sends, which by the rule above is a bump. It was left out of the catch's change
+only because `scripts/net/` was being changed in parallel; it is listed under
+*Not handled yet*.
 
 `tests/unit/test_net_look_wire.gd` holds the encoding — every look round-trips,
 an older build's bytes, truncation at every length, noise —
@@ -448,6 +464,16 @@ Honestly, and in roughly the order I would fix them.
   pulling it down each frame instead. On the strip's flat, axis-aligned tiles
   the two agree, and the tests say so, but a sloped or stepped zone would want
   snapping put back — deterministically, inside `_move()`.
+- **A change of rules is not refused in the lobby.** The handshake compares the
+  protocol version and the strip, and nothing else. A build with the catch and
+  one without it will seat each other and diverge the first time an empty hand
+  presses throw. Bumping `NetProtocol.VERSION`, or sending a rules revision in
+  `HELLO`, is the fix (see *Versions* above).
+- **Replayed frames ring their presentation again.** `NetSession` re-steps
+  corrected frames without setting the match's `replaying`, so a corrected kill
+  or catch fires its signal twice. The catch guards itself in `match_scene.gd`
+  (`CATCH_ECHO`). The others do not yet; setting `replaying` around
+  `_replay_to()` in `session.gd` would fix all of them.
 - **No bandwidth adaptation.** The snapshot rate is a constant.
 - **The clock sync is crude.** One-way latency is taken as half the round trip,
   which is wrong on an asymmetric connection.
