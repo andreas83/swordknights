@@ -132,9 +132,10 @@ func _beat_retry() -> bool:
 ## level to find one: this harness is about the frames around the hit, and a
 ## patrol put down any earlier would have walked off before the swing.
 ##
-## GUARD_REACH is the gap that matters. Closer than the two bodies' half-widths
-## and the guard simply walks into the character, who takes the hit a few
-## frames before the blade is live — which is a real beat, but not this one.
+## GUARD_REACH is the gap that matters. It is inside the guard's engage gap
+## (scripts/entities/patrol.gd), so the guard has begun its raise when the
+## sword lands, and the strip shows the answer the raise is there to invite:
+## cut first, and the raise is staggered out of its cut.
 func _stage_guard() -> void:
 	var entities := _game.get_node_or_null("Entities") as Node2D
 	if entities == null:

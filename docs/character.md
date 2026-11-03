@@ -244,6 +244,49 @@ xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1280x720 \
   --script tests/fighter_poses.gd -- --out docs/fighter-poses.png [--hitboxes]
 ```
 
+## The sentinel
+
+The guards on the terraces are drawn by `scripts/entities/patrol_art.gd`, a
+rig of the same kind as the prince's — a pose dictionary from
+`(state, state_time)`, a rig, state-blind drawing helpers — and built to be his
+opposite at every point the eye uses at this size: near-black where he is mid
+red, a dome helm with a gold spike where he has a pointed cowl, pauldrons
+where he is narrowest, legs and boots under a knee-length coat where his robe
+reaches the floor, and a curved sabre on the shoulder where his blade hangs
+low. The sun-facing edge of the coat, helm, pauldrons and helm-cloth carries a
+one-pixel rim, so a dark figure does not vanish into the ink of an arch.
+
+![every sentinel state, with the prince for scale](enemy-poses.png)
+
+What the guard *does* changed with it, deliberately and narrowly. It used to
+hurt on contact, which made it a moving spike: nothing to read and nothing to
+fence with. Now it is harmless to touch and dangerous in one state only:
+
+| State | Frames | What it is for |
+| --- | --- | --- |
+| `WINDUP` | 27 | the telegraph — sabre cocked overhead, eye slit burning white, a star of light up the blade, a cloth cue |
+| `STRIKE` | 9 | the only frames `Patrol.strike_rect()` is non-empty |
+| `RECOVER` | 33 | point on the floor, bent over: the opening |
+
+The raise starts when the prince is `ENGAGE_GAP` in front of the guard, which
+is already inside the prince's own sword reach, and his sword is live six
+frames into a swing. So a player who acts on the raise wins the exchange, and
+a hit during it staggers the guard out of its cut; a player who backs off one
+tile is out of `REACH`. `tests/unit/test_patrol.gd` pins those relationships
+against `Tuning`, so a retune of the prince cannot quietly make guards unfair.
+The stomp is unchanged. A guard that dies kneels, topples and flickers out
+over 1.3 s while its sabre spins away; it is neither dangerous nor hittable
+from the killing blow on.
+
+```bash
+xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1280x720 \
+  --script tools/enemy_poses.gd -- --out docs/enemy-poses.png [--silhouette]
+```
+
+`--silhouette` paints every figure black: the two-tone check from
+`docs/art-direction.md`, and the quickest way to see that the guard and the
+prince are different shapes.
+
 ## Tests
 
 ```bash

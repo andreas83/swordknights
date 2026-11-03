@@ -199,6 +199,10 @@ func _spawn_entities(data: AsciiLevel) -> void:
 				var guard := Patrol.new()
 				guard.position = at
 				guard.level = level
+				# The raise is the warning, so it is heard as well as seen:
+				# a guard about to cut off-screen is still a guard about to cut.
+				guard.alerted.connect(func() -> void: GameAudio.cue("cloth", {"pitch": 0.7}))
+				guard.struck.connect(func() -> void: GameAudio.cue("sword", {"pitch": 0.78}))
 				_entities.add_child(guard)
 
 
@@ -217,32 +221,43 @@ func _resolve_interactions() -> void:
 		if node is Relic and body.intersects((node as Relic).bounds()):
 			(node as Relic).collect()
 		elif node is Patrol:
-			var guard := node as Patrol
-			if has_attack and attack.intersects(guard.bounds()):
-				guard.hit(player.global_position.x)
-				GameAudio.cue("guard_hit")
-				# --- feel/flow (additive) ---
-				_impact(guard.global_position, Flow.HIT_FRAMES, 1.9, 0.55)
-			elif body.intersects(guard.bounds()):
-				# A falling player lands on the guard instead of taking the hit.
-				var stomping := (
-					player.velocity.y > 40.0
-					and body.position.y + body.size.y - guard.bounds().position.y < 10.0
-				)
-				if stomping:
-					guard.hit(player.global_position.x)
-					GameAudio.cue("guard_hit", {"pitch": 0.9})
-					# --- feel/flow (additive) --- heavier than the
-					# sword: the whole body is behind this one.
-					_impact(guard.global_position, Flow.STOMP_FRAMES, 2.6, 0.8)
-					player.velocity.y = -Tuning.JUMP_SPEED * 0.68
-				elif player.damage(1, guard.global_position.x):
-					# --- feel/flow (additive) --- only when it landed:
-					# damage() returns false during invulnerability.
-					Flow.hitstop(self, Flow.HURT_FRAMES * Flow.FRAME)
+			_resolve_guard(node as Patrol, body, attack, has_attack)
 
 	if _exit != null and body.intersects(_exit.bounds()):
 		_complete()
+
+
+## One guard against the prince. A guard hurts only with its blade, and only
+## while the blade is live (Patrol.strike_rect()); walking into one is free.
+## A dying guard is scenery and is skipped entirely.
+func _resolve_guard(guard: Patrol, body: Rect2, attack: Rect2, has_attack: bool) -> void:
+	guard.target_rect = body if player.is_alive() else Rect2()
+	if not guard.is_alive():
+		return
+	if has_attack and attack.intersects(guard.bounds()):
+		guard.hit(player.global_position.x)
+		GameAudio.cue("guard_hit")
+		# --- feel/flow (additive) ---
+		_impact(guard.global_position, Flow.HIT_FRAMES, 1.9, 0.55)
+		return
+	# A falling player lands on the guard instead of taking the hit.
+	var stomping := (
+		body.intersects(guard.bounds())
+		and player.velocity.y > 40.0
+		and body.position.y + body.size.y - guard.bounds().position.y < 10.0
+	)
+	if stomping:
+		guard.hit(player.global_position.x)
+		GameAudio.cue("guard_hit", {"pitch": 0.9})
+		# --- feel/flow (additive) --- heavier than the
+		# sword: the whole body is behind this one.
+		_impact(guard.global_position, Flow.STOMP_FRAMES, 2.6, 0.8)
+		player.velocity.y = -Tuning.JUMP_SPEED * 0.68
+	elif guard.is_dangerous() and body.intersects(guard.strike_rect()):
+		if player.damage(1, guard.global_position.x):
+			# --- feel/flow (additive) --- only when it landed:
+			# damage() returns false during invulnerability.
+			Flow.hitstop(self, Flow.HURT_FRAMES * Flow.FRAME)
 
 
 func _complete() -> void:
