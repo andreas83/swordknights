@@ -86,3 +86,26 @@ are striking because they are almost bare. Three well-placed arches and one
 long shadow beat a screen full of ornament.
 
 When in doubt, remove something.
+
+## The icon
+
+The icon is this page in one frame: a horseshoe arch, the low sun on the
+horizon inside it, and the prince against the sun with his sword up, throwing
+a long shadow down the floor towards you. Backlit, he is a silhouette, and a
+silhouette against gold is the strongest two-tone read the palette has — the
+only thing that survives at 48 px on a home screen. The blade is the one cold
+colour in it.
+
+It is generated like everything else, by `tools/generate_icon.py`, which
+rasterises the same shapes **at each output's own pixel grid** (48 for the
+favicon, 108 for Android's adaptive layers) with hard edges, rather than
+shrinking one large image and smearing it. Sky and sun are the adaptive
+icon's back layer; arch, floor and figure are the front, so a launcher's
+parallax slides the sun behind the arch. `tests/unit/test_app_icon.gd` reads
+the files back and fails if a preset names a missing file, a layer has lost its
+alpha, or a colour has crept in from outside `Palette`.
+
+```bash
+python3 tools/generate_icon.py
+godot --headless --path . --import
+```

@@ -11,6 +11,10 @@ extends RefCounted
 ## swapping that table re-lights the whole game.
 
 const INK := Color("2b0a14")
+## One tone below SHADOW_DEEP: the darkest a lit-world SURFACE may go, so that
+## stone in deep shade stays crimson. INK is for voids, joints and silhouettes.
+## tools/generate_tiles_png.py and tools/generate_icon.py carry the same value.
+const SHADOW_PIT := Color("4a0d1e")
 const SHADOW_DEEP := Color("7a1230")
 const SHADOW := Color("b32142")
 const SHADOW_WARM := Color("d8452c")
