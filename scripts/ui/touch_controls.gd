@@ -69,7 +69,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _on_touch(event: InputEventScreenTouch) -> void:
-	var point := _to_canvas(event.position)
+	var point := _local(event)
 	if event.pressed:
 		_surface.visible = true
 		var button := _button_at(point)
@@ -100,7 +100,7 @@ func _on_touch(event: InputEventScreenTouch) -> void:
 func _on_drag(event: InputEventScreenDrag) -> void:
 	if _stick_index != event.index:
 		return
-	_stick_point = _to_canvas(event.position)
+	_stick_point = _local(event)
 	_apply_stick()
 	_surface.queue_redraw()
 
@@ -162,8 +162,21 @@ func _button_at(point: Vector2) -> Dictionary:
 	return {}
 
 
-func _to_canvas(screen_position: Vector2) -> Vector2:
-	return screen_position * (_surface.size.x / maxf(1.0, DisplayServer.window_get_size().x))
+## Where a touch is, in the surface's own coordinates -- the ones the buttons
+## are laid out and drawn in.
+##
+## A touch reaches _input already in canvas units: with the canvas_items
+## stretch mode the window converts every event before any node sees it. This
+## used to convert again, from window pixels, scaling each touch down by the
+## stretch factor -- by six on a 1080p phone -- so a tap on JUMP in the bottom
+## right landed on the stick in the top left, and the buttons drawn on screen
+## were not where they could be pressed. make_input_local() is the engine's
+## own conversion, and stays right if this layer is ever offset or scaled.
+func _local(event: InputEvent) -> Vector2:
+	var local := _surface.make_input_local(event)
+	if local is InputEventScreenDrag:
+		return (local as InputEventScreenDrag).position
+	return (local as InputEventScreenTouch).position
 
 
 func draw_surface() -> void:
