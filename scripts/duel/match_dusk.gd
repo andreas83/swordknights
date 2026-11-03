@@ -4,7 +4,8 @@ extends CanvasModulate
 ##
 ## The gate zones are where a match is won, and the light says so: as the view
 ## moves into either end zone the world goes down from the duotone noon of the
-## middle to a dark, cooled dusk, and the sky with it. Anything in the LIT group
+## middle to a dusk lit by a burning sun on the horizon, and the view starts
+## to tremble. Anything in the LIT group
 ## is lifted back out of it: the two duellists, so the darkest room is also the
 ## one where they read most clearly against the ground, and the torches, which
 ## are the only lights in it and should look like it.
@@ -17,13 +18,11 @@ extends CanvasModulate
 ## changing light inside a match needs both lights at once, and a multiply over
 ## the duotone keeps its hard edges and its two-tone structure.
 
-## The light in the last room, as a multiply over the world. Cooler and a
-## little violet, so crimson goes to maroon and gold to ochre rather than both
-## going to mud.
-const DUSK := Color(0.50, 0.40, 0.62)
-## The sky dims less than the ground: a darker ground under a still-glowing sky
-## is what dusk looks like, and it keeps the silhouettes of the city.
-const SKY_DUSK := Color(0.62, 0.46, 0.66)
+## The light in the last room, as a multiply over the world: firelight from a
+## sun on the horizon. Red is kept, green and blue are taken away, so crimson
+## goes to blood and gold to burnt orange -- the final scene lit by the fire
+## behind it, not merely darker.
+const DUSK := Color(0.68, 0.36, 0.42)
 ## How far into a zone, in zone widths, dusk begins and is complete. Measured
 ## from the end of the strip: it starts as the view crosses into the last zone
 ## and is full by the time the view is centred on it.
@@ -34,15 +33,15 @@ const COMPLETE := 0.85
 ## the torches come and go with their zone -- join it when they are made.
 const LIT := &"lit_at_dusk"
 
-var camera: Camera2D
+var camera: MatchCamera
 var strip: ZoneStrip
-var sky: CanvasItem
+var sky: ParallaxSky
 
 ## 0 at noon, 1 in full dusk. Public so a screenshot or a test can read it.
 var amount := 0.0
 
 
-func setup(view: Camera2D, zones: ZoneStrip, sky_node: CanvasItem) -> void:
+func setup(view: MatchCamera, zones: ZoneStrip, sky_node: ParallaxSky) -> void:
 	camera = view
 	strip = zones
 	sky = sky_node
@@ -64,8 +63,11 @@ func _apply() -> void:
 	amount = maxf(west, east)
 
 	color = Color.WHITE.lerp(DUSK, amount)
+	# The sky paints its own dusk -- a burning sun under ink -- rather than being
+	# multiplied down, which would dim the very sun that is meant to glow.
 	if sky != null:
-		sky.modulate = Color.WHITE.lerp(SKY_DUSK, amount)
+		sky.dusk = amount
+	camera.tremor = amount
 	# Lifted back to full light: the inverse of the world's multiply, so the
 	# dusk falls on the room and not on what is lit.
 	var lift := Color(1.0 / color.r, 1.0 / color.g, 1.0 / color.b)

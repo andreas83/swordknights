@@ -47,6 +47,10 @@ const VERTICAL_FOLLOW := 6.0
 ## that a zone still fits across one. See _apply_zoom().
 const FIGHTER_SHARE := 0.085
 
+## The rumble at full tremor, in world pixels. Small on purpose: the fight has to
+## stay readable, and a fighter is only 22 px tall.
+const TREMOR_PX := 0.9
+
 var fight: DuelMatch
 
 ## The world width the view should frame, in pixels. Zero frames one zone, which
@@ -54,10 +58,16 @@ var fight: DuelMatch
 ## the duel at the adventure's scale, for deciding how wide a zone should be.
 var framing_width := 0.0
 
+## 0 to 1: a low, continuous rumble under the view, for the last room. Set by
+## MatchDusk. Also scales up every shake while it is on, so a kill in the
+## final room lands harder than one in the middle.
+var tremor := 0.0
+
 ## The follow position before it is snapped to whole screen pixels. Snapping the
 ## smoothed value itself would stall the lerp a fraction of a pixel short.
 var _smooth := Vector2.ZERO
 var _shake_time := 0.0
+var _rumble_time := 0.0
 var _shake_magnitude := 0.0
 var _rng := RandomNumberGenerator.new()
 
@@ -97,16 +107,18 @@ func _process(delta: float) -> void:
 	)
 	global_position = _snapped(_smooth)
 
+	var jolt := Vector2.ZERO
 	if _shake_time > 0.0:
 		_shake_time -= delta
-		# Scaled by the zoom so a shake reads the same whatever the aspect.
-		var amount := _shake_magnitude * clampf(_shake_time / 0.25, 0.0, 1.0) / zoom.x
-		offset = Vector2(
-			_rng.randf_range(-amount, amount), _rng.randf_range(-amount, amount)
-		)
+		# Scaled by the zoom so a shake reads the same whatever the aspect, and
+		# up to doubled in the last room.
+		var amount := _shake_magnitude * clampf(_shake_time / 0.25, 0.0, 1.0) / zoom.x \
+			* (1.0 + tremor)
+		jolt = Vector2(_rng.randf_range(-amount, amount), _rng.randf_range(-amount, amount))
 	else:
-		offset = Vector2.ZERO
 		_shake_magnitude = 0.0
+	_rumble_time += delta
+	offset = _snapped(jolt + _rumble() * TREMOR_PX * tremor)
 
 
 ## The centre of the authoritative window, and a vertical framing of whatever
@@ -182,6 +194,16 @@ func _stretch() -> float:
 	if window == null or view.y <= 0.0 or window.size.y <= 0:
 		return 0.0
 	return float(window.size.y) / view.y
+
+
+## A slow, irregular sway: incommensurate sines, so it never visibly repeats
+## and never jerks. Unit amplitude, roughly.
+func _rumble() -> Vector2:
+	var t := _rumble_time
+	return Vector2(
+		sin(t * 9.1) * 0.6 + sin(t * 23.7) * 0.4,
+		sin(t * 7.3 + 1.7) * 0.6 + sin(t * 19.1 + 0.4) * 0.4
+	)
 
 
 ## A camera position on the screen's pixel grid. With a whole number of screen

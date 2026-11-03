@@ -44,6 +44,8 @@ const SURFACE_EDGE := SHADOW_WARM
 ## Sky gradient, top to bottom.
 const SKY_STOPS: Array[Color] = [SHADOW_DEEP, SHADOW, MID, LIGHT_WARM]
 const SKY_OFFSETS: Array[float] = [0.0, 0.45, 0.78, 1.0]
+## The same bands at the last room's dusk: ink overhead, fire at the horizon.
+const DUSK_SKY_STOPS: Array[Color] = [INK, INK, SHADOW_DEEP, SHADOW_WARM]
 
 
 static func with_alpha(color: Color, alpha: float) -> Color:
