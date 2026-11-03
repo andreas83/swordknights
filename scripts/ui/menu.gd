@@ -91,7 +91,7 @@ func move(by: int) -> void:
 		if bool(_rows[next]["enabled"]):
 			break
 	_index = next
-	AudioDirector.play("ui_move")
+	GameAudio.cue("ui_move")
 	queue_redraw()
 
 
@@ -100,19 +100,19 @@ func confirm() -> void:
 		return
 	var row := _rows[_index]
 	if not bool(row["enabled"]):
-		AudioDirector.play("ui_back")
+		GameAudio.cue("ui_back")
 		return
 	if String(row["id"]) == SETTINGS_ID:
-		AudioDirector.play("ui_confirm")
+		GameAudio.cue("ui_confirm")
 		_open_settings()
 		return
 
 	var scene := String(row["scene"])
 	if ResourceLoader.exists(scene):
-		AudioDirector.play("ui_confirm")
+		GameAudio.cue("ui_confirm")
 		get_tree().change_scene_to_file(scene)
 	else:
-		AudioDirector.play("ui_back")
+		GameAudio.cue("ui_back")
 		push_error("mode '%s' points at a missing scene: %s" % [row["id"], scene])
 
 

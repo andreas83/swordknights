@@ -77,7 +77,7 @@ func _on_touch(event: InputEventScreenTouch) -> void:
 			if String(button["id"]) == "mute":
 				# Not an input action: the only touch-reachable way to silence
 				# the game, short of the settings screen.
-				AudioDirector.toggle_mute()
+				GameAudio.toggle_mute()
 			else:
 				_held[event.index] = button["action"]
 				_press(button["action"])
@@ -207,7 +207,7 @@ func _draw_sound_mark(at: Vector2, ink: Color) -> void:
 		Vector2(at.x + 2.0, at.y - 5.0), Vector2(at.x + 2.0, at.y + 5.0),
 		Vector2(at.x - 1.0, at.y + 2.0), Vector2(at.x - 4.0, at.y + 2.0),
 	]), ink)
-	if AudioDirector.settings.muted:
+	if GameAudio.is_muted():
 		_surface.draw_line(Vector2(at.x - 5.0, at.y + 5.0),
 			Vector2(at.x + 5.0, at.y - 5.0), Palette.CLOTH, 1.6)
 	else:

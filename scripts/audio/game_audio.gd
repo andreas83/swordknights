@@ -29,6 +29,20 @@ static func cue(voice: StringName, options: Dictionary = {}) -> void:
 		director.play(voice, options)
 
 
+## Flip the persisted mute. The director saves its own settings.
+static func toggle_mute() -> void:
+	var director := _resolve()
+	if director != null:
+		director.toggle_mute()
+
+
+## True when the game is muted. False with no director: a headless test is
+## silent, but it is not *muted*, and a mute icon should not claim otherwise.
+static func is_muted() -> bool:
+	var director := _resolve()
+	return director != null and director.settings.muted
+
+
 static func available() -> bool:
 	return _resolve() != null
 

@@ -90,8 +90,6 @@ static func _fresh_seed() -> int:
 ## The seed, top right, drawn in the game's own palette rather than with a
 ## stock Label so it sits in the picture instead of on top of it.
 class Readout extends Control:
-	const MARGIN := 7.0
-
 	var seed_value: int = 0
 	var difficulty: float = 0.0
 	var level_name: String = ""
@@ -99,12 +97,9 @@ class Readout extends Control:
 	var columns: int = 0
 	var failure: String = ""
 
-	var _font: Font
-
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		set_anchors_preset(Control.PRESET_FULL_RECT)
-		_font = ThemeDB.fallback_font
 		# A Control under a CanvasLayer draws once before its anchors resolve,
 		# which would put this off the left edge at size zero. Redraw when the
 		# layout settles and whenever the window changes shape.
@@ -118,28 +113,23 @@ class Readout extends Control:
 		var view := get_viewport_rect().size
 		if view.x <= 0.0:
 			return
+		# Bottom-left of the safe area: health holds the top-left corner, the
+		# pause and mute buttons the top-right, the stick and the action
+		# buttons the bottom-right. UiFont.draw_text casts its own shadow.
+		var content := UiLayout.content(view)
+		var left := content.position.x
+		var bottom := content.end.y
 
 		if failure != "":
-			_right(failure, view.x - MARGIN, MARGIN + 6.0, 8, Palette.PAPER)
-			_right("SEED %d" % seed_value, view.x - MARGIN, MARGIN + 16.0, 7,
-				Palette.LIGHT_SOFT)
+			UiFont.draw_text(self, failure, Vector2(left, bottom - 15.0),
+				UiFont.Cut.TEXT, Palette.PAPER, UiFont.Align.LEFT, 0.7)
+			UiFont.draw_text(self, "SEED %d" % seed_value, Vector2(left, bottom - 5.0),
+				UiFont.Cut.MICRO, Palette.LIGHT_SOFT, UiFont.Align.LEFT, 0.7)
 			return
 
-		_right("SEED %d" % seed_value, view.x - MARGIN, MARGIN + 6.0, 8, Palette.PAPER)
-		_right("%d COLS  %d BEATS  DIFF %.2f" % [columns, beats, difficulty],
-			view.x - MARGIN, MARGIN + 14.0, 6,
-			Palette.with_alpha(Palette.LIGHT_SOFT, 0.7))
-
-	func _right(value: String, right_x: float, y: float, font_size: int,
-			color: Color) -> void:
-		if value == "" or _font == null:
-			return
-		var width := _font.get_string_size(
-			value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size
-		).x
-		# A shadow, because the readout sits over a bright sky.
-		draw_string(_font, Vector2(right_x - width + 1.0, y + 1.0), value,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size,
-			Palette.with_alpha(Palette.INK, 0.55))
-		draw_string(_font, Vector2(right_x - width, y), value,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+		UiFont.draw_text(self, "SEED %d" % seed_value, Vector2(left, bottom - 14.0),
+			UiFont.Cut.TEXT, Palette.PAPER, UiFont.Align.LEFT, 0.7)
+		UiFont.draw_text(self,
+			"%d COLS  %d BEATS  DIFF %.2f" % [columns, beats, difficulty],
+			Vector2(left, bottom - 5.0), UiFont.Cut.MICRO,
+			Palette.with_alpha(Palette.LIGHT_SOFT, 0.75), UiFont.Align.LEFT, 0.7)
