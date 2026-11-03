@@ -78,7 +78,7 @@ does not care:
 | `PARRY` | the high guard: weight on the back foot, both hands over the hood and the blade across above it, where the sentinel's cut comes down; the edge gleams only while the parry can still turn a cut |
 | `BACKSTEP` | the parry's opposite: leaning *away*, the blade upright in front of the face rather than level over the hood, the free arm flung back for balance, feet off the floor for the middle of the slide, then the knees taking the weight; the edge gleams only while a cut from the front would miss |
 | `HURT` | thrown back and tilted, hood knocked away, whole figure burned white for 0.14 s |
-| `DEAD` | toppled: the robe keeps its shape, the figure does not |
+| `DEAD` | toppled: the robe keeps its shape, the figure does not. Over *backwards* off a wound's knockback, head and blade behind; from a fatal fall (`Player.is_fallen()`), folded at the knees on the frame it lands and then *face down* in a fifth of a second, arms flung ahead and the blade knocked flat beyond them, with no hop — so a fall never shares a silhouette with a cut |
 
 ## The sword in the air
 
@@ -410,6 +410,7 @@ Run `tests/tuning_feel_test.gd` and `tests/character_traversal_test.gd` too.
 | *(none — a press outside IDLE/WALK/RUN was dropped)* | `ATTACK_BUFFER 0.12` | A sword press in the last frames of a fall, in a turn, in a landing or in the tail of a swing did nothing. It is now kept like a jump press and swings on the first frame it can. |
 | `LADDER_SPEED 48` | `88` | **Measured 3.0 tiles/s, now 5.5** (`tests/unit/test_ladder.gd` times it in the real scene). The feel lab's seven-tile ladder took 2.3 s, longer than walking the whole lab; it now takes 1.3 s, a run's pace. |
 | *(a ladder jump that re-grabbed the next frame)* | `LADDER_JUMP_SCALE 0.82`, `LADDER_REGRAB_TIME 0.3` | JUMP on a ladder always left it — for one frame. The stick is still pushed up when the thumb taps JUMP, so the next frame's free movement put the prince back on the rungs. A ladder jump now goes sideways at run speed when a direction is held and straight up off the rungs when none is, and keeps the hands off every ladder for 18 frames. The 0.82 was already the jump's height; it moved here from `player.gd`. |
+| *(no fall killed)* | `FATAL_FALL_TILES 10` | **The owner's rule** (`docs/campaign.md`): a landing ten tiles or more below the apex of its fall kills. A height, not a landing speed, because speed saturates: `terminal_fall_height()` is five tiles, so every drop from five down lands at `MAX_FALL_SPEED`. Measured from the apex, so a jump's rise counts — a walk off nine tiles is survived, a jump off eight is not. Ladders, ledge grabs and the floor reset it; a plunge does not (`docs/feel.md`, *A fall of ten tiles*). Not reach: it moves no arc, and the proof prunes by the same `is_fatal_fall()` the player dies by. |
 | *(a ladder caught in mid-air slid)* | — | Gravity and the air-state pass ran on top of a mid-air grab and turned it back into `FALL`, so a ladder could only be taken from the floor. `LevelReachability` has always routed through the mid-air catch; the player can now do it. |
 
 **None of the ladder numbers is grammar.** `LevelReachability` steps between
@@ -428,6 +429,13 @@ the art and the dust both scale off `impact_weight()` so they cannot disagree
 about how hard a landing was, and `gap_tiles()` is the horizontal half of the
 grammar — the widest flat gap a running jump crosses, currently 3 — which is
 what the feel lab's long-gap station is built to.
+
+The fatal fall added three more, beside the one constant it chose:
+`fatal_fall_height()` (160 px), `terminal_fall_height()` (80 px — five tiles,
+integrated at 60 Hz, which is the argument for the rule being a height) and
+`safe_jump_drop_tiles()` (7 — the deepest drop a full jump survives, against
+the campaign's five-tile rule for intended drops). `is_fatal_fall()` is the
+one comparison: `Player` dies by it and `LevelReachability` prunes by it.
 
 ## The feel lab
 

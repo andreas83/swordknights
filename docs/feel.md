@@ -300,6 +300,50 @@ restart happens *behind* the cover rather than after it. The player is in
 control again while the shadow is still clearing, which is the thing that
 makes a retry feel instant rather than merely short.
 
+### A fall of ten tiles
+
+The owner's rule (`docs/campaign.md`, "Decided by the owner"): a fall of ten
+tiles or more kills. It is twice the deepest drop a level may ask for, so it
+only ever ends a mistake, and it has to be as readable as a cut — one cause,
+on screen, told by the landing itself.
+
+**It is measured as a height, from the apex.** `Tuning.FATAL_FALL_TILES` is
+10; `Tuning.is_fatal_fall()` is the one comparison the player dies by and the
+proof prunes by. A landing speed cannot carry it: a fall from rest reaches
+`MAX_FALL_SPEED` five tiles down (`Tuning.terminal_fall_height()`, 80 px at
+60 Hz), so the deepest intended drop and a fatal one land at the same
+360 px/s. What tells them apart is how far the feet came down from where the
+body last stopped going up — so a full jump off a ledge counts its own rise:
+a walk off nine tiles is survived, a jump off eight is not
+(`Tuning.safe_jump_drop_tiles()` is 7).
+
+| Resets the fall | Why |
+| --- | --- |
+| the floor, and a lift on it | held up: an eleven-tile ride down on a lift's slab is no fall; only the drop after leaving it counts |
+| a ladder, climbed down or caught | the rungs hold him: a long ladder is no fall, and a fall caught on one is two short ones |
+| a ledge grab | the hands stop him; letting go starts a new fall from the hang |
+| going up | a bounce off a guard, stomped or plunged, is a new arc — a guard at the foot of a drop breaks the fall |
+
+**The plunge is a fall.** It drops at the hardest speed the game has, and
+exempting it would make down + SWORD a way to cancel any fall: the rule would
+kill only players who had not found the trick. **Water and spikes** need no
+exception — each kills on contact, a frame or more before the feet can reach
+the bed, so a fall into them is a death by them, with that one cause.
+
+The beat is the landing, made the death (`Player._fall_to_death()`):
+
+| Part | A hard landing (5–9 tiles) | A fatal fall (10+) |
+| --- | --- | --- |
+| body | `LAND`, squashed, 11 frames of recovery | `DEAD` on the frame it hits: folded at the knees, then face down in a fifth of a second, arms out ahead, the blade knocked flat beyond them — the wound's death goes over *backwards* off a knockback hop, this one goes down *forwards* where it landed, with no hop |
+| sound | `land_hard` at 0.92 | `land_hard` a fifth lower at +2 dB, stone under it, then `die` |
+| camera | shake 1.6, settle at full weight | the same landing, then the death's shake 3.0 |
+| dust, haptics | full-weight dust and buzz | the same, then the death's burst and buzz |
+
+After that it is the ordinary death: `died`, the 300 ms hold, the fast wipe,
+the respawn at the last torch. No hitstop, for the same reason a landing
+holds none. `tests/unit/test_fatal_fall.gd` plays all of it in the real
+scene, each death announced to the death watch.
+
 ### Checkpoints: the torches
 
 Half a second of retry is worth nothing if the retry starts at the spawn. A

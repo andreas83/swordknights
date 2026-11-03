@@ -187,7 +187,9 @@ into a cistern and climbing out works.
 Each arc is stepped frame by frame and records everything it proves: where it
 lands, every ledge it could grab on the way down, every ladder it passes
 through. An arc that touches spikes or water stops there and contributes
-nothing beyond that point, because the player would be dead.
+nothing beyond that point, because the player would be dead. So does an arc
+whose landing is ten tiles or more below its apex: that landing kills
+(`Tuning.FATAL_FALL_TILES`, and *The fatal fall* below), so it is not offered.
 
 The queue is bucketed by manhattan distance to the exit — greedy best-first.
 A solvable level is usually settled in a few dozen expansions (level 01 takes
@@ -206,7 +208,13 @@ is simply not offered:
 - crouch-walking under a one-tile ceiling;
 - leaning the last ~4 px out over a drop before jumping — the lip takeoff is
   modelled at the tile boundary, where half the body is still over solid
-  ground, and the genuine overhang past that is given up.
+  ground, and the genuine overhang past that is given up;
+- walking off an edge, in practice. The arc is offered, but it leaves the
+  ground when the body's *centre* passes the lip, and on its first falling
+  frame the body is still half over the lip and lands back on it, so it
+  proves nothing. A drop is only ever proved by a jump — which, since the
+  fatal fall, means a drop the proof accepts is one a full jump survives:
+  seven tiles (`Tuning.safe_jump_drop_tiles()`), where a walk survives nine.
 
 So **"verified" means "reachable even by this reduced character"**, never
 "reachable if you play perfectly". Erring the other way would make the proof
@@ -217,6 +225,35 @@ The counterweight — the thing that stops conservatism becoming uselessness —
 is that `tests/level_envelope_test.gd` verifies `levels/level_01.txt`, a level
 a person designed and played. A model that could not route through it would be
 too strict to generate anything good.
+
+### The fatal fall
+
+A fall of ten tiles or more kills (`docs/feel.md`, *A fall of ten tiles*),
+so `Solver._trace()` prunes a landing `Tuning.is_fatal_fall()` says kills —
+the same function the player dies by, measured the same way: from the
+highest point of the arc to the feet at touchdown. A ladder caught or a ledge
+grabbed on the way down is still offered; those come before the landing and
+the player survives them. The prune lives in the arc, which the plain search
+and the masked one (`ReachSearch`) both step, so neither needed its own copy.
+
+It changes nothing that exists. Counting pruned arcs over every flood:
+
+| | Arcs pruned | Proof |
+| --- | --- | --- |
+| the Sun Terrace and every file in `levels/` | 0 | unchanged, state for state (`test_reach_guard_rail.gd`'s pins hold) |
+| 400 Endless ruins, every difficulty, length 170 | 0 in all 400 | all 400 texts byte-identical to before; none fails the new proof |
+| Chapter II–III stand-ins (`docs/campaign/drafts/`) | 0 | unchanged |
+| Chapter IV's stand-in, the tower | 42 | the same 158 cells reached, 4 of 4 torches: falls back down the balconies, never the route |
+| Chapter V's stand-in | 1 | unchanged reach, 4 of 4 torches |
+
+**Endless never needs one, by construction.** The grammar's only descent is
+a terrace's step down, at most `grab_rise()` (4), and its deepest pit is
+`PIT_DEPTH` (4); both are inside the campaign's five-tile rule for intended
+drops, and a full jump off five tiles falls about seven from its apex. The
+generator only returns a ruin the proof routes, and the proof now refuses a
+deadly landing, so a ruin that needed one could not be returned at all.
+`tests/unit/test_fatal_fall.gd` builds forty ruins across the dial, proves
+each and holds every beat's step down and pit depth to five.
 
 ### From somewhere other than the spawn
 
@@ -461,6 +498,7 @@ godot --headless --path . --script tests/level_solvability_test.gd
 | `unit/test_secret_generator.gd` | where Endless hides a secret, and that it moves nothing else |
 | `unit/test_reach_mechanisms.gd` | the proof over a channel mask, on a toy plate and gate and a trapdoor |
 | `unit/test_reach_guard_rail.gd` | levels without mechanisms proved exactly as before the framework |
+| `unit/test_fatal_fall.gd` | a ten-tile landing pruned by both searches, and forty ruins that never need one |
 
 `tests/level_asserts.gd` is the shared helper. It is `preload`ed rather than
 registered with `class_name`, so it cannot collide with a real test framework

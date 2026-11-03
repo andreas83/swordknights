@@ -297,6 +297,7 @@ landing a step mid-stride. Step volume also scales with the actual
 | `LADDER` cadence, while moving | `ladder` (a wooden rung) |
 | `jumped` | `jump` |
 | `landed(impact)` | `land_soft` or `land_hard` above `Tuning.HARD_LAND_SPEED`, with volume from −15 dB and pitch from 1.14 scaled by impact |
+| `landed` from a fatal fall (`Player.is_fallen()`) | `land_hard` at pitch 0.68 and +2 dB, `masonry` at 0.6 and −8 dB under it, `cloth` at −1 dB; then `died` adds `die`. Every survivable landing from five tiles down hits at the same speed and sounds the same at 0.92, so this one is pitched apart from all of them |
 | `grabbed_ledge` | `ledge_grab` |
 | entering `CLIMB_UP` | `climb` |
 | `attacked` | `sword` |
