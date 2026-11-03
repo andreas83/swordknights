@@ -285,9 +285,21 @@ func _ready() -> void:
 	_veil = veil
 
 
-## The wipe runs on the display clock: it is presentation, and on a client
-## reconciling a duel the physics clock can step twice in one frame.
-func _process(delta: float) -> void:
+## The wipe runs on the simulation clock, not the display clock.
+##
+## A wipe looks like pure presentation and `DuelCamera` makes the opposite
+## choice for exactly that reason — but this one fires the caller's work at
+## full cover, and that work is a respawn or a scene change. CLAUDE.md:
+## *nothing gameplay-relevant may depend on `_process` or on `delta` varying*.
+## A retry that happens on frame 23 at 60 fps and frame 11 at 30 fps is
+## gameplay depending on the display, so the whole state machine runs here
+## with the hitstop clock instead.
+##
+## The reason `DuelCamera` avoids the physics clock — a client reconciling a
+## duel may step it twice in one frame — cannot reach this file: `Flow` is
+## installed by `Game._ready()` and a duel never runs `Game`.
+func _physics_process(delta: float) -> void:
+	_step_hitstop(delta)
 	if _stage == Stage.IDLE:
 		return
 	_time += delta
@@ -317,8 +329,9 @@ func _process(delta: float) -> void:
 
 ## Hitstop is counted in simulation frames, so it is spent on the simulation
 ## clock — one call to `hitstop(4 frames)` must hold for exactly four steps of
-## the thing it is freezing.
-func _physics_process(delta: float) -> void:
+## the thing it is freezing. Called from `_physics_process` above, so the wipe
+## and the hold are measured by one clock.
+func _step_hitstop(delta: float) -> void:
 	if _hitstop <= 0.0:
 		return
 	_hitstop -= delta

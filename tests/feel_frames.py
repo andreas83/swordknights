@@ -50,7 +50,7 @@ ROWS = [
         "reveal",
         "MENU → LEVEL",
         "The shadow lifts off the scene. One hard raked edge, a lit rim, no fade.",
-        [4, 6, 8, 10, 12, 14, 16],
+        [5, 7, 9, 11, 13, 15, 17],
         None,
     ),
     (
