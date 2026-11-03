@@ -38,19 +38,29 @@ Ledge grabs happen automatically when you fall past a grabbable corner while
 moving into it; press up (or jump) to mantle, down to let go. Hold down and
 press jump to drop through a one-way platform.
 
-In the local duel both players share one keyboard. A Godot action cannot tell
-two gamepads apart, so these bindings are keyboard-only by design:
+The local duel is a tug of war in the spirit of *Nidhogg*: one hit kills, and
+every kill sends the world scrolling toward the killer's gate. Both players
+share one keyboard; a Godot action cannot tell two gamepads apart, so these
+bindings are keyboard-only by design:
 
-| Action       | Player one | Player two          |
-| ------------ | ---------- | ------------------- |
-| Move         | `W A S D`  | Arrows / numpad `8456` |
-| Jump         | `Space` / `V` | `K` / numpad `0` |
-| Sword        | `F`        | `J` / numpad `1`    |
-| Guard        | `G`        | `L` / numpad `2`    |
-| Walk (slow)  | `Shift`    | `;` / numpad `3`    |
+| Action                 | Player one    | Player two             |
+| ---------------------- | ------------- | ---------------------- |
+| Run                    | `A` `D`       | `←` `→` / numpad `4 6` |
+| Sword high / low       | hold `W` / `S` | hold `↑` / `↓` / numpad `8 5` |
+| Duck                   | hold `S`, standing still | hold `↓`, standing still |
+| Jump                   | `Space` / `V` | `K` / numpad `0`       |
+| Thrust                 | `F`           | `J` / numpad `1`       |
+| Throw the sword        | `G`           | `L` / numpad `2`       |
+| Roll / dive kick       | down + jump, on the ground / in the air | same |
 
-The networked duel uses the single-player bindings above, plus `Q` / `L` or
-R1 to guard.
+Holding neither up nor down is the middle stance. Meet a thrust at its height
+and the blades clash; move your sword *into* its height just as it starts and
+you disarm the attacker. Up + throw angles the throw upward. An empty-handed
+fighter sweeps on the ground and stamps from the air, and picks a sword up by
+holding down over it.
+
+The online duel is still the earlier round-based duel, with the single-player
+bindings above plus `Q` / `L` or R1 to guard.
 
 ## Project layout
 

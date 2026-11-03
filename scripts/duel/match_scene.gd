@@ -65,6 +65,8 @@ func _ready() -> void:
 		push_error("the match would not build")
 		return
 
+	_start_in_zone_argument()
+
 	# Seat two wears steel and sea-green; teal is player two's colour and no one
 	# else's (docs/art-direction.md). Presentation, so it is set here and not
 	# in the match, which must not know what a fighter looks like.
@@ -76,6 +78,7 @@ func _ready() -> void:
 	camera.framing_width = _framing_argument()
 	camera.setup(fight)
 	sky.camera = camera
+	_light_the_last_rooms()
 	sky.seed_value = hash(strip.name)
 
 	_build_gates()
@@ -88,6 +91,40 @@ func _ready() -> void:
 	fight.fighter_respawned.connect(_on_fighter_respawned)
 	fight.leader_consumed.connect(_on_leader_consumed)
 	fight.match_over.connect(_on_match_over)
+
+
+## Dusk over the gate zone at each end of the strip. See MatchDusk.
+func _light_the_last_rooms() -> void:
+	for seat: DuelSeat in fight.seats:
+		var art := seat.node.get_node_or_null("FighterArt")
+		if art != null:
+			art.add_to_group(MatchDusk.LIT)
+	var dusk := MatchDusk.new()
+	dusk.name = "Dusk"
+	add_child(dusk)
+	dusk.setup(camera, strip, sky)
+
+
+## `--start-zone=N` in the user arguments opens the match with the window on
+## zone N instead of the middle, both fighters on open ground in it. For looking
+## at a zone -- the dusk over the last rooms above all -- without fighting the
+## way there. Not a game mode: it writes match state from outside the match.
+func _start_in_zone_argument() -> void:
+	var zone := -1
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--start-zone="):
+			zone = arg.trim_prefix("--start-zone=").to_int()
+	if zone < 0 or zone >= strip.zone_count():
+		return
+	var left := strip.zone_left(zone)
+	var width := strip.zone_width()
+	fight.scroll = left
+	fight.zone_index = zone
+	for slot: int in fight.seats.size():
+		var wanted := left + width * (0.38 if slot == 0 else 0.62)
+		var found := strip.find_open_ground(wanted, left + width * 0.5)
+		if bool(found["ok"]):
+			fight.seats[slot].respawn_at(found["position"], 1 if slot == 0 else -1)
 
 
 ## `--framing=320` in the user arguments frames the view that many world pixels

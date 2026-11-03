@@ -30,8 +30,8 @@ static func modes() -> Array[Dictionary]:
 		{
 			"id": "duel",
 			"title": "Duel",
-			"subtitle": "Two swords, one keyboard",
-			"scene": "res://scenes/duel_local.tscn",
+			"subtitle": "Tug of war, one keyboard",
+			"scene": "res://scenes/duel_match.tscn",
 			"available": true,
 		},
 		{

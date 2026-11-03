@@ -156,6 +156,8 @@ func _realize(zone: int) -> void:
 		var torch := Torch.new()
 		torch.name = "Torch_%d_%d" % [cell.x, cell.y]
 		torch.position = Vector2(cell.x * TILE + TILE * 0.5, (cell.y + 1) * TILE)
+		# A flame keeps its own light when dusk falls on the room around it.
+		torch.add_to_group(MatchDusk.LIT)
 		_props.add_child(torch)
 	builds += 1
 	built_last_focus = true
