@@ -38,6 +38,7 @@ const CLOTH_ON_ENTER := {
 	Player.State.AIR_SLASH: -4.0,
 	Player.State.PLUNGE: -1.0,
 	Player.State.PARRY: -4.0,
+	Player.State.BACKSTEP: -2.0,
 }
 
 ## Below this impact a landing is inaudible — stepping off a kerb should not
@@ -175,6 +176,11 @@ func _on_state_entered(state: int) -> void:
 		# The blade going up: the sword's own voice, higher and quieter than
 		# a swing, so a parry and a swing are told apart by ear.
 		_play("sword", {"pitch": 1.25, "volume_db": -5.0})
+	if state == Player.State.BACKSTEP:
+		# The blade drawn back across the body: the same voice low and soft, a
+		# whoosh under the cloth rather than a swing, so the ear does not
+		# hear an attack in a move that is not one.
+		_play("sword", {"pitch": 0.7, "volume_db": -10.0})
 
 
 func _on_jumped() -> void:

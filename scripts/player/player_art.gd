@@ -194,7 +194,7 @@ func _skip_frame() -> bool:
 ## Whether the blade is drawn in front of the robe rather than behind it.
 func _blade_in_front() -> bool:
 	match _player.state:
-		Player.State.PLUNGE_LAND, Player.State.PARRY:
+		Player.State.PLUNGE_LAND, Player.State.PARRY, Player.State.BACKSTEP:
 			return true
 		_:
 			return _player.is_striking()
@@ -578,7 +578,7 @@ func _grounded() -> bool:
 	match _player.state:
 		Player.State.IDLE, Player.State.WALK, Player.State.RUN, Player.State.TURN, \
 		Player.State.CROUCH, Player.State.LAND, Player.State.ATTACK, \
-		Player.State.PLUNGE_LAND, Player.State.PARRY:
+		Player.State.PLUNGE_LAND, Player.State.PARRY, Player.State.BACKSTEP:
 			return true
 		_:
 			return _player.is_grounded()
@@ -657,6 +657,8 @@ func _posture() -> Dictionary:
 			return _pose(SwordPoses.plunge_land(t))
 		Player.State.PARRY:
 			return _pose(SwordPoses.parry(t))
+		Player.State.BACKSTEP:
+			return _pose(SwordPoses.backstep(t))
 		Player.State.HURT:
 			return _hurt(t)
 		Player.State.DEAD:

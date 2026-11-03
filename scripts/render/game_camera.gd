@@ -10,8 +10,8 @@ extends Camera2D
 ##
 ## ## Framing the beat
 ##
-## The base behaviour above is the resting state. Four beats bend it, and the
-## whole budget for all four is about thirty pixels:
+## The base behaviour above is the resting state. Five beats bend it, and the
+## whole budget for all five is about thirty pixels:
 ##
 ## | Beat | What the frame does | Budget |
 ## | --- | --- | --- |
@@ -21,6 +21,7 @@ extends Camera2D
 ## |   | ground arrives before the player does | |
 ## | a ledge grab | stops leading, lifts onto the ledge taken | `GRAB_LIFT` |
 ## | a hard landing | settles with the weight of it, recovers | `SETTLE_MAX` |
+## | a backstep | holds the lead where it was; dips a pixel | 0.3 x `SETTLE_MAX` |
 ##
 ## The rules are static functions below so they can be reasoned about and
 ## tested without a physics world: `_physics_process` only composes them.
@@ -177,6 +178,13 @@ func _physics_process(delta: float) -> void:
 	var fall_speed := target.velocity.y
 
 	var lead_goal := target.facing * look_ahead * lead_scale(target.velocity.x, hanging)
+	# A backstep is a step, not travel. The lead is scaled by speed and aimed
+	# by facing, and a backstep is the one move that is fast while facing
+	# against its motion, so left alone it threw the frame most of a full lead
+	# toward the guard and drifted it back over a second -- a lurch on every
+	# dodge. The lead holds where it was; the dead zone absorbs the step.
+	if target.is_backstepping():
+		lead_goal = _look_ahead_current
 	# Asymmetric: extending the lead is a decision, retracting it is a settle.
 	var toward := (
 		look_ahead_smoothing

@@ -28,6 +28,10 @@ const MENU_SCENE := "res://scenes/menu.tscn"
 # to claim it. Wider than one frame of full-speed running, so it cannot be
 # skipped, and narrow enough that it reads as "I reached the torch".
 const CHECKPOINT_REACH := 10.0
+# --- feel/flow (additive) --- the backstep's camera beat, as a share of a
+# full-weight landing's settle: GameCamera.SETTLE_MAX 4 px x 0.3 rounds to one
+# pixel. Enough that the weight is felt going back, too little to be seen.
+const BACKSTEP_SETTLE := 0.3
 
 @export_file("*.txt") var level_path: String = "res://levels/level_01.txt"
 ## Set instead of level_path to run a generated level without writing a file.
@@ -97,6 +101,9 @@ func _ready() -> void:
 	player.healed.connect(func(_h: int) -> void: _update_hud())
 	player.died.connect(_on_died)
 	player.plunge_landed.connect(_on_plunge_landed)
+	# The backstep's weight going onto the rear foot: a single pixel of dip,
+	# the lightest settle in the game. The lead is held by the camera itself.
+	player.backstepped.connect(func() -> void: camera.settle(BACKSTEP_SETTLE))
 	# --- secrets ---
 	secrets.setup(level, player)
 	secrets.furnish(_entities)
@@ -321,6 +328,11 @@ func _resolve_guard(guard: Patrol, body: Rect2, attack: Rect2, has_attack: bool)
 	elif guard.is_dangerous() and body.intersects(guard.strike_rect()):
 		if player.deflect(guard.global_position.x) and guard.parried():
 			_on_parried(guard)
+		elif player.evades(guard.global_position.x):
+			# The backstep: the cut goes by in front of him. Nothing happens
+			# to either of them -- the guard's own cut is its sound, and the
+			# missing hit is the read. No riposte, no reel: see Player.evades().
+			pass
 		elif player.damage(1, guard.global_position.x):
 			# --- feel/flow (additive) --- only when it landed:
 			# damage() returns false during invulnerability.

@@ -134,6 +134,48 @@ const STOMP_BOUNCE := 0.68
 const PARRY_TIME := 0.4
 const PARRY_ACTIVE := 0.2
 
+# The backstep. A third move made of the stick and SWORD, and the only one of
+# the three that moves the prince along the floor, so it is the one that had
+# to be kept out of the grammar on purpose: it is ground-only, it stops at the
+# lip of any drop the way a careful step does (Player._careful()), and
+# so it cannot carry him over a gap of any width. LevelReachability offers it
+# nowhere. tests/unit/test_backstep.gd pins every number below against
+# Patrol's raise, cut and opening, the way test_specials.gd pins the parry.
+
+## THE BACKSTEP: back + SWORD on the ground. The whole move, slide and
+## recovery: nothing comes out of it -- no swing, no jump, no turn, no second
+## backstep -- until it is over. 27 frames, which is what makes it the move
+## that SURVIVES the exchange where the parry wins it: from a backstep that
+## needed its window, this plus the run back into reach and the swing's lead
+## is longer than the guard's opening, so the cut he dodged costs the guard
+## nothing.
+const BACKSTEP_TIME := 0.45
+## How long the feet are moving. The rest of BACKSTEP_TIME is the recovery.
+const BACKSTEP_SLIDE := 0.2
+## The speed the slide starts at, falling off linearly to nothing at
+## BACKSTEP_SLIDE. Gives backstep_distance(), 22.75 px, about 1.4 tiles: from
+## where a guard raises, four times the step out of his cut, and enough ground
+## that the run back in costs his whole opening (test_backstep.gd).
+const BACKSTEP_SPEED := 210.0
+## A guard's cut from the FRONT does not land for this long from the first
+## frame. Longer than Patrol.STRIKE_TIME, so a backstep with its back to a
+## wall can outlast the whole cut; shorter than Patrol.WINDUP_TIME, so one
+## thrown on sight with nowhere to go is over before the blade arrives.
+const BACKSTEP_ACTIVE := 0.25
+## After a backstep, the stick and SWORD cannot make another one for this long
+## (from the end of the first). Without it a held stick and a mashed button
+## chain them, and a chain retreats faster than a walk with the window up
+## twice a second.
+const BACKSTEP_REARM := 0.2
+## How long after the stick turned him on the spot a SWORD press still reads
+## the stick against the way he faced BEFORE that turn, and takes the turn
+## back. A thumb does not land the stick and the button on the same frame,
+## and standing or walking, the stick going back turns him at once; without
+## this, back-then-SWORD would turn him and swing away from the guard. Six
+## frames: as long as a planted TURN takes, so an on-the-spot turn is never
+## more final than a running one.
+const BACKSTEP_READ := 0.1
+
 # Landing.
 #
 # Both thresholds sit above flat_jump_land_speed(), which is the whole point:
@@ -244,6 +286,29 @@ static func flat_jump_land_speed() -> float:
 static func land_speed_after_drop(tiles: float) -> float:
 	var v2 := JUMP_SPEED * JUMP_SPEED + 2.0 * GRAVITY * tiles * TILE
 	return minf(sqrt(v2), MAX_FALL_SPEED)
+
+
+## The backstep's speed `t` seconds into it: BACKSTEP_SPEED falling off in a
+## straight line to nothing at BACKSTEP_SLIDE. Player moves by this and
+## backstep_distance() integrates it, so the two cannot disagree.
+static func backstep_speed(t: float) -> float:
+	return BACKSTEP_SPEED * maxf(0.0, 1.0 - t / BACKSTEP_SLIDE)
+
+
+## How far a backstep on open floor carries the body, in pixels.
+##
+## Integrated a frame at a time, as jump_airtime() is and for the same reason:
+## the simulation is a fixed 60 Hz step, and the frame the move starts on
+## moves at t = 0. That is the ground the move costs, so tests pin it between
+## one tile and a tile and a half.
+static func backstep_distance() -> float:
+	var dt := 1.0 / 60.0
+	var distance := 0.0
+	var t := 0.0
+	while t < BACKSTEP_SLIDE:
+		distance += backstep_speed(t) * dt
+		t += dt
+	return distance
 
 
 ## 0 for a weightless touchdown, 1 for the hardest landing the game can

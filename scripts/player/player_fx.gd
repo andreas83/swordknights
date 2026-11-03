@@ -67,6 +67,8 @@ const HAPTIC_LAND_FROM := 0.35
 const HAPTIC_LAND_CEILING := 0.7
 const HAPTIC_HURT := 0.8
 const HAPTIC_DEATH := 1.0
+## Grit kicked up by a backstep's push-off.
+const BACKSTEP_DUST := 5
 
 var _player: Player
 var _art: PlayerArt
@@ -106,6 +108,7 @@ func _ready() -> void:
 	_art = _player.get_node_or_null("PlayerArt") as PlayerArt
 	_player.landed.connect(_on_landed)
 	_player.grabbed_ledge.connect(_on_grabbed_ledge)
+	_player.backstepped.connect(_on_backstepped)
 	_player.hurt.connect(_on_hurt)
 	_player.died.connect(_on_died)
 
@@ -230,6 +233,18 @@ func _on_grabbed_ledge() -> void:
 		_spawn(hand + Vector2(randf_range(-1.5, 1.5), randf_range(-1.0, 1.0)),
 			Vector2(_player.facing * randf_range(4.0, 20.0), randf_range(-14.0, 6.0)),
 			randf_range(0.2, 0.36), 1.0, Kind.DUST)
+
+
+## The feet pushing off for a backstep: a low spray of grit thrown FORWARD,
+## toward the blade he is leaving, from the front foot that pushed. Few and
+## flat -- a scuff, not a landing -- and no buzz: the hand did nothing hard.
+func _on_backstepped() -> void:
+	var front := float(_player.facing)
+	var at := _player.global_position + Vector2(front * 2.5, -0.5)
+	for i: int in BACKSTEP_DUST:
+		_spawn(at + Vector2(randf_range(-1.5, 1.5), 0.0),
+			Vector2(front * randf_range(18.0, 42.0), -randf_range(4.0, 14.0)),
+			randf_range(0.2, 0.32), 1.0 + 0.3 * float(i % 2), Kind.DUST)
 
 
 func _on_hurt(_remaining_health: int) -> void:

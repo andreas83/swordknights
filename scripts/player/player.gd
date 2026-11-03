@@ -22,6 +22,9 @@ signal healed(health: int)
 signal died()
 ## A plunge met the floor instead of a guard: the point is in the stone.
 signal plunge_landed()
+## Back + SWORD came out as a backstep: the feet push off. The dust, the cloth
+## and the camera's dip hang off this, so none of them reads the state machine.
+signal backstepped()
 
 ## New states go on the end, so a state's number never changes under anything
 ## that has stored one.
@@ -30,7 +33,7 @@ enum State {
 	JUMP, FALL, LAND,
 	HANG, CLIMB_UP, LADDER,
 	ATTACK, HURT, DEAD,
-	AIR_SLASH, PLUNGE, PLUNGE_LAND, PARRY,
+	AIR_SLASH, PLUNGE, PLUNGE_LAND, PARRY, BACKSTEP,
 }
 
 const TILE := 16.0
@@ -67,6 +70,13 @@ var _ladder_lockout: float = 0.0
 var _rise_time: float = 0.0
 ## A parry that turned a cut: the next sword press comes out at once.
 var _riposte := false
+## Counting down from the stick turning him on the spot: a SWORD press now
+## still reads the stick against the facing he turned from. See
+## _reads_backstep().
+var _about_face: float = 0.0
+## Counting down from the start of a backstep; another cannot start until it
+## is spent. Tuning.BACKSTEP_REARM says why.
+var _backstep_rearm: float = 0.0
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 
@@ -92,6 +102,8 @@ func respawn(at: Vector2) -> void:
 	_attack_buffer = 0.0
 	_ladder_lockout = 0.0
 	_riposte = false
+	_about_face = 0.0
+	_backstep_rearm = 0.0
 	_set_crouched(false)
 
 
@@ -168,6 +180,25 @@ func deflect(from_x: float) -> bool:
 	return true
 
 
+## Somewhere in the backstep, slide or recovery. The camera asks, to hold its
+## lead: see GameCamera.
+func is_backstepping() -> bool:
+	return state == State.BACKSTEP
+
+
+## Whether a cut from a blade at `from_x` misses this frame because the prince
+## is stepping back out from under it: inside BACKSTEP_ACTIVE, and only from
+## the way he faces. He is leaning away from the blade in front of him with
+## his own across his body; one from behind is the blade he is stepping into.
+## Unlike deflect() it arms nothing: the backstep survives a cut, it does not
+## open the guard, so there is no riposte to earn.
+func evades(from_x: float) -> bool:
+	if state != State.BACKSTEP or state_time >= Tuning.BACKSTEP_ACTIVE:
+		return false
+	var toward := int(signf(from_x - position.x))
+	return toward == 0 or toward == facing
+
+
 ## A plunge that found a guard springs back off him, the way a stomp does: it
 ## is the stomp with the sword in it. It comes out as a jump the player can
 ## steer, so a second plunge is a decision and not a bounce.
@@ -184,6 +215,8 @@ func _physics_process(delta: float) -> void:
 	_drop_through = maxf(0.0, _drop_through - delta)
 	_attack_buffer = maxf(0.0, _attack_buffer - delta)
 	_ladder_lockout = maxf(0.0, _ladder_lockout - delta)
+	_about_face = maxf(0.0, _about_face - delta)
+	_backstep_rearm = maxf(0.0, _backstep_rearm - delta)
 	_rise_time += delta
 	if input.just_pressed_jump:
 		_jump_buffer = Tuning.JUMP_BUFFER
@@ -245,6 +278,10 @@ func _update_free(delta: float) -> void:
 				_enter(State.IDLE if grounded else State.FALL)
 		State.PARRY:
 			_update_parry(delta, grounded)
+		State.BACKSTEP:
+			_slide_back(delta)
+			if state_time >= Tuning.BACKSTEP_TIME:
+				_enter(State.IDLE)
 		State.LAND:
 			_land_timer -= delta
 			velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * delta)
@@ -329,7 +366,14 @@ func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) ->
 		return
 
 	if want_x != 0:
+		if want_x != facing and grounded:
+			# On the spot: remember it for BACKSTEP_READ, so a SWORD press a
+			# few frames behind the stick can still take it back. A second
+			# turn inside that time is a wiggle, and cancels the first.
+			_about_face = Tuning.BACKSTEP_READ if _about_face <= 0.0 else 0.0
 		facing = want_x
+	else:
+		_about_face = 0.0
 	_steer(delta, want_x, walking, grounded)
 
 	if grounded:
@@ -342,18 +386,22 @@ func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) ->
 			_enter(State.RUN)
 
 
-## The sword button, read with the stick. On the ground it swings, or with up
-## held raises the parry; in a jump or a fall it slashes there and then, or
-## with down held plunges. Up and down are the only directions a thumb can add
-## to SWORD without changing where it is going, and each one points at where
-## the move happens: the parry goes up to meet an overhead cut, the plunge
-## goes down. False when the sword cannot come out from this state, so the
-## press stays buffered.
+## The sword button, read with the stick. On the ground it swings, with up held
+## raises the parry, and with the stick held back steps back out of a cut; in
+## a jump or a fall it slashes there and then, or with down held plunges. Each
+## direction points at where its move happens: the parry goes up to meet an
+## overhead cut, the plunge goes down, the backstep goes back. Up wins over
+## back, because a diagonal held up-and-back is a thumb reaching for the parry
+## past a stick that has drifted. False when the sword cannot come out from
+## this state, so the press stays buffered.
 func _start_sword(delta: float, want_x: int, walking: bool, grounded: bool) -> bool:
 	if grounded:
 		_attack_buffer = 0.0
 		if input.up:
 			_enter(State.PARRY)
+			return true
+		if _reads_backstep(want_x):
+			_start_backstep(delta)
 			return true
 		_enter(State.ATTACK)
 		attacked.emit()
@@ -369,6 +417,93 @@ func _start_sword(delta: float, want_x: int, walking: bool, grounded: bool) -> b
 		# The press frame is an airborne frame like any other: steered, not held.
 		_steer(delta, want_x, walking, false)
 	attacked.emit()
+	return true
+
+
+## Whether this press of SWORD, on the ground, is a backstep: the stick held
+## away from the way he faces. Read BEFORE the turn, which is the point -- the
+## stick going back is what turns a standing prince, and a backstep that
+## turned him first would step back facing away from the blade.
+##
+## Three cases. The stick went back on this very frame: the turn has not
+## happened yet, so the facing is still the old one, and it is a backstep if
+## that turn would have been on the spot (standing or walking). The stick went
+## back a few frames ago and turned him on the spot: inside BACKSTEP_READ the
+## turn is taken back and it is a backstep all the same, because a thumb never
+## lands the stick and the button together. The stick went back at a run: that
+## turn is planted (TURN), and the press waits out the turn in the buffer and
+## swings the new way, as it always has -- a running prince has his weight
+## going forward, and a backstep is a move from a stance.
+##
+## Inside BACKSTEP_REARM none of this applies and the press is whatever it was
+## before the backstep existed.
+func _reads_backstep(want_x: int) -> bool:
+	if want_x == 0 or _backstep_rearm > 0.0:
+		return false
+	if want_x != facing:
+		return absf(velocity.x) <= Tuning.WALK_SPEED
+	if _about_face > 0.0:
+		facing = -facing
+		return true
+	return false
+
+
+func _start_backstep(delta: float) -> void:
+	_about_face = 0.0
+	_backstep_rearm = Tuning.BACKSTEP_TIME + Tuning.BACKSTEP_REARM
+	_enter(State.BACKSTEP)
+	_slide_back(delta)
+	backstepped.emit()
+
+
+## One frame of the backstep: Tuning.backstep_speed(), away from the facing,
+## and never past the lip of a drop. Facing does not change and nothing is
+## steered; the stick has already said what it had to.
+func _slide_back(delta: float) -> void:
+	var speed := -float(facing) * Tuning.backstep_speed(state_time)
+	velocity.x = _careful(speed, delta)
+
+
+## The careful step's rule, applied to the backstep: the body ends the frame
+## with the whole of it over floor and none of it in a hazard, or it stops at
+## the lip -- the far edge of the last floor tile -- and goes no further.
+##
+## That is a decision, not a convenience. The backstep is thrown looking the
+## other way, at a blade, and it is fast; one that slid off a ledge would turn
+## a dodge into a fall nobody chose. Stopping at the lip also keeps it out of
+## the traversal grammar entirely: it can cross no gap of any width, so no
+## level can come to depend on it and Tuning's jump numbers stay the only
+## horizontal reach there is. A backstep that starts already overhanging a
+## lip goes nowhere, and still has its window.
+func _careful(speed: float, delta: float) -> float:
+	if level == null or speed == 0.0:
+		return speed
+	var next := position.x + speed * delta
+	if _footing(next):
+		return speed
+	var half := Tuning.BODY_WIDTH * 0.5
+	var lip: float
+	if speed < 0.0:
+		lip = floorf((position.x - half) / TILE) * TILE + half
+	else:
+		lip = (floorf((position.x + half - 0.001) / TILE) + 1.0) * TILE - half
+	if not _footing(lip):
+		return 0.0
+	return (lip - position.x) / delta
+
+
+## Whether a standing body with its feet at `x` would be entirely over floor
+## (solid or one-way) and clear of every hazard.
+func _footing(x: float) -> bool:
+	var half := Tuning.BODY_WIDTH * 0.5
+	var body := Rect2(x - half, position.y - _height(), Tuning.BODY_WIDTH, _height())
+	if level.rect_is_deadly(body):
+		return false
+	var row := floori((position.y + 1.0) / TILE)
+	for column: int in range(floori((x - half) / TILE), floori((x + half - 0.001) / TILE) + 1):
+		var kind := level.kind_at_cell(Vector2i(column, row))
+		if kind != Tiles.Kind.SOLID and kind != Tiles.Kind.PLATFORM:
+			return false
 	return true
 
 
@@ -407,12 +542,14 @@ func _steer(delta: float, want_x: int, walking: bool, grounded: bool) -> void:
 
 
 ## Whether a jump may fire from the current state: not out of a swing, a slash,
-## a crouch, or either special -- a special is a commitment, and one a jump
-## could cancel would have no price.
+## a crouch, or any special -- a special is a commitment, and one a jump could
+## cancel would have no price. For the backstep there is a second reason: a
+## jump out of its slide would carry its speed into the air, and that is a
+## longer jump than Tuning.gap_tiles() is derived from.
 func _jump_allowed() -> bool:
 	match state:
 		State.ATTACK, State.AIR_SLASH, State.CROUCH, State.PLUNGE, State.PLUNGE_LAND, \
-		State.PARRY:
+		State.PARRY, State.BACKSTEP:
 			return false
 		_:
 			return true

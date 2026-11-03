@@ -1,10 +1,10 @@
 class_name SwordPoses
 extends RefCounted
 ## The prince's poses with the sword in play: the swing, the air slash, the
-## plunge and its landing, and the parry.
+## plunge and its landing, the parry and the backstep.
 ##
 ## They live apart from PlayerArt because they are the part of the vocabulary
-## that grows -- four of these five arrived together -- and because they share
+## that grows -- four of the first five arrived together -- and because they share
 ## one rule the rest of the poses do not: a blade drawn in a pose here is a
 ## promise about a hitbox in Player, so a curve here and a window there change
 ## together. Each returns only the fields it overrides; PlayerArt._pose()
@@ -147,4 +147,43 @@ static func parry(t: float) -> Dictionary:
 		"cloak_sweep": 0.2, "cloak_rise": 0.6, "cloak_flare": 1.2,
 		"blade": lerpf(0.4, -0.22, up), "blade_len": 10.0,
 		"blade_hot": 1.0 if t < Tuning.PARRY_ACTIVE else 0.0,
+	}
+
+
+## A skip back on the rear foot, the blade raised upright in front of the body
+## and across it, the free arm flung back for balance. It has to read as the
+## opposite of the parry at 22 px: the parry plants and holds the blade level
+## OVER the hood, where an overhead cut lands; this one leans away and holds it
+## upright IN FRONT of the face -- a man getting out of the way, not standing
+## in it. The feet leave the floor for the middle of the slide (bob and dangle
+## together lift the whole figure, not just the legs), then the knees take the
+## weight for the recovery. The edge gleams only while a cut from the front
+## would miss, as the parry's does, so the window can be seen to close.
+static func backstep(t: float) -> Dictionary:
+	var slide := clampf(t / Tuning.BACKSTEP_SLIDE, 0.0, 1.0)
+	var rest := Tuning.BACKSTEP_TIME - Tuning.BACKSTEP_SLIDE
+	var settle := smoothstep(0.0, 1.0, clampf((t - Tuning.BACKSTEP_SLIDE) / rest, 0.0, 1.0))
+	var up := smoothstep(0.0, 0.25, slide)
+	var hop := sin(slide * PI) * (1.0 - settle)
+	var plant := smoothstep(0.7, 1.0, slide) * (1.0 - settle)
+	return {
+		"squash": 1.0 - plant * 0.06,
+		"sink": plant * 1.8 + settle * 0.4,
+		"bob": -hop * 1.6,
+		"dangle": -hop * 1.6,
+		"lean": lerpf(-2.6, -0.4, settle),
+		"twist": lerpf(0.82, 0.95, settle),
+		"stride": lerpf(2.4, 1.2, settle),
+		"stance": lerpf(1.6, 1.2, settle),
+		"knee": lerpf(1.4, 0.2, settle),
+		"hem_lift": lerpf(2.2, 0.8, settle),
+		"hem_fwd": lerpf(2.6, 0.6, settle),
+		"hem_spread": 0.6,
+		"hood_tilt": lerpf(-0.22, -0.05, settle),
+		"arm_a": lerpf(0.9, 0.2, up) + settle * 0.3, "arm_a_len": 5.4,
+		"arm_b": lerpf(1.6, 2.7, up) - settle * 0.4, "arm_b_len": 5.6,
+		"cloak_sweep": lerpf(-1.8, -0.2, settle), "cloak_rise": lerpf(1.6, 0.4, settle),
+		"cloak_flare": 1.3,
+		"blade": lerpf(1.6, -1.2, up) + settle * 0.35, "blade_len": 10.0,
+		"blade_hot": 1.0 if t < Tuning.BACKSTEP_ACTIVE else 0.0,
 	}
