@@ -13,12 +13,17 @@ extends SceneTree
 ##
 ## Modes: direct-host, direct-guest, room-host, room-guest.
 ##
+## `--sim match` (the default) plays the tug-of-war match on the real fighter,
+## which is what the online duel runs; `--sim round` plays the earlier round
+## duel.
+##
 ## Runs at real time on purpose: no --fixed-fps. Two processes talking over a
 ## socket have to agree about how fast a second is.
 
 const Support := preload("res://tests/duel_support.gd")
 
 var mode := "direct-host"
+var sim_kind := "match"
 var url := "ws://127.0.0.1:45678"
 var port := 45678
 var code := ""
@@ -28,7 +33,7 @@ var code_out := ""
 ## Give up if nothing ever connects, so a failed run ends rather than hangs.
 var patience_frames := 1800
 
-var _duel: Duel
+var _duel: DuelSim
 var _transport: WsTransport
 var _session: NetSession
 var _stream: Array[Vector2i]
@@ -86,7 +91,17 @@ func _physics_process(_delta: float) -> bool:
 ## --- setting up -------------------------------------------------------------
 
 func _open() -> void:
-	_duel = Support.spawn_duel(root)
+	if sim_kind == "match":
+		var fight := DuelMatch.new()
+		fight.name = "Match"
+		fight.fighter_scene = load("res://scenes/fighter.tscn")
+		root.add_child(fight)
+		if not fight.build(ZoneStrip.from_manifest("res://levels/duel_zones.txt")):
+			_finish("the match would not build")
+			return
+		_duel = fight
+	else:
+		_duel = Support.spawn_duel(root)
 	_transport = WsTransport.new()
 	_transport.room_assigned.connect(_on_room_assigned)
 
@@ -157,11 +172,8 @@ func _finish(note: String) -> bool:
 		"running=%s" % (_session != null and _session.is_running()),
 		"frames=%d" % (_duel.frame if _duel != null else -1),
 		"ran=%d" % _ran,
-		"round=%d" % (_duel.round_index if _duel != null else -1),
-		"scores=%d,%d" % [
-			_duel.scores[0] if _duel != null else -1,
-			_duel.scores[1] if _duel != null else -1,
-		],
+		"sim=%s" % sim_kind,
+		"outcome=%s" % _outcome(),
 		"snapshots_sent=%d" % (_session.snapshots_sent if _session != null else 0),
 		"snapshots_received=%d" % (_session.snapshots_received if _session != null else 0),
 		"corrections=%d" % (_session.corrections if _session != null else 0),
@@ -184,6 +196,18 @@ func _finish(note: String) -> bool:
 	return true
 
 
+## What the duel came to, in the sim's own terms: kills in the match, round and
+## score in the round duel.
+func _outcome() -> String:
+	var fight := _duel as DuelMatch
+	if fight != null:
+		return "kills %d,%d leader %d" % [fight.kills[0], fight.kills[1], fight.leader_slot()]
+	var duel := _duel as Duel
+	if duel != null:
+		return "round %d scores %d,%d" % [duel.round_index, duel.scores[0], duel.scores[1]]
+	return "none"
+
+
 func _parse_args() -> void:
 	var args := OS.get_cmdline_user_args()
 	var i := 0
@@ -193,6 +217,9 @@ func _parse_args() -> void:
 		match key:
 			"--mode":
 				mode = value
+				i += 2
+			"--sim":
+				sim_kind = value
 				i += 2
 			"--url":
 				url = value

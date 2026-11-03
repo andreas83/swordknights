@@ -37,8 +37,8 @@ static func modes() -> Array[Dictionary]:
 		{
 			"id": "duel_online",
 			"title": "Duel Online",
-			"subtitle": "Host or join by room code",
-			"scene": "res://scenes/duel_online.tscn",
+			"subtitle": "Two phones, one Wi-Fi",
+			"scene": "res://scenes/duel_match_online.tscn",
 			"available": true,
 		},
 		{

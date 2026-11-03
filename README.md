@@ -59,8 +59,13 @@ you disarm the attacker. Up + throw angles the throw upward. An empty-handed
 fighter sweeps on the ground and stamps from the air, and picks a sword up by
 holding down over it.
 
-The online duel is still the earlier round-based duel, with the single-player
-bindings above plus `Q` / `L` or R1 to guard.
+Two players do not fit on one phone, so on phones each plays on their own:
+**Duel Online** → *Host on this Wi-Fi* on one phone shows a short code, and the
+other phone picks *Join on this Wi-Fi* and types it. On a phone the left half
+of the screen is a stick (sideways to run, up or down for the sword's height),
+with JUMP, SWORD and THROW on the right. On a desktop the online duel uses the
+single-player keys above, with `Q` / `L` or R1 to throw. A relay room joins
+players on different networks; see [`docs/netplay.md`](docs/netplay.md).
 
 ## Project layout
 

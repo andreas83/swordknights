@@ -61,6 +61,8 @@ func _physics_process(_delta: float) -> void:
 	if _online:
 		# NetSession.poll() pumps the transport for us.
 		session.poll()
+		if session == null:
+			return
 		if session.stage == NetSession.Stage.ENDED and not _local_fallback:
 			_offer_fallback(session.status_detail)
 		return
@@ -153,8 +155,10 @@ func _start_session(as_host: bool) -> void:
 	session.local_input = func() -> int: return PlayerInput.bits_from_actions("")
 	session.desync_detected.connect(_on_desync)
 	session.handshake_complete.connect(_on_seated)
-	session.link_failed.connect(_offer_fallback)
-	session.peer_departed.connect(_on_peer_departed)
+	# Deferred: both fire from inside session.poll(), and tearing the session
+	# down there leaves poll() running on a closed transport.
+	session.link_failed.connect(_offer_fallback, CONNECT_DEFERRED)
+	session.peer_departed.connect(_on_peer_departed, CONNECT_DEFERRED)
 	session.start(transport, duel, as_host)
 
 	hud.session = session

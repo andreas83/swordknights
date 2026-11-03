@@ -36,7 +36,7 @@ trap cleanup EXIT
 peer() {  # peer <report-name> <args...>
   local name="$1"; shift
   "$GODOT" --headless --path "$ROOT" --script tests/net_live.gd -- \
-    --frames "$FRAMES" --report "$WORK/$name.txt" "$@" \
+    --sim "${SIM:-match}" --frames "$FRAMES" --report "$WORK/$name.txt" "$@" \
     > "$WORK/$name.log" 2>&1
 }
 

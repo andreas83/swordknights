@@ -9,9 +9,10 @@ extends Control
 ##                    listen for a connection, and the only one that works from
 ##                    behind a router without forwarding a port.
 ##   JOIN A ROOM      the other half of that.
-##   HOST DIRECTLY    listens on a port. No relay, lowest latency, needs either
-##                    a LAN or a forwarded port. Not available on the web.
-##   JOIN DIRECTLY    dials an address.
+##   HOST ON THIS WI-FI   listens on a port and shows a one-number code
+##                    (scripts/net/lan_code.gd). No relay, lowest latency; needs
+##                    a shared network or a forwarded port. Not on the web.
+##   JOIN ON THIS WI-FI   dials that code, or any address.
 ##   LOCAL TWO-PLAYER no network at all. Also where you end up when a
 ##                    connection fails, which is why it is on this screen.
 ##
@@ -67,18 +68,20 @@ func _process(delta: float) -> void:
 func show_menu() -> void:
 	page = Page.MENU
 	_hint = "UP / DOWN TO CHOOSE   ·   JUMP TO CONFIRM"
+	# Same Wi-Fi first: two phones in one room is the common case, and it needs
+	# nothing running anywhere. A relay room is for players who are apart.
 	var rows: Array[Array] = [
+		["HOST ON THIS WI-FI", _on_host_direct],
+		["JOIN ON THIS WI-FI", _on_join_direct],
 		["HOST A ROOM", _on_host_room],
 		["JOIN A ROOM", _on_join_room],
-		["HOST DIRECTLY", _on_host_direct],
-		["JOIN DIRECTLY", _on_join_direct],
 		["LOCAL TWO-PLAYER", _on_local],
 		["RELAY:  %s" % _shorten(relay_url), _on_edit_relay],
 		["BACK", _on_back],
 	]
 	if not WsTransport.new().supports_hosting():
 		# A web build cannot accept a connection. Saying so beats offering it.
-		rows[2] = ["HOST DIRECTLY  —  NOT ON WEB", Callable()]
+		rows[0] = ["HOST ON THIS WI-FI  —  NOT ON WEB", Callable()]
 	_set_rows(rows)
 	_field_row.visible = false
 
@@ -134,14 +137,20 @@ func _on_join_room() -> void:
 
 
 func _on_host_direct() -> void:
-	show_busy("LISTENING ON PORT %d…" % WsTransport.DEFAULT_PORT)
+	# The code is what the other phone types; the full address is for a
+	# desktop, or a network where the two do not share the first three numbers.
+	var address := LanCode.my_address()
+	if address == "":
+		show_busy("LISTENING ON PORT %d…" % WsTransport.DEFAULT_PORT)
+	else:
+		show_busy("CODE %s   ·   OR %s" % [LanCode.code_for(address), address])
 	host_direct_requested.emit(WsTransport.DEFAULT_PORT)
 
 
 func _on_join_direct() -> void:
 	_show_field(
-		Page.ENTER_ADDRESS, "HOST ADDRESS", "", "192.168.1.20", 64, false,
-		"ADDRESS OR WS:// URL   ·   ENTER TO CONNECT"
+		Page.ENTER_ADDRESS, "HOST CODE", "", "23", 64, false,
+		"THE CODE ON THE HOST'S SCREEN, OR ITS ADDRESS   ·   ENTER TO CONNECT"
 	)
 
 
@@ -174,8 +183,9 @@ func _submit_field() -> void:
 			if value == "":
 				set_status("ENTER AN ADDRESS")
 				return
-			show_busy("CONNECTING TO %s…" % value)
-			join_direct_requested.emit(value)
+			var target := LanCode.resolve(value, LanCode.my_address())
+			show_busy("CONNECTING TO %s…" % target)
+			join_direct_requested.emit(target)
 		Page.ENTER_RELAY:
 			relay_url = value if value != "" else DEFAULT_RELAY
 			set_status("RELAY SET")

@@ -146,9 +146,9 @@ byte for byte. Each of those checks was seen to fail with its fix removed.
 The match's own suites still run on the placeholder in `match_stub_fighter.gd`,
 on purpose: they test the rope, and do not need a physics space.
 
-**Nothing in the game loads the match yet.** The menu's DUEL and DUEL ONLINE
-still start the round-based duel in `scripts/duel/duel.gd`. Both implement
-`DuelSim`, which is why they can coexist.
+Both menu entries run the match. The round duel in `scripts/duel/duel.gd` is
+no longer reachable from the menu; it still implements `DuelSim` and still has
+its own tests.
 
 Open before the match replaces the round duel:
 
@@ -174,4 +174,11 @@ Open before the match replaces the round duel:
 3. **The zones are bare.** `zones_view.gd` builds its own tilemap, so the
    architecture and cast shadows in [`world.md`](world.md) do not run on them.
 4. **The HUD is on the fallback font**, not the game's typeface ([`ui.md`](ui.md)).
-5. **The menu and the network session** still point at the round duel.
+5. ~~The menu and the network session.~~ The menu's **Duel** is the match on
+   one keyboard, and **Duel Online** is the match between two devices
+   (`scenes/duel_match_online.tscn`, `scripts/duel/match_online.gd`): the lobby,
+   transport and session of the round duel around the match's own scene, with
+   touch controls and a THROW button. Phones on one Wi-Fi pair with a
+   one-number code (`scripts/net/lan_code.gd`). `tests/match_net_test.gd` plays
+   it between two sessions under latency, jitter and loss, and
+   `tests/net_live.sh` between two processes, direct and relayed.

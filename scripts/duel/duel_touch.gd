@@ -1,6 +1,6 @@
 class_name DuelTouchGuard
 extends Control
-## One more on-screen button: GUARD.
+## One more on-screen button: GUARD in the round duel, THROW in the match.
 ##
 ## scripts/ui/touch_controls.gd puts a stick on the left and JUMP and SWORD on
 ## the right, and knows nothing about blocking. A duel on a phone with no block
@@ -10,10 +10,18 @@ extends Control
 ## Like the controls it sits next to, the press goes straight into the input
 ## map, so the duel never learns that touch exists — it reads the same "guard"
 ## action a keyboard sets. And like them, it only appears on a touch device.
+##
+## The tug-of-war match has no guard -- the stances replaced it -- and the bit
+## the guard used is the throw now, so the same button serves both: `action`
+## and `glyph` are set by the scene that places it.
 
 const RADIUS := 18.0
 const HIT_PADDING := 8.0
-const ACTION := "guard"
+
+## The input action the button presses: "guard" or "throw".
+@export var action := "guard"
+## What the button shows: "shield" or "throw".
+@export var glyph := "shield"
 
 var _at := Vector2.ZERO
 var _held := -1
@@ -53,11 +61,11 @@ func _input(event: InputEvent) -> void:
 	if touch.pressed:
 		if touch.position.distance_to(_at) <= RADIUS + HIT_PADDING:
 			_held = touch.index
-			Input.action_press(ACTION)
+			Input.action_press(action)
 			queue_redraw()
 	elif touch.index == _held:
 		_held = -1
-		Input.action_release(ACTION)
+		Input.action_release(action)
 		queue_redraw()
 
 
@@ -66,6 +74,9 @@ func _draw() -> void:
 	draw_circle(_at, RADIUS, Palette.with_alpha(Palette.INK, 0.3 if down else 0.18))
 	draw_arc(_at, RADIUS, 0.0, TAU, 24,
 		Palette.with_alpha(Palette.LIGHT_SOFT, 0.8 if down else 0.45), 1.0)
+	if glyph == "throw":
+		_draw_throw_mark(down)
+		return
 	# A little shield, so the button needs no label to be understood.
 	var w := 6.0
 	var h := 8.0
@@ -78,5 +89,23 @@ func _draw() -> void:
 
 func _exit_tree() -> void:
 	if _held != -1:
-		Input.action_release(ACTION)
+		Input.action_release(action)
 		_held = -1
+
+
+## A sword flying point-first, with two speed lines behind it: the throw,
+## readable without a label at thumb size.
+func _draw_throw_mark(down: bool) -> void:
+	var steel := Palette.with_alpha(Palette.STEEL, 0.95 if down else 0.6)
+	var light := Palette.with_alpha(Palette.LIGHT_SOFT, 0.9 if down else 0.5)
+	var dir := Vector2(1.0, -0.55).normalized()
+	var side := Vector2(-dir.y, dir.x)
+	var tip := _at + dir * 8.0
+	var hilt := _at - dir * 4.0
+	draw_colored_polygon(PackedVector2Array([
+		hilt + side * 1.1, tip, hilt - side * 1.1,
+	]), steel)
+	draw_line(hilt + side * 3.0, hilt - side * 3.0, light, 1.4)
+	for k: int in 2:
+		var back := hilt - dir * (3.0 + 2.5 * float(k)) + side * (2.5 - 5.0 * float(k))
+		draw_line(back, back - dir * 4.0, light, 1.0)
