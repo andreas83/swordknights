@@ -302,6 +302,10 @@ func _beat_ends(grounded: bool) -> bool:
 	var wall := level.looks_solid_at(Vector2(ahead_x, global_position.y - 4.0))
 	var ground_kind := level.kind_at_world(Vector2(ahead_x, global_position.y + 2.0))
 	var ground := ground_kind == Tiles.Kind.SOLID or ground_kind == Tiles.Kind.PLATFORM
+	# Crumbling stone is the end of a beat, not more of it: a sentinel is
+	# too heavy to trust a cracked slab (docs/campaign.md, "Crumbling stone").
+	if ground and CrumblingStone.gives_way(level, Vector2(ahead_x, global_position.y + 2.0)):
+		ground = false
 	return wall or not ground
 
 

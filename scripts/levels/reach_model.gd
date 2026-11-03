@@ -22,6 +22,24 @@ extends RefCounted
 ## - `fixed_cells(cells, kind)` -- these cells are `kind` in every state:
 ##   for something the proof should treat as always there, or never.
 ##
+## One more verb is for a floor that gives way a moment after it is stood on
+## -- crumbling stone (docs/campaign.md, "Crumbling stone"):
+##
+## - `fuse_on_stand(cells, channel)` -- standing in these cells is
+##   **transient**: any move may leave them, nothing may wait in them, and
+##   the channel is on from the moment they are left. The search expands such
+##   a stand under the mask it arrived with (the floor still there) and lands
+##   every move it makes under the mask with the channel on (the floor gone
+##   behind it) -- the jump straight up included, which is how the proof
+##   stays on a slab: it comes down where the slab was and falls through.
+##   Pair it with `switch_cells(cells below, channel, SOLID, EMPTY)`.
+##
+## And one word about a respawn: `resets_on_respawn(channel)` says a wire is
+## a trap, put back as authored behind the death wipe -- a fallen slab is
+## whole again -- rather than a deed that is kept. The checkpoint proof clears
+## such bits from every mask before it proves a torch under it
+## (respawn_mask()), because that is the state a death actually comes back to.
+##
 ## The proof starts with every channel off: the level as authored. A stand
 ## state reached under a new mask is checked again under it -- a plate that
 ## drops a trapdoor beneath the prince drops him -- so a latch can never leave
@@ -59,6 +77,10 @@ var _switched: Array[Dictionary] = []
 var _fixed: Dictionary = {}
 ## cell -> mask of the bits standing there sets.
 var _latches: Dictionary = {}
+## cell -> mask of the bits leaving there sets: a transient stand.
+var _fuses: Dictionary = {}
+## The bits a checkpoint respawn clears: traps, not deeds.
+var _resets := 0
 ## Wiring the model could not take: too many channels.
 var problems := PackedStringArray()
 ## channel -> `{mode, seconds, phase, period}`, the level's `;! channel` lines,
@@ -104,7 +126,8 @@ static func _has_hook(script: Script) -> bool:
 
 
 func is_empty() -> bool:
-	return _switched.is_empty() and _fixed.is_empty() and _latches.is_empty()
+	return _switched.is_empty() and _fixed.is_empty() and _latches.is_empty() \
+		and _fuses.is_empty()
 
 
 ## The bit for `channel`, allocated on first use; -1 past MAX_CHANNELS.
@@ -167,11 +190,45 @@ func race_on_stand(cells: Array[Vector2i], channel: StringName) -> void:
 			(_races[cell] as Array[StringName]).append(channel)
 
 
+## Standing in any of `cells` is transient, and leaving turns `channel` on
+## for good (above).
+func fuse_on_stand(cells: Array[Vector2i], channel: StringName) -> void:
+	var index := bit(channel)
+	if index < 0:
+		return
+	for cell: Vector2i in cells:
+		_fuses[cell] = int(_fuses.get(cell, 0)) | (1 << index)
+
+
+## `channel` is a trap: a checkpoint respawn puts it back off.
+func resets_on_respawn(channel: StringName) -> void:
+	var index := bit(channel)
+	if index >= 0:
+		_resets |= 1 << index
+
+
 ## --- what the search asks ------------------------------------------------------
 
 ## The mask after standing in `cell` with `mask`.
 func after_standing(mask: int, cell: Vector2i) -> int:
 	return mask | int(_latches.get(cell, 0))
+
+
+## The mask once a stand in `cell` under `mask` is left: its fuses burnt.
+## The same mask for any cell that is not a transient stand.
+func after_leaving(mask: int, cell: Vector2i) -> int:
+	return mask | int(_fuses.get(cell, 0))
+
+
+## `mask` as a checkpoint respawn leaves it: every trap put back.
+func respawn_mask(mask: int) -> int:
+	return mask & ~_resets
+
+
+## Whether every wire here is a trap, so that every respawn is into the
+## authored state and no flood is needed to say which masks it can be.
+func only_traps() -> bool:
+	return _bits.size() > 0 and _resets == (1 << _bits.size()) - 1
 
 
 ## Every cell the model gives a kind to under `mask`: cell -> Tiles.Kind.

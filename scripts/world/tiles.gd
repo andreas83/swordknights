@@ -100,6 +100,7 @@ const MECHANISM_LEGEND := {
 	"'": "lift", ## the lift's travel: air, until the slab passes through it
 	"o": "plate", ## a pressure plate: a floor stone (scripts/mechanisms/plate.gd)
 	"!": "gate", ## a portcullis, hung from a lintel (scripts/mechanisms/gate.gd)
+	",": "crumbling", ## scripts/mechanisms/crumbling_stone.gd
 }
 ## The terrain a mechanism glyph's cell is in the grid. Only for something
 ## that IS terrain and stays it, like a plate, which is a floor stone: the

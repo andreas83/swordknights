@@ -26,6 +26,20 @@ extends RefCounted
 ## has no other way to set one. A latch that drops the floor between a torch
 ## and the door therefore costs the torch its checkpoint, rather than making
 ## a respawn a soft lock.
+##
+## ## Floors that give way
+##
+## A transient stand (ReachModel.fuse_on_stand(): crumbling stone) is
+## expanded under the mask it was reached with, and everything it leads to
+## arrives under the mask with its fuse burnt (_leaving()). A move whose
+## landing that took away is re-checked where it arrives and falls from there
+## if it no longer stands. Waiting needs no move of its own: the jump straight
+## up comes down where the slab was, with it gone, and falls through -- which
+## is what a slab does to anyone who stays on it. A model with no fuses leaves
+## every mask as it was, and none of this runs.
+##
+## A respawn puts traps back (ReachModel.resets_on_respawn()), so a torch is
+## proved under each mask it is stood on with, as the respawn leaves it.
 
 const MASK_SHIFT := LevelReachability.Solver.MASK_SHIFT
 const LOW_MASK := LevelReachability.Solver.LOW_MASK
@@ -73,9 +87,10 @@ static func search(solver: LevelReachability.Solver, start: Vector2i,
 			return {"ok": false, "explored": explored, "reason":
 				"search budget of %d states exhausted" % LevelReachability.MAX_STATES}
 		_expand(solver, key, neighbours)
+		var leaving := _leaving(solver, key)
 		for next: int in neighbours:
 			arrivals.clear()
-			arrive(solver, next, key >> MASK_SHIFT, arrivals)
+			arrive(solver, next, leaving, arrivals, 0, key >> MASK_SHIFT)
 			for full: int in arrivals:
 				if visited.has(full):
 					continue
@@ -117,9 +132,10 @@ static func survey(solver: LevelReachability.Solver, start: Vector2i,
 				% LevelReachability.MAX_STATES, "reached": {}, "stranded": {},
 				"stranded_states": {}, "states": head}
 		_expand(solver, key, neighbours)
+		var leaving := _leaving(solver, key)
 		for next: int in neighbours:
 			arrivals.clear()
-			arrive(solver, next, key >> MASK_SHIFT, arrivals)
+			arrive(solver, next, leaving, arrivals, 0, key >> MASK_SHIFT)
 			for full: int in arrivals:
 				if not incoming.has(full):
 					incoming[full] = []
@@ -171,21 +187,25 @@ static func survey(solver: LevelReachability.Solver, start: Vector2i,
 static func prove_checkpoints(solver: LevelReachability.Solver, spawn: Vector2i,
 		exits: Array[Vector2i], torches: Array[Vector2i]) -> Array[Vector2i]:
 	var proved: Array[Vector2i] = []
-	var flood := standing_masks(solver, spawn, torches)
-	if not bool(flood["ok"]):
-		return proved
-	var claims_by_cell: Dictionary = flood["masks"]
+	# Every wire a trap: every respawn is into the authored state, whatever
+	# the flood would say he stood on the torch with, so it is not flooded.
+	var claims_by_cell := {}
+	if not solver.model().only_traps():
+		var flood := standing_masks(solver, spawn, torches)
+		if not bool(flood["ok"]):
+			return proved
+		claims_by_cell = flood["masks"]
 	var proved_states := {}
 	for torch: Vector2i in torches:
 		var claims: Array[int] = [0]
 		if claims_by_cell.has(torch):
-			claims.assign(claims_by_cell[torch])
-		else:
-			solver.use_mask(0)
-			if not solver.is_stand(torch.x, torch.y):
-				continue
+			claims = _as_respawned(solver, claims_by_cell[torch])
 		var holds := true
 		for mask: int in claims:
+			solver.use_mask(mask)
+			if not solver.is_stand(torch.x, torch.y):
+				holds = false
+				break
 			if not bool(search(solver, torch, exits, proved_states, mask)["ok"]):
 				holds = false
 				break
@@ -193,6 +213,18 @@ static func prove_checkpoints(solver: LevelReachability.Solver, spawn: Vector2i,
 			proved.append(torch)
 			proved_states.merge(states_of(solver, [torch] as Array[Vector2i], claims))
 	return proved
+
+
+## `masks` as a checkpoint respawn leaves them -- every trap put back -- once
+## each, ascending.
+static func _as_respawned(solver: LevelReachability.Solver, masks: Array) -> Array[int]:
+	var seen := {}
+	for mask: int in masks:
+		seen[solver.model().respawn_mask(mask)] = true
+	var out: Array[int] = []
+	out.assign(seen.keys())
+	out.sort()
+	return out
 
 
 ## The masks the prince can be standing in each of `cells` under, flooding
@@ -226,9 +258,10 @@ static func standing_masks(solver: LevelReachability.Solver, start: Vector2i,
 				masks[cell] = [] as Array[int]
 			(masks[cell] as Array[int]).append(key >> MASK_SHIFT)
 		_expand(solver, key, neighbours)
+		var leaving := _leaving(solver, key)
 		for next: int in neighbours:
 			arrivals.clear()
-			arrive(solver, next, key >> MASK_SHIFT, arrivals)
+			arrive(solver, next, leaving, arrivals, 0, key >> MASK_SHIFT)
 			for full: int in arrivals:
 				if not seen.has(full):
 					seen[full] = true
@@ -254,8 +287,21 @@ static func states_of(solver: LevelReachability.Solver, cells: Array[Vector2i],
 ## new mask he may not be standing any more, and then he falls from there and
 ## arrives wherever that leaves him. Bits are only ever set, so this recurses
 ## at most once per channel.
+##
+## `expanded_under` is the mask the move was found under, when that is not
+## `mask` -- a move off a transient stand, found with the floor there and
+## arriving with it gone. Such an arrival is checked again under `mask`, and
+## falls from where it is if it no longer stands or hangs on a ladder.
 static func arrive(solver: LevelReachability.Solver, low: int, mask: int,
-		out: Array[int], depth: int = 0) -> void:
+		out: Array[int], depth: int = 0, expanded_under: int = -1) -> void:
+	if expanded_under >= 0 and expanded_under != mask and not _holds(solver, low, mask):
+		if depth >= ReachModel.MAX_CHANNELS:
+			return
+		var fell: Array[int] = []
+		solver.drop(_cell_of(solver, low), fell)
+		for next: int in fell:
+			arrive(solver, next, mask, out, depth + 1)
+		return
 	if low & 1 != LevelReachability.MODE_STAND:
 		out.append((mask << MASK_SHIFT) | low)
 		return
@@ -282,6 +328,30 @@ static func _expand(solver: LevelReachability.Solver, key: int, out: Array[int])
 	solver.expand(key & LOW_MASK, out)
 	# A held plate is a race: a move to wherever the run beats the hold.
 	ReachRace.extend(solver, key, out)
+
+
+## The mask the moves out of full state `key` arrive under: its own, with
+## the fuses of a transient stand burnt.
+static func _leaving(solver: LevelReachability.Solver, key: int) -> int:
+	var mask := key >> MASK_SHIFT
+	var low := key & LOW_MASK
+	if low & 1 != LevelReachability.MODE_STAND:
+		return mask
+	return solver.model().after_leaving(mask, _cell_of(solver, low))
+
+
+## Whether cell key `low` still stands, or still hangs on a ladder, under
+## `mask`. Leaves that mask's flags in place.
+static func _holds(solver: LevelReachability.Solver, low: int, mask: int) -> bool:
+	var cell := _cell_of(solver, low)
+	solver.use_mask(mask)
+	if low & 1 == LevelReachability.MODE_STAND:
+		return solver.is_stand(cell.x, cell.y)
+	return solver.is_ladder(cell.x, cell.y)
+
+
+static func _cell_of(solver: LevelReachability.Solver, low: int) -> Vector2i:
+	return Vector2i((low >> 1) % solver.cols, (low >> 1) / solver.cols)
 
 
 ## The cells of a set of full states, once each, for the search's heuristic.
