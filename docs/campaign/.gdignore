@@ -1,0 +1,5 @@
+# The campaign's design drafts and its rendered sheet: documentation, not build
+# inputs. Godot must not import the picture, and nothing in the game loads a
+# draft -- a draft becomes a level when it is copied into levels/ with its
+# mechanisms built (docs/campaign.md, "Build plan"). Tests can still read the
+# drafts by path: the engine ignores this folder, the filesystem does not.

@@ -1,0 +1,111 @@
+; The Aqueduct
+;
+; Chapter III of the Adventure. A DRAFT: docs/campaign.md is the design, this
+; file is its level, 128 x 28. Sunset -- the sun on the skyline, every shadow
+; at its longest. The masons' ruined quarter, then the aqueduct that crosses
+; the ravine to the Mirror Tower. The stone here is tired: it gives under
+; weight.
+;
+; @time sunset
+; (Directives are proposed; the foundation decides the final syntax.)
+;
+; Legend, existing (scripts/world/tiles.gd):
+;   #  solid        =  one-way platform    H  ladder       :  backdrop
+;   ^  spikes       ~  water               @  spawn        *  relic
+;   D  exit door    t  torch               p  sentinel
+;   %  false wall   &  cracked wall/floor  L  inscription
+;   A  arch   |  column   (architecture marks; the rest is dressed by rule)
+; Legend, proposed (docs/campaign.md). None of these parse yet -- an unknown
+; glyph reads as empty air, so play and prove the _static file instead:
+;   o  pressure plate: a floor stone       !  portcullis, hung from a lintel
+;   1-9  mason's mark: stone carved with a channel number. It wires the one
+;        mechanism it touches. Same mark, same channel.
+;   [ ]  a lift's platform at its home stop    '  the lift's travel
+;   ,  crumbling stone     x  sun mirror (turned by the sword; starts facing up)
+;   O  sun-seal door       Q  sun-sealed secret (a third seal)
+;   z  scythe on a beat    i  spike slot on a beat
+;   w  Bastion   j  Caracal   g  Glassbearer   Y  owl   E  the Eclipse
+;
+; Beat sheet, left to right (columns):
+;   1. The masons' gate (0-9). Spawn in the ruined quarter; doves on the
+;      lit flags.
+;   2. The first crumble (10-14). Two cracked slabs over a cellar two deep.
+;      Walk on: they shudder, then let you down -- harmless; grab out. Run
+;      on: they fall behind you. Secret C is the cellar's east wall.
+;                                            [crumbling stone: introduce]
+;   3. The walk (16-34). Grab onto a walk over a walled yard. Below it a
+;      Caracal stalks the doves: crouch, pounce, skid. It cannot reach you
+;      up here. R1 on the walk.              [Caracal: introduce]
+;   4. The cat's yard (35-46). Drop in. A Caracal on open ground: backstep
+;      the pounce, cut it in the skid.       [Caracal: develop]
+;   5. Two roofs (47-59). House A, three slabs, house B. Run the slabs, or
+;      fall four tiles into the lane between and climb back out -- secret
+;      A is in house B's face, down there. Torch 1 on house B.
+;                                            [crumbling stone: develop]
+;   6. The deck (60-80). The aqueduct over the ravine: three slabs over the
+;      void, and a Caracal on the stone beyond them. Wait back on the deck
+;      and it stalks you across them and crouches on them -- and a cat
+;      cannot push off crumbling stone.
+;                                 [crumbling stone + Caracal: twist]
+;   7. The way down is the floor (81-86). A ruined tower stands on the
+;      deck. Stand on the two cracked slabs in front of it, and wait. R2 is
+;      on the tower's top, up its face by one crumbling stone: grab it,
+;      stand, and jump at once.              [crumbling stone: twist]
+;   8. The channel (82-100). The covered water-channel, shafts of red light
+;      through its vents, a sentinel in the low dark. Secret B is a cracked
+;      floor over the wide pier: jump, then plunge.
+;   9. Torch 2, at the channel's mouth (101).
+;  10. The collapse (101-117). The open channel over the ravine: runs of
+;      three slabs between the piers that hold. Once you are on it, it falls
+;      in a chain behind you -- faster than a walk, slower than a run.
+;                          [crumbling stone: master; SET PIECE]
+;  11. The tower's foot (118-127). The last Caracal waits on the stone, with
+;      the collapse at your back: a backstep here costs ground you no longer
+;      have. The door is cut in the Mirror Tower's first course.
+;                                            [Caracal: master]
+;
+; Secrets:
+;   A. House B's west face, at the lane: a false wall. A relic and WE LEFT /
+;      BY NIGHT.
+;   B. The channel's floor, over the wide pier: cracked, two wide. A relic.
+;   C. The first cellar's east wall: cracked. A relic -- the first thing in
+;      the chapter that gave way under you was a door.
+;
+; Relics: R1 (the walk), R2 (the tower's top), and one in each secret: five.
+; Par 2:15. Expert line, about 0:45: run every slab, cut the cats out of the
+; air instead of backstepping, take the channel's door the moment you reach
+; it.
+;
+; The rule this draft is built on: crumbling stone comes in runs of at most
+; three between solid stone at least two wide. With every slab fallen, each
+; crossing is still a gap_tiles() jump from a two-tile runway, so nothing
+; that falls can strand anyone.
+;
+
+
+
+
+                                                                                          *                                 ####
+                                                                                       ######                               ####
+###                                                                                    ######                               ####
+###                                                                                    ######                               ####
+###                                                                                   ,######                               ####
+###                                                                                    ######                               ####
+###                                                                                    ######                               ####
+###                                                                       j            ######                               ####
+###                                                         ######,,,###############,,######### ## ##                       ####
+###                           *                          t  ######   #############                                          ####
+::              ###################            ####,,,######   ##    ##    ##    #
+::              ##               ##            ####   ######   ##    ##    ##    #           p       t                   j    D
+:A              ##               ##            ####   %::::#   ##    ##    ##    ###############&&#####,,,##,,,##,,,############
+:: @            ##       j       ##       j    ####   %*:L:#   ##    ##    ##       ##     ## #::::#      ##   ##   ############
+###########,,###############################################   ##    ##    ##       ##     ## #:::*#      ##   ##   ############
+##########    &:::##########################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+##########    &::*##########################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+############################################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+############################################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+############################################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+############################################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+############################################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+############################################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+############################################################   ##    ##    ##       ##     ## ######      ##   ##   ############
