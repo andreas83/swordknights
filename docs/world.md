@@ -266,8 +266,105 @@ broken level per clause.
 One per act, each teaching the next: walk through, cut through, plunge
 through.
 
+## Directives and wiring
+
+A level file can say things about itself that are not rows of it. A comment
+that starts `;!` is a **directive**:
+
+```
+;! time dusk
+;! mark 1 plate channel=west_gate
+;! mark 2 gate channel=west_gate
+; The Cistern Gate
+```
+
+A directive is a comment first. The geometry parser skips it like any `;`
+line, so it can never move a tile — the failure the format has been burned by
+twice — and it is never taken for the title, which is still the first plain
+comment. `;` stays the only comment marker; `#` is still a solid tile.
+
+| Directive | Means | Read by |
+| --- | --- | --- |
+| `time <stop>` | the hour the level is set at | the time-of-day grade |
+| `mark <glyph> <kind> [key=value …]` | `glyph` places an entity of `kind` here, with these parameters | `AsciiLevel` |
+
+`AsciiLevel.DIRECTIVES` lists the names something reads. A name that is not
+there is a *problem*, like a malformed line or a glyph in no legend; problems
+are collected in `AsciiLevel.problems`, `Game` warns about them when the
+level loads, and `tests/unit/test_level_directives.gd` refuses a shipping
+level that has any. Nothing about a problem stops a level from playing.
+
+### Declared marks
+
+`mark` binds a glyph no legend uses to a registered entity kind for this level
+only. Digits are the natural choice, and there are plenty of free letters.
+Every **connected run** of the glyph (up, down, left, right) is *one* entity,
+anchored at the run's bottom-left cell — where a thing that stands, stands —
+with the whole run in its `cells`. So a gate three cells tall is
+
+```
+;! mark 2 gate channel=a
+      2
+      2
+  @   2     D
+```
+
+one gate. Like every entity mark, a declared cell is left empty in the grid:
+whatever is there in play is the entity's to say (below). The marks join the
+legend's in reading order, which is the order `Game` places and meets them.
+
+### Wiring
+
+Mechanisms are wired by naming the same channel: every mark with
+`channel=west_gate` shares one wire on the level's `ChannelBus`
+(`scripts/mechanisms/channel_bus.gd`). A trigger turns its wire on; a
+receiver acts when it changes. A wire is on while any trigger **holds** it —
+two plates on one channel are an OR — or for good once one **latches** it.
+Wiring is data in the level text; there is nothing to connect in code.
+
+### What a mechanism is in play
+
+A mechanism (`scripts/mechanisms/mechanism.gd`) changes what its cells are
+with `set_kind()`: stone, a one-way platform, spikes, a ladder, or air. It
+never repaints the tilemap. It brings its own `StaticBody2D` on the solid or
+one-way collision layer, which the prince's own `move_and_slide()` meets like
+terrain — so dropping through a one-way mechanism works the way it does
+through a platform, by clearing the one-way bit — and it writes the cell's
+kind into the level's **overlay** (`Level.set_overlay()`), which every tile
+query reads first: the ledge grab, the footing check, the stand-up room, the
+hazard check, a guard's turn at a wall. Both halves are needed, and a test
+breaks each one: with only the overlay the prince walks through a shut gate;
+with only the body he could grab it and stand up inside it.
+
+The tilemap, the dressing and the cast shadow are built from the level as
+authored, so a mechanism draws itself and casts no sun shadow. Mechanisms
+are props in the light, like a torch.
+
+### Restarts and respawns
+
+A restart rebuilds the level, mechanisms included. **A checkpoint respawn
+also puts every mechanism back as the level text placed it**, on a fresh bus,
+while relics, found secrets and fallen foes stay as the prince left them.
+The reason is the checkpoint proof: a torch is proved to reach the door with
+every wire off, so a respawn into any other mechanism state is one the proof
+says nothing about — and keeping "the gate he opened" means also keeping "the
+floor he broke", which is a soft lock. `Game._respawn()` carries the full
+argument.
+
+### Proving a level with mechanisms
+
+Each mechanism kind tells the reachability proof how it changes passability
+(`static func reach(mark, model)`), and the proof searches over a channel mask
+as well as cells: see `docs/level-generation.md`, *Mechanisms*. A level with
+no mechanism is proved exactly as it always was.
+
 ## Tests
 
+- `tests/unit/test_level_directives.gd` — directives move no tile and are
+  never the title; declared runs, anchors, parameters and reading order; every
+  malformed line is a problem; shipping levels have none.
+- `tests/unit/test_mechanisms.gd` — the bus, the overlay, a toy plate and gate
+  in the game scene, and the restart and respawn rule.
 - `tests/unit/test_secret_walls.gd`, `tests/unit/test_secret_count.gd` — the
   seals played through the real game scene, and the count.
 - `tests/unit/test_zone_dressing.gd` — the duel's zones: the stitched strip is

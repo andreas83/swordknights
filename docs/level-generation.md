@@ -228,6 +228,55 @@ definition, but the exit is not necessarily reachable *from* it, and a
 checkpoint in a dead end would be a soft lock. Torches are proved from the
 door backwards, each one only as far as the last one proved.
 
+### Mechanisms
+
+A level with plates and gates in it (`docs/world.md`, *Directives and
+wiring*) changes in play, and a proof over its authored cells would be wrong
+both ways: a gate its plate opens would read as a wall, and a trapdoor its
+plate drops as floor. So each mechanism kind describes itself to a
+`ReachModel` (`scripts/levels/reach_model.gd`), from its own
+`static func reach(mark, model)`, in three verbs:
+
+| Verb | Means | Example |
+| --- | --- | --- |
+| `switch_cells(cells, channel, off, on)` | these cells are `off` while the wire is off, `on` while it is on | a gate: SOLID, then EMPTY |
+| `latch_on_stand(cells, channel)` | standing in any of these sets the wire for good | a plate that stays down |
+| `fixed_cells(cells, kind)` | these cells are `kind` in every state | a lift treated as a ladder |
+
+The search state becomes `(cell, mode, channel mask)`, packed into one integer
+— `(mask << 32) | cell key` — so a level without mechanisms has the very same
+keys it always had. Before each state is expanded the tile flags are swapped
+for its mask's, so every primitive above — the arcs, the grab probe, the
+ladders — sees the level as that state has it without knowing mechanisms
+exist. Arriving somewhere can set bits, and a stand state reached under a new
+mask is checked again under it: a plate that drops the floor beneath the
+prince drops him, and he arrives wherever the fall leaves him.
+
+Three rules carry over with care:
+
+- **The start is every wire off** — the level as authored, which is also what
+  a checkpoint respawn puts back (`Game._respawn()`).
+- **A proved checkpoint counts only with every wire off.** Reachability is
+  transitive only between equal states: a torch proved with the gate shut says
+  nothing about arriving at it with the gate open. Exits count under any mask.
+- **A dead end is a state, not a cell.** `survey()` reports a cell stranded if
+  *any* reached state of it is, and lists the states; the secret audit compares
+  them state for state with the shut level.
+
+What the model leaves out is time (a gate open for three seconds) and
+momentary triggers (a plate held only while stood on); `reach_model.gd` says
+what to declare instead, and what a timed route would need from the search.
+
+**Levels without mechanisms are proved exactly as before.** The masked search
+is separate code (`scripts/levels/reach_search.gd`), reached only through a
+non-empty model. `tests/unit/test_reach_guard_rail.gd` checks that nothing
+shipping or generated takes it, pins the Sun Terrace's proof and four Endless
+ruins to numbers taken before the framework existed, and checks that the
+masked flood agrees with the plain one where nothing changes.
+`tests/unit/test_reach_mechanisms.gd` proves the toy: a gate passable only
+through its plate, a trapdoor plate that drops the prince, a checkpoint proved
+with every wire off and one that is not.
+
 ### Retries
 
 `LevelGenerator.build()` verifies every candidate. A rejected one is retried
@@ -398,6 +447,8 @@ godot --headless --path . --script tests/level_solvability_test.gd
 | `level_solvability_test` | 240 seeds across four lengths and six difficulties, independently re-verified |
 | `unit/test_secret_proof.gd` | the secret audit on the Sun Terrace, and one broken level per clause |
 | `unit/test_secret_generator.gd` | where Endless hides a secret, and that it moves nothing else |
+| `unit/test_reach_mechanisms.gd` | the proof over a channel mask, on a toy plate and gate and a trapdoor |
+| `unit/test_reach_guard_rail.gd` | levels without mechanisms proved exactly as before the framework |
 
 `tests/level_asserts.gd` is the shared helper. It is `preload`ed rather than
 registered with `class_name`, so it cannot collide with a real test framework

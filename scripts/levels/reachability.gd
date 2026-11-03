@@ -24,6 +24,12 @@ extends RefCounted
 ## one-tile ceiling), the edge is simply not offered. So "verified" means
 ## "reachable even by this reduced character", never "reachable if you are
 ## perfect". Erring the other way would make the proof worthless.
+##
+## Mechanisms -- plates, gates, anything that changes a cell in play -- are
+## searched over too, with a channel mask in the search state
+## (scripts/levels/reach_model.gd). A level with no mechanism has an empty
+## model and runs the search below exactly as it always did; the masked
+## search is separate code, reached only through a non-empty model.
 
 ## Tile flags, cached off AsciiLevel.kind_at once per verification.
 const F_SOLID := 1
@@ -75,7 +81,8 @@ static func verify_from(level: AsciiLevel, start: Vector2i,
 	if exits.is_empty():
 		return _fail("level has no exit door", 0)
 
-	var solver := Solver.new(level)
+	var model := ReachModel.for_level(level)
+	var solver := Solver.new(level, model)
 
 	var spawn := start
 	if not solver.is_stand(spawn.x, spawn.y):
@@ -92,9 +99,13 @@ static func verify_from(level: AsciiLevel, start: Vector2i,
 		goals.append(cell + Vector2i.UP)
 	if not grounded_exit:
 		return _fail("exit door %s is not standing on clear solid ground" % str(exits[0]), 0)
-	goals.append_array(proved)
 
-	var report := solver.search(spawn, goals)
+	var report: Dictionary
+	if model.is_empty():
+		goals.append_array(proved)
+		report = solver.search(spawn, goals)
+	else:
+		report = ReachSearch.search(solver, spawn, goals, proved)
 	report["spawn"] = spawn
 	report["goal"] = exits[0]
 	return report
@@ -158,6 +169,14 @@ static func audit_secrets(level: AsciiLevel) -> Dictionary:
 			return _fail("secret %d's room opens onto %s without its seal: it is not "
 				% [index, str(breach)] + "hidden", states)
 
+	# With mechanisms a dead end is a state, not a cell -- the same cell can be
+	# a way on with a gate open and a trap with it shut -- so the shut level's
+	# stranded states are flooded once and compared state for state.
+	var masked := not ReachModel.for_level(level).is_empty()
+	var stranded_shut: Dictionary = {}
+	if masked:
+		stranded_shut = survey(shut).get("stranded_states", {})
+
 	for open: Dictionary in _openings(count):
 		var played := survey(level.with_secrets(open))
 		states += int(played["states"])
@@ -166,10 +185,16 @@ static func audit_secrets(level: AsciiLevel) -> Dictionary:
 			return _fail("opening secrets %s cuts the way to the exit (%s)"
 				% [which, String(played["reason"])], states)
 		var stranded: Dictionary = played["stranded"]
-		for cell: Vector2i in stranded:
-			if not _stranded_anyway(shut, cell):
-				return _fail("with secrets %s open, standing at %s the exit is gone"
-					% [which, str(cell)], states)
+		if masked:
+			for state: int in played.get("stranded_states", {}):
+				if not stranded_shut.has(state):
+					return _fail("with secrets %s open, a state at %s cannot reach the exit"
+						% [which, str(_state_cell(level, state))], states)
+		else:
+			for cell: Vector2i in stranded:
+				if not _stranded_anyway(shut, cell):
+					return _fail("with secrets %s open, standing at %s the exit is gone"
+						% [which, str(cell)], states)
 		if open.size() == 1:
 			var index: int = open.keys()[0]
 			var reached: Dictionary = played["reached"]
@@ -196,6 +221,13 @@ static func _breach(shut: AsciiLevel, secret: Dictionary) -> Vector2i:
 			if not own.has(next) and not shut.is_solid(next.x, next.y):
 				return next
 	return Vector2i(-1, -1)
+
+
+## The cell of a full search state, for a report.
+static func _state_cell(level: AsciiLevel, state: int) -> Vector2i:
+	var index := (state & Solver.LOW_MASK) >> 1
+	var cols := maxi(level.cols, 1)
+	return Vector2i(index % cols, index / cols)
 
 
 ## True when `cell` was a dead end before any secret was opened: reachable with
@@ -241,10 +273,13 @@ static func survey(level: AsciiLevel) -> Dictionary:
 			goals.append(mark["cell"] + Vector2i.UP)
 	if goals.is_empty():
 		return _fail("level has no exit door", 0).merged(empty)
-	var solver := Solver.new(level)
+	var model := ReachModel.for_level(level)
+	var solver := Solver.new(level, model)
 	if not solver.is_stand(level.spawn_point.x, level.spawn_point.y):
 		return _fail("spawn is not standing on clear solid ground", 0).merged(empty)
-	return solver.survey(level.spawn_point, goals)
+	if model.is_empty():
+		return solver.survey(level.spawn_point, goals)
+	return ReachSearch.survey(solver, level.spawn_point, goals)
 
 
 ## Runs the same search toward arbitrary goal cells. Used by `measure_reach()`
@@ -252,10 +287,14 @@ static func survey(level: AsciiLevel) -> Dictionary:
 static func reaches(level: AsciiLevel, goals: Array[Vector2i]) -> Dictionary:
 	if level == null:
 		return _fail("no level data", 0)
-	var solver := Solver.new(level)
+	var model := ReachModel.for_level(level)
+	var solver := Solver.new(level, model)
 	if not solver.is_stand(level.spawn_point.x, level.spawn_point.y):
 		return _fail("spawn is not standing on clear solid ground", 0)
-	return solver.search(level.spawn_point, goals)
+	if model.is_empty():
+		return solver.search(level.spawn_point, goals)
+	var none: Array[Vector2i] = []
+	return ReachSearch.search(solver, level.spawn_point, goals, none)
 
 
 ## The authoring envelope, for documentation and for the CLI's banner. The
@@ -363,6 +402,12 @@ static func _fail(reason: String, explored: int) -> Dictionary:
 ## --- the search ------------------------------------------------------------
 
 class Solver extends RefCounted:
+	## A full search state is `(mask << MASK_SHIFT) | cell key`; the cell key is
+	## everything a state is without mechanisms, so with an empty mask the two
+	## are the same number.
+	const MASK_SHIFT := 32
+	const LOW_MASK := (1 << 32) - 1
+
 	var cols: int
 	var rows: int
 	var flags: PackedByteArray = PackedByteArray()
@@ -370,8 +415,13 @@ class Solver extends RefCounted:
 	var _half: float
 	var _body: float
 	var _tile: float
+	# --- mechanisms --- null for a level without any. The flags as authored,
+	# and the flags under each channel mask the search has met.
+	var _model: ReachModel = null
+	var _base := PackedByteArray()
+	var _by_mask: Dictionary = {}
 
-	func _init(level: AsciiLevel) -> void:
+	func _init(level: AsciiLevel, model: ReachModel = null) -> void:
 		cols = maxi(level.cols, 1)
 		rows = maxi(level.rows, 1)
 		_half = Tuning.BODY_WIDTH * 0.5
@@ -381,19 +431,24 @@ class Solver extends RefCounted:
 		flags.resize(cols * rows)
 		for y: int in rows:
 			for x: int in cols:
-				var flag := 0
-				match level.kind_at(x, y):
-					Tiles.Kind.SOLID:
-						flag = F_SOLID
-					Tiles.Kind.PLATFORM:
-						flag = F_PLATFORM
-					Tiles.Kind.SPIKES, Tiles.Kind.WATER:
-						flag = F_HAZARD
-					Tiles.Kind.LADDER:
-						flag = F_LADDER
-					_:
-						flag = 0
-				flags[y * cols + x] = flag
+				flags[y * cols + x] = Solver.flag_for(level.kind_at(x, y))
+		if model != null and not model.is_empty():
+			_model = model
+			_base = flags
+			flags = _flags_for(0)
+
+	static func flag_for(kind: Tiles.Kind) -> int:
+		match kind:
+			Tiles.Kind.SOLID:
+				return F_SOLID
+			Tiles.Kind.PLATFORM:
+				return F_PLATFORM
+			Tiles.Kind.SPIKES, Tiles.Kind.WATER:
+				return F_HAZARD
+			Tiles.Kind.LADDER:
+				return F_LADDER
+			_:
+				return 0
 
 	## Mirrors AsciiLevel.kind_at: the sides are walls, above and below is open.
 	func at(x: int, y: int) -> int:
@@ -603,6 +658,54 @@ class Solver extends RefCounted:
 		for cell: Vector2i in goals:
 			best = mini(best, absi(cell.x - x) + absi(cell.y - y))
 		return clampi(best, 0, span - 1)
+
+	## --- seams for the masked search (scripts/levels/reach_search.gd) --------
+	##
+	## A level with mechanisms is searched by ReachSearch over (cell, mode,
+	## channel mask), in its own file so that search() and survey() above stay
+	## exactly the code a level without a mechanism has always run
+	## (tests/unit/test_reach_guard_rail.gd). These are the few things it needs
+	## from a solver: the level's flags under a mask, and the same primitives,
+	## which see whatever flags are in place and never know mechanisms exist.
+
+	func model() -> ReachModel:
+		return _model
+
+	## The cell key the search uses for a state: what a state is without a mask.
+	func cell_key(mode: int, x: int, y: int) -> int:
+		return _key(mode, x, y)
+
+	func priority(x: int, y: int, goals: Array[Vector2i], span: int) -> int:
+		return _priority(x, y, goals, span)
+
+	## The states one step from cell key `low`, under the flags in place.
+	func expand(low: int, out: Array[int]) -> void:
+		out.clear()
+		if low & 1 == MODE_STAND:
+			_expand_stand((low >> 1) % cols, (low >> 1) / cols, out)
+		else:
+			_expand_ladder((low >> 1) % cols, (low >> 1) / cols, out)
+
+	## Falling straight down from standing in `cell`: where it ends.
+	func drop(cell: Vector2i, out: Array[int]) -> void:
+		_trace(cell.x, cell.y, false, 0, 1, 0.0, 0.0, 0, out)
+
+	## Puts the level's flags under `mask` in place.
+	func use_mask(mask: int) -> void:
+		flags = _flags_for(mask)
+
+	## The level's flags as `mask` has them: the authored flags with every cell
+	## the model gives a kind to under that mask overwritten. Cached per mask.
+	func _flags_for(mask: int) -> PackedByteArray:
+		if _by_mask.has(mask):
+			return _by_mask[mask]
+		var out := _base.duplicate()
+		var kinds := _model.kinds_for(mask)
+		for cell: Vector2i in kinds:
+			if cell.x >= 0 and cell.y >= 0 and cell.x < cols and cell.y < rows:
+				out[cell.y * cols + cell.x] = Solver.flag_for(kinds[cell])
+		_by_mask[mask] = out
+		return out
 
 	## --- primitives --------------------------------------------------------
 

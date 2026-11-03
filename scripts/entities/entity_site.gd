@@ -35,6 +35,8 @@ var level: Level
 ## True when a checkpoint here is proved to lead to the exit
 ## (Game.checkpoint_cells()); only a torch asks.
 var checkpoint := false
+## The level's mechanism wiring (scripts/mechanisms/channel_bus.gd).
+var bus: ChannelBus
 
 ## Bound by Game: a relic taken. Connect `collected` to it.
 var relic_taken := Callable()

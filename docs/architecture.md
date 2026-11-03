@@ -14,6 +14,7 @@ scenes/boot.tscn
                  ├─ world/level.gd ....... TileMapLayer + geometry queries
                  ├─ player/player.gd ..... state machine on a CharacterBody2D
                  ├─ entities/* ........... placed through entities/entity_registry.gd
+                 ├─ mechanisms/* ......... plates, gates: own collision, wired by channel
                  ├─ render/game_camera.gd  dead-zone follow
                  ├─ ui/hud.gd, ui/touch_controls.gd
                  └─ audio/player_audio.gd  maps the character to sound
@@ -231,6 +232,53 @@ entities and every sound cued. The traces before and after are byte for byte
 the same; the tool is how the next refactor of `Game` should be checked too.
 `tests/unit/test_foe_contract.gd` and `tests/unit/test_foe_projectile.gd`
 hold the contract with toy foes that answer it differently from the guard.
+
+### Adding a mechanism
+
+Plates, gates, crumbling floors, timed traps and lifts are mechanisms: a
+script that `extends Mechanism` (`scripts/mechanisms/mechanism.gd`), one line
+in `EntityRegistry.kinds()`, and a `;! mark` declaration in each level that
+uses it (`docs/world.md`, *Directives and wiring*):
+
+```
+;! mark 1 plate channel=west_gate
+;! mark 2 gate channel=west_gate
+```
+
+What the base gives a mechanism, and what it overrides:
+
+| | |
+| --- | --- |
+| `cells`, `params`, `channel` | every cell of its glyph's connected run, the declaration's `key=value` words, its wire |
+| `_setup()` | override: the authored state — its collision and look as the level text has it |
+| `meet(contact)` | override, for a trigger: sense the prince (`feet_on()`, `body_in()`) and `bus.hold()`, `bus.release()` or `bus.latch()` its channel |
+| `_on_channel(on)` | override, for a receiver: its wire changed |
+| `set_kind(kind)` | make its cells stone, a one-way platform, spikes, a ladder or air — its own `StaticBody2D` on `Tiles.MASK_SOLID` / `MASK_ONE_WAY` for the prince's physics *and* the level's overlay for his probes; never the tilemap |
+| `contact.harm(hearts, from_x)` | hurt the prince without being a foe (a crusher); something that kills outright is `set_kind(SPIKES)` |
+| `cue` / `impact` | presentation, through `GameAudio.cue` and Game's impact budget |
+| `static func reach(mark, model)` | override: how it changes passability, for the proof |
+
+Three rules:
+
+1. **All state lives in the node, and `_setup()` is the only reset.** A
+   restart and a checkpoint respawn both rebuild every mechanism from its
+   mark on a new bus. The respawn rule is deliberate — a torch is proved with
+   every wire off, so the respawn must be into that state — and it is argued
+   in `Game._respawn()`.
+2. **Change collision through `set_kind()`, never through the TileMap.** The
+   body and the overlay must agree, or the prince can walk through a gate he
+   can grab, or grab one he walks through.
+3. **Tell the proof.** In `reach()`, describe the mechanism to the
+   `ReachModel` (`scripts/levels/reach_model.gd`) with `switch_cells()`,
+   `latch_on_stand()` and `fixed_cells()`. Say the conservative thing for
+   anything with a clock in it: a timed gate the proof treats as shut, a
+   crumbling floor as a latch that drops it the moment it is stood on. A
+   mechanism that says nothing is treated as never changing anything.
+
+The framework ships with no real mechanism, only the toy that proves it — a
+permanent plate that opens a gate, in `tests/unit/test_mechanisms.gd` (in
+play) and `tests/unit/test_reach_mechanisms.gd` (in the proof). Copy their
+shape.
 
 ## Configuration as code
 

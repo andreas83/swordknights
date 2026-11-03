@@ -19,7 +19,8 @@ extends RefCounted
 ##
 ## ## The vocabulary
 ##
-## `reach_exit()` and `offer_checkpoint(at)` are the level's two goals. A
+## `harm(hearts, from_x)` is a mechanism's way to hurt him without being a
+## foe. `reach_exit()` and `offer_checkpoint(at)` are the level's two goals. A
 ## relic's tally and heal ride on its own `collected` signal, which its
 ## `place()` wires to the site (scripts/entities/entity_site.gd) because a
 ## relic can be taken by more than the prince's body.
@@ -53,6 +54,8 @@ var checkpoint_offered := Callable()
 var foe_met := Callable()
 ## `(shot: FoeProjectile) -> void`
 var shot_met := Callable()
+## `(hearts: int, from_x: float) -> bool`: true when the hurt was dealt.
+var harmed := Callable()
 
 
 ## The blade is out and live this frame.
@@ -71,6 +74,14 @@ func reach_exit() -> void:
 ## further on than the checkpoint already held.
 func offer_checkpoint(at: Vector2) -> bool:
 	return checkpoint_offered.is_valid() and bool(checkpoint_offered.call(at))
+
+
+## Hurts the prince by `hearts`, from the side `from_x` is on -- a crushing
+## block, a trap's blade -- through the same Player.damage() a cut uses, with
+## its grace and its held frames. True when it was dealt. Something that
+## should kill outright is a hazard instead: Mechanism.set_kind(SPIKES).
+func harm(hearts: int, from_x: float) -> bool:
+	return harmed.is_valid() and bool(harmed.call(hearts, from_x))
 
 
 func meet_foe(foe: Foe) -> void:

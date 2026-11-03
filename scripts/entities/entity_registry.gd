@@ -24,11 +24,20 @@ extends RefCounted
 ##   `signal impact(at: Vector2, frames: int, shake: float, weight: float)`,
 ##   optional. Game connects whichever a kind declares, so its sounds go
 ##   through GameAudio.cue and its weight through Game's one impact budget.
+## - `static func reach(mark: Dictionary, model: ReachModel) -> void`,
+##   optional: how the kind changes what the character can pass, for the
+##   reachability proof (scripts/levels/reach_model.gd). Mechanism declares a
+##   default that says nothing; a mechanism that opens or closes a way must
+##   say so.
+##
+## A kind with no glyph of its own is placed by a `;! mark` declaration in the
+## level that uses it, which is also how mechanisms are wired (docs/world.md,
+## "Directives and wiring").
 ##
 ## What happens to a kind at a checkpoint respawn is decided by what it is,
 ## not listed here: a Foe goes back to its post unless it was cut down, a
-## FoeProjectile is gone, and everything else keeps the state it was in --
-## a relic taken stays taken.
+## FoeProjectile is gone, a Mechanism is put back as authored, and everything
+## else keeps the state it was in -- a relic taken stays taken.
 ##
 ## `tests/unit/test_entity_registry.gd` holds the legend and this table
 ## together, and checks that every script here keeps the protocol.

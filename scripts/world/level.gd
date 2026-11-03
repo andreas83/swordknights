@@ -32,6 +32,20 @@ extends Node2D
 ## The duel's zones are drawn by this same path, a zone at a time: the layers,
 ## the paint and the sun's material are the static helpers below, and
 ## scripts/duel/zones_view.gd calls them rather than keeping a second copy.
+##
+## ## The overlay
+##
+## A mechanism that changes what a cell is -- a gate shutting, a floor giving
+## way -- does not repaint the tilemap. It brings its own collision body on
+## the solid or one-way layer, which the character's own move_and_slide()
+## meets like stone, and it writes the cell's new kind here, which every query
+## below reads first. Both halves are needed: the body is what stops the
+## character, and the queries are what his ledge grab, his footing, his
+## stand-up room and the hazard check ask. A gate that only had a body could
+## not be grabbed and could be stood up into; one that only had an overlay
+## would let him walk through it. Each entry remembers who wrote it, so a
+## mechanism that leaves only takes its own cells with it. Empty -- every
+## level without a mechanism -- the queries are exactly what they were.
 
 signal level_built(level: AsciiLevel)
 
@@ -59,6 +73,11 @@ const SUN_SHADER: Shader = preload("res://assets/world_shadow.gdshader")
 ## The atlas as an image, which the shadow solve reads tile opacity from. The
 ## atlas does not change while the game runs, so it is read once.
 static var _atlas_image: Image
+
+## --- mechanisms --- cell -> Tiles.Kind, and cell -> the instance id that set
+## it. See "The overlay" above.
+var _overlay: Dictionary = {}
+var _overlay_owner: Dictionary = {}
 
 
 func _ready() -> void:
@@ -211,7 +230,7 @@ func cell_of(world_position: Vector2) -> Vector2i:
 
 
 func kind_at_cell(cell: Vector2i) -> Tiles.Kind:
-	return data.kind_at(cell.x, cell.y)
+	return _kind(cell.x, cell.y)
 
 
 func kind_at_world(world_position: Vector2) -> Tiles.Kind:
@@ -219,7 +238,7 @@ func kind_at_world(world_position: Vector2) -> Tiles.Kind:
 
 
 func is_solid_cell(cell: Vector2i) -> bool:
-	return data.is_solid(cell.x, cell.y)
+	return _kind(cell.x, cell.y) == Tiles.Kind.SOLID
 
 
 func is_solid_at(world_position: Vector2) -> bool:
@@ -244,7 +263,7 @@ func rect_has_kind(rect: Rect2, kinds: Array) -> bool:
 	var y1 := floori((rect.position.y + rect.size.y - 0.001) / TILE)
 	for y: int in range(y0, y1 + 1):
 		for x: int in range(x0, x1 + 1):
-			if kinds.has(data.kind_at(x, y)):
+			if kinds.has(_kind(x, y)):
 				return true
 	return false
 
@@ -268,3 +287,33 @@ func spawn_world_position() -> Vector2:
 
 func entity_world_position(cell: Vector2i) -> Vector2:
 	return Vector2(cell.x * TILE + TILE * 0.5, (cell.y + 1) * TILE)
+
+
+## --- the overlay (mechanisms) ------------------------------------------------
+
+## `cell` is `kind` now, as far as every query is concerned, on `owner`'s say.
+func set_overlay(cell: Vector2i, kind: Tiles.Kind, owner: Object) -> void:
+	_overlay[cell] = kind
+	_overlay_owner[cell] = owner.get_instance_id()
+
+
+## Gives back every cell `owner` set, and only those.
+func clear_overlay(owner: Object) -> void:
+	var id := owner.get_instance_id()
+	for cell: Vector2i in _overlay_owner.keys():
+		if int(_overlay_owner[cell]) == id:
+			_overlay.erase(cell)
+			_overlay_owner.erase(cell)
+
+
+## The kind a mechanism made of `cell`, or -1 when none did.
+func overlay_at(cell: Vector2i) -> int:
+	return int(_overlay.get(cell, -1))
+
+
+func _kind(x: int, y: int) -> Tiles.Kind:
+	if not _overlay.is_empty():
+		var cell := Vector2i(x, y)
+		if _overlay.has(cell):
+			return _overlay[cell] as Tiles.Kind
+	return data.kind_at(x, y)

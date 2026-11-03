@@ -77,11 +77,14 @@ var _contact := Contact.new()
 var _hitstopped := false
 var _impact_cooldown: float = 0.0
 # --- checkpoints --- torch cells proved to route to the exit, the marks whose
-# foes come back at a respawn (with their order among their kind), and the
-# posts cleared for good.
+# entities come back at a respawn -- foes and mechanisms, with their order
+# among their kind -- and the posts cleared for good.
 var _checkpoint_cells: Array[Vector2i] = []
 var _returning: Array[Dictionary] = []
 var _down: Dictionary = {}
+# --- mechanisms --- the wiring of the mechanisms now placed. A new one every
+# time they are placed again, so one on its way out never hears the next.
+var _bus := ChannelBus.new()
 # Foes the current swing has already reached, by instance id. Cleared when a
 # new swing starts. See _resolve_foe().
 var _struck: Dictionary = {}
@@ -95,6 +98,11 @@ func _ready() -> void:
 	if data == null:
 		push_error("no level data")
 		return
+	# Malformed directives and glyphs in no legend: the level still plays, and
+	# whoever wrote it hears about it here (tests refuse a shipping level with
+	# any).
+	for problem: String in data.problems:
+		push_warning("%s: %s" % [data.name, problem])
 
 	level.build(data)
 	_checkpoint_cells = checkpoint_cells(data)
@@ -105,6 +113,7 @@ func _ready() -> void:
 	_contact.checkpoint_offered = _offer_checkpoint
 	_contact.foe_met = _resolve_foe
 	_contact.shot_met = _resolve_shot
+	_contact.harmed = _harm
 	_spawn_entities(data)
 
 	player.level = level
@@ -253,7 +262,7 @@ func _spawn_entities(data: AsciiLevel) -> void:
 		var ordinal := int(counted.get(kind, 0))
 		counted[kind] = ordinal + 1
 		var node := _place(mark, ordinal)
-		if node is Foe:
+		if node is Foe or node is Mechanism:
 			_returning.append({"mark": mark, "ordinal": ordinal})
 
 
@@ -285,6 +294,7 @@ func _site_for(mark: Dictionary, ordinal: int) -> EntitySite:
 	site.ordinal = ordinal
 	site.level = level
 	site.checkpoint = _checkpoint_cells.has(site.cell)
+	site.bus = _bus
 	site.relic_taken = _on_relic_collected
 	site.relic_counted = func() -> void: relics_total += 1
 	site.exit_declared = _declare_exit
@@ -532,10 +542,19 @@ func _complete() -> void:
 	level_completed.emit(elapsed, relics, relics_total)
 
 
+## A mechanism hurt the prince: the cut's own path, grace and held frames.
+func _harm(hearts: int, from_x: float) -> bool:
+	var dealt := player.damage(hearts, from_x)
+	if dealt:
+		Flow.hitstop(self, Flow.HURT_FRAMES * Flow.FRAME)
+	return dealt
+
+
 func _restart() -> void:
 	for node: Node in _entities.get_children():
 		node.queue_free()
 	_down.clear()
+	_bus = ChannelBus.new()
 	secrets.reseal() # --- secrets --- behind the wipe, like the rest
 	_spawn_entities(level.data)
 	secrets.furnish(_entities)
@@ -646,6 +665,17 @@ func _update_hud(refill: bool = false) -> void:
 ##   you, and anything a foe had loosed is gone. The clock keeps running: a
 ##   death costs the seconds since the torch, which is the point, and nothing
 ##   more.
+## - **Mechanisms do not remember.** Every plate, gate and crumbling floor is
+##   put back exactly as the level text placed it, on a fresh bus. This is the
+##   rule that keeps the first one true: a torch is proved with every channel
+##   off (LevelReachability.verify_from() starts the mask at zero), so a
+##   respawn into any other mechanism state would be a respawn the proof says
+##   nothing about. Keeping a gate the player opened sounds kinder until the
+##   same rule keeps a floor he broke, or a trapdoor he dropped, between the
+##   torch and the door -- a soft lock, and one only a restart cures. The
+##   things that do persist are safe by construction: relics never touch
+##   passability, foes being down only removes danger, and found secrets are
+##   proved never-a-trap in every combination (audit_secrets).
 
 ## Torch cells in `data` that a character could respawn on and still finish.
 ##
@@ -698,13 +728,15 @@ func _progress(at: Vector2) -> float:
 
 
 ## Back on the last checkpoint, behind the cover of the wipe. Every foe still
-## standing goes back to its post, every projectile in the air is gone, and
-## the rest of the level stays as the prince left it.
+## standing goes back to its post, every projectile in the air is gone, every
+## mechanism is as authored on a new bus, and the rest of the level stays as
+## the prince left it.
 func _respawn() -> void:
 	for node: Node in _entities.get_children():
-		if node is Foe or node is FoeProjectile:
+		if node is Foe or node is FoeProjectile or node is Mechanism:
 			_entities.remove_child(node)
 			node.queue_free()
+	_bus = ChannelBus.new()
 	for entry: Dictionary in _returning:
 		var mark: Dictionary = entry["mark"]
 		if not _down.has(EntitySite.post_of(String(mark["kind"]), mark["cell"])):
