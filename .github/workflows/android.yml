@@ -255,7 +255,11 @@ jobs:
           set -euo pipefail
           apksigner="$(ls -d "${ANDROID_HOME}"/build-tools/*/apksigner | sort -V | tail -1)"
           "${apksigner}" verify --verbose --print-certs dist/*.apk | tee "${RUNNER_TEMP}/certs.txt"
-          signer="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "${RUNNER_TEMP}/certs.txt" | head -1)"
+          # apksigner names the signer by its scheme ("V3.0 Signer:") when v1
+          # signing is off, which Godot leaves it; "Signer #1" only with v1.
+          signer="$(grep -m1 -oP 'certificate SHA-256 digest: \K[0-9a-f]{64}' \
+            "${RUNNER_TEMP}/certs.txt" || true)"
+          [[ -n "${signer}" ]] || { echo "::error::No signer digest in apksigner output"; exit 1; }
           echo "signer=${signer}" >> "$GITHUB_OUTPUT"
 
       # The levels are plain text read with FileAccess, not imported resources,
@@ -328,7 +332,7 @@ jobs:
         run: |
           set -uo pipefail
           published="$(gh release download dev --pattern version.json --output - 2>/dev/null \
-            | jq -r '.code // 0' 2>/dev/null)"
+            | jq -r '.code // 0' 2>/dev/null || true)"
           published="${published:-0}"
           [[ "${published}" =~ ^[0-9]+$ ]] || published=0
           echo "Published: build ${published}. This run: build ${CODE}."
