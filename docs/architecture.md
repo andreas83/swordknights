@@ -13,7 +13,7 @@ scenes/boot.tscn
                  ├─ core/game.gd ......... owns a level's actors and arbitrates them
                  ├─ world/level.gd ....... TileMapLayer + geometry queries
                  ├─ player/player.gd ..... state machine on a CharacterBody2D
-                 ├─ entities/* ........... relic, exit, torch, patrol
+                 ├─ entities/* ........... placed through entities/entity_registry.gd
                  ├─ render/game_camera.gd  dead-zone follow
                  ├─ ui/hud.gd, ui/touch_controls.gd
                  └─ audio/player_audio.gd  maps the character to sound
@@ -141,6 +141,97 @@ byte-identical run to run and can be pinned by a test. Variation happens at
 playback — pitch and level — not at bake, so repeated footsteps do not
 machine-gun.
 
+## Entities: one registry, one protocol, one referee
+
+Everything a level places — relics, torches, the door, guards, and whatever
+the campaign adds — goes through the same three pieces, so `Game` never names
+a kind of thing:
+
+| Piece | File | Job |
+| --- | --- | --- |
+| registry | `scripts/entities/entity_registry.gd` | kind name → script; one line per kind |
+| site | `scripts/entities/entity_site.gd` | where a mark put the entity, and what the level knows there |
+| contact | `scripts/entities/contact.gd` | the prince as entities see him for one frame, and the consequences they may ask for |
+
+`Game._spawn_entities()` walks the level's marks in order and asks the
+registry for each; the script's `place(site)` takes it from there.
+`Game._resolve_interactions()` calls `meet(contact)` on every entity, in the
+same order, once a playing frame. A relic decides that a touching body takes
+it; a torch decides what "reaching it on your feet" means and *offers* itself
+as a checkpoint, which Game takes only if it is further on; a door says it was
+reached, and Game ends the level after the pass. A kind that declares
+`signal cue(voice, options)` or `signal impact(at, frames, shake, weight)` has
+them wired to `GameAudio.cue` and to Game's one impact budget.
+
+Kinds that are glyphs but placed by someone else are listed in
+`EntityRegistry.ELSEWHERE` (the spawn point; inscriptions, which the secret
+keeper furnishes). `tests/unit/test_entity_registry.gd` fails on a legend
+glyph that is in neither table — the glyph would otherwise spawn nothing, in
+silence.
+
+At a checkpoint respawn, what happens to an entity follows from what it *is*:
+a foe goes back to its post unless it was cut down, a foe's projectile is
+gone, and everything else stays as the prince left it.
+
+### Adding a foe
+
+A foe is a script that `extends Foe` (`scripts/entities/foe.gd`) and one line
+in `EntityRegistry.kinds()`, plus its glyph in `Tiles.ENTITY_LEGEND`. Game
+referees every foe against that contract, with no branch for any one of them:
+
+| Game asks | Default | Override it to |
+| --- | --- | --- |
+| `bounds()` | — | give the body a stomp lands on (required) |
+| `hurt_rect()` | `bounds()` | wound somewhere other than the whole body |
+| `is_alive()` / `is_dangerous()` | alive, harmless | — |
+| `is_engaged()` | `is_dangerous()` | hold the prince's idle while it fights |
+| `dangers()` | none | list what can hurt him this frame (`FoeDanger`) |
+| `hit(from_x)` | — | take one wound; true when it killed (emit `defeated`) |
+| `take_blow(blow, from_x)` | every blow is `hit()` | block a sword from the front, refuse a stomp |
+| `wound_voice()` | `guard_hit` | sound different when wounded |
+
+The rules Game applies, once a frame per foe, in this order:
+
+1. `target_rect` is set to the prince's body (empty when he is dead). A foe
+   never reaches for the Player.
+2. A foe that is not `is_alive()` is scenery: nothing more happens.
+3. **Blade.** The sword's live rect against `hurt_rect()`, **once per swing
+   per foe** (`tests/unit/test_one_swing.gd`): `Blow.SWORD`, or `Blow.PLUNGE`,
+   which springs the prince back off whatever it hit.
+4. **Stomp.** Falling onto `bounds()` from above is `Blow.STOMP` and bounces
+   him — unless the foe answers `Outcome.NONE`, and then it never was one.
+5. **Danger.** While `is_dangerous()`, the first of `dangers()` that touches
+   his body is resolved: *parried* if his parry is up, he faces it and the
+   danger has a `parry` (the guard's cut does; a slam need not), *evaded* in a
+   backstep's window if it is `evadable`, otherwise *landed*.
+
+`take_blow()` answers an `Outcome`, and Game presents it: a wound or a kill
+gets the wound sound and the impact, `BLOCKED` the clang and a small held
+beat, `NONE` nothing. A foe asks for presentation rather than making it —
+`cue` for a sound, `impact` for weight — so audio keeps its one front door
+and hitstop its one budget.
+
+**Down stays down.** A foe placed from a mark has a `post` (`patrol@38,11`)
+that survives restarts; `defeated` makes Game remember it, and a respawn puts
+back every foe whose post it does not remember, whole, at its post. A foe
+brought in at runtime with `summon()` has no post: a respawn clears it.
+
+**Projectiles.** `launch(FoeProjectile)` hands an arrow, a knife or a stone
+to the level (`scripts/entities/foe_projectile.gd`). It is a danger to the
+prince until a parry sends it back, faster, at which point it is his: the
+first foe it meets takes it as `Blow.SHOT` — its own archer included. It is
+spent on the prince, on stone, out of the level, or when `LIFE` runs out, and
+a respawn clears whatever is in the air.
+
+The guard (`scripts/entities/patrol.gd`) is the reference foe. Its refactor
+onto the contract was proved to change nothing by `tools/trace_level.gd`,
+which plays the Sun Terrace end to end and an arena of every guard
+interaction under scripted input and records every physics frame — prince,
+entities and every sound cued. The traces before and after are byte for byte
+the same; the tool is how the next refactor of `Game` should be checked too.
+`tests/unit/test_foe_contract.gd` and `tests/unit/test_foe_projectile.gd`
+hold the contract with toy foes that answer it differently from the guard.
+
 ## Configuration as code
 
 `project.godot` is written by `tools/configure_project.gd`. Settings and input
@@ -153,7 +244,9 @@ editor.
 - **New level** — add an ASCII file under `levels/`, point a scene's
   `level_path` at it. `Game.level_source` takes an `AsciiLevel` directly for
   levels that are generated rather than stored.
-- **New entity** — add a class under `scripts/entities/`, a legend character
-  in `scripts/world/tiles.gd`, and a case in `Game._spawn_entities`.
+- **New entity** — a script under `scripts/entities/` that keeps the protocol
+  (`place(site)`, and `meet(contact)` if the prince can touch it), one line in
+  `EntityRegistry.kinds()`, and its glyph in `Tiles.ENTITY_LEGEND`. Never a
+  case in `Game`. A foe extends `Foe`: see [Adding a foe](#adding-a-foe).
 - **New mode** — add one entry to `scripts/core/mode_registry.gd` and it
   appears in the menu. The scene is loaded only when the mode is chosen.

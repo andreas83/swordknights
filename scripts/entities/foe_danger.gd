@@ -1,0 +1,58 @@
+class_name FoeDanger
+extends RefCounted
+## One way a foe can hurt the prince on this frame: a rectangle, the side the
+## blow comes from, and what happens when he turns it aside.
+##
+## Game resolves every danger the same way, whatever made it -- a guard's cut,
+## a boss's sweep, an arrow in flight (Game._resolve_danger()):
+##
+## 1. **Parried** -- the prince's parry is up and he faces `from_x`
+##    (Player.deflect), and `parry` says the blow could be turned. Steel meets
+##    steel: Game's clang, and whatever `parry` did to the blow.
+## 2. **Evaded** -- a backstep's window is open and he faces `from_x`
+##    (Player.evades), and the danger is `evadable`. Nothing happens to anyone;
+##    the blow that did not land is the read.
+## 3. **Landed** -- `damage` hearts through Player.damage(), which refuses it
+##    in his grace after a hit, and `landed` hears whether it was dealt.
+##
+## A danger that has no `parry` cannot be parried: a raised sword is simply
+## hit. That is a design lever, not an omission -- a falling block, a fire, a
+## boss's slam can each say so in one line.
+
+## Where the blow is, in world units.
+var rect := Rect2()
+## The x the blow comes from. The parry and the backstep both read the
+## prince's facing against it, so a cut from behind goes round a raised guard.
+var from_x := 0.0
+## Hearts it takes when it lands.
+var damage := 1
+## Whether a backstep's window lets it by.
+var evadable := true
+## `() -> bool`: the blow met a parry; true when it was turned. Unbound, it
+## cannot be parried.
+var parry := Callable()
+## `(dealt: bool) -> void`: it reached the prince. `dealt` is false when his
+## grace refused the damage. A projectile is spent here.
+var on_landed := Callable()
+
+
+static func make(at: Rect2, from: float, hearts: int = 1) -> FoeDanger:
+	var danger := FoeDanger.new()
+	danger.rect = at
+	danger.from_x = from
+	danger.damage = hearts
+	return danger
+
+
+func can_be_parried() -> bool:
+	return parry.is_valid()
+
+
+## The prince's parry met it. True when the blow was turned.
+func parried() -> bool:
+	return parry.is_valid() and bool(parry.call())
+
+
+func landed(dealt: bool) -> void:
+	if on_landed.is_valid():
+		on_landed.call(dealt)

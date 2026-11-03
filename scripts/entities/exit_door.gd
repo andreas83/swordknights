@@ -13,6 +13,21 @@ var is_open := false:
 var _time: float = 0.0
 
 
+## --- the entity protocol (scripts/entities/entity_registry.gd) ---------------
+
+func place(site: EntitySite) -> void:
+	position = site.at
+	is_open = true
+	site.declare_exit()
+
+
+## Reaching it ends the level -- after the rest of this frame's pass, so a
+## relic touched on the same frame is on the complete screen.
+func meet(contact: Contact) -> void:
+	if contact.body.intersects(bounds()):
+		contact.reach_exit()
+
+
 func bounds() -> Rect2:
 	return Rect2(global_position - Vector2(WIDTH * 0.5, HEIGHT), Vector2(WIDTH, HEIGHT))
 

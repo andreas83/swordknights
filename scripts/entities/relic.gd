@@ -11,8 +11,9 @@ extends Node2D
 ##
 ## Taking one also gives back a heart, up to the maximum; at full health it is
 ## only a shard. That rule lives in `Game._on_relic_collected()`, not here: the
-## relic does not know the prince exists, which is what lets a test collect
-## one with nobody standing in it.
+## relic knows a body touched it (Contact) and nothing about whose, which is
+## what lets a test collect one with nobody standing in it. `place()` wires
+## `collected` to that rule and counts the shard toward the level's total.
 ##
 ## A shard that has been taken is no longer collectable even while it is still
 ## on screen: `bounds()` goes empty and `collect()` does nothing, so standing
@@ -25,6 +26,20 @@ const BURST_TIME := 0.32
 
 var _time: float = 0.0
 var _taken_at: float = -1.0
+
+
+## --- the entity protocol (scripts/entities/entity_registry.gd) ---------------
+
+func place(site: EntitySite) -> void:
+	position = site.at
+	site.count_relic()
+	if site.relic_taken.is_valid():
+		collected.connect(site.relic_taken)
+
+
+func meet(contact: Contact) -> void:
+	if contact.body.intersects(bounds()):
+		collect()
 
 
 func bounds() -> Rect2:

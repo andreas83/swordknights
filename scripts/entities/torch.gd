@@ -28,17 +28,22 @@ const EMBER_RISE := 16.0
 ## ## The checkpoint
 ##
 ## `Game` decides which torches count (only those the exit can be reached
-## from) and when one is claimed; this file only shows it. The claim is a
-## single flare that dies back to the ordinary flame, not a torch that
-## changes state for good: every torch is already lit, and a level full of
-## torches that look "off" until touched would look unfinished. The flare is
-## the same flat discs at integer radii as the glow, so it steps like the
-## flame rather than swelling smoothly.
+## from, `EntitySite.checkpoint`) and whether a claim moves the checkpoint
+## (only forward); this file decides what reaching the torch means and shows
+## it. The claim is a single flare that dies back to the ordinary flame, not a
+## torch that changes state for good: every torch is already lit, and a level
+## full of torches that look "off" until touched would look unfinished. The
+## flare is the same flat discs at integer radii as the glow, so it steps like
+## the flame rather than swelling smoothly.
 
 ## How long the flare takes to die back to the ordinary flame.
 const FLARE_TIME := 0.7
+## How close, either side of the torch, the feet have to pass to claim it.
+## Wider than one frame of full-speed running, so it cannot be skipped, and
+## narrow enough that it reads as "I reached the torch".
+const REACH := 10.0
 
-## Set by Game when the exit is reachable from here.
+## Set when the exit is reachable from here.
 var checkpoint := false
 var claimed := false
 
@@ -49,6 +54,27 @@ var _flare: float = 0.0
 
 func _ready() -> void:
 	_phase = fmod(global_position.x * 0.37 + global_position.y * 0.11, TAU)
+
+
+## --- the entity protocol (scripts/entities/entity_registry.gd) ---------------
+
+func place(site: EntitySite) -> void:
+	position = site.at
+	checkpoint = site.checkpoint
+
+
+## Claimed by reaching it on your feet: grounded, on the torch's own floor --
+## not jumping past it or standing on a ledge above it -- and within REACH.
+## Whether it is further on than the checkpoint already held is Game's call.
+func meet(contact: Contact) -> void:
+	if not checkpoint or claimed or not contact.grounded:
+		return
+	if absf(contact.body.get_center().x - position.x) > REACH:
+		return
+	if absf(contact.feet.y - position.y) > 1.0:
+		return
+	if contact.offer_checkpoint(position):
+		claim()
 
 
 func claim() -> void:

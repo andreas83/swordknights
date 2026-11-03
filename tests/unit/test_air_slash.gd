@@ -5,7 +5,7 @@ extends GutTest
 ## Until this, a sword press in the air was held in the buffer and came out on
 ## landing, so jump-and-attack was a jump followed by an attack. The owner
 ## asked for both at once. Three things are held here: the slash exists in a
-## jump and in a fall, it wounds a guard through `Game._resolve_guard()` with
+## jump and in a fall, it wounds a guard through `Game._resolve_foe()` with
 ## the one-swing-one-heart rule intact, and it leaves the jump's arc exactly
 ## as it was -- which is the decision that keeps it out of the traversal
 ## grammar (see `Tuning.ATTACK_TIME`'s note and docs/character.md).

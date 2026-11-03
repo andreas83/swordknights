@@ -381,19 +381,18 @@ static func is_calm(player: Player) -> bool:
 	return not guard_near(player)
 
 
-## A live guard inside GUARD_NEAR, or one that is raising, cutting or
-## recovering anywhere at all.
+## A live foe inside GUARD_NEAR, or one in a fight anywhere at all -- for the
+## guard, raising, cutting or recovering (Foe.is_engaged()).
 static func guard_near(player: Node2D) -> bool:
 	if not player.is_inside_tree():
 		return false
-	for node: Node in player.get_tree().get_nodes_in_group(Patrol.GROUP):
-		var guard := node as Patrol
-		if guard == null or not guard.is_alive():
+	for node: Node in player.get_tree().get_nodes_in_group(Foe.GROUP):
+		var foe := node as Foe
+		if foe == null or not foe.is_alive():
 			continue
-		match guard.state:
-			Patrol.State.WINDUP, Patrol.State.STRIKE, Patrol.State.RECOVER:
-				return true
-		var gap := (guard.global_position - player.global_position).abs()
+		if foe.is_engaged():
+			return true
+		var gap := (foe.global_position - player.global_position).abs()
 		if gap.x <= GUARD_NEAR.x and gap.y <= GUARD_NEAR.y:
 			return true
 	return false

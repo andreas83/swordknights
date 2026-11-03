@@ -26,9 +26,18 @@ extends SceneTree
 ## prince's feet there (world units, at rest), `["kill"]` kills him,
 ## `["face", 1 or -1]` turns him, and `["press", action]` / `["release",
 ## action]` work the real input map, which is what the game's own screens
-## read (JUMP to replay on the complete screen). Warps are part of the script, so both builds
-## get the same ones; they let one trace reach every interaction the level has
-## without the program having to be a speedrun.
+## read (JUMP to replay on the complete screen). Warps are part of the
+## script, so both builds get the same ones; they let one trace reach every
+## interaction the level has without the program having to be a speedrun.
+##
+## ## What a frame records
+##
+## The game's phase and counters, the hitstop and the wipe, the prince, every
+## entity in tree order, and every sound cued on that frame. The sounds are
+## caught by standing a recorder in for the audio director (GameAudio's
+## `_director`), so a refactor that moves where a cue is wired -- a guard's
+## raise is heard because something connects it to GameAudio.cue -- is
+## checked as closely as one that moves a guard.
 ##
 ## Only what both sides of a refactor have is read: public fields, and the
 ## entities by position, state and health through `get()`, which answers null
@@ -74,8 +83,23 @@ class ProgramInput extends PlayerInput:
 		apply_bits(bits)
 
 
+## Stands in for the audio director and writes down what it is asked to play.
+## Silent, and it answers the two other questions GameAudio asks of one.
+class CueRecorder extends Node:
+	var settings := AudioSettings.new()
+	var heard := PackedStringArray()
+
+	func play(event: String, opts: Dictionary = {}) -> AudioStreamPlayer:
+		heard.append("%s%s" % [event, opts if not opts.is_empty() else ""])
+		return null
+
+	func toggle_mute() -> void:
+		pass
+
+
 var _game: Game
 var _input := ProgramInput.new()
+var _cues := CueRecorder.new()
 var _steps: Array = []
 var _step := 0
 var _left := 0
@@ -99,6 +123,7 @@ func _initialize() -> void:
 		return
 	var spec: Dictionary = PROGRAMS[_program]
 	_steps = call(String(spec["steps"]))
+	GameAudio._director = _cues
 
 	_game = (load(GAME_SCENE) as PackedScene).instantiate() as Game
 	if String(spec["level"]) == "":
@@ -163,6 +188,8 @@ func _finish() -> void:
 		return
 	file.store_string("\n".join(_lines) + "\n")
 	file.close()
+	GameAudio._director = null
+	_cues.free()
 	var player := _game.player
 	print("trace_level: %s, %d frames -> %s; prince at (%.1f, %.1f), phase %d, deaths %d, "
 		% [_program, _lines.size(), _out, player.position.x, player.position.y,
@@ -186,6 +213,9 @@ func _record() -> String:
 	if entities != null:
 		for node: Node in entities.get_children():
 			parts.append(_entity(node))
+	if not _cues.heard.is_empty():
+		parts.append("cues " + ", ".join(_cues.heard))
+		_cues.heard.clear()
 	return " | ".join(parts)
 
 

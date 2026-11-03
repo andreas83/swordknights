@@ -87,7 +87,7 @@ came down. It now slashes there and then: `AIR_SLASH`, the ground swing's
 timing (`ATTACK_TIME`, the same live window) on a steeper arc whose band runs
 from the chest to 4 px below the feet (`AIR_SLASH_HEIGHT`), so a tapped hop
 cuts a guard standing in front of it. It wounds through exactly the code a
-ground swing does — `Player.attack_rect()` feeds `Game._resolve_guard()`, and
+ground swing does — `Player.attack_rect()` feeds `Game._resolve_foe()`, and
 the `attacked` signal that clears the one-swing-one-heart memory fires once
 per slash. A slash that lands soft finishes on the feet as `ATTACK` at the
 same phase without re-firing `attacked`, so it is still one swing; a landing
@@ -140,7 +140,7 @@ The third move made of the stick and SWORD: **stick back + SWORD, on the
 ground**. A slide of `backstep_distance()` — 22.75 px, about 1.4 tiles — away
 from the way the prince faces, the blade raised across his body. For the
 first `BACKSTEP_ACTIVE` (15 frames) a guard's cut **from the front** does not
-land (`Player.evades()`, checked in `Game._resolve_guard()` after the parry).
+land (`Player.evades()`, checked in `Game._resolve_danger()` after the parry).
 From behind — the blade he is stepping back into — or after the window, he is
 hit as normal. The parry *wins* the exchange; the backstep *survives* it.
 
@@ -349,7 +349,8 @@ camera rests centred on a standing prince, and a 180-unit frame is at most
 400 units wide on a 20:9 phone, so that box is "anywhere a guard could share
 the screen with him". If the player can see a guard, so can the prince; and
 a prince dozing beside one would teach that guards are harmless. Guards join
-`Patrol.GROUP` so the idle can ask the tree for them.
+`Foe.GROUP`, every foe does, and the idle asks the tree for them and whether
+one is `is_engaged()`.
 
 **Not in the duel.** `FighterArt` overrides `_bind()`, so a duellist never
 gets an `IdleArt`. That is a decision, not an accident: a duellist standing

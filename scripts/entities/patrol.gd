@@ -1,7 +1,13 @@
 class_name Patrol
-extends CharacterBody2D
+extends Foe
 ## A palace sentinel: walks its terrace, turns at walls and drops, and cuts at
 ## the prince when he comes within a blade's length.
+##
+## The first foe, and the one the foe contract was cut to fit
+## (scripts/entities/foe.gd): Game reaches it only through that contract, so
+## everything below is the guard's own business -- when it raises, how far it
+## cuts, how long it reels -- and nothing about how a sword or a stomp is
+## refereed lives here.
 ##
 ## ## Danger has exactly one look
 ##
@@ -36,7 +42,6 @@ extends CharacterBody2D
 ## `facing` and `velocity` and poses a figure from them, the way PlayerArt
 ## dresses the Player.
 
-signal defeated()
 ## The raise began: the one moment a player is warned.
 signal alerted()
 ## The blade came down.
@@ -87,12 +92,7 @@ const CUT_HIGH := 18.0
 const HEAR_GAP := 6.0
 ## How far apart two feet can be and still count as the same floor.
 const SAME_FLOOR := 10.0
-## Every guard joins this group, so whatever needs to know whether one is
-## about -- the prince's idle, for one -- asks the tree instead of being handed
-## a list by the scene that spawned them.
-const GROUP := &"guards"
 
-var level: Level
 var facing: int = -1
 var health: int = MAX_HEALTH
 var state: State = State.WALK
@@ -101,18 +101,11 @@ var state_time: float = 0.0
 ## for a parried cut.
 var stagger_length: float = STAGGER_TIME
 
-## The prince's body this frame, or an empty rect when there is nobody to
-## fight. Game writes it every physics frame; the guard never reaches for the
-## player itself, which is what lets a test hand it a rectangle.
-var target_rect := Rect2()
-
 
 func _ready() -> void:
+	super()
 	motion_mode = CharacterBody2D.MOTION_MODE_GROUNDED
 	up_direction = Vector2.UP
-	collision_layer = 0
-	collision_mask = Tiles.MASK_SOLID | Tiles.MASK_ONE_WAY
-	add_to_group(GROUP)
 
 	var shape := CollisionShape2D.new()
 	var rect := RectangleShape2D.new()
@@ -143,6 +136,19 @@ func strike_rect() -> Rect2:
 
 func is_dangerous() -> bool:
 	return state == State.STRIKE
+
+
+## Raising, cutting or getting his blade back: a fight is on.
+func is_engaged() -> bool:
+	return state == State.WINDUP or state == State.STRIKE or state == State.RECOVER
+
+
+## The cut, while it is live: turned by a parry, let by by a backstep.
+func dangers() -> Array[FoeDanger]:
+	var cut := FoeDanger.make(strike_rect(), global_position.x)
+	cut.parry = parried
+	var out: Array[FoeDanger] = [cut]
+	return out
 
 
 ## False from the killing blow on: a falling body is scenery.
@@ -218,6 +224,7 @@ func tick(delta: float, grounded: bool) -> void:
 			if state_time >= WINDUP_TIME:
 				_enter(State.STRIKE)
 				struck.emit()
+				cue.emit(&"sword", {"pitch": 0.78})
 		State.STRIKE:
 			# A half step into the cut: weight behind it, not a lunge that
 			# carries the guard off its ledge.
@@ -249,6 +256,9 @@ func _engage() -> bool:
 		_enter(State.WINDUP)
 		velocity.x = 0.0
 		alerted.emit()
+		# The raise is the warning, so it is heard as well as seen: a guard
+		# about to cut off-screen is still a guard about to cut.
+		cue.emit(&"cloth", {"pitch": 0.7})
 		return true
 	var behind := gap_behind(target_rect)
 	if behind <= HEAR_GAP and behind > -BODY.x - target_rect.size.x and state == State.WALK:

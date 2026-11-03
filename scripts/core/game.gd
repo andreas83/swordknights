@@ -6,6 +6,15 @@ extends Node2D
 ## Everything level-specific comes from the ASCII file it is given, so adding a
 ## level — hand-authored or generated — means supplying different text, not
 ## touching this file.
+##
+## The same holds for what is in a level. Every mark is placed through the
+## entity registry (scripts/entities/entity_registry.gd) and every entity met
+## the same way, once a frame, through a Contact; a foe hands itself back to
+## be refereed against the foe contract (scripts/entities/foe.gd). So no kind
+## of thing is named here, and adding one -- a foe, a mechanism, a boss --
+## means a new file and a registry line (docs/architecture.md, "Adding a
+## foe"). What is here is the referee: the rules for a sword, a stomp and a
+## cut, the checkpoint, the tally, and the presentation every impact shares.
 
 signal level_completed(elapsed: float, relics: int, relics_total: int)
 
@@ -24,10 +33,6 @@ const DEATH_SKIP_DELAY := 0.1
 # over and the frame appears to freeze for a fifth of a second.
 const IMPACT_COOLDOWN := 0.16
 const MENU_SCENE := "res://scenes/menu.tscn"
-# --- checkpoints --- how close, either side of a torch, the feet have to pass
-# to claim it. Wider than one frame of full-speed running, so it cannot be
-# skipped, and narrow enough that it reads as "I reached the torch".
-const CHECKPOINT_REACH := 10.0
 # --- feel/flow (additive) --- the backstep's camera beat, as a share of a
 # full-weight landing's settle: GameCamera.SETTLE_MAX 4 px x 0.3 rounds to one
 # pixel. Enough that the weight is felt going back, too little to be seen.
@@ -58,18 +63,27 @@ var checkpoint := Vector2.ZERO
 
 var _death_timer: float = 0.0
 var _entities: Node2D
-var _exit: ExitDoor
+# The level's way out, for measuring which checkpoint is further on. The last
+# exit mark's, like the door the level is run toward. See _progress().
+var _goal := Vector2.ZERO
+var _has_goal := false
+# Set by an exit during the interaction pass; the level ends after the pass,
+# so everything else touched on the same frame counts first.
+var _completing := false
+# The prince as the level's entities see him, refreshed every playing frame.
+var _contact := Contact.new()
 # --- feel/flow (additive) --- last seen value of Flow.is_hitstopped(), so the
 # freeze is applied on the edge rather than re-asserted every frame.
 var _hitstopped := false
 var _impact_cooldown: float = 0.0
-# --- checkpoints --- torch cells proved to route to the exit, the guards'
-# posts in spawn order, and which of those posts have been cleared for good.
+# --- checkpoints --- torch cells proved to route to the exit, the marks whose
+# foes come back at a respawn (with their order among their kind), and the
+# posts cleared for good.
 var _checkpoint_cells: Array[Vector2i] = []
-var _guard_posts: Array[Vector2] = []
-var _guards_down: Dictionary = {}
-# Guards the current swing has already wounded, by instance id. Cleared when a
-# new swing starts. See _resolve_guard().
+var _returning: Array[Dictionary] = []
+var _down: Dictionary = {}
+# Foes the current swing has already reached, by instance id. Cleared when a
+# new swing starts. See _resolve_foe().
 var _struck: Dictionary = {}
 # --- secrets --- the level's secret rooms: what opens them, what is in them,
 # how many are found. See scripts/world/secret_keeper.gd.
@@ -87,6 +101,10 @@ func _ready() -> void:
 	_entities = Node2D.new()
 	_entities.name = "Entities"
 	add_child(_entities)
+	_contact.exit_reached = func() -> void: _completing = true
+	_contact.checkpoint_offered = _offer_checkpoint
+	_contact.foe_met = _resolve_foe
+	_contact.shot_met = _resolve_shot
 	_spawn_entities(data)
 
 	player.level = level
@@ -222,47 +240,92 @@ func _overlay_subtitle() -> String:
 			return ""
 
 
+## Every mark, in the level's order, through the registry. Kinds the registry
+## does not place (EntityRegistry.ELSEWHERE) are left to whoever does.
 func _spawn_entities(data: AsciiLevel) -> void:
 	relics = 0
 	relics_total = 0
-	_exit = null
-	_guard_posts.clear()
-
+	_returning.clear()
+	_has_goal = false
+	var counted := {}
 	for mark: Dictionary in data.entities:
-		var at: Vector2 = level.entity_world_position(mark["cell"])
-		match String(mark["kind"]):
-			"relic":
-				var relic := Relic.new()
-				relic.position = at
-				relic.collected.connect(_on_relic_collected)
-				_entities.add_child(relic)
-				relics_total += 1
-			"exit":
-				_exit = ExitDoor.new()
-				_exit.position = at
-				_exit.is_open = true
-				_entities.add_child(_exit)
-			"torch":
-				var torch := Torch.new()
-				torch.position = at
-				torch.checkpoint = _checkpoint_cells.has(mark["cell"])
-				_entities.add_child(torch)
-			"patrol":
-				_guard_posts.append(at)
-				_spawn_guard(_guard_posts.size() - 1)
+		var kind := String(mark["kind"])
+		var ordinal := int(counted.get(kind, 0))
+		counted[kind] = ordinal + 1
+		var node := _place(mark, ordinal)
+		if node is Foe:
+			_returning.append({"mark": mark, "ordinal": ordinal})
 
 
-func _spawn_guard(post: int) -> void:
-	var guard := Patrol.new()
-	guard.position = _guard_posts[post]
-	guard.level = level
-	# The raise is the warning, so it is heard as well as seen:
-	# a guard about to cut off-screen is still a guard about to cut.
-	guard.alerted.connect(func() -> void: GameAudio.cue("cloth", {"pitch": 0.7}))
-	guard.struck.connect(func() -> void: GameAudio.cue("sword", {"pitch": 0.78}))
-	# --- checkpoints --- a guard cut down stays down after a respawn.
-	guard.defeated.connect(func() -> void: _guards_down[post] = true)
-	_entities.add_child(guard)
+## One entity from one mark: made by the registry, placed on its site, its
+## presentation signals wired to Game's, and into the level.
+func _place(mark: Dictionary, ordinal: int) -> Node:
+	var kind := String(mark["kind"])
+	var node := EntityRegistry.make(kind)
+	if node == null:
+		if not EntityRegistry.ELSEWHERE.has(kind):
+			push_warning("no entity registered for '%s' (scripts/entities/entity_registry.gd)"
+				% kind)
+		return null
+	node.call(&"place", _site_for(mark, ordinal))
+	_adopt(node)
+	_entities.add_child(node)
+	return node
+
+
+func _site_for(mark: Dictionary, ordinal: int) -> EntitySite:
+	var site := EntitySite.new()
+	site.kind = String(mark["kind"])
+	site.cell = mark["cell"]
+	for cell: Vector2i in mark.get("cells", [site.cell]):
+		site.cells.append(cell)
+	site.params = mark.get("params", {})
+	site.at = level.entity_world_position(site.cell)
+	site.post = EntitySite.post_of(site.kind, site.cell)
+	site.ordinal = ordinal
+	site.level = level
+	site.checkpoint = _checkpoint_cells.has(site.cell)
+	site.relic_taken = _on_relic_collected
+	site.relic_counted = func() -> void: relics_total += 1
+	site.exit_declared = _declare_exit
+	return site
+
+
+## A way out was placed at `at`. The last one placed is the door the level is
+## run toward, and checkpoints are measured against it (_progress()).
+func _declare_exit(at: Vector2) -> void:
+	_goal = at
+	_has_goal = true
+
+
+## Wires what an entity asks of the game: its sounds through GameAudio.cue,
+## its weight through _impact(), and for a foe, its projectiles and the memory
+## that it is down.
+func _adopt(node: Node) -> void:
+	if node.has_signal(&"cue"):
+		node.connect(&"cue", _on_cue)
+	if node.has_signal(&"impact"):
+		node.connect(&"impact", _impact)
+	var foe := node as Foe
+	if foe == null:
+		return
+	foe.launched.connect(_adopt_runtime)
+	foe.summoned.connect(_adopt_runtime)
+	# --- checkpoints --- a foe cut down stays down after a respawn.
+	if foe.post != "":
+		var post := foe.post
+		foe.defeated.connect(func() -> void: _down[post] = true)
+
+
+## Something a foe brought into the level -- a projectile, a summons. It has
+## no mark, so a respawn clears it and nothing puts it back.
+func _adopt_runtime(node: Node) -> void:
+	_adopt(node)
+	_entities.add_child(node)
+
+
+func _on_cue(voice: StringName, options: Dictionary) -> void:
+	GameAudio.cue(voice, options)
 
 
 func _resolve_interactions() -> void:
@@ -273,82 +336,162 @@ func _resolve_interactions() -> void:
 			player.kill()
 			return
 
-	var attack := player.attack_rect()
-	var has_attack := attack.size.x > 0.0
+	_read_contact(body)
 	secrets.resolve(player) # --- secrets ---
 
+	_completing = false
 	for node: Node in _entities.get_children():
-		if node is Relic and body.intersects((node as Relic).bounds()):
-			(node as Relic).collect()
-		elif node is Torch:
-			_try_claim(node as Torch, body)
-		elif node is Patrol:
-			_resolve_guard(node as Patrol, body, attack, has_attack)
-
-	if _exit != null and body.intersects(_exit.bounds()):
+		if node.has_method(&"meet"):
+			node.call(&"meet", _contact)
+	if _completing:
 		_complete()
 
 
-## One guard against the prince. A guard hurts only with its blade, and only
-## while the blade is live (Patrol.strike_rect()); walking into one is free.
-## A dying guard is scenery and is skipped entirely.
+## The prince as this frame's pass sees him. Read once, before anything is
+## met, so every entity on the frame sees the same body and the same blade.
+func _read_contact(body: Rect2) -> void:
+	_contact.body = body
+	_contact.blade = player.attack_rect()
+	_contact.feet = player.position
+	_contact.velocity = player.velocity
+	_contact.facing = player.facing
+	_contact.grounded = player.is_grounded()
+	_contact.alive = player.is_alive()
+	_contact.plunging = player.is_plunging()
+
+
+## One foe against the prince, through the foe contract. A dying foe is
+## scenery and is skipped entirely; one that is alive hurts only through its
+## dangers, and walking into it is free.
 ##
-## A swing wounds a given guard once. The sword's rect is live for about eight
-## frames and this runs on every one; a hit knocks the guard back about two
+## The body and the blade are this frame's, as the pass began. Everything
+## else is read from the prince as it is now, because a foe met earlier in
+## the same pass may have changed it: a plunge that found one guard has
+## already sprung him back, so the next is met by a falling prince, not a
+## plunging one.
+##
+## A swing reaches a given foe once. The sword's rect is live for about eight
+## frames and this runs on every one; a hit knocks a guard back about two
 ## pixels a frame, which does not clear a fourteen-pixel blade, so without
 ## `_struck` the next live frame hit him again and one swing took both hearts.
-func _resolve_guard(guard: Patrol, body: Rect2, attack: Rect2, has_attack: bool) -> void:
-	guard.target_rect = body if player.is_alive() else Rect2()
-	if not guard.is_alive():
+func _resolve_foe(foe: Foe) -> void:
+	var body := _contact.body
+	foe.target_rect = body if player.is_alive() else Rect2()
+	if not foe.is_alive():
 		return
-	var id := guard.get_instance_id()
-	if has_attack and not _struck.has(id) and attack.intersects(guard.bounds()):
+	var id := foe.get_instance_id()
+	if _contact.has_blade() and not _struck.has(id) \
+			and _contact.blade.intersects(foe.hurt_rect()):
 		_struck[id] = true
-		guard.hit(player.global_position.x)
-		if player.is_plunging():
-			_plunge_hit(guard)
-			return
-		GameAudio.cue("guard_hit")
-		# --- feel/flow (additive) ---
-		_impact(guard.global_position, Flow.HIT_FRAMES, 1.9, 0.55)
+		var plunging := player.is_plunging()
+		var blow := Foe.Blow.PLUNGE if plunging else Foe.Blow.SWORD
+		var outcome := foe.take_blow(blow, player.global_position.x)
+		if plunging:
+			_plunge_hit(foe, outcome)
+		else:
+			_sword_hit(foe, outcome)
 		return
-	# A falling player lands on the guard instead of taking the hit.
+	# A falling player lands on the foe instead of taking the hit.
 	var stomping := (
-		body.intersects(guard.bounds())
+		body.intersects(foe.bounds())
 		and player.velocity.y > 40.0
-		and body.position.y + body.size.y - guard.bounds().position.y < 10.0
+		and body.position.y + body.size.y - foe.bounds().position.y < 10.0
 	)
 	if stomping:
-		guard.hit(player.global_position.x)
-		GameAudio.cue("guard_hit", {"pitch": 0.9})
-		# --- feel/flow (additive) --- heavier than the
-		# sword: the whole body is behind this one.
-		_impact(guard.global_position, Flow.STOMP_FRAMES, 2.6, 0.8)
-		player.velocity.y = -Tuning.JUMP_SPEED * Tuning.STOMP_BOUNCE
-	elif guard.is_dangerous() and body.intersects(guard.strike_rect()):
-		if player.deflect(guard.global_position.x) and guard.parried():
-			_on_parried(guard)
-		elif player.evades(guard.global_position.x):
-			# The backstep: the cut goes by in front of him. Nothing happens
-			# to either of them -- the guard's own cut is its sound, and the
-			# missing hit is the read. No riposte, no reel: see Player.evades().
-			pass
-		elif player.damage(1, guard.global_position.x):
+		var outcome := foe.take_blow(Foe.Blow.STOMP, player.global_position.x)
+		if outcome != Foe.Outcome.NONE:
+			_stomp_hit(foe, outcome)
+			return
+	if foe.is_dangerous():
+		for danger: FoeDanger in foe.dangers():
+			if _resolve_danger(danger, body):
+				break
+
+
+## One danger against the prince's body. True when it touched him, whatever
+## came of it: a foe hurts once a frame.
+func _resolve_danger(danger: FoeDanger, body: Rect2) -> bool:
+	if not body.intersects(danger.rect):
+		return false
+	if danger.can_be_parried() and player.deflect(danger.from_x) and danger.parried():
+		_on_parried(danger)
+	elif danger.evadable and player.evades(danger.from_x):
+		# The backstep: the cut goes by in front of him. Nothing happens
+		# to either of them -- the guard's own cut is its sound, and the
+		# missing hit is the read. No riposte, no reel: see Player.evades().
+		pass
+	else:
+		var dealt := player.damage(danger.damage, danger.from_x)
+		danger.landed(dealt)
+		if dealt:
 			# --- feel/flow (additive) --- only when it landed:
 			# damage() returns false during invulnerability.
 			Flow.hitstop(self, Flow.HURT_FRAMES * Flow.FRAME)
+	return true
 
 
-## A plunge found a guard: the whole fall is behind this one, so it is the
+## A foe's projectile in flight. Until a parry turns it, a danger to the
+## prince; after, the prince's, and the first foe it meets takes it as a blow.
+func _resolve_shot(shot: FoeProjectile) -> void:
+	if shot.is_spent():
+		return
+	if not shot.reflected:
+		var danger := shot.danger()
+		if danger != null and player.is_alive():
+			_resolve_danger(danger, _contact.body)
+		return
+	for node: Node in _entities.get_children():
+		var foe := node as Foe
+		if foe == null or not foe.is_alive() or not shot.rect().intersects(foe.hurt_rect()):
+			continue
+		var outcome := foe.take_blow(Foe.Blow.SHOT, shot.global_position.x - shot.velocity.x)
+		_sword_hit(foe, outcome)
+		shot.spend()
+		return
+
+
+## A swing, an air slash or a sent-back shot met a foe.
+func _sword_hit(foe: Foe, outcome: Foe.Outcome) -> void:
+	match outcome:
+		Foe.Outcome.NONE:
+			pass
+		Foe.Outcome.BLOCKED:
+			_on_blocked(foe)
+		_:
+			GameAudio.cue(foe.wound_voice())
+			# --- feel/flow (additive) ---
+			_impact(foe.global_position, Flow.HIT_FRAMES, 1.9, 0.55)
+
+
+## A falling prince landed on one. Heavier than the sword: the whole body is
+## behind this one. He bounces either way; a foe that turned it takes no
+## wound and makes the clang instead.
+func _stomp_hit(foe: Foe, outcome: Foe.Outcome) -> void:
+	if outcome == Foe.Outcome.BLOCKED:
+		_on_blocked(foe)
+	else:
+		GameAudio.cue(foe.wound_voice(), {"pitch": 0.9})
+		# --- feel/flow (additive) ---
+		_impact(foe.global_position, Flow.STOMP_FRAMES, 2.6, 0.8)
+	player.velocity.y = -Tuning.JUMP_SPEED * Tuning.STOMP_BOUNCE
+
+
+## A plunge found a foe: the whole fall is behind this one, so it is the
 ## heaviest beat in the adventure -- the hitstop ceiling, the hardest shake
 ## short of a death, a full-weight settle, sparks at his helm -- and the prince
 ## springs back off him. The low wound sound under a stone thump, because the
-## body arrived with the blade.
-func _plunge_hit(guard: Patrol) -> void:
-	GameAudio.cue("guard_hit", {"pitch": 0.8})
-	GameAudio.cue("land_hard", {"volume_db": -6.0})
-	_impact(guard.global_position + Vector2(0.0, -Patrol.BODY.y),
-		Flow.PLUNGE_FRAMES, 2.8, 1.0)
+## body arrived with the blade. A foe the plunge passed through (NONE) is not
+## sprung from.
+func _plunge_hit(foe: Foe, outcome: Foe.Outcome) -> void:
+	match outcome:
+		Foe.Outcome.NONE:
+			return
+		Foe.Outcome.BLOCKED:
+			_on_blocked(foe)
+		_:
+			GameAudio.cue(foe.wound_voice(), {"pitch": 0.8})
+			GameAudio.cue("land_hard", {"volume_db": -6.0})
+			_impact(foe.impact_point(), Flow.PLUNGE_FRAMES, 2.8, 1.0)
 	player.rebound()
 
 
@@ -356,12 +499,19 @@ func _plunge_hit(guard: Patrol) -> void:
 ## frame on the contact, sparks where the blades met, and almost no camera: a
 ## parry is the prince standing his ground, and a frame that lurches says the
 ## opposite.
-func _on_parried(guard: Patrol) -> void:
+func _on_parried(danger: FoeDanger) -> void:
 	GameAudio.cue("sword_hit", {"pitch": 1.35})
 	var at := Vector2(
-		(player.global_position.x + guard.global_position.x) * 0.5,
-		guard.global_position.y - Patrol.CUT_HIGH)
+		(player.global_position.x + danger.from_x) * 0.5, danger.rect.position.y)
 	_impact(at, Flow.PARRY_FRAMES, 0.8, 0.7)
+
+
+## The prince's blow was turned by the foe -- a shield, a guard up. The same
+## clang a parry makes, a shade lower, and the smallest held beat: something
+## resisted him, but nothing gave.
+func _on_blocked(foe: Foe) -> void:
+	GameAudio.cue("sword_hit", {"pitch": 1.1})
+	_impact(foe.impact_point(), Flow.HURT_FRAMES, 0.6, 0.4)
 
 
 ## A plunge that met stone. The landing already thumps, dusts and settles at
@@ -385,7 +535,7 @@ func _complete() -> void:
 func _restart() -> void:
 	for node: Node in _entities.get_children():
 		node.queue_free()
-	_guards_down.clear()
+	_down.clear()
 	secrets.reseal() # --- secrets --- behind the wipe, like the rest
 	_spawn_entities(level.data)
 	secrets.furnish(_entities)
@@ -491,10 +641,11 @@ func _update_hud(refill: bool = false) -> void:
 ## - **Forward only.** Walking back past an earlier torch does not move the
 ##   checkpoint backwards. "Further" is measured toward the exit door.
 ## - **The level remembers what you did.** Relics you picked up stay picked up
-##   and guards you cut down stay down; a guard still standing goes back to its
+##   and foes you cut down stay down; a foe still standing goes back to its
 ##   post, so the respawn is never into the middle of the fight that killed
-##   you. The clock keeps running: a death costs the seconds since the torch,
-##   which is the point, and nothing more.
+##   you, and anything a foe had loosed is gone. The clock keeps running: a
+##   death costs the seconds since the torch, which is the point, and nothing
+##   more.
 
 ## Torch cells in `data` that a character could respawn on and still finish.
 ##
@@ -526,38 +677,38 @@ static func checkpoint_cells(data: AsciiLevel) -> Array[Vector2i]:
 	return out
 
 
-func _try_claim(torch: Torch, body: Rect2) -> void:
-	if not torch.checkpoint or torch.claimed or not player.is_grounded():
-		return
-	if absf(body.get_center().x - torch.position.x) > CHECKPOINT_REACH:
-		return
-	# On the torch's own floor, not jumping past it or on a ledge above it.
-	if absf(player.position.y - torch.position.y) > 1.0:
-		return
-	if _progress(torch.position) <= _progress(checkpoint):
-		return
-	checkpoint = torch.position
-	torch.claim()
+## A torch (or anything else that can be) offered `at` as the place a death
+## comes back to. Forward only: taken when it is further on than the one held.
+## The torch decides what reaching it means (Torch.meet()); this decides
+## whether it counts.
+func _offer_checkpoint(at: Vector2) -> bool:
+	if _progress(at) <= _progress(checkpoint):
+		return false
+	checkpoint = at
 	GameAudio.cue("relic", {"pitch": 0.72})
+	return true
 
 
 ## Larger is closer to the exit. Levels run toward their door, which is the one
 ## direction every level in the game agrees on.
 func _progress(at: Vector2) -> float:
-	if _exit == null:
+	if not _has_goal:
 		return at.x
-	return -absf(_exit.position.x - at.x)
+	return -absf(_goal.x - at.x)
 
 
-## Back on the last checkpoint, behind the cover of the wipe.
+## Back on the last checkpoint, behind the cover of the wipe. Every foe still
+## standing goes back to its post, every projectile in the air is gone, and
+## the rest of the level stays as the prince left it.
 func _respawn() -> void:
 	for node: Node in _entities.get_children():
-		if node is Patrol:
+		if node is Foe or node is FoeProjectile:
 			_entities.remove_child(node)
 			node.queue_free()
-	for post: int in _guard_posts.size():
-		if not _guards_down.has(post):
-			_spawn_guard(post)
+	for entry: Dictionary in _returning:
+		var mark: Dictionary = entry["mark"]
+		if not _down.has(EntitySite.post_of(String(mark["kind"]), mark["cell"])):
+			_place(mark, int(entry["ordinal"]))
 	player.respawn(checkpoint)
 	# The same grace as after a hit: a torch can stand on a guard's beat, and
 	# the first half-second back is for reading the room, not for paying again.
