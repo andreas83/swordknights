@@ -1,5 +1,5 @@
 class_name ZoneStrip
-extends RefCounted
+extends DuelWorld
 ## A tug-of-war level: three to five linked zones, read as one continuous world.
 ##
 ## WHY A MANIFEST RATHER THAN A LONGER GRID

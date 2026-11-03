@@ -71,6 +71,12 @@ restore and desyncs the netplay rollback. The duel runs its own slide loop over
 `resource_local_to_scene = true` on anything mutated at runtime (collision
 shapes above all), or one duellist crouches the other's hitbox.
 
+**`Object.set()` on a typed property drops a wrongly typed value in silence.**
+No error, no warning: the property keeps its old value, usually null. The duel
+fighter ran without a world for exactly this reason. Anything injected by name
+— `set()`, `call()`, reflection — is read back and checked
+(`DuelSeat.give_world()` shows how).
+
 **A hazard narrower than grab reach is not a hazard.** The ledge-grab probe
 runs every falling frame, so a 2-tile spike pit is free passage. A pit must be
 wider than `Tuning.grab_tiles()`, be roofed, or have nothing grabbable on the

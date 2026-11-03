@@ -11,10 +11,11 @@ extends Node2D
 ## something only ever one screen wide.
 ##
 ## WHAT IS STREAMED AND WHAT IS NOT
-## Only this: the TileMapLayer's cells, and therefore the physics bodies the
-## engine builds from them. The GEOMETRY the simulation reads is never streamed
-## — ZoneStrip answers every collision question for every zone, always, from
-## four thousand integers of ASCII. A simulation whose answers depended on what
+## Only this: the TileMapLayer's cells, which this layer draws. It builds no
+## collision. The GEOMETRY the simulation reads is never streamed — ZoneStrip
+## answers every query for every zone, always, from four thousand integers of
+## ASCII, and the physics a fighter moves against is DuelMatch's ground layer,
+## built whole once per match. A simulation whose answers depended on what
 ## had finished loading is a simulation two peers can disagree about, and the
 ## duel is checksummed.
 ##
@@ -68,7 +69,10 @@ func setup(zones: ZoneStrip) -> void:
 		tilemap = TileMapLayer.new()
 		tilemap.name = "Tiles"
 		tilemap.tile_set = _tile_set
-		tilemap.collision_enabled = true
+		# Drawing only. The physics a fighter moves against is DuelMatch's
+		# ground, which is never streamed; collision here would add a second,
+		# streamed copy that two peers could hold differently.
+		tilemap.collision_enabled = false
 		add_child(tilemap)
 	tilemap.clear()
 

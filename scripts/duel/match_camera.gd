@@ -41,6 +41,14 @@ const VERTICAL_FOLLOW := 6.0
 
 var fight: DuelMatch
 
+## The world width the view should frame, in pixels. Zero frames one zone, which
+## is what the mode is designed around. Anything else is a comparison: 320 shows
+## the duel at the adventure's scale, for deciding how wide a zone should be.
+var framing_width := 0.0
+
+## The follow position before it is snapped to whole screen pixels. Snapping the
+## smoothed value itself would stall the lerp a fraction of a pixel short.
+var _smooth := Vector2.ZERO
 var _shake_time := 0.0
 var _shake_magnitude := 0.0
 var _rng := RandomNumberGenerator.new()
@@ -59,7 +67,8 @@ func setup(match_node: DuelMatch) -> void:
 	limit_bottom = int(world.y)
 
 	_apply_zoom()
-	global_position = _target()
+	_smooth = _target()
+	global_position = _snapped(_smooth)
 	reset_smoothing()
 
 
@@ -74,10 +83,11 @@ func _process(delta: float) -> void:
 	_apply_zoom()
 
 	var want := _target()
-	global_position = Vector2(
-		lerpf(global_position.x, want.x, 1.0 - exp(-FOLLOW * delta)),
-		lerpf(global_position.y, want.y, 1.0 - exp(-VERTICAL_FOLLOW * delta))
+	_smooth = Vector2(
+		lerpf(_smooth.x, want.x, 1.0 - exp(-FOLLOW * delta)),
+		lerpf(_smooth.y, want.y, 1.0 - exp(-VERTICAL_FOLLOW * delta))
 	)
+	global_position = _snapped(_smooth)
 
 	if _shake_time > 0.0:
 		_shake_time -= delta
@@ -98,6 +108,12 @@ func _target() -> Vector2:
 	var centre := fight.scroll + width * 0.5
 
 	var view := _view_size() / zoom
+	if view.x < width - 0.5:
+		# Framed narrower than the window: follow the fighters inside it rather
+		# than staring at its middle while they fight at one end.
+		var mid := (fight.fighter_position(0).x + fight.fighter_position(1).x) * 0.5
+		centre = clampf(mid, fight.scroll + view.x * 0.5,
+			fight.scroll + width - view.x * 0.5)
 	var high := fight.fighter_position(0).y
 	var low := high
 	for slot: int in 2:
@@ -112,12 +128,48 @@ func _target() -> Vector2:
 	return Vector2(centre, vertical)
 
 
-## Exactly one zone across, whatever the window's aspect. The world width is
-## fixed and the view's height follows from it, rather than the other way round:
-## the horizontal is what the mode's distances are written in.
+## One zone across, whatever the window's aspect, at a whole number of screen
+## pixels per world pixel.
+##
+## The world width is fixed and the view's height follows from it, rather than
+## the other way round: the horizontal is what the mode's distances are written
+## in. But the exact fit is a fractional scale on most screens -- 3.75 screen
+## pixels per texel on a 20:9 phone at 1080p -- and a fractional scale on
+## nearest-filtered pixel art draws texels alternately three and four pixels
+## wide, which shimmers as the view scrolls. So the scale is rounded DOWN to a
+## whole number: every texel is the same size, and the view shows a little more
+## than one zone rather than a little less. The window's walls are what bound
+## the fight, not the screen's edge, so the extra margin costs nothing.
 func _apply_zoom() -> void:
-	var scale := _view_size().x / fight.strip.zone_width()
-	zoom = Vector2(scale, scale)
+	var wanted := framing_width if framing_width > 0.0 else fight.strip.zone_width()
+	var view := _view_size()
+	var stretch := _stretch()
+	if stretch <= 0.0:
+		zoom = Vector2.ONE * (view.x / wanted)
+		return
+	var pixels := maxf(1.0, floorf(view.x * stretch / wanted))
+	zoom = Vector2.ONE * (pixels / stretch)
+
+
+## Screen pixels per virtual unit: the canvas_items stretch factor. Zero when
+## there is no window to measure, as under a headless test.
+func _stretch() -> float:
+	var window := get_window()
+	var view := _view_size()
+	if window == null or view.y <= 0.0 or window.size.y <= 0:
+		return 0.0
+	return float(window.size.y) / view.y
+
+
+## A camera position on the screen's pixel grid. With a whole number of screen
+## pixels per texel, texel edges then fall on pixel edges too: without this the
+## view sits a fraction of a pixel off, and one row of every texel band renders
+## a pixel taller than the rest.
+func _snapped(at: Vector2) -> Vector2:
+	var per_world := zoom.x * _stretch()
+	if per_world <= 0.0:
+		return at
+	return (at * per_world).round() / per_world
 
 
 func _view_size() -> Vector2:

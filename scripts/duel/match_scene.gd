@@ -30,6 +30,7 @@ extends Node2D
 ##       --out /tmp/shots --shots 3.4,9.0,15.5 --demo
 
 const MENU_SCENE := "res://scenes/menu.tscn"
+const FIGHTER_SCENE: PackedScene = preload("res://scenes/fighter.tscn")
 const MANIFEST := "res://levels/duel_zones.txt"
 
 @onready var fight: DuelMatch = $World/Match
@@ -59,10 +60,20 @@ func _ready() -> void:
 	gore.setup(strip)
 	gore.z_index = -1 # beneath the actors, in one pass
 
+	fight.fighter_scene = FIGHTER_SCENE
 	if not fight.build(strip, zones):
 		push_error("the match would not build")
 		return
 
+	# Seat two wears steel and sea-green; teal is player two's colour and no one
+	# else's (docs/art-direction.md). Presentation, so it is set here and not
+	# in the match, which must not know what a fighter looks like.
+	for slot: int in fight.seats.size():
+		var fighter := fight.seats[slot].node as Fighter
+		if fighter != null:
+			FighterArt.dress(fighter, slot)
+
+	camera.framing_width = _framing_argument()
 	camera.setup(fight)
 	sky.camera = camera
 	sky.seed_value = hash(strip.name)
@@ -77,6 +88,16 @@ func _ready() -> void:
 	fight.fighter_respawned.connect(_on_fighter_respawned)
 	fight.leader_consumed.connect(_on_leader_consumed)
 	fight.match_over.connect(_on_match_over)
+
+
+## `--framing=320` in the user arguments frames the view that many world pixels
+## wide instead of one zone. Used to compare zone widths on screen; see
+## docs/duel-match.md.
+func _framing_argument() -> float:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--framing="):
+			return maxf(0.0, arg.trim_prefix("--framing=").to_float())
+	return 0.0
 
 
 func _build_gates() -> void:
@@ -187,6 +208,8 @@ func _on_match_over(_winner: int) -> void:
 ## shows the same thing every time. Kills are scripted rather than fought: this
 ## branch's fighter is a placeholder and cannot be relied on to land a blow at
 ## a particular moment, and the point of the demo is the match layer anyway.
+## The fighters are real now; the kills stay scripted so a screenshot at a given
+## second is the same screenshot every time.
 
 ## frame -> [victim, killer]
 const DEMO_KILLS := {
@@ -205,7 +228,7 @@ func _demo_input() -> Vector2i:
 		var pair: Array = DEMO_KILLS[_demo_frame]
 		var victim := int(pair[0])
 		if fight.is_fighter_alive(victim):
-			fight.seats[victim].node.call("slay", int(pair[1]))
+			fight.seats[victim].kill(int(pair[1]))
 
 	var leader := fight.leader_slot()
 	if leader < 0:
@@ -231,6 +254,10 @@ func _walk(slot: int, direction: int) -> int:
 	var here := strip.ground_row(column)
 	var ahead := strip.ground_row(column + direction)
 	var blocked := ahead < 0 or (here > 0 and ahead < here)
-	if blocked and _demo_frame % 6 < 2:
+	# Held, then let go long enough for the next press to be an edge. A tap is
+	# not a jump: the fighter has variable jump height, and two frames of jump
+	# is a 13 px hop that will not clear a one-tile step. The placeholder had no
+	# jump cut, which is why the old two-frame tap worked for it.
+	if blocked and _demo_frame % 20 < 14:
 		bits |= PlayerInput.BIT_JUMP
 	return bits

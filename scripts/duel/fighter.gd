@@ -86,9 +86,10 @@ var id: int = 0
 var tuning: DuelTuning = DuelTuning.default()
 ## The arena. Loose swords and standing up out of a roll are resolved against
 ## the tile grid rather than with a physics query, so they cost nothing and
-## cannot disagree between two machines. The match sets this, as the existing
-## duel does for Player.
-var level: Level
+## cannot disagree between two machines. The match hands over its ZoneStrip;
+## the fighter's tests hand over a LevelWorld. See DuelWorld for why this is a
+## type and not a convention.
+var world: DuelWorld
 ## One frame of intent, from a keyboard, a replay, an AI or the wire.
 var input: PlayerInput = PlayerInput.new()
 ## Set by the match while it replays mispredicted frames: the simulation still
@@ -180,6 +181,32 @@ func write_state(into: PackedByteArray, at: int) -> void:
 	into.encode_s32(at + OFF_FACING, facing)
 	into.encode_s32(at + OFF_STANCE, stance)
 	into.encode_s32(at + OFF_COMMIT, _commit)
+	into.encode_s32(at + OFF_FLAGS, _flags())
+	blade.write(into, at + OFF_BLADE)
+
+
+## This fighter's share of the match checksum: every field write_state()
+## carries, floats quantised by DuelSim.quantise(), integers as they are.
+##
+## The fighter writes this itself because only the fighter knows which of its
+## bytes are which. The match's fallback reads a fighter's block as a run of
+## float64s, which is right for the placeholder and wrong here: this layout
+## mixes doubles and int32s, and an int read as a double is a garbage value
+## whose quantisation is not something two CPUs are promised to agree on.
+func checksum_into(words: PackedInt32Array) -> void:
+	for value: float in [
+		position.x, position.y, velocity.x, velocity.y,
+		blade.position.x, blade.position.y, blade.velocity.x, blade.velocity.y,
+	]:
+		words.append(DuelSim.quantise(value))
+	for value: int in [
+		int(state), state_frame, facing, stance, _commit, _flags(),
+		int(blade.mode), blade.stance, blade.thrown_by,
+	]:
+		words.append(value)
+
+
+func _flags() -> int:
 	var flags := input.previous_bits() << FLAG_INPUT_SHIFT
 	if _ducked:
 		flags |= FLAG_DUCKED
@@ -187,8 +214,7 @@ func write_state(into: PackedByteArray, at: int) -> void:
 		flags |= FLAG_GROUNDED
 	if stance_changed:
 		flags |= FLAG_STANCE_CHANGED
-	into.encode_s32(at + OFF_FLAGS, flags)
-	blade.write(into, at + OFF_BLADE)
+	return flags
 
 
 func read_state(from: PackedByteArray, at: int) -> void:
@@ -223,7 +249,7 @@ func read_state(from: PackedByteArray, at: int) -> void:
 func simulate(dt: float) -> void:
 	state_frame += 1
 	_update_stance()
-	blade.step(dt, tuning, level)
+	blade.step(dt, tuning, world)
 	if state == State.DEAD:
 		# DEAD overrides every other state. A corpse still falls — into the
 		# pit, off the balcony — and that is all it does.
@@ -599,13 +625,13 @@ func _leave_roll() -> void:
 
 
 func _can_stand() -> bool:
-	if level == null:
+	if world == null:
 		return true
 	var rect := Rect2(
 		position.x - tuning.body_width * 0.5, position.y - tuning.body_height,
 		tuning.body_width, tuning.body_height
 	)
-	return not level.rect_hits_solid(rect)
+	return not world.rect_hits_solid(rect)
 
 
 func _apply_gravity(dt: float) -> void:

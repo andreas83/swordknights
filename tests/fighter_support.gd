@@ -143,7 +143,7 @@ static func _spawn(stage: Stage, seat: int) -> Fighter:
 	var fighter := packed.instantiate() as Fighter
 	fighter.name = "Fighter%d" % seat
 	stage.root.add_child(fighter)
-	fighter.level = stage.level
+	fighter.world = LevelWorld.new(stage.level)
 	fighter.setup(seat, stage.tuning)
 	fighter.respawn_at(Vector2(LEFT_X, float(FLOOR_ROW) * TILE), 1)
 	return fighter

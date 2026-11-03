@@ -110,6 +110,8 @@ var fighter_scene: PackedScene = null
 var fighter_profiles: Array[Resource] = [null, null]
 
 var _view: ZoneView
+## The collision a physics-bodied fighter moves against. See _build_ground().
+var _ground: TileMapLayer
 var _fighter_bytes := 0
 var _scratch := PackedByteArray()
 var _built := false
@@ -138,21 +140,60 @@ func build(zones: ZoneStrip, view: ZoneView = null) -> bool:
 			push_error("seat %d's fighter does not answer the interface: %s"
 				% [slot, seat.missing()])
 			return false
-		seat.give_world(strip)
+		if not seat.give_world(strip):
+			push_error("seat %d's fighter refused the strip as its world" % slot)
+			return false
 		seat.setup(fighter_profiles[slot])
 		seat.on_died(_on_fighter_died)
 		seats.append(seat)
 
 	_fighter_bytes = seats[0].state_bytes()
-	if _fighter_bytes <= 0 or _fighter_bytes % 8 != 0:
+	# A fighter that hashes itself may lay its state out however it likes. One
+	# that does not is read back as float64s by checksum(), so it must be a
+	# whole number of them.
+	var aligned := _fighter_bytes > 0 and _fighter_bytes % 8 == 0
+	if _fighter_bytes <= 0 or (not seats[0].hashes_itself() and not aligned):
 		push_error("a fighter's state is %d bytes; it must be a whole number of"
-			% _fighter_bytes + " float64s, so the checksum can quantise it")
+			% _fighter_bytes + " float64s, or the fighter must hash itself")
 		return false
 	_scratch.resize(2 * _fighter_bytes)
+	if seats[0].node is PhysicsBody2D:
+		_build_ground()
 	_built = true
 
 	reset_match()
 	return true
+
+
+## Every solid and one-way cell of the whole strip, as one hidden tilemap,
+## built once and never streamed.
+##
+## The real fighter moves with move_and_collide(), so the ground it stands on
+## is whatever the physics space holds. ZoneView streams its cells in and out
+## around the camera, which is right for drawing and wrong for this: a fighter
+## on a peer whose view had not reached a zone yet would fall through a floor
+## that the other peer has, and the two would disagree about a frame. The rule
+## this layer already keeps for its own queries -- the geometry the simulation
+## reads is never streamed -- now holds for the physics space too. ZoneView's
+## tilemap has collision switched off; it only draws.
+##
+## Five zones of 40 x 14 cells is under three thousand tiles of static
+## collision, built once per match. Hidden, because a TileMapLayer collides
+## whether or not it draws.
+func _build_ground() -> void:
+	if _ground != null:
+		_ground.queue_free()
+	_ground = TileMapLayer.new()
+	_ground.name = "Ground"
+	_ground.tile_set = GROUND_TILES
+	_ground.visible = false
+	for y: int in strip.rows():
+		for x: int in strip.cols():
+			var kind := strip.kind_at(x, y)
+			if kind == Tiles.Kind.SOLID or kind == Tiles.Kind.PLATFORM:
+				_ground.set_cell(Vector2i(x, y), 0, strip.atlas_for(x, y))
+	add_child(_ground)
+	_ground.update_internals()
 
 
 func _make_fighter() -> Node2D:
@@ -206,6 +247,7 @@ func step(bits_a: int, bits_b: int) -> void:
 
 	seats[0].simulate(DT)
 	seats[1].simulate(DT)
+	events.append_array(DuelSeat.referee(seats[0], seats[1], strip))
 
 	if phase != Phase.MATCH_OVER:
 		_advance_respawns()
@@ -545,6 +587,8 @@ func set_match_length(length: int) -> bool:
 
 const HEADER_BYTES := 44
 
+const GROUND_TILES: TileSet = preload("res://assets/tiles.tres")
+
 
 func snapshot_bytes() -> int:
 	return HEADER_BYTES + 2 * _fighter_bytes
@@ -631,6 +675,11 @@ func checksum() -> int:
 	words.append(quantise(respawn[0]))
 	words.append(quantise(respawn[1]))
 	words.append(quantise(scroll))
+
+	if seats[0].hashes_itself():
+		seats[0].checksum_into(words)
+		seats[1].checksum_into(words)
+		return fnv1a(words)
 
 	seats[0].write_state(_scratch, 0)
 	seats[1].write_state(_scratch, _fighter_bytes)

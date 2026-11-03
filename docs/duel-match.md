@@ -7,10 +7,11 @@ of blades resolves is [`duel-combat.md`](duel-combat.md).
 
 ![Three frames of a demo match](duel-match.png)
 
-*Rendered with `tools/screenshot.gd` from `scenes/duel_match.tscn --demo`. The
-fighters in it are placeholders and are not drawn — see "Status" below. The
-rings are respawn timers, the pools are gore, the track at the top is the zone
-and initiative indicator.*
+*Rendered with `tools/screenshot.gd` from `scenes/duel_match.tscn --demo`, on
+the real fighter. The fighters are drawn as their own hitboxes — body, blade,
+dropped sword — by `scripts/duel/fighter_art.gd`; see "Status". The demo's
+kills are scripted so a screenshot at a given second is always the same one.
+Rings are respawn timers, the track at the top is zone and initiative.*
 
 ## The pieces
 
@@ -31,6 +32,19 @@ and initiative indicator.*
 nothing but the match's state and those two input bytes. That is the promise
 the round duel made and the network session relies on: a client replays the
 host's frames and compares checksums. `docs/netplay.md` explains what it buys.
+
+Inside the frame, in this order: both inputs applied, both fighters simulated,
+then `DuelSeat.referee()` — blade against blade through `DuelCombat.resolve()`,
+then each body against the ground's hazards (spikes, water, falling out of the
+world). Blades go first, so a fighter cut down over the spikes is credited to
+the blade. The fighter resolves its own frame and nothing else; refereeing two
+of them is the match's job.
+
+The real fighter moves with `move_and_collide()`, so it needs ground in the
+physics space. The match builds that itself, once per match: a hidden tilemap
+of every solid and one-way cell of the whole strip (`_build_ground()`). The
+view's tilemap is streamed and only draws — its collision is off — because a
+streamed floor is one two peers could hold differently.
 
 ## Simulation and presentation
 
@@ -62,9 +76,11 @@ compared against thresholds, and rounding a threshold comparison to 32 bits
 moves a transition by a whole frame.
 
 The checksum quantises every float to 1/256 before hashing, so noise in the
-last bit cannot fire it. It reads each fighter block as a run of float64s, so a
-fighter's state must be a whole number of doubles; `build()` refuses one that
-is not.
+last bit cannot fire it. The real fighter supplies its own share
+(`Fighter.checksum_into()`), because its 100-byte state mixes doubles and
+int32s and only it knows which bytes are which. A fighter that does not hash
+itself — the placeholder — is read back as a run of float64s, so its state must
+be a whole number of them; `build()` refuses one that is neither.
 
 ## Initiative and the window
 
@@ -121,35 +137,37 @@ reconciling client does not paint the same death twice.
 
 ## Status
 
-The match is **built against a placeholder fighter** (`match_stub_fighter.gd`),
-as agreed when the work was split, and **nothing in the game loads it yet**:
-the menu's DUEL still starts the round-based duel in `scripts/duel/duel.gd`.
-Both duels implement `DuelSim`, which is why they can coexist.
+**The match runs on the real fighter.** `scenes/duel_match.tscn` builds it,
+and `tests/match_fighter_test.gd` plays matches on it: the seam hands over the
+world and the checksum, the fighters stand on the ground, a thrust kills
+through the match and moves the initiative, a hazard kills, two runs on the
+same inputs agree frame by frame, and a rewind to a snapshot replays 300 frames
+byte for byte. Each of those checks was seen to fail with its fix removed.
+
+The match's own suites still run on the placeholder in `match_stub_fighter.gd`,
+on purpose: they test the rope, and do not need a physics space.
+
+**Nothing in the game loads the match yet.** The menu's DUEL and DUEL ONLINE
+still start the round-based duel in `scripts/duel/duel.gd`. Both implement
+`DuelSim`, which is why they can coexist.
 
 Open before the match replaces the round duel:
 
-1. **The real fighter does not fit the seat yet.** `Fighter.level` is typed
-   `Level`, but the seat hands it a `ZoneStrip`; `Fighter.state_bytes()` is 100,
-   not a whole number of doubles; and the fighter collides through the physics
-   space, which is the part that is streamed.
-2. **The zones are bare.** `zones_view.gd` builds its own tilemap, so the
+1. **Zone width — a design decision, not made yet.** `ZoneStrip.SCREEN_WIDTH`
+   is a 640 px "design screen"; the view is 320–440 units wide. At 640 a
+   fighter is about 5% of the screen's height on a phone, at 320 about 12%.
+   No pixels are lost either way: the stretch mode is `canvas_items`, which
+   draws at native resolution. The camera now rounds its scale **down** to a
+   whole number of screen pixels per texel and snaps its position to the
+   pixel grid, so texels are all the same size on any aspect and the view shows
+   slightly more than one zone, never less. `--framing=320` in the scene's user
+   arguments frames the view 320 px wide, for comparing.
+2. **The fighter is drawn as its hitboxes.** `fighter_art.gd` argues for it:
+   the rectangles are what decides a duel, so the art that shows them teaches
+   the game. It reads, but next to the prince's rig in `player_art.gd` it is a
+   placeholder, and the larger the zone choice makes the fighter, the more it
+   shows.
+3. **The zones are bare.** `zones_view.gd` builds its own tilemap, so the
    architecture and cast shadows in [`world.md`](world.md) do not run on them.
-3. **The HUD is on the fallback font**, not the game's typeface ([`ui.md`](ui.md)).
-4. **A zone is 640 px wide and the view is 320.** `ZoneStrip.SCREEN_WIDTH` is a
-   640 px "design screen", so the camera zooms to 0.5 to fit a zone — and to
-   about 0.63–0.69 on wider phones. The game is landscape-only already, so the
-   view is 320–440 units wide whatever the device.
-
-   No pixels are lost: the stretch mode is `canvas_items`, which draws 2D at
-   the screen's native resolution, so at 0.5 every texel is a clean 2×2 block
-   at 720p (measured on `duel-match.png`'s source frames). Two real costs
-   remain. **Size:** a fighter is half its adventure size, about 6% of the
-   screen's height, and whether the three blade heights still read at that
-   size is a question for a phone in hand. **Uneven texels:** at 20:9 and
-   1080p the scale is 3.75 screen pixels per texel, so texels alternate 3 and
-   4 pixels wide and shimmer when the view scrolls; the frames also show a
-   slight vertical unevenness, because the camera is not snapped to the texel
-   grid. The second is fixed by snapping the zoom to a whole number of screen
-   pixels per texel and showing a little more than one zone, whatever width a
-   zone is. The first is a design decision, not a bug, and it is not made
-   yet.
+4. **The HUD is on the fallback font**, not the game's typeface ([`ui.md`](ui.md)).
+5. **The menu and the network session** still point at the round duel.

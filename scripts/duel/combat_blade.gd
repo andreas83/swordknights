@@ -83,14 +83,14 @@ func rect(tuning: DuelTuning) -> Rect2:
 ## One frame of a loose or flying sword. Axis by axis against the arena grid —
 ## a pure data lookup, no physics query and no engine state, so a replayed
 ## frame lands the blade on the same pixel.
-func step(dt: float, tuning: DuelTuning, level: Level) -> void:
-	if mode == Mode.HELD or level == null:
+func step(dt: float, tuning: DuelTuning, world: DuelWorld) -> void:
+	if mode == Mode.HELD or world == null:
 		return
 	if mode == Mode.LOOSE:
 		# A sword that has landed stays exactly where it landed. It does not
 		# skid: a dropped sword is a landmark both fighters are navigating
 		# toward, so it being where it fell matters more than it sliding.
-		if _is_supported(tuning, level):
+		if _is_supported(tuning, world):
 			velocity = Vector2.ZERO
 			return
 		velocity.y = minf(velocity.y + tuning.blade_fall_gravity * dt, tuning.max_fall_speed)
@@ -99,14 +99,14 @@ func step(dt: float, tuning: DuelTuning, level: Level) -> void:
 		return
 
 	var step_x := Vector2(velocity.x * dt, 0.0)
-	if level.rect_hits_solid(tuning.loose_blade_rect(position + step_x)):
+	if world.rect_hits_solid(tuning.loose_blade_rect(position + step_x)):
 		velocity.x = 0.0
 		mode = Mode.LOOSE
 	else:
 		position += step_x
 
 	var step_y := Vector2(0.0, velocity.y * dt)
-	if level.rect_hits_solid(tuning.loose_blade_rect(position + step_y)):
+	if world.rect_hits_solid(tuning.loose_blade_rect(position + step_y)):
 		velocity.y = 0.0
 		mode = Mode.LOOSE
 	else:
@@ -114,7 +114,7 @@ func step(dt: float, tuning: DuelTuning, level: Level) -> void:
 
 	# A throw that leaves the arena is gone rather than flying forever: the
 	# position is in the checksum, so an unbounded coordinate is a real bug.
-	var bounds := level.world_size()
+	var bounds := world.world_size()
 	if position.x < -tuning.blade_length or position.x > bounds.x + tuning.blade_length \
 			or position.y > bounds.y:
 		velocity = Vector2.ZERO
@@ -124,8 +124,8 @@ func step(dt: float, tuning: DuelTuning, level: Level) -> void:
 ## Whether something solid is directly under the blade. A grid lookup, not a
 ## physics query: the position is in the checksum, so this has to be the same
 ## answer on every machine.
-func _is_supported(tuning: DuelTuning, level: Level) -> bool:
-	return level.rect_hits_solid(tuning.loose_blade_rect(position + Vector2(0.0, 1.0)))
+func _is_supported(tuning: DuelTuning, world: DuelWorld) -> bool:
+	return world.rect_hits_solid(tuning.loose_blade_rect(position + Vector2(0.0, 1.0)))
 
 
 func write(into: PackedByteArray, at: int) -> void:
