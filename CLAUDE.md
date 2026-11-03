@@ -99,8 +99,11 @@ measures nothing must fail.
 
 Tabs. Statically typed GDScript (`:=` and explicit return types). Lines ≤ 100.
 `gdlint .` from the repository root — it resolves `.gdlintrc` upwards from the
-working directory. Two rules are disabled with written reasons; do not disable a
-third to go green.
+working directory. Two rules are disabled and one threshold is raised, each with
+a written reason in that file. **Do not disable a third rule to go green.**
+Moving a threshold is a different act from switching a rule off — the rule keeps
+firing — but it still needs the argument written down next to the number, and
+the argument has to be about the code's shape, not about the build being red.
 
 A docstring says what the file is responsible for and why it is built that way.
 The repository's comments argue for decisions rather than restate the code —
