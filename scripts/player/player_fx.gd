@@ -28,6 +28,20 @@ extends Node2D
 ## Effects are cosmetic and read-only with respect to gameplay: nothing here
 ## can change a simulation value, which is what keeps it safe to skip entirely
 ## on a replay or a remote peer.
+##
+## ## Hitstop and haptics
+##
+## Two things reach out of this node, and neither can affect a simulation.
+##
+## It *reads* `Flow.is_hitstopped()` and holds every particle and the sword
+## trail still while a frame is held. Without that the dust keeps drifting
+## through a frozen image and the hitstop reads as a dropped frame instead of
+## as weight. Reading the flag is safe anywhere: in a duel nothing ever sets
+## it, so it is always false there (see docs/feel.md).
+##
+## It *calls* `Flow.haptic()`, which is `Input.vibrate_handheld()` behind a
+## setting. Landings and hits buzz, scaled by the same `impact_weight()` the
+## dust uses, so the phone agrees with the screen.
 
 enum Kind { DUST, SCUFF, SPARK }
 
@@ -46,6 +60,13 @@ const DUST_GRAVITY := 34.0
 const DUST_DRAG := 2.6
 const SCUFF_INTERVAL := 0.11
 const TRAIL_POINTS := 7
+
+## Below this a landing is a touchdown, not an impact: no dust and no buzz.
+const HAPTIC_LAND_FROM := 0.35
+## A landing can never buzz as hard as taking a hit does.
+const HAPTIC_LAND_CEILING := 0.7
+const HAPTIC_HURT := 0.8
+const HAPTIC_DEATH := 1.0
 
 var _player: Player
 var _art: PlayerArt
@@ -99,6 +120,11 @@ func reset() -> void:
 
 
 func _process(delta: float) -> void:
+	# A held frame holds everything in it. The redraw still happens so the
+	# node survives a resize or a re-parent mid-hitstop.
+	if Flow.is_hitstopped():
+		queue_redraw()
+		return
 	_step_particles(delta)
 	_step_scuffs(delta)
 	_step_trail(delta)
@@ -163,10 +189,28 @@ func _step_trail(delta: float) -> void:
 
 ## --- signal handlers -------------------------------------------------------
 
+## Sparks where a blade or a boot connected, plus the buzz for it.
+##
+## Called by `Game` rather than driven off a signal, because the player does
+## not know it hit anything: the scene arbitrates that. `weight` is 0..1 and
+## scales both the spark count and the haptic.
+func sword_hit(at: Vector2, weight: float) -> void:
+	var amount := clampf(weight, 0.0, 1.0)
+	var count := 4 + int(amount * 6.0)
+	for i: int in count:
+		var angle := TAU * float(i) / float(count) + randf() * 0.5
+		_spawn(at + Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)),
+			Vector2(cos(angle), sin(angle)) * (46.0 + 54.0 * amount) * randf_range(0.5, 1.0),
+			randf_range(0.1, 0.2) + amount * 0.08, 1.0, Kind.SPARK)
+	Flow.haptic(amount)
+
+
 func _on_landed(impact_speed: float) -> void:
 	var weight := Tuning.impact_weight(impact_speed)
 	if weight <= 0.05:
 		return
+	if weight >= HAPTIC_LAND_FROM:
+		Flow.haptic(weight * HAPTIC_LAND_CEILING)
 	var count := 2 + int(weight * 9.0)
 	var at := _player.global_position
 	for i: int in count:
@@ -190,10 +234,12 @@ func _on_grabbed_ledge() -> void:
 
 func _on_hurt(_remaining_health: int) -> void:
 	_burst(8, 60.0)
+	Flow.haptic(HAPTIC_HURT)
 
 
 func _on_died() -> void:
 	_burst(14, 86.0)
+	Flow.haptic(HAPTIC_DEATH)
 
 
 func _burst(count: int, speed: float) -> void:

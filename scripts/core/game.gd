@@ -11,7 +11,18 @@ signal level_completed(elapsed: float, relics: int, relics_total: int)
 
 enum Phase { PLAYING, DYING, COMPLETE, PAUSED }
 
-const DEATH_HOLD := 1.1
+# --- feel/flow (additive) --- the death beat, which was a flat 1.1 s hold and
+# a hard cut. It is now long enough to read what killed you and short enough
+# that the next attempt is the thing you are thinking about; the respawn itself
+# happens behind the wipe, so this is the whole of the wait. Mashing jump skips
+# it after DEATH_SKIP_DELAY. See docs/feel.md.
+const DEATH_HOLD := 0.3
+const DEATH_SKIP_DELAY := 0.1
+# --- feel/flow (additive) --- one swing, one impact. The attack rect stays
+# live for about eight frames and the interaction pass runs every one of them,
+# so without this a single swing spends the hitstop budget two or three times
+# over and the frame appears to freeze for a fifth of a second.
+const IMPACT_COOLDOWN := 0.16
 const MENU_SCENE := "res://scenes/menu.tscn"
 
 @export_file("*.txt") var level_path: String = "res://levels/level_01.txt"
@@ -32,6 +43,10 @@ var relics_total: int = 0
 var _death_timer: float = 0.0
 var _entities: Node2D
 var _exit: ExitDoor
+# --- feel/flow (additive) --- last seen value of Flow.is_hitstopped(), so the
+# freeze is applied on the edge rather than re-asserted every frame.
+var _hitstopped := false
+var _impact_cooldown: float = 0.0
 
 
 func _ready() -> void:
@@ -59,9 +74,26 @@ func _ready() -> void:
 	hud.show_title(data.name)
 	_update_hud()
 
+	# --- feel/flow (additive) --- lift the shadow off whatever just loaded. A
+	# no-op when the previous scene already drove the wipe.
+	Flow.enter(self)
+
 
 func _physics_process(delta: float) -> void:
-	if Input.is_action_just_pressed("pause"):
+	# --- feel/flow (additive) --- a hitstop holds the actors for a handful
+	# of frames so an impact has weight. It is driven from this scene and
+	# only this scene: a duel steps in _physics_process and must never be
+	# frozen by one peer's local hit. See docs/feel.md.
+	var stopped := Flow.is_hitstopped()
+	if stopped != _hitstopped:
+		_hitstopped = stopped
+		_apply_freeze()
+	if stopped:
+		return
+
+	# --- feel/flow (additive) --- a transition owns the screen while it
+	# runs, so nothing queues a second one behind it.
+	if Input.is_action_just_pressed("pause") and not Flow.busy():
 		if phase == Phase.PLAYING:
 			_set_phase(Phase.PAUSED)
 			GameAudio.cue("pause_in")
@@ -71,30 +103,53 @@ func _physics_process(delta: float) -> void:
 
 	match phase:
 		Phase.PAUSED:
-			if Input.is_action_just_pressed("attack"):
-				get_tree().change_scene_to_file(MENU_SCENE)
+			if Input.is_action_just_pressed("attack") and not Flow.busy():
+				Flow.change_scene(self, MENU_SCENE)
 		Phase.COMPLETE:
-			if Input.is_action_just_pressed("jump"):
-				_restart()
+			if Flow.busy():
+				pass
+			elif Input.is_action_just_pressed("jump"):
+				Flow.wipe(self, _restart)
 			elif Input.is_action_just_pressed("attack"):
-				get_tree().change_scene_to_file(MENU_SCENE)
+				Flow.change_scene(self, MENU_SCENE)
 		Phase.DYING:
+			# --- feel/flow (additive) --- the beat, then the respawn behind
+			# the wipe. Nothing is added to the wait: the player is already
+			# playing again as the shadow lifts.
 			_death_timer -= delta
-			if _death_timer <= 0.0:
-				_restart()
+			var skipped := (
+				Input.is_action_just_pressed("jump")
+				and _death_timer <= DEATH_HOLD - DEATH_SKIP_DELAY
+			)
+			if (_death_timer <= 0.0 or skipped) and not Flow.busy():
+				Flow.wipe(self, _restart, Flow.Pace.FAST)
 		Phase.PLAYING:
 			elapsed += delta
+			# --- feel/flow (additive) --- spent in live frames, so a held
+			# frame does not count against it.
+			_impact_cooldown = maxf(0.0, _impact_cooldown - delta)
 			_resolve_interactions()
 
 
 func _set_phase(next: Phase) -> void:
 	phase = next
-	var frozen := next == Phase.PAUSED or next == Phase.COMPLETE
+	_apply_freeze()
+	hud.set_overlay(_overlay_title(), _overlay_subtitle())
+
+
+# --- feel/flow (additive) --- was the body of _set_phase, with hitstop added
+# as a third reason to hold the actors still. Split out so the hitstop edge can
+# re-apply the freeze without going through a phase change.
+func _apply_freeze() -> void:
+	var frozen := (
+		phase == Phase.PAUSED
+		or phase == Phase.COMPLETE
+		or Flow.is_hitstopped()
+	)
 	player.set_physics_process(not frozen)
 	_entities.process_mode = (
 		Node.PROCESS_MODE_DISABLED if frozen else Node.PROCESS_MODE_INHERIT
 	)
-	hud.set_overlay(_overlay_title(), _overlay_subtitle())
 
 
 func _overlay_title() -> String:
@@ -166,6 +221,8 @@ func _resolve_interactions() -> void:
 			if has_attack and attack.intersects(guard.bounds()):
 				guard.hit(player.global_position.x)
 				GameAudio.cue("guard_hit")
+				# --- feel/flow (additive) ---
+				_impact(guard.global_position, Flow.HIT_FRAMES, 1.9, 0.55)
 			elif body.intersects(guard.bounds()):
 				# A falling player lands on the guard instead of taking the hit.
 				var stomping := (
@@ -175,9 +232,14 @@ func _resolve_interactions() -> void:
 				if stomping:
 					guard.hit(player.global_position.x)
 					GameAudio.cue("guard_hit", {"pitch": 0.9})
+					# --- feel/flow (additive) --- heavier than the
+					# sword: the whole body is behind this one.
+					_impact(guard.global_position, Flow.STOMP_FRAMES, 2.6, 0.8)
 					player.velocity.y = -Tuning.JUMP_SPEED * 0.68
-				else:
-					player.damage(1, guard.global_position.x)
+				elif player.damage(1, guard.global_position.x):
+					# --- feel/flow (additive) --- only when it landed:
+					# damage() returns false during invulnerability.
+					Flow.hitstop(self, Flow.HURT_FRAMES * Flow.FRAME)
 
 	if _exit != null and body.intersects(_exit.bounds()):
 		_complete()
@@ -197,6 +259,7 @@ func _restart() -> void:
 	camera.setup(player, level.world_size())
 	elapsed = 0.0
 	_death_timer = 0.0
+	_impact_cooldown = 0.0 # --- feel/flow (additive) ---
 	_set_phase(Phase.PLAYING)
 	_update_hud()
 
@@ -207,9 +270,26 @@ func _on_relic_collected() -> void:
 	_update_hud()
 
 
+# --- feel/flow (additive) --- one place for "something connected": a few
+# frozen frames, a camera settle, sparks at the contact point and a buzz, all
+# scaled off the same weight so they cannot disagree.
+func _impact(at: Vector2, frames: int, shake_amount: float, weight: float) -> void:
+	if _impact_cooldown > 0.0:
+		return
+	_impact_cooldown = IMPACT_COOLDOWN
+	Flow.hitstop(self, frames * Flow.FRAME)
+	camera.shake(shake_amount, 0.2)
+	camera.settle(weight * 0.5)
+	var fx := PlayerFx.attach(player)
+	if fx != null and fx.is_inside_tree():
+		fx.sword_hit(at, weight)
+
+
 func _on_landed(impact: float) -> void:
 	if impact >= Tuning.HARD_LAND_SPEED:
 		camera.shake(1.6, 0.18)
+	# --- feel/flow (additive) --- the frame settles with the weight of it.
+	camera.settle(Tuning.impact_weight(impact))
 
 
 func _on_died() -> void:
