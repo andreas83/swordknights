@@ -280,6 +280,8 @@ static func arrive(solver: LevelReachability.Solver, low: int, mask: int,
 static func _expand(solver: LevelReachability.Solver, key: int, out: Array[int]) -> void:
 	solver.use_mask(key >> MASK_SHIFT)
 	solver.expand(key & LOW_MASK, out)
+	# A held plate is a race: a move to wherever the run beats the hold.
+	ReachRace.extend(solver, key, out)
 
 
 ## The cells of a set of full states, once each, for the search's heuristic.

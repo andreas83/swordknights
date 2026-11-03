@@ -309,10 +309,26 @@ Four rules carry over with care:
   *any* reached state of it is, and lists the states; the secret audit compares
   them state for state with the shut level.
 
-What the model leaves out is time (a gate open for three seconds) and
-momentary triggers (a plate held only while stood on): a reach hook asks
-`model.channel_mode()` and says nothing for either. `reach_model.gd` says
-what to declare instead, and what a timed route would need from the search.
+Momentary triggers (a plate held only while stood on) are left out: a reach
+hook asks `model.channel_mode()` and says nothing, because the prince cannot
+stand on a plate and walk through the gate it holds.
+
+**A held gate is a race** (`scripts/levels/reach_race.gd`). A plate on a
+`hold` wire says `race_on_stand()`, and standing on it is one more move: from
+there a search with the gate open, charged in frames, finds every place the
+prince can reach inside 75% of the hold -- 25% slack, because a thumb on a
+phone does not run perfectly -- and offers each as an arrival with the gate
+shut again. The frames are the primitives' own: an arc costs the frames
+`_trace` stepped it for (the solver says which frame it was on when it
+offered a landing, `arc_frame`), a grab adds its hang and mantle, a tile at a
+run is `Tuning.RUN_SPEED`'s, and a standing start loses what
+`Tuning.GROUND_ACCEL` takes to reach a run. The clock starts as the last foot
+leaves the plate, which is when the bus starts the hold, and the gate is
+already up by then -- he can wait on the plate for it. A race sets no bit, so
+the checkpoint argument above still holds. `ReachRace.measure(level)` reports
+every race against its hold, which is how Chapter II's holds were set
+(`docs/campaign.md`); `tests/unit/test_reach_race.gd` proves a race with room,
+refuses one with 10% slack, and checks that a hop costs the frames of its arc.
 
 **Levels without mechanisms are proved exactly as before.** The masked search
 is separate code (`scripts/levels/reach_search.gd`), reached only through a

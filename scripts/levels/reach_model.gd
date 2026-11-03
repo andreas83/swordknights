@@ -33,15 +33,14 @@ extends RefCounted
 ##
 ## ## What it does not model, and what to do instead
 ##
-## Time. A gate that a plate opens for three seconds, a floor that crumbles a
-## moment after it is touched, a lift's journey: none has a clock here. Say
-## the conservative thing -- a timed gate that the proof treats as shut, a
+## Time, mostly. A floor that crumbles a moment after it is touched, a lift's
+## journey: neither has a clock here. Say the conservative thing -- a
 ## crumbling floor as a latch that drops it the moment it is stood on, a lift
 ## as a ladder or as nothing -- so the proof never claims a route the player
-## cannot take. A level that genuinely needs a timed route has to grow a time
-## dimension in the search (frames since the bit was set, carried in the
-## state and charged per primitive), and that is the change to make, here and
-## in the solver, not a looser model.
+## cannot take. The one timed route the proof does make is the race against a
+## held gate: `race_on_stand()` marks the plate, and ReachRace charges the run
+## from it in frames and offers wherever it beats the hold, with the gate shut
+## again on arrival (scripts/levels/reach_race.gd). It sets no bit.
 ##
 ## Momentary triggers -- a plate that is down only while stood on -- are
 ## likewise left out: the prince cannot hold a plate and walk through the
@@ -65,6 +64,14 @@ var problems := PackedStringArray()
 ## channel -> `{mode, seconds, phase, period}`, the level's `;! channel` lines,
 ## for a reach hook to ask what its wire does (channel_mode()).
 var channels: Dictionary = {}
+## The level the model describes, for an extension that searches it on its
+## own terms (ReachRace builds a timed solver over it).
+var level: AsciiLevel
+## Per-level scratch for search extensions, so what they cache lives and dies
+## with the model.
+var extras: Dictionary = {}
+## cell -> the channels whose race standing there starts (race_on_stand()).
+var _races: Dictionary = {}
 
 
 ## The model of `level`: every mark whose registered kind has a reach hook
@@ -75,6 +82,7 @@ static func for_level(level: AsciiLevel) -> ReachModel:
 	if level == null:
 		return model
 	model.channels = level.channels.duplicate(true)
+	model.level = level
 	var kinds := EntityRegistry.kinds()
 	for mark: Dictionary in level.entities:
 		var script := kinds.get(String(mark["kind"])) as Script
@@ -115,8 +123,8 @@ func channel_count() -> int:
 
 
 ## What `channel` does when pressed: "momentary" (no `;! channel` line),
-## "latch", "hold" or "beat". A plate's hook latches only a latch: a held
-## wire is a race the model has no clock for, and is said as nothing.
+## "latch", "hold" or "beat". A plate's hook latches a latch and races a hold
+## (race_on_stand()); a momentary wire it says nothing about.
 func channel_mode(channel: StringName) -> String:
 	return String((channels.get(String(channel), {}) as Dictionary).get("mode", "momentary"))
 
@@ -148,6 +156,17 @@ func fixed_cells(cells: Array[Vector2i], kind: Tiles.Kind) -> void:
 		_fixed[cell] = kind
 
 
+## Standing in any of `cells` presses `channel`, a held wire: a race against
+## its hold, which ReachRace times. Sets no bit.
+func race_on_stand(cells: Array[Vector2i], channel: StringName) -> void:
+	bit(channel)
+	for cell: Vector2i in cells:
+		if not _races.has(cell):
+			_races[cell] = [] as Array[StringName]
+		if not (_races[cell] as Array[StringName]).has(channel):
+			(_races[cell] as Array[StringName]).append(channel)
+
+
 ## --- what the search asks ------------------------------------------------------
 
 ## The mask after standing in `cell` with `mask`.
@@ -163,6 +182,44 @@ func kinds_for(mask: int) -> Dictionary:
 		var kind: Tiles.Kind = entry["on"] if on else entry["off"]
 		for cell: Vector2i in entry["cells"]:
 			out[cell] = kind
+	return out
+
+
+## The races standing in `cell` starts: their channels.
+func races_at(cell: Vector2i) -> Array[StringName]:
+	if not _races.has(cell):
+		return [] as Array[StringName]
+	return _races[cell]
+
+
+func has_races() -> bool:
+	return not _races.is_empty()
+
+
+## Every cell a race starts from, in reading order.
+func race_cells() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for cell: Vector2i in _races:
+		out.append(cell)
+	out.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return a.y < b.y or (a.y == b.y and a.x < b.x))
+	return out
+
+
+## A held wire's hold, in physics frames.
+func hold_frames(channel: StringName) -> int:
+	var spec := channels.get(String(channel), {}) as Dictionary
+	return roundi(float(spec.get("seconds", 0.0)) * 60.0)
+
+
+## The cells switched by `channel`: its gate, for a race's far side.
+func switched_cells(channel: StringName) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var index := int(_bits.get(channel, -1))
+	for entry: Dictionary in _switched:
+		if int(entry["bit"]) == index:
+			for cell: Vector2i in entry["cells"]:
+				out.append(cell)
 	return out
 
 

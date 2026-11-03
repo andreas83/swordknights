@@ -41,8 +41,12 @@ static func reach(mark: Dictionary, model: ReachModel) -> void:
 	var channel := Mechanism.mark_channel(mark)
 	if channel == &"":
 		return
-	if model.channel_mode(channel) == "latch":
-		model.latch_on_stand(Mechanism.cells_above(Mechanism.mark_cells(mark)), channel)
+	var above := Mechanism.cells_above(Mechanism.mark_cells(mark))
+	match model.channel_mode(channel):
+		"latch":
+			model.latch_on_stand(above, channel)
+		"hold":
+			model.race_on_stand(above, channel)
 
 
 static func wired() -> bool:

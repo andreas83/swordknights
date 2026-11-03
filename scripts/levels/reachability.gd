@@ -446,6 +446,10 @@ class Solver extends RefCounted:
 	var _model: ReachModel = null
 	var _base := PackedByteArray()
 	var _by_mask: Dictionary = {}
+	## The frame of the arc _trace() is stepping when it offers a state, -1
+	## outside an arc. Nothing in this file reads it: a search that charges
+	## moves by their time does (ReachRace.Timed).
+	var arc_frame := -1
 
 	func _init(level: AsciiLevel, model: ReachModel = null) -> void:
 		cols = maxi(level.cols, 1)
@@ -827,6 +831,7 @@ class Solver extends RefCounted:
 			return
 
 		for frame: int in MAX_ARC_FRAMES:
+			arc_frame = frame
 			# 1. horizontal control, exactly as Player._free_movement
 			var accel := Tuning.GROUND_ACCEL if grounded else Tuning.AIR_ACCEL
 			var friction := Tuning.GROUND_FRICTION if grounded else Tuning.AIR_FRICTION
