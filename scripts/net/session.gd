@@ -80,7 +80,10 @@ const HANDSHAKE_RETRY_FRAMES := 30
 var role: Role = Role.HOST
 var stage: Stage = Stage.OFFLINE
 var transport: NetTransport
-var duel: Duel
+## The simulation being reconciled. Typed as the shared surface in
+## scripts/duel/match_sim.gd, not as either concrete simulation: nothing in this
+## file knows whether it is driving rounds or a tug-of-war.
+var duel: DuelSim
 var local_slot: int = DuelRules.SLOT_A
 var remote_slot: int = DuelRules.SLOT_B
 
@@ -138,7 +141,7 @@ var _started := false
 
 ## --- lifecycle --------------------------------------------------------------
 
-func start(net: NetTransport, fight: Duel, as_host: bool) -> void:
+func start(net: NetTransport, fight: DuelSim, as_host: bool) -> void:
 	transport = net
 	duel = fight
 	role = Role.HOST if as_host else Role.CLIENT
@@ -146,7 +149,7 @@ func start(net: NetTransport, fight: Duel, as_host: bool) -> void:
 	# which keeps the handshake to one exchange.
 	local_slot = DuelRules.SLOT_A if as_host else DuelRules.SLOT_B
 	remote_slot = DuelRules.SLOT_B if as_host else DuelRules.SLOT_A
-	_arena_hash = NetProtocol.arena_hash(fight.level.data)
+	_arena_hash = fight.arena_identity()
 
 	transport.received.connect(_on_received)
 	transport.peer_joined.connect(_on_peer_joined)
@@ -420,7 +423,7 @@ func _on_received(bytes: PackedByteArray) -> void:
 		NetProtocol.Type.HELLO:
 			if role == Role.HOST:
 				transport.send(NetProtocol.welcome(
-					DuelRules.SLOT_B, duel.rounds_to_win, _arena_hash
+					DuelRules.SLOT_B, duel.match_length(), _arena_hash
 				))
 				_begin_running()
 
@@ -431,7 +434,14 @@ func _on_received(bytes: PackedByteArray) -> void:
 				if int(message["arena_hash"]) != _arena_hash:
 					_fail("the two sides are not fighting in the same arena")
 					return
-				duel.rounds_to_win = maxi(1, int(message["rounds_to_win"]))
+				# WELCOME's one number is the shape of the match: rounds to win
+				# for a round duel, zones in the strip for a tug-of-war. A host
+				# asking for a shape this build cannot play is a failed
+				# handshake, not a desync four zones later.
+				if not duel.set_match_length(int(message["rounds_to_win"])):
+					_fail("the host is playing a match this build cannot: %d"
+						% int(message["rounds_to_win"]))
+					return
 				_begin_running()
 
 		NetProtocol.Type.INPUT:

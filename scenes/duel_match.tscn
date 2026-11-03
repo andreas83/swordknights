@@ -1,0 +1,40 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/duel/match_scene.gd" id="1_scene"]
+[ext_resource type="Script" path="res://scripts/render/parallax_sky.gd" id="2_sky"]
+[ext_resource type="Script" path="res://scripts/duel/zones_view.gd" id="3_zones"]
+[ext_resource type="Script" path="res://scripts/duel/gore.gd" id="4_gore"]
+[ext_resource type="Script" path="res://scripts/duel/match.gd" id="5_match"]
+[ext_resource type="Script" path="res://scripts/duel/match_camera.gd" id="6_camera"]
+[ext_resource type="Script" path="res://scripts/duel/match_hud.gd" id="7_hud"]
+
+[node name="DuelMatch" type="Node2D"]
+script = ExtResource("1_scene")
+
+[node name="Sky" type="CanvasLayer" parent="."]
+layer = -10
+
+[node name="ParallaxSky" type="Node2D" parent="Sky"]
+script = ExtResource("2_sky")
+
+[node name="World" type="Node2D" parent="."]
+
+[node name="ZoneView" type="Node2D" parent="World"]
+script = ExtResource("3_zones")
+
+[node name="Gore" type="Node2D" parent="World"]
+script = ExtResource("4_gore")
+
+[node name="Match" type="Node2D" parent="World"]
+script = ExtResource("5_match")
+
+[node name="Camera" type="Camera2D" parent="."]
+script = ExtResource("6_camera")
+
+[node name="HudLayer" type="CanvasLayer" parent="."]
+
+[node name="Hud" type="Control" parent="HudLayer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("7_hud")
