@@ -218,6 +218,16 @@ Three new parameters, each a number rather than new art:
   outright, which also saves the half second Chapter V's 1840 × 1024 mask
   costs on a desktop.
 
+**On the stone.** As first built the grade fell on the dressing and the
+sky but not on the terrain: the world shader writes its colour outright, so a
+`CanvasModulate` never reaches it, and Chapter IV's dusk was gold stone under a
+crimson sky, Chapter V's night the afternoon's shade half at full strength.
+`WorldGrade` now lays the same multiply on the stone through the shader's
+`tint`, so the bible's table is true of the whole city: shade times `NIGHT`
+at night, which is what lets the torches' fire read as the only light there.
+An afternoon has no grade, and its stone is untouched
+(`tests/unit/test_time_of_day.gd`).
+
 **What the grade does not touch.** Like `MatchDusk.LIT`, everything the player
 must read is lifted back to full light: the prince, every foe (their tells are
 drawn in `LIGHT` and `PAPER`, and a tell that dims is a death that is not
@@ -1124,11 +1134,21 @@ into the raised disc, a stomp on the crown — is `Outcome.BLOCKED`: Game's
 clang, no wound. A wrong answer is heard at once and costs time, not a heart.
 
 **The dark reaches the stone.** The world shader is unshaded and writes its
-colour outright, so the grade's multiply never lands on the tiles — the
-night's look is the atlas's shade half, not the multiply. The third phase's
-dim comes onto the stone through the shader's `tint` (white, and so a no-op,
-everywhere else); the hour's own grade still does not, which is a question for
-the time-of-day grade rather than for the boss.
+colour outright, so a canvas multiply never lands on the tiles. The grade is
+laid on the stone through the shader's `tint` instead -- the hour's multiply
+and the third phase's dim together, the same colour the canvas gets
+(`WorldGrade`, "The stone takes the grade by hand").
+
+**He is drawn a quarter larger than he is refereed.** Posed at his body's
+32 px, in play he read as about the prince's size: the frame is 320 units
+wide, and the crown was a smudge on a column as narrow as a cowl. The figure
+is drawn at `EclipseArt.SCALE` (1.25) about his feet -- forty pixels to the
+crown band, a thirty-pixel disc, nearly twice the prince to the tip of the
+crown -- and his hitbox is `Eclipse.BODY` as before, so the fight, its tests
+and its clear run are the same frame for frame. The plunge errs the right way:
+its point reaches under the prince's feet, so they meet the drawn crown as the
+point meets the refereed one; and the tallest spike, flared, stays under a
+gallery's underside where he pauses to be plunged.
 
 **What he has left is on him**, not in a bar: nine gold spikes in his crown,
 one put out per wound, outer pair first, the centre one the finale's; and a

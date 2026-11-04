@@ -29,7 +29,7 @@ func _ready() -> void:
 	_grade = game.get_node_or_null(^"WorldGrade") as WorldGrade
 	_sky = game.get("sky") as ParallaxSky
 	if _grade != null:
-		_from = _grade.color
+		_from = _grade.hour
 	if _sky != null:
 		_from_sky = _sky.night
 
@@ -41,6 +41,6 @@ func _process(_delta: float) -> void:
 	if p <= 0.0:
 		return
 	if _grade != null:
-		_grade.color = _from.lerp(TimeOfDay.NIGHT, p)
+		_grade.hour = _from.lerp(TimeOfDay.NIGHT, p)
 	if _sky != null:
 		_sky.night = lerpf(_from_sky, 1.0, p)

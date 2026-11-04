@@ -150,3 +150,22 @@ func test_at_dusk_the_world_is_graded_and_what_must_be_read_is_not() -> void:
 		var seen := (node as CanvasItem).modulate * grade.color
 		assert_true(seen.is_equal_approx(Color.WHITE),
 			"%s is at its own light under the grade" % node.name)
+
+
+## The world shader writes its colour outright, so the canvas grade never
+## reached the stone: Chapter IV's dusk was gold stone under a crimson sky.
+## The hour is laid on the stone through the shader's tint, the same multiply
+## as the canvas's; and an afternoon leaves it white, as it always was.
+func test_the_hour_reaches_the_stone_and_the_afternoon_does_not() -> void:
+	var game := await _play("dusk")
+	var grade := game.get_node_or_null(^"WorldGrade") as WorldGrade
+	assert_not_null(grade, "dusk is a grade")
+	var material := game.level.tilemap.material as ShaderMaterial
+	var tint: Variant = material.get_shader_parameter(&"tint")
+	assert_true(tint is Color and (tint as Color).is_equal_approx(grade.color),
+		"the stone takes the dusk the canvas takes: %s" % str(tint))
+	var plain := await _play("")
+	var white: Variant = (plain.level.tilemap.material as ShaderMaterial) \
+		.get_shader_parameter(&"tint")
+	assert_true(white == null or (white as Color).is_equal_approx(Color.WHITE),
+		"and the afternoon's stone is untouched")

@@ -83,8 +83,12 @@ the table, and every node in `MatchDusk.LIT` lifted back out by the inverse of
 the multiply. The prince, every foe (in `Foe._ready`, so a new foe is lifted by
 the contract), every projectile, the torches and the relics join that group:
 a tell drawn in `LIGHT` that dims at dusk is a death that cannot be read, so
-the grade falls on the city and not on what you fight. An afternoon level gets
-no `WorldGrade` at all — the game as it always looked.
+the grade falls on the city and not on what you fight. The stone takes the
+same multiply by hand: the world shader is unshaded and writes its colour
+outright, so no `CanvasModulate` reaches the tiles, and `WorldGrade` lays its
+colour on them through the shader's `tint` every frame it changes. An
+afternoon level gets no `WorldGrade` at all, and its tint stays white — the
+game as it always looked.
 
 The campaign's sky carries one landmark the hour reaches like every other
 building: the Mirror Tower (`ParallaxSky.tower`, `docs/campaign.md`, "The
