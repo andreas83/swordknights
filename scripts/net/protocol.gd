@@ -35,8 +35,19 @@ extends RefCounted
 ## is more than its tiles now: blades on the beat, water on a timer and stone
 ## that falls are rules a version-2 build does not have, so the two would step
 ## one strip into two matches. The version says so in the lobby first.
+##
+## VERSION 4: duel fairness and the series. No message changed shape except
+## the snapshot, whose match header grew by the two seats' trailing-edge
+## counters and the series score -- but what the inputs do changed under every
+## message: down standing still is a LOW guard and down with WALK the duck,
+## WALK shuffles without turning, a roll ends in recovery frames, a kick's
+## knockdown is short, a double kill leaves the initiative where it was, a
+## fighter held at the trailing edge is put back ahead of the runner, and a
+## gate reached wins a round of a best of three instead of the match. A
+## version-3 build steps the same inputs into a different match; the lobby
+## says so before the desync detector would.
 
-const VERSION := 3
+const VERSION := 4
 ## The longest strip name WELCOME carries. A name is an id -- lower-case ASCII,
 ## digits and underscores, as a look's ids are -- so a hostile host cannot
 ## hand the guest a string to log.

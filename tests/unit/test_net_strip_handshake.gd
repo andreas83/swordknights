@@ -1,6 +1,6 @@
 extends GutTest
 ## The host chooses the strip; the guest loads it, or says in the lobby why it
-## cannot. The wire half (protocol version 3, the strip's name on WELCOME, a
+## cannot. The wire half (protocol version 3 and on, the strip's name on WELCOME, a
 ## name that is not a name refused) and the session half (a guest on another
 ## strip switched to the host's, a guest without it refused with the strip
 ## named, and the host told why rather than that the guest left).
@@ -13,7 +13,7 @@ const POLLS := 120
 
 
 func test_welcome_carries_the_strip_by_name() -> void:
-	assert_eq(NetProtocol.VERSION, 3, "the strips are protocol 3")
+	assert_gte(NetProtocol.VERSION, 3, "the strips are protocol 3, and every one since")
 	var bytes := NetProtocol.welcome(1, 5, 0x1234abcd, {"figure": "heroine"}, "well")
 	var back := NetProtocol.decode(bytes)
 	assert_false(back.has("error"), "it decodes: %s" % back.get("error", ""))

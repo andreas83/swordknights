@@ -209,9 +209,9 @@ from 427 to 504 of the 510 or so that arrive; it matters below, too, because
 the frames the client can replay are the ones whose blood it can put where the
 host's was.
 
-The snapshot is *exact*. A 44-byte match header (frame, phase, initiative,
-zone, kills, and the timers and scroll as doubles) and a 100-byte block per
-fighter: position and velocity as doubles, then the discrete state — state,
+The snapshot is *exact*. A 52-byte match header (frame, phase, initiative,
+zone, kills, the series, the two trailing-edge counters, and the timers and
+scroll as doubles) and a 100-byte block per fighter: position and velocity as doubles, then the discrete state — state,
 frame count, facing, stance, the input's press-edge memory — as 32-bit
 integers, then the fighter's sword. A replayed frame cannot re-fire a jump that
 was already held, and nothing the simulation compares against a threshold is
@@ -277,8 +277,19 @@ file by (`scripts/net/protocol.gd`, `_get_look`):
   able to do with it. The reason is kept in `remote_look_error` and logged.
 - Once seated, later `HELLO`s cannot change the look.
 
-**Versions.** The protocol version is **3**, bumped for the strips (below).
-Version 2 was the sword catch: it changed what an empty hand's THROW does
+**Versions.** The protocol version is **4**, bumped for duel fairness
+([`duel-combat.md`](duel-combat.md#stance-footwork-and-the-duck),
+[`duel-match.md`](duel-match.md#passed)). Down standing still is a LOW guard
+and the duck is down with WALK. WALK shuffles without turning. A roll ends in
+recovery frames, and a kick's knockdown is short. A double kill keeps the
+initiative where it was, and a fighter held at the trailing edge is put back
+ahead of the runner. A gate reached now wins a round of a best of three
+([`duel-match.md`](duel-match.md#the-series)); the next round starts inside
+the simulation, so there is no rematch handshake. The same inputs step a
+different match on a version-3 build, and the match header grew by eight bytes.
+`tests/unit/test_net_fairness_version.gd` holds every version-3 message refused
+and a version-3 guest told why. Version 3 was the strips (below). Version 2 was
+the sword catch: it changed what an empty hand's THROW does
 without changing a byte on the wire, so a protocol-1 build and a protocol-2 one
 would have seated each other and diverged the first time an empty hand pressed
 throw. In both cases the HELLO is refused and the lobby says the other phone
