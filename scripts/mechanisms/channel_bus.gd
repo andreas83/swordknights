@@ -125,6 +125,25 @@ func release(channel: StringName, source: Object) -> void:
 	_edge(channel, was)
 
 
+## A bus with `channels` latched and nothing else: the deeds of a run saved
+## at a torch (CampaignProgress), for for_level() to keep as a respawn keeps
+## them. Whatever a level does not declare is the caller's to leave out.
+static func of_latches(channels: PackedStringArray) -> ChannelBus:
+	var bus := ChannelBus.new()
+	for channel: String in channels:
+		bus._latched[StringName(channel)] = true
+	return bus
+
+
+## The channels latched for good, sorted: what a saved checkpoint keeps.
+func latched() -> PackedStringArray:
+	var out := PackedStringArray()
+	for channel: StringName in _latched:
+		out.append(String(channel))
+	out.sort()
+	return out
+
+
 ## On for good, whatever the channel's mode: the deed that cannot be undone.
 func latch(channel: StringName) -> void:
 	var was := is_on(channel)

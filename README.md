@@ -156,7 +156,9 @@ window that guards a death lasts half as long again.
 
 Every torch you reach on foot is a checkpoint: the flame flares, and a death
 sends you back there rather than to the start. Relics you picked up and guards
-you cut down stay that way; the clock keeps running.
+you cut down stay that way; the clock keeps running. In a chapter the last
+torch is saved as you reach it, so if you leave -- quit, or the phone rings --
+CONTINUE puts you back on it. Choosing the chapter by name starts it over.
 
 The city keeps **secret rooms** behind bricked-up doorways. Look for the
 outline of an arch filled in with smaller stones: air moving through its

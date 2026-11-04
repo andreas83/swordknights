@@ -412,6 +412,11 @@ with a lozenge. A row that cannot be played is dimmed but still visited by
 the cursor — what is ahead is part of the reason to go on — and jump on it is
 the back sound and nothing else.
 
+CONTINUE carries on from the last torch reached in that chapter, when there
+is one, and its second caption line says FROM THE LAST TORCH REACHED; the
+chapter's own row always starts it over and forgets the torch
+([`feel.md`](feel.md), *Checkpoints: the torches*).
+
 Two caption lines under the list speak for the selected row: the hour it is
 set at and its epigraph, then its bests in full — BEST, RELICS, SECRETS — or
 why it cannot be played (CLEAR THE SUN TERRACE TO OPEN IT, STILL BEING BUILT).

@@ -377,7 +377,9 @@ opens the next entry; jump on the complete screen plays the next entry behind
 the wipe (`Game.advance`, with `Game.advance_label` saying CONTINUE), goes back
 to the chapter select when the next is not built, and shows the ending card
 (`Campaign.ENDING`) after the last; sword leaves for the chapter select
-(`Game.quit_scene`). `tests/unit/test_campaign_game.gd` plays a two-chapter
+(`Game.quit_scene`); and every torch taken is saved, so CONTINUE picks the
+chapter up there (`Campaign.resume`, `Game.resume_at()`; `docs/feel.md`,
+*Checkpoints: the torches*). `tests/unit/test_campaign_game.gd` plays a two-chapter
 campaign through all of it.
 
 ## Configuration as code

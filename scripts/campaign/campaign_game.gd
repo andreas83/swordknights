@@ -25,6 +25,12 @@ extends Node2D
 ##   its sky has the Mirror Tower in it, at the entry's distance.
 ## - **Sword goes back to the chapter select**, from pause or the complete
 ##   screen (`Game.quit_scene`), not to the title: the campaign is a place.
+## - **The last torch is kept** between sessions (`Game.checkpoint_taken`),
+##   saved the moment it is reached, so a chapter left by a phone call, a
+##   quit or a closed app is picked up there by CONTINUE (`Campaign.resume`)
+##   instead of from its start. Starting an entry any other way -- its own
+##   row, the next chapter after a clear, RESTART CHAPTER -- is a new run and
+##   forgets it, as a clear does.
 
 const GAME_SCENE := "res://scenes/game.tscn"
 const CHAPTER_SELECT := "res://scenes/chapter_select.tscn"
@@ -47,7 +53,9 @@ var _dawn: DawnFrame
 func _ready() -> void:
 	progress = CampaignProgress.open(progress_path)
 	index = clampi(Campaign.selected, 0, maxi(0, Campaign.count() - 1))
-	_build()
+	var resuming := Campaign.resume
+	Campaign.resume = false
+	_build(resuming)
 
 
 ## The game playing the current entry; null on the ending card.
@@ -64,7 +72,7 @@ func dawn() -> DawnFrame:
 	return _dawn
 
 
-func _build() -> void:
+func _build(resuming: bool = false) -> void:
 	var entry := Campaign.entry(index)
 	var file := String(entry.get("file", ""))
 	if file == "" or not FileAccess.file_exists(file):
@@ -92,6 +100,29 @@ func _build() -> void:
 	_game.hud.show_card(Campaign.card(index))
 	# The Mirror Tower, as near as this chapter has come to it.
 	_game.sky.tower = float(entry.get("tower", 0.0))
+	_pick_up_or_forget(resuming)
+	_game.checkpoint_taken.connect(_on_torch)
+	_game.restarted.connect(func() -> void: _forget_torch())
+
+
+## CONTINUE, with a torch saved: the run goes on from it. Anything else, or a
+## torch the level no longer proves, starts afresh and forgets it.
+func _pick_up_or_forget(resuming: bool) -> void:
+	var torch := progress.torch_of(index)
+	if resuming and not torch.is_empty() and _game.resume_at(torch["cell"],
+			torch["latched"], float(torch["time"])):
+		return
+	_forget_torch()
+
+
+func _on_torch(cell: Vector2i, latched: PackedStringArray) -> void:
+	progress.set_torch(index, cell, latched, _game.elapsed)
+	_save()
+
+
+func _forget_torch() -> void:
+	if progress.clear_torch(index):
+		_save()
 
 
 func _advance_label() -> String:
@@ -104,6 +135,10 @@ func _advance_label() -> String:
 func _on_completed(elapsed: float, relics: int, relics_total: int) -> void:
 	progress.record_clear(index, elapsed, relics, relics_total,
 		_game.secrets.count, _game.secrets.total)
+	_save()
+
+
+func _save() -> void:
 	var err := progress.save()
 	if err != OK:
 		push_warning("campaign: could not save %s: %s" % [progress.path, error_string(err)])

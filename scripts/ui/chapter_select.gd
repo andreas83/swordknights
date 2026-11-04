@@ -4,7 +4,10 @@ extends Control
 ##
 ## CONTINUE first, and the cursor starts on it: the one thing a returning
 ## player wants is to carry on, and it should cost one press
-## (CampaignProgress.continue_index()). Under it every entry of the campaign
+## (CampaignProgress.continue_index()). It carries on from the last torch
+## reached in that chapter, when there is one, and says so under the list;
+## the chapter's own row starts it over (CampaignProgress, "the run in
+## progress"). Under it every entry of the campaign
 ## in order (Campaign.entries()), each with its numeral, its title and, on
 ## the right, what the player has done there: the best time once cleared,
 ## LOCKED until the one before it is, TO COME while it is still being built.
@@ -134,6 +137,10 @@ func caption(row: int) -> Array[PackedStringArray]:
 	var first := PackedStringArray([hour])
 	if epigraph != "":
 		first = PackedStringArray(["%s  ·  %s" % [hour, epigraph], epigraph])
+	if bool(_rows[row]["continue"]) and not _progress.torch_of(at).is_empty():
+		return [first, PackedStringArray([
+			"FROM THE LAST TORCH REACHED", "FROM THE LAST TORCH", "FROM THE TORCH",
+		])]
 	return [first, _standing(at)]
 
 
@@ -181,6 +188,7 @@ func confirm() -> void:
 		return
 	var at := entry_of(_index)
 	Campaign.selected = at
+	Campaign.resume = bool(_rows[_index]["continue"])
 	GameAudio.cue("ui_confirm")
 	if play.is_valid():
 		play.call(at)

@@ -5,7 +5,15 @@ extends RefCounted
 ## How many entries are open, and for each one played: cleared or not, the
 ## best time, and the most relics and secrets found in one run, with the
 ## totals they were out of. Entries unlock in Campaign's order, one clear at a
-## time; a restart or a death changes nothing here, only a clear does.
+## time; a restart or a death changes none of that, only a clear does.
+##
+## And the run in progress: the last torch reached in an entry not yet left
+## by its door, so that CONTINUE picks a chapter up where the player was
+## rather than at its start -- on a phone a session ends when a call comes
+## in, not when a chapter does. Its cell, the wires latched when it was taken
+## and the clock then; Game.resume_at() refuses one the level no longer
+## proves. A clear forgets it, and so does starting the entry from its own
+## row or from RESTART CHAPTER: those are new runs (CampaignGame).
 ##
 ## ## The file
 ##
@@ -19,6 +27,11 @@ extends RefCounted
 ##     relics_total=6
 ##     secrets=1
 ##     secrets_total=3
+##
+##     [aqueduct]
+##     torch=Vector2i(41, 9)
+##     torch_latched=PackedStringArray("1")
+##     torch_time=95.2
 ##
 ## Sections are entry ids, not positions, so a chapter added or moved in the
 ## catalogue moves nobody's record. Reading is forgiving to the field, as the
@@ -38,6 +51,9 @@ var path := UserData.at(PATH)
 var _unlocked := 1
 ## id -> {cleared, best_time, relics, relics_total, secrets, secrets_total}
 var _records: Dictionary = {}
+## id -> {cell: Vector2i, latched: PackedStringArray, time: float}: the last
+## torch reached in a run not yet finished.
+var _torches: Dictionary = {}
 
 
 ## The saved progress at `at`, or a fresh campaign if nothing there is usable.
@@ -52,6 +68,7 @@ static func open(at: String = "") -> CampaignProgress:
 func load_from_disk() -> bool:
 	_unlocked = 1
 	_records.clear()
+	_torches.clear()
 	var file := ConfigFile.new()
 	if file.load(path) != OK:
 		return false
@@ -72,6 +89,15 @@ func load_from_disk() -> bool:
 		_records[id] = record
 		if bool(record["cleared"]):
 			_unlocked = maxi(_unlocked, index + 2)
+		var cell: Variant = file.get_value(id, "torch", Vector2.ZERO)
+		if typeof(cell) == TYPE_VECTOR2I:
+			var latched: Variant = file.get_value(id, "torch_latched", PackedStringArray())
+			_torches[id] = {
+				"cell": cell,
+				"latched": latched if typeof(latched) == TYPE_PACKED_STRING_ARRAY
+					else PackedStringArray(),
+				"time": maxf(0.0, _time(file.get_value(id, "torch_time", 0.0))),
+			}
 	return true
 
 
@@ -82,6 +108,11 @@ func save() -> Error:
 		var record: Dictionary = _records[id]
 		for key: String in record:
 			file.set_value(id, key, record[key])
+	for id: String in _torches:
+		var torch: Dictionary = _torches[id]
+		file.set_value(id, "torch", torch["cell"])
+		file.set_value(id, "torch_latched", torch["latched"])
+		file.set_value(id, "torch_time", torch["time"])
 	return file.save(path)
 
 
@@ -135,7 +166,30 @@ func record_clear(index: int, seconds: float, relics: int, relics_total: int,
 		record["secrets"] = secrets
 	_records[id] = record
 	_unlocked = maxi(_unlocked, index + 2)
+	# Out by the door: there is no run left to pick up.
+	_torches.erase(id)
 	return improved
+
+
+## The last torch reached in entry `index`'s unfinished run, as
+## `{cell, latched, time}`; empty when there is none.
+func torch_of(index: int) -> Dictionary:
+	var id := String(Campaign.entry(index).get("id", ""))
+	return (_torches.get(id, {}) as Dictionary).duplicate()
+
+
+## A torch reached at `cell` in entry `index`, with the channels `latched`
+## then and the clock at `seconds`. Saving is the caller's.
+func set_torch(index: int, cell: Vector2i, latched: PackedStringArray, seconds: float) -> void:
+	var id := String(Campaign.entry(index).get("id", ""))
+	if id != "":
+		_torches[id] = {"cell": cell, "latched": latched, "time": maxf(0.0, seconds)}
+
+
+## Forgets entry `index`'s torch. True if there was one, so a caller saves
+## only when something changed.
+func clear_torch(index: int) -> bool:
+	return _torches.erase(String(Campaign.entry(index).get("id", "")))
 
 
 ## Where CONTINUE goes: the first entry that can be played and has not been

@@ -60,6 +60,10 @@ const TOWER := {
 ## Which entry CampaignGame plays: set by the chapter select before it
 ## changes scene, and moved on by CampaignGame as chapters chain.
 static var selected := 0
+## Whether CampaignGame picks `selected` up at its last torch reached
+## (CampaignProgress.torch_of()) rather than starting it: set by the chapter
+## select's CONTINUE, and spent by the first chapter it plays.
+static var resume := false
 
 static var _for_tests: Array[Dictionary] = []
 
@@ -131,11 +135,13 @@ static func card(index: int) -> Dictionary:
 static func use_for_test(list: Array[Dictionary]) -> void:
 	_for_tests = list.duplicate(true)
 	selected = 0
+	resume = false
 
 
 static func reset() -> void:
 	_for_tests.clear()
 	selected = 0
+	resume = false
 
 
 ## An entry, built by name rather than as a literal so every line of

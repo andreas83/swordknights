@@ -17,6 +17,11 @@ extends Node2D
 ## cut, the checkpoint, the tally, and the presentation every impact shares.
 
 signal level_completed(elapsed: float, relics: int, relics_total: int)
+## --- checkpoints --- a torch taken, by its cell, with the wires latched when
+## it was: what a mode that keeps a run between sessions saves (CampaignGame).
+signal checkpoint_taken(cell: Vector2i, latched: PackedStringArray)
+## The pause menu's RESTART: the run that torch belonged to is over.
+signal restarted()
 
 enum Phase { PLAYING, DYING, COMPLETE, PAUSED }
 
@@ -723,6 +728,7 @@ func _restart() -> void:
 	_impact_cooldown = 0.0 # --- feel/flow (additive) ---
 	_set_phase(Phase.PLAYING)
 	_update_hud(true)
+	restarted.emit()
 
 
 ## --- secrets --- the found beat. A chime that answers the relic's struck
@@ -878,6 +884,29 @@ func _offer_checkpoint(at: Vector2) -> bool:
 		return false
 	checkpoint = at
 	GameAudio.cue("relic", {"pitch": 0.72})
+	for cell: Vector2i in _checkpoint_cells:
+		if level.entity_world_position(cell).is_equal_approx(at):
+			checkpoint_taken.emit(cell, _bus.latched())
+	return true
+
+
+## Picks a saved run up at the torch on `cell`: the wires in `latched` held,
+## the clock at `clock`, and everything else as a respawn there leaves it --
+## which is all a fresh load can promise, so the foes are back and the relics
+## too. The torch must be one this level proves a checkpoint, with a latch it
+## declares: a saved cell from an older build of the level that no longer
+## leads to the door is refused (false) rather than trusted.
+func resume_at(cell: Vector2i, latched: PackedStringArray, clock: float) -> bool:
+	if not _checkpoint_cells.has(cell):
+		return false
+	var known := PackedStringArray()
+	for channel: String in latched:
+		if level.data.channels.has(channel):
+			known.append(channel)
+	checkpoint = level.entity_world_position(cell)
+	_bus = ChannelBus.of_latches(known)
+	_respawn()
+	elapsed = maxf(0.0, clock)
 	return true
 
 

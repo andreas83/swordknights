@@ -437,6 +437,25 @@ backwards: each torch only has to reach one already proved, so ten torches
 cost about what one full-level search does. Jump-to-replay on the complete
 screen is still a full restart — clock, relics, guards and checkpoint.
 
+**The last torch outlives the session, in the campaign.** Progress was
+saved only on a clear, and CONTINUE started the chapter over, so a chapter
+left for a phone call was replayed from its first stone. Now the moment a
+torch is taken in a chapter (`Game.checkpoint_taken`), `CampaignGame` saves
+its cell, the wires latched then and the clock to `user://progress.cfg`
+(`CampaignProgress.set_torch()`), and CONTINUE puts the prince back on it
+through `Game.resume_at()`: a respawn there on a freshly built level.
+
+| Rule | Why |
+| --- | --- |
+| Only CONTINUE resumes; the chapter's own row starts it over | the row is how a player asks for a fresh run, CONTINUE how they ask to carry on |
+| The chapter's row, RESTART CHAPTER and a clear each forget the torch | each ends the run the torch belonged to |
+| The latched wires come back with it, and only ones the level declares | the torch was proved from the masks the prince can stand on it under; a gate he latched open behind him has to stay open, or the respawn could be a soft lock |
+| A cell the level no longer proves a checkpoint is refused, and forgotten | a level edited since the save must not put him in a wall |
+| The clock comes back as it was at the torch | a best time from a resumed run is the whole run's, give or take the stretch since the torch |
+| Foes, relics, secrets and the Eclipse's won phases do not | a fresh load is the level as authored; foes standing and relics in place are a state the proof covers, and are only more to do |
+
+`tests/unit/test_campaign_torch.gd` holds each of those.
+
 Completing a level is unchanged in substance — the overlay, the relic count,
 the time — except that jump-to-replay and sword-to-menu now wipe instead of
 cutting, and both are gated on `Flow.busy()` so a mashed button cannot queue a
