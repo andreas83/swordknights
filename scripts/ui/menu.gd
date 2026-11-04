@@ -12,10 +12,10 @@ extends Control
 ## backs out of a sub-screen.
 ##
 ## Only the selected mode shows its subtitle. Five modes each with a caption is
-## a wall of small type; one caption that moves is a list with a voice. A mode
-## with `choices` in ModeRegistry (DUEL VS CPU's difficulty) shows them there
-## instead, the chosen one lit, stepped with left and right on its row -- the
-## same left/right that sets a value everywhere else on these pages.
+## a wall of small type; one caption that moves is a list with a voice. Every
+## row does one thing: it opens a page. A mode with choices to make -- the
+## Adventure's chapter, the duel's way and level -- makes them on its own
+## second page (ChapterSelect, DuelSelect), not on this one.
 ##
 ## A development build also asks the dev channel whether it has been
 ## superseded (UpdateCheck), and if so hangs a plaque from the lintel:
@@ -29,15 +29,13 @@ extends Control
 ## caption under the list landed on the rail. The selection band stays 13 tall
 ## and overlaps its neighbours' gaps, which is invisible with one band drawn.
 ## It is the most a row gets: with more rows than fit at twelve -- DUEL VS CPU
-## made eight -- the pitch closes up instead (_row_pitch), never below the
+## once made eight -- the pitch closes up instead (_row_pitch), never below the
 ## smallest that still clears a TEXT cap.
 const ROW_HEIGHT := 12.0
 const MIN_ROW_HEIGHT := 10.0
 ## Between the last row and the rail's face: the caption's gap, its cap, and
 ## clear stone under it.
 const CAPTION_ROOM := 14.0
-## Between the words of a row's choices, in the caption slot.
-const CHOICE_GAP := 12.0
 const COLUMN_WIDTH := 104.0
 const REPEAT_DELAY := 0.26
 ## Depth of the lintel across the top, before its scalloped fringe.
@@ -62,7 +60,6 @@ const PLAQUE_TOUCH := 24.0
 var _index := 0
 var _time := 0.0
 var _repeat := 0.0
-var _repeat_across := 0.0
 var _rows: Array[Dictionary] = []
 var _settings: SettingsPanel
 var _update: UpdateCheck
@@ -123,18 +120,12 @@ func offer_rect() -> Rect2:
 func _build_rows() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for mode: Dictionary in ModeRegistry.modes():
-		var choices := PackedStringArray()
-		for choice: String in mode.get("choices", []):
-			choices.append(choice.to_upper())
-		var id := String(mode["id"])
 		out.append({
-			"id": id,
+			"id": String(mode["id"]),
 			"title": String(mode["title"]).to_upper(),
 			"subtitle": String(mode["subtitle"]).to_upper(),
 			"scene": String(mode["scene"]),
 			"enabled": bool(mode.get("available", true)),
-			"choices": choices,
-			"choice": clampi(ModeRegistry.chosen(id), 0, maxi(0, choices.size() - 1)),
 		})
 	out.append({
 		"id": "wardrobe",
@@ -177,26 +168,6 @@ func move(by: int) -> void:
 		if bool(_rows[next]["enabled"]):
 			break
 	_index = next
-	GameAudio.cue("ui_move")
-	queue_redraw()
-
-
-## Steps the selected row's choice, if it offers any, and remembers it for the
-## scene the mode opens (ModeRegistry.choose). Stops at the ends rather than
-## wrapping: HARD is a wall to push against, not a way back round to EASY.
-func shift_choice(by: int) -> void:
-	if _rows.is_empty():
-		return
-	var row := _rows[_index]
-	var choices: PackedStringArray = row.get("choices", PackedStringArray())
-	if choices.is_empty() or not bool(row["enabled"]):
-		return
-	var next := clampi(int(row["choice"]) + by, 0, choices.size() - 1)
-	if next == int(row["choice"]):
-		GameAudio.cue("ui_back")
-		return
-	row["choice"] = next
-	ModeRegistry.choose(String(row["id"]), next)
 	GameAudio.cue("ui_move")
 	queue_redraw()
 
@@ -275,14 +246,6 @@ func _process(delta: float) -> void:
 	elif absf(axis) <= 0.5:
 		_repeat = 0.0
 
-	_repeat_across = maxf(0.0, _repeat_across - delta)
-	var across := Input.get_axis("move_left", "move_right")
-	if absf(across) > 0.5 and is_zero_approx(_repeat_across):
-		shift_choice(signi(int(signf(across))))
-		_repeat_across = REPEAT_DELAY
-	elif absf(across) <= 0.5:
-		_repeat_across = 0.0
-
 	if Input.is_action_just_pressed("jump") or Input.is_action_just_pressed("attack"):
 		confirm()
 
@@ -335,11 +298,8 @@ func _draw() -> void:
 		var caption := String(row["subtitle"])
 		if not bool(row["enabled"]):
 			caption = "COMING SOON"
-		if _has_choices(row) and bool(row["enabled"]):
-			_draw_choices(row, cx, caption_y)
-		else:
-			UiFont.draw_text(self, caption, Vector2(cx, caption_y), UiFont.Cut.MICRO,
-				Palette.with_alpha(Palette.LIGHT_SOFT, 0.8), UiFont.Align.CENTER, 0.6)
+		UiFont.draw_text(self, caption, Vector2(cx, caption_y), UiFont.Cut.MICRO,
+			Palette.with_alpha(Palette.LIGHT_SOFT, 0.8), UiFont.Align.CENTER, 0.6)
 
 	_draw_hint(content, cx, rail)
 
@@ -359,12 +319,6 @@ func _draw_hint(content: Rect2, cx: float, rail: float) -> void:
 		"UP / DOWN  ·  JUMP TO BEGIN",
 		"JUMP TO BEGIN",
 	])
-	if not _rows.is_empty() and _has_choices(_rows[_index]):
-		phrasings = PackedStringArray([
-			"LEFT / RIGHT: HOW HARD   ·   JUMP TO BEGIN",
-			"LEFT / RIGHT  ·  JUMP TO BEGIN",
-			"LEFT / RIGHT  ·  JUMP",
-		])
 	var hint := UiFont.fit(phrasings, room, UiFont.Cut.MICRO)
 
 	var at := Vector2(cx, rail + 1.0)
@@ -467,42 +421,9 @@ func _draw_row(row: Dictionary, column: Rect2, y: float, selected: bool) -> void
 		UiFont.Cut.TEXT, colour, UiFont.Align.LEFT, 0.7 if enabled else 0.3)
 
 
-## --- a row's choices --------------------------------------------------------
-
 ## As many rows as fit at ROW_HEIGHT, closing up when there are more: the
 ## caption under the list has to stay clear of the rail it sits above.
 func _row_pitch(list_top: float, rail: float) -> float:
 	var room := rail - CAPTION_ROOM - list_top
 	var pitch := floorf(room / maxf(1.0, float(_rows.size())))
 	return clampf(pitch, MIN_ROW_HEIGHT, ROW_HEIGHT)
-
-
-func _has_choices(row: Dictionary) -> bool:
-	return not (row.get("choices", PackedStringArray()) as PackedStringArray).is_empty()
-
-
-## The choices in the caption slot, all of them, so what else there is can be
-## read at a glance: the chosen one in the light colour, the others dim, and a
-## caret on each side of it that there is somewhere to step to -- so EASY
-## points only right and HARD only left. Centred as a whole on the list, not on
-## the chosen word, so stepping through them moves the light and nothing else.
-func _draw_choices(row: Dictionary, cx: float, y: float) -> void:
-	var choices: PackedStringArray = row["choices"]
-	var chosen := int(row["choice"])
-	var cut := UiFont.Cut.MICRO
-	var total := CHOICE_GAP * float(choices.size() - 1)
-	for choice: String in choices:
-		total += UiFont.width(choice, cut)
-	var x := roundf(cx - total * 0.5)
-	var mid := y + UiFont.cap(cut) * 0.5
-	for i: int in choices.size():
-		var wide := UiFont.width(choices[i], cut)
-		var lit := i == chosen
-		UiFont.draw_text(self, choices[i], Vector2(x, y), cut,
-			Palette.LIGHT if lit else Palette.with_alpha(Palette.PAPER, 0.42),
-			UiFont.Align.LEFT, 0.6)
-		if lit and i > 0:
-			UiMarks.caret(self, Vector2(x - 4.0, mid), -3.0, Palette.LIGHT)
-		if lit and i < choices.size() - 1:
-			UiMarks.caret(self, Vector2(x + wide + 3.0, mid), 3.0, Palette.LIGHT)
-		x += wide + CHOICE_GAP

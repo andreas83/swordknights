@@ -12,8 +12,9 @@ extends "res://scripts/duel/match_scene.gd"
 ##     fight.step(...)    the player's buttons are read here, for the first time
 ##     cpu.watch(fight)   and the frame is seen, as the screen shows it
 ##
-## HOW HARD comes from the menu's row (ModeRegistry.chosen), or from
-## `--cpu=easy|medium|hard` in the user arguments, for a screenshot or a report.
+## HOW HARD comes from the duel page's VS CPU row, as it saved it
+## (DuelChoice, read from `choice_path`), or from `--cpu=easy|medium|hard` in
+## the user arguments, for a screenshot or a report.
 ##
 ## THE SEED is `--seed=N`, or the clock's. It is printed at the start of every
 ## match, because a match against the computer is the seed and the player's
@@ -27,8 +28,11 @@ extends "res://scripts/duel/match_scene.gd"
 ## THE LOOKS are the wardrobe's: player one's in the crimson seat, and the
 ## computer wears player two's, held to sea-green like any second seat.
 
-const MODE_ID := "duel_cpu"
 const CPU_SEAT := 1
+
+## Where the level is read from. A seam for a test, which must never read or
+## write the real file.
+var choice_path := DuelChoice.PATH
 
 var level: DuelBrain.Difficulty = DuelBrain.Difficulty.EASY
 var seed_value := 0
@@ -83,8 +87,7 @@ func _level_argument() -> DuelBrain.Difficulty:
 			var at := DuelBrain.LEVEL_NAMES.find(name)
 			if at >= 0:
 				return at as DuelBrain.Difficulty
-	var chosen := clampi(ModeRegistry.chosen(MODE_ID), 0, DuelBrain.LEVEL_NAMES.size() - 1)
-	return chosen as DuelBrain.Difficulty
+	return DuelChoice.open(choice_path).level
 
 
 func _seed_argument() -> int:

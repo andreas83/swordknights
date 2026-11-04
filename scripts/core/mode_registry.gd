@@ -28,25 +28,11 @@ static func modes() -> Array[Dictionary]:
 			"available": true,
 		},
 		{
+			# One row; how to duel is the page's second step (DuelSelect).
 			"id": "duel",
 			"title": "Duel",
-			"subtitle": "Tug of war, one keyboard",
-			"scene": "res://scenes/duel_match.tscn",
-			"available": true,
-		},
-		{
-			"id": "duel_cpu",
-			"title": "Duel vs CPU",
-			"subtitle": "One phone, one opponent",
-			"scene": "res://scenes/duel_match_cpu.tscn",
-			"available": true,
-			"choices": ["Easy", "Medium", "Hard"],
-		},
-		{
-			"id": "duel_online",
-			"title": "Duel Online",
-			"subtitle": "Two phones, one Wi-Fi",
-			"scene": "res://scenes/duel_match_online.tscn",
+			"subtitle": "One keyboard, the computer, or online",
+			"scene": "res://scenes/duel_select.tscn",
 			"available": true,
 		},
 		{
@@ -65,23 +51,3 @@ static func available() -> Array[Dictionary]:
 		if mode.get("available", true):
 			out.append(mode)
 	return out
-
-
-## --- choices ---------------------------------------------------------------
-##
-## A mode may offer `choices`, a short list the menu steps through with left
-## and right on its row (DUEL VS CPU's difficulty). What was chosen is kept
-## here, by mode id, for the rest of the session, so the scene the mode opens
-## can read it and the menu shows it again on the way back. Not saved to disk:
-## the menu starts every launch on a mode's first choice, which for the
-## computer opponent is the gentlest.
-
-static var _chosen := {}
-
-
-static func choose(id: String, index: int) -> void:
-	_chosen[id] = index
-
-
-static func chosen(id: String, otherwise: int = 0) -> int:
-	return int(_chosen.get(id, otherwise))

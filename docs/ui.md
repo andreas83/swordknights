@@ -200,6 +200,8 @@ route, round it yourself.
 | Title screen | `scripts/ui/menu.gd`, `scenes/menu.tscn` |
 | Settings | `scripts/ui/settings_panel.gd` |
 | Wardrobe | `scripts/ui/wardrobe_screen.gd`, `scripts/ui/figure_preview.gd`, `scenes/wardrobe.tscn` |
+| Chapter select | `scripts/ui/chapter_select.gd`, `scenes/chapter_select.tscn` |
+| Duel page | `scripts/ui/duel_select.gd`, `scripts/ui/duel_choice.gd`, `scenes/duel_select.tscn` |
 | Level HUD, title and chapter cards, pause/complete overlay | `scripts/ui/hud.gd` |
 | The dawn's words | `scripts/campaign/ending_card.gd`, over `scripts/campaign/dawn_frame.gd` |
 | Touch controls | `scripts/ui/touch_controls.gd`, `scripts/ui/touch_surface.gd` |
@@ -216,23 +218,18 @@ Only the selected mode shows its subtitle, in a fixed slot below the list, so
 moving the selection does not reflow anything. Eight rows each with a caption
 is a wall of small type.
 
-**A row with choices.** A mode may list `choices` in `ModeRegistry`; DUEL VS
-CPU lists EASY, MEDIUM and HARD. With that row selected the caption slot shows
-all of them, the chosen one in the light colour and the others dim, with a
-caret on each side of it that there is somewhere to step to — EASY points only
-right, HARD only left — and left and right step it, stopping at the ends. The
-same left/right sets a value on every other page, and the stick already does
-it, so the choice needs no page of its own. The words are centred as a whole
-on the list, so stepping moves the light and nothing else; at 320 units with
-the thumbs up they end five units short of the SWORD button. The hint on the
-rail says `LEFT / RIGHT: HOW HARD · JUMP TO BEGIN` while the row is selected.
-What was chosen is kept by `ModeRegistry.choose()` for the session, for the
-scene to read and for the menu to show again on the way back.
+**Every row opens a page.** The title screen once had a row for each way to
+duel — DUEL, DUEL VS CPU with EASY, MEDIUM and HARD stepped with left and
+right in the caption slot, and DUEL ONLINE — three of eight rows for one mode,
+and the only row on the screen that did two things. Now there is one DUEL, and
+the way and the level are chosen on its own page, as the Adventure's chapter
+is (*Duel page*, below). Left and right do nothing on this screen.
 
 **The row pitch** is twelve units at most. With more rows than twelve leaves
 room for between the title and a caption clear of the rail, the pitch closes
-up (`MenuScene._row_pitch`): eight rows sit at eleven. Seven still sit at
-twelve, so adding a row never moves a screen that had room for it.
+up (`MenuScene._row_pitch`): eight rows sat at eleven while the duel
+had three. Six or seven sit at twelve, so adding a row never moves a screen
+that had room for it.
 
 The hint line is cut into the rail (`UiLayout.rail(view)`, shared with the
 settings page). When the on-screen stick is up, a sword button covers the right
@@ -340,7 +337,7 @@ illegible, and the arrow already carries the colour. Under it, for an online
 match, the network line, then the persistent hint; a hint wider than the safe
 area breaks at its `  ·  ` separators rather than running off a 4:3 screen.
 
-**Who is who, against the computer.** In Duel vs CPU each end of the rope
+**Who is who, against the computer.** In VS CPU each end of the rope
 carries a tag on the side of that seat's gate: `YOU` beside the west gate, and
 `CPU` with its level under it beside the east, each with a lozenge in the
 seat's colour on a rim of light (a crimson mark on a crimson sky is otherwise
@@ -436,6 +433,38 @@ picture is the point. It holds for `EndingCard.HOLD` (3.4 s) before jump,
 sword or a tap returns to the chapter select: a card a held jump skips is a
 card nobody saw, and this one is the last.
 
+### Duel page
+
+The title screen's DUEL opens a second step (`scripts/ui/duel_select.gd`):
+**ONE KEYBOARD**, **VS CPU**, **ONLINE**. It is the chapter select's shape —
+the same wash and rail, the title in the display cut over a rule, the
+selected row lit, one caption under the list, the hint cut in the rail — so
+the two second steps read as one place. Three rows leave room, so each is 16
+units tall, two more than a chapter's, and the list sits lower, in the middle
+of the stone.
+
+On the right each row says what it is: TWO PLAYERS, TWO PHONES, and on VS CPU
+the computer's level. With that row selected the level sits between carets
+that say which way it can go — EASY points only right, HARD only left — and
+left and right step it, stopping at the ends; the hint on the rail says
+`LEFT / RIGHT: HOW HARD`. A tap selects a row, a tap on the selected row plays
+it, and a tap on either side of the level steps it that way. With the thumbs
+up the list keeps out of JUMP's corner and the caption out of SWORD's reach;
+`tests/unit/test_duel_select.gd` holds every row's hit rectangle clear of
+both buttons.
+
+**It remembers.** Starting a duel writes the way and the level to
+`user://duel.cfg` (`DuelChoice`), as words, and the page opens on them next
+time: someone who plays the computer every evening presses DUEL and then
+jump. Browsing saves nothing. A missing file, one that does not parse, a key
+that is not there, a value of the wrong type or a word that names nothing
+falls back for exactly that field — ONE KEYBOARD, EASY — and a broken way
+never costs the level. Tests and `tests/ui_screens.gd` take the file through
+an injected `store_path` (and the VS CPU scene through `choice_path`).
+
+Back is sword or pause, to the title screen; quitting a match from any of the
+three ways comes back here, as quitting a chapter goes to the chapter select.
+
 ### Wardrobe
 
 `scripts/ui/wardrobe_screen.gd`, `scenes/wardrobe.tscn`: choose the figure each
@@ -513,8 +542,8 @@ are the same width at five pixels and nobody reads a label on a button they
 are hitting with a thumb. It is the only touch-reachable way to silence the
 game short of the settings screen.
 
-The duel's THROW button (`scripts/duel/duel_touch.gd`, in Duel Online and Duel
-vs CPU) lays itself out against the same `UiLayout.safe()`, up and to the left
+The duel's THROW button (`scripts/duel/duel_touch.gd`, online and against
+the computer) lays itself out against the same `UiLayout.safe()`, up and to the left
 of JUMP. It used to convert the safe area by hand, which put it off the right
 edge whenever the reported area was wider than the window — the bug the stick
 and the other buttons had before UiLayout.
@@ -531,8 +560,8 @@ different typeface.
 # One frame per interface state, including the ones you cannot reach by
 # playing: pause, settings, a finished match, the wardrobe as the heroine
 # and as player two (wardrobe_heroine, wardrobe_two, wardrobe_touch), and
-# DUEL VS CPU chosen at HARD and played with the thumbs up (menu_cpu,
-# match_cpu).
+# the duel page on a first launch and opened on VS CPU at HARD with the
+# thumbs up (duel_select, duel_select_cpu), and that match (match_cpu).
 xvfb-run -a godot --path . --rendering-driver opengl3 \
   --script tests/ui_screens.gd -- --out /tmp/ui/after --window 1280x720
 

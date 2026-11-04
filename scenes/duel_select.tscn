@@ -1,0 +1,24 @@
+[gd_scene load_steps=4 format=3]
+
+; The duel's second step, reached from the title screen's DUEL row: ONE
+; KEYBOARD, VS CPU or ONLINE. The same sky and touch controls as the menu and
+; the chapter select, so the three read as one place; the page is drawn by
+; scripts/ui/duel_select.gd.
+
+[ext_resource type="Script" path="res://scripts/ui/duel_select.gd" id="1_duel"]
+[ext_resource type="Script" path="res://scripts/render/parallax_sky.gd" id="2_sky"]
+[ext_resource type="PackedScene" path="res://scenes/touch_controls.tscn" id="3_touch"]
+
+[node name="DuelSelect" type="Control"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_duel")
+
+[node name="Sky" type="CanvasLayer" parent="."]
+layer = -10
+
+[node name="ParallaxSky" type="Node2D" parent="Sky"]
+script = ExtResource("2_sky")
+
+[node name="TouchControls" parent="." instance=ExtResource("3_touch")]

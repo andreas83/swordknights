@@ -22,6 +22,8 @@ const SETTLE_FRAMES := 6
 const WARDROBE_STORE := "user://ui_screens_wardrobe.cfg"
 ## Where the chapter select shots keep their progress, for the same reason.
 const PROGRESS_STORE := "user://ui_screens_progress.cfg"
+## Where the duel page and DUEL VS CPU shots keep the duel choice.
+const DUEL_STORE := "user://ui_screens_duel.cfg"
 
 var _out_dir := "user://ui"
 var _only := ""
@@ -78,7 +80,9 @@ func _catalogue() -> Array[Dictionary]:
 		{"name": "match", "scene": "res://scenes/duel_match.tscn", "pose": ""},
 		{"name": "match_flash", "scene": "res://scenes/duel_match.tscn", "pose": "flash"},
 		{"name": "match_over", "scene": "res://scenes/duel_match.tscn", "pose": "over"},
-		{"name": "menu_cpu", "scene": "res://scenes/menu.tscn", "pose": "cpu"},
+		{"name": "duel_select", "scene": "res://scenes/duel_select.tscn", "pose": ""},
+		{"name": "duel_select_cpu", "scene": "res://scenes/duel_select.tscn", "pose": "touch",
+			"cpu": DuelBrain.Difficulty.HARD},
 		{"name": "match_cpu", "scene": "res://scenes/duel_match_cpu.tscn", "pose": "touch",
 			"cpu": DuelBrain.Difficulty.HARD},
 		{"name": "wardrobe", "scene": "res://scenes/wardrobe.tscn", "pose": "prince"},
@@ -106,9 +110,20 @@ func _build(shot: Dictionary) -> void:
 		_index = _shots.size()
 		return
 	if shot.has("cpu"):
-		# What the menu's row would have chosen, read by the scene as it readies.
-		ModeRegistry.choose("duel_cpu", int(shot["cpu"]))
+		# What the duel page saves when VS CPU is started at that level, read
+		# by the scene, or opened on by the page, as it readies.
+		var choice := DuelChoice.new()
+		choice.path = DUEL_STORE
+		choice.way = 1
+		choice.level = int(shot["cpu"]) as DuelBrain.Difficulty
+		choice.save()
+	else:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(DUEL_STORE))
 	_stage = packed.instantiate()
+	if "choice_path" in _stage:
+		_stage.set("choice_path", DUEL_STORE)
+	if _stage is DuelSelect:
+		(_stage as DuelSelect).store_path = DUEL_STORE
 	if shot.has("cpu") and "wardrobe_path" in _stage:
 		_stage.set("wardrobe_path", WARDROBE_STORE)
 	if _stage is WardrobeScreen:
@@ -132,18 +147,6 @@ func _pose(shot: Dictionary) -> void:
 			var throw := _stage.get_node_or_null(^"ThrowLayer/ThrowButton")
 			if throw != null:
 				throw.visible = true
-		"cpu":
-			# DUEL VS CPU chosen, at HARD, with the thumbs up beside it.
-			var thumbs := _stage.get_node_or_null(^"TouchControls/Surface")
-			if thumbs != null:
-				thumbs.visible = true
-			var menu := _stage as MenuScene
-			if menu != null:
-				for _row: int in menu.rows().size():
-					if String(menu.rows()[menu.index()]["id"]) == "duel_cpu":
-						break
-					menu.move(1)
-				menu.shift_choice(2)
 		"update":
 			# A dev build that has been superseded, with the thumbs up so the
 			# plaque is seen next to the pause and mute buttons it must clear.

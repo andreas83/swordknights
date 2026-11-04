@@ -5,7 +5,7 @@ extends Node2D
 ## — initiative, the window, respawns, the gates — is in scripts/duel/match.gd,
 ## because the networked version (scripts/duel/match_online.gd, which extends
 ## this) has to get exactly the same rules out of exactly the same code. What is
-## here is wiring and reactions. The menu's Duel entry is this scene.
+## here is wiring and reactions. The duel page's ONE KEYBOARD is this scene.
 ##
 ## CONTROLS (written by tools/configure_project.gd)
 ##   seat one   A D   W S   SPACE jump   F sword   G guard   SHIFT walk
@@ -24,7 +24,9 @@ extends Node2D
 ##       --script tools/screenshot.gd -- --scene res://scenes/duel_match.tscn \
 ##       --out /tmp/shots --shots 3.4,9.0,15.5 --demo
 
-const MENU_SCENE := "res://scenes/menu.tscn"
+## Where quitting a match goes: the duel page, as quitting a chapter goes to
+## the chapter select. The title screen is one SWORD further back.
+const MENU_SCENE := "res://scenes/duel_select.tscn"
 const FIGHTER_SCENE: PackedScene = preload("res://scenes/fighter.tscn")
 const MANIFEST := "res://levels/duel_zones.txt"
 

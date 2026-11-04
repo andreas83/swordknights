@@ -141,18 +141,21 @@ throw just as the blade arrives, and it is yours. Snatch too early and you stand
 there with open hands; a low throw cannot be caught at all
 ([`docs/duel-combat.md`](docs/duel-combat.md#the-catch)).
 
-**Duel vs CPU** is the duel on one phone: you in the crimson seat, the computer
-in the sea-green one. Left and right on its row in the menu choose **EASY**,
+**Duel** on the title screen asks how: **One keyboard**, **VS CPU** or
+**Online**, and opens next time on the way and the level last played.
+
+**VS CPU** is the duel on one phone: you in the crimson seat, the computer
+in the sea-green one. Left and right on its row choose **EASY**,
 **MEDIUM** or **HARD**. The computer plays through the same eight buttons you
 do, sees the fight a reaction time late (20 frames on EASY, 8 on HARD, at 60
 a second) and never sees your buttons at all; EASY telegraphs its thrusts and
 blunders, HARD guards, reads for the disarm and feints. The stick, JUMP, SWORD
-and THROW are as in Duel Online; on a desktop it is the single-player keys.
+and THROW are as online; on a desktop it is the single-player keys.
 How it plays and why is in
 [`docs/duel-match.md`](docs/duel-match.md#the-computer-opponent).
 
 Two players do not fit on one phone, so on phones each plays on their own:
-**Duel Online** → *Host on this Wi-Fi* on one phone shows a short code, and the
+**Duel** → **Online** → *Host on this Wi-Fi* on one phone shows a short code, and the
 other phone picks *Join on this Wi-Fi* and types it. On a phone the left half
 of the screen is a stick (sideways to run, up or down for the sword's height),
 with JUMP, SWORD and THROW on the right. On a desktop the online duel uses the

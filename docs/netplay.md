@@ -12,8 +12,8 @@ works on the Godot foundation.
 
 | I want to…                        | Do this                                                  |
 | --------------------------------- | -------------------------------------------------------- |
-| Duel on one keyboard              | Menu → **Duel**. No network, nothing to configure.        |
-| Duel on two phones, one Wi-Fi     | Menu → **Duel Online** → *Host on this Wi-Fi* shows a code like `23`; the other phone picks *Join on this Wi-Fi* and types it. |
+| Duel on one keyboard              | Menu → **Duel** → **One keyboard**. No network, nothing to configure. |
+| Duel on two phones, one Wi-Fi     | Menu → **Duel** → **Online** → *Host on this Wi-Fi* shows a code like `23`; the other phone picks *Join on this Wi-Fi* and types it. |
 | Duel over the internet            | Run a relay (below), both players pick *Host a room* / *Join a room*. |
 | Play when none of that works      | *Local two-player*, which is on the same screen for exactly that reason. |
 
