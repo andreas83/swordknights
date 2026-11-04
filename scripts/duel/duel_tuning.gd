@@ -74,6 +74,11 @@ const DUCKED := 3
 # --- horizontal motion -----------------------------------------------------
 
 @export var run_speed: float = 120.0
+## WALK held: the guarded shuffle, which keeps the fighter facing the way it
+## faces. Slow enough that backing off is a choice with a cost -- a runner
+## gains 75 px a second on it -- and quick enough to step out of a reach in a
+## few frames: 27 px of reach is given up in about half a second.
+@export var walk_speed: float = 48.0
 @export var ground_accel: float = 4800.0
 @export var ground_friction: float = 2400.0
 ## Air control is deliberately weaker than ground control, but still immediate:
@@ -102,11 +107,28 @@ const DUCKED := 3
 
 @export var roll_frames: int = 25
 @export var roll_speed: float = 160.0
+## Frames spent getting up at the end of a roll (Fighter.State.RISING): body
+## standing, blade not yet up, no input read. A roll used to cost nothing, so
+## two rolls chained kept a fighter 7 px tall for 116 frames in 120. Seven is
+## enough for a fighter standing where the roll ends to thrust into it -- a
+## thrust is live on its first frame. The rise still carries the roll's speed:
+## the price is the standing body and the empty hands, not the ground, so a
+## roll past a blade from outside its reach is still the way past, and still
+## out-runs a chaser (roll_travel()).
+@export var roll_recover: int = 7
 
 @export var divekick_speed_x: float = 180.0
 @export var divekick_speed_y: float = 420.0
 ## Frames spent planted after a dive kick lands. The commitment is the cost.
-@export var divekick_recover: int = 10
+## Longer than the kick's knockdown (kick_downed_frames), so a fighter kicked
+## off their feet is up, blade raised, before the kicker can move: the kick
+## buys a reset at close range, not a free kill. docs/duel-combat.md, "The dive
+## kick", has the numbers it replaced.
+@export var divekick_recover: int = 16
+## How long a dive kick keeps the fighter it lands on down. The sweep keeps its
+## own, much longer downed_frames: it is the empty hand's way back into a
+## fight, and its finisher is the ground pound.
+@export var kick_downed_frames: int = 12
 
 ## The unarmed sub-machine.
 @export var disarmed_frames: int = 10
@@ -218,6 +240,11 @@ func hand_position(feet: Vector2, facing: int, stance: int) -> Vector2:
 	return Vector2(
 		feet.x + (half + blade_length * 0.5) * facing, feet.y - (band.x + band.y) * 0.5
 	)
+
+
+## How far a roll carries, the rise at the end of it included.
+func roll_travel() -> float:
+	return roll_speed * float(roll_frames + roll_recover) / 60.0
 
 
 ## Frames to go from a standing start to top speed on the ground.

@@ -65,6 +65,87 @@ attacker (`_faces()`). Without it, a fighter running away with a matching stance
 would be immune to a stab in the back. A duel where the back is safe is not a
 duel.
 
+## Stance, footwork and the duck
+
+Up is HIGH, nothing is MID, and **down is LOW**, standing still as much as
+running. **WALK** is footwork: held with a direction, the fighter shuffles that
+way at `walk_speed` (48 px/s, against a run's 120) and does *not* turn round,
+so a guard can give ground with the blade still toward the opponent. **The
+duck is down with WALK**: planted, 13 px tall, under a HIGH blade and a HIGH
+throw.
+
+| Input | Standing | With a direction |
+|---|---|---|
+| nothing | MID guard | run, turning that way, MID |
+| up | HIGH guard | run, HIGH |
+| down | **LOW guard** | run, LOW |
+| WALK + direction | -- | shuffle, keeping the facing, at the held stance |
+| down + WALK | **duck** | duck (planted; the direction is ignored) |
+| down + jump | roll | roll |
+
+### What was wrong
+
+Down standing still used to *be* the duck, and the duck is the matrix's fourth
+column, which LOW kills. The only way to hold a LOW guard was down and a
+direction together: running into the blade. Backing off turned the fighter
+round, so a LOW thrust could be guarded only by walking into it. A bot that
+thrust nothing but LOW beat EASY 24 times in 24, and finished 17 of 18 against
+MEDIUM. The computer's own "LOW guard" and its LOW flick were ducks too, so the
+read `duel-match.md` describes did not exist at LOW.
+
+The duck also leaked into the thrust. Nothing cleared it on the way into
+`THRUSTING`, so a thrust from a duck kept the 13 px body under a HIGH blade
+while its own LOW blade killed, and two of them met as a double kill instead
+of a clash.
+
+### Why down is the guard and down + WALK the duck, not the other way round
+
+The choice is made for the phone stick. The stick
+(`scripts/ui/touch_controls.gd`) presses a direction past a 7-unit dead zone,
+up or down past 14, and WALK when the push is sideways and small (between 7
+and 16.5 units of a 30-unit stick).
+
+- **The guard is held; the duck is a moment.** A fencer holds a stance for
+  seconds at the edge of reach. The duck is a dodge for the frames a HIGH blade
+  or a throw takes to pass. The steadiest thing a thumb can hold on a stick is
+  a straight push, so the straight push is the stance. It is LOW, as up is
+  HIGH: one rule for all three heights, standing or running.
+- **The other way round, the LOW guard could not stand still on a phone.**
+  Down + WALK as the guard needs a sideways push to press WALK, and a sideways
+  push moves the fighter. Every LOW guard would shuffle, which is the bug
+  again in a new form.
+- **The duck stays reachable.** On a phone it is the stick pushed down and a
+  little to either side; on a keyboard, `S` with `Shift` (seat two, `↓` with
+  `;`). Whichever side the stick leans, the duck is planted, so a lean the
+  wrong way costs nothing.
+- **It is a smaller move than it was.** The roll goes under HIGH and MID
+  blades and throws, and needs no diagonal. The duck is kept for what only it
+  does: stay where you are, under a HIGH blade, with the blade coming back to
+  you.
+
+### A thrust is made standing
+
+Out of a duck the body comes up into the thrust (`Fighter._begin_attack`). The
+duck is a dodge, never a stance to stab from. So a thrust from a duck against a
+HIGH thrust on the same frame is two thrusts at different heights, and both
+land. Two thrusts from ducks are two LOW thrusts, and they clash. The punish
+from a duck is timed: wait under the HIGH blade until its four live frames are
+over, then come up into its recovery.
+
+### The read is the posture, not the button
+
+`stance_changed`, which the disarm read is built on, is now "the posture moved
+this frame" rather than "the stance moved". Standing up out of a duck into LOW,
+or out of a knockdown into MID, moves the blade into that height as surely as
+pressing down does: a duck holds no height at all. So both are reads.
+
+`tests/combat_matrix_test.gd` holds every defender posture standing still, LOW
+included. `tests/unit/test_duel_fair_fencing.gd` holds the stationary LOW
+parry, the LOW disarm from a standstill and from a duck, WALK backing off with
+the guard still up (and a run turning the back), the duck planted under HIGH,
+and the thrust from a duck as designed. Each was seen to fail with the old
+rule put back.
+
 ## The disarm window
 
 This is the most important number in the combat system, because it decides
@@ -264,14 +345,75 @@ catch. It replays the catch from before the throw and again from mid-flight,
 and checks every frame byte for byte. It also checks that the checksum changes
 with the catch state.
 
+## The roll and the dive kick: moves that cost
+
+Both were free, and both decided matches on their own.
+
+### The roll ends in recovery
+
+| | Frames | Tuning field |
+|---|---|---|
+| Rolling, 7 px tall | 1–25 | `roll_frames` |
+| Rising (`RISING`): standing height, no blade up, no input | 26–32 | `roll_recover` |
+
+A roll had no recovery, so two chained kept a fighter 7 px tall for 116 frames
+in 120, under every HIGH and MID blade and every throw above LOW. Now chained
+rolls spend 99 frames in 120 low at most, and every rise is seven frames of
+standing body with no blade up. The matrix reads a rising fighter's stance,
+but with no blade up, so any height cuts it. Seven is inside the six to eight
+asked for. It is enough for a fighter standing where the roll ends to thrust
+into it, since a thrust is live on its first frame. It is short enough that a
+roll past a blade from outside its reach is still the way past.
+
+`RISING` is appended after `CATCH`, so every older state keeps its number on
+the wire. The fighter's block is still 100 bytes. Under a low ceiling the rise
+is at duck height, as the end of a roll always was.
+
+### The dive kick buys a reset, not a kill
+
+| | Before | Now | Tuning field |
+|---|---|---|---|
+| Kicker planted after landing | 10 | 16 | `divekick_recover` |
+| Kicked fighter down | 45 (the sweep's) | 12 | `kick_downed_frames` |
+| Swept fighter down | 45 | 45 | `downed_frames` |
+
+The kick knocked its target down for the sweep's 45 frames while the kicker got
+up in 10. A LOW thrust kills a fighter on the floor, so the kick was a kill
+with extra steps: 12 kicks, 12 kills against a standing guard, and a bot that
+did nothing else beat EASY 12 times in 12.
+
+Now the kicked fighter is up first. The knockdown runs from the moment the kick
+lands, in the air, and the kicker still has the rest of the dive and 16 frames
+on the ground. A thrust on the kicker's first free frame meets a fighter who
+has had a few frames to choose a height. Rising into the thrust's height is a
+read (above), so the kicker can lose the sword. The probe that killed 12 times
+in 12 now kills 0 times. What the kick still does is end whatever the target
+was doing, put them on the floor for 12 frames and knock them back. It breaks a
+turtle and opens a path past them. It no longer decides the exchange.
+
+**Why not make the kick disarm instead?** A disarm is the read the whole
+matrix is built to reward: a stance moved into a thrust inside five frames.
+Handing it out for a jump would make the cheap move pay the skill ceiling's
+price. A disarmed fighter is ten frames from free, with the sword on the floor
+in front of the kicker, and an armed fighter against an empty hand wins most
+exchanges. A short knockdown keeps the kick as a tool and the disarm as the
+read.
+
+The sweep keeps its 45 frames. It is the empty hand's way back into a fight,
+and the spec gives its finisher to the ground pound. The fighter remembers how
+long this knockdown is in the commitment counter, which was already in the
+snapshot, so no bytes were added. `tests/unit/test_duel_fair_fencing.gd` plays a
+kick and the LOW thrust after it, and was seen to fail with the sweep's 45
+frames put back.
+
 ## Where else the duel is decided
 
 Not covered here, and documented in the code:
 
 - Sword throw, flight and pickup: `DuelCombat._resolve_flight()`,
   `_resolve_pickups()`, and `scripts/duel/combat_blade.gd`. The catch is above.
-- Roll, dive kick, sweep and ground pound: `DuelCombat._apply_strike()` and the
-  fighter's state machine.
+- Sweep and ground pound: `DuelCombat._apply_strike()` and the fighter's state
+  machine. The roll and the dive kick are above.
 - The movement profile: `DuelTuning`, which the match hands to each fighter in
   `setup()`. The fighter never reads `scripts/core/tuning.gd`; the duel is not
   the adventure.

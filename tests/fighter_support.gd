@@ -49,6 +49,7 @@ const DOWN := PlayerInput.BIT_DOWN
 const JUMP := PlayerInput.BIT_JUMP
 const ATTACK := PlayerInput.BIT_ATTACK
 const THROW := PlayerInput.BIT_THROW
+const WALK := PlayerInput.BIT_WALK
 
 const FIGHTER_SCENE := "res://scenes/fighter.tscn"
 
@@ -151,22 +152,21 @@ static func _spawn(stage: Stage, seat: int) -> Fighter:
 
 ## --- input ------------------------------------------------------------------
 
-## The bits that hold a stance. Up is HIGH, down is LOW, neither is MID.
-##
-## A LOW stance also needs a direction held: down while standing still is a
-## DUCK, which is a different column of the combat matrix. `toward` is the sign
-## of the direction to hold, normally toward the opponent, because meeting a
-## low blade is something you do while closing.
+## The bits that hold a stance. Up is HIGH, down is LOW, neither is MID, all
+## of them standing still. The duck -- the matrix's fourth column -- is down
+## with WALK. `toward`, if not zero, also holds a direction: a stance carried
+## while running, which turns the fighter that way.
 static func stance_bits(stance: int, toward: int = 0) -> int:
+	var run := 0 if toward == 0 else (LEFT if toward < 0 else RIGHT)
 	match stance:
 		DuelTuning.Stance.HIGH:
-			return UP
+			return UP | run
 		DuelTuning.Stance.LOW:
-			return DOWN | (LEFT if toward < 0 else RIGHT)
+			return DOWN | run
 		DuelTuning.DUCKED:
-			return DOWN
+			return DOWN | WALK
 		_:
-			return 0
+			return run
 
 
 ## --- assertions -------------------------------------------------------------

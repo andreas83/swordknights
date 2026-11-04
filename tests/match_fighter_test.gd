@@ -306,6 +306,10 @@ func _duellist(fight: DuelMatch, seat: int, rng: RandomNumberGenerator) -> int:
 	bits &= ~PlayerInput.BIT_ATTACK
 	if rng.randi() % 3 == 0:
 		bits |= PlayerInput.BIT_ATTACK
+	# WALK held half the time would be a duellist who mostly ducks and shuffles,
+	# and three hundred frames of that need not see a death.
+	if rng.randi() % 4 != 0:
+		bits &= ~PlayerInput.BIT_WALK
 	bits &= ~(PlayerInput.BIT_LEFT | PlayerInput.BIT_RIGHT)
 	var me := fight.fighter_position(seat)
 	var them := fight.fighter_position(1 - seat)

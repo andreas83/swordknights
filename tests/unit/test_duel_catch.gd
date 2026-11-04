@@ -62,6 +62,7 @@ func test_the_catch_states_were_appended_and_moved_no_one() -> void:
 	assert_eq(int(Fighter.State.DEAD), 11)
 	assert_eq(int(Fighter.State.SNATCH), 12)
 	assert_eq(int(Fighter.State.CATCH), 13)
+	assert_eq(int(Fighter.State.RISING), 14, "and the roll's recovery after them")
 	assert_eq(Fighter.state_bytes(), 100, "and the fighter's block is the same 100 bytes")
 
 

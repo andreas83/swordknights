@@ -53,7 +53,11 @@ func _the_free_states_follow_the_feet() -> void:
 	stage.run(1, Support.RIGHT, 0)
 	_s.equal(stage.a.state, Fighter.State.RUNNING, "a direction is RUNNING")
 	stage.run(1, Support.DOWN, 0)
-	_s.equal(stage.a.state, Fighter.State.DUCKING, "down on the spot is DUCKING")
+	stage.run(1, Support.DOWN, 0)
+	_s.equal(stage.a.state, Fighter.State.IDLE, "down on the spot is a stance, standing")
+	_s.equal(stage.a.posture(), DuelTuning.Stance.LOW, "the LOW guard")
+	stage.run(1, Support.DOWN | Support.WALK, 0)
+	_s.equal(stage.a.state, Fighter.State.DUCKING, "down with WALK on the spot is DUCKING")
 	_s.check(
 		stage.a.hurt_rect().size.y < stage.tuning.body_height, "and the hurtbox comes down"
 	)

@@ -198,7 +198,10 @@ static func _apply_strike(att: Fighter, def: Fighter, kind: int, events: Array[D
 				"kind": "kill", "victim": def.id, "killer": att.id, "at": def.position,
 			})
 		return
-	def.knock_down(att.position.x)
+	# A kick puts the fighter down for less time than the kicker spends getting
+	# up from it; a sweep for long enough to be finished. See DuelTuning.
+	var frames := att.tuning.kick_downed_frames if kind == Fighter.Strike.KICK else -1
+	def.knock_down(att.position.x, frames)
 	events.append({"kind": "knockdown", "victim": def.id, "by": att.id, "at": def.position})
 
 

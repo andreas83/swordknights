@@ -38,7 +38,7 @@ Transitions are **prioritised**: `DEAD` overrides every other state.
 | --- | --- |
 | IDLE / RUNNING | Stance may change freely between HIGH, MID and LOW. **Zero frames of animation lock.** |
 | THRUSTING | 12–15 frames total. Frames 1–4 the blade hitbox extends forward (active). Frames 5–15 are recovery and the fighter is vulnerable if the thrust missed. The fighter drifts slightly forward during the thrust. |
-| ROLLING | 25 frames. Hurtbox compressed to ~30% of standing height, which passes under HIGH and MID attacks and under thrown swords. **No invulnerability** — a LOW thrust kills a rolling fighter. |
+| ROLLING | 25 frames. Hurtbox compressed to ~30% of standing height, which passes under HIGH and MID attacks and under thrown swords. **No invulnerability** — a LOW thrust kills a rolling fighter. *(Built with 7 recovery frames after it; see the engineering notes.)* |
 | DISARMED / UNARMED | Its own sub-machine. Leg sweep knocks the opponent down; ground pound finishes a downed opponent. Standing over a dropped sword and pressing down picks it up in one frame. Throw with an empty hand snatches a thrown sword out of the air (implemented; see the sword throw below). |
 
 ## 2. Combat matrix
@@ -191,6 +191,28 @@ matters because the duel is host-authoritative and verified by checksum.
 
 Oriented rectangles become necessary only if a diagonal or arcing attack is
 added later.
+
+## Where the build departs from the table, for fairness
+
+Measured against scripted opponents, four things decided matches on their own.
+The changes are argued in [`duel-combat.md`](duel-combat.md) and
+[`duel-match.md`](duel-match.md); here they are in one place, so the owner can
+overrule them:
+
+- **Duck-Input is down with WALK; down alone is the LOW stance.** The spec
+  gives IDLE a LOW stance and DUCKING its own input, and the build had them on
+  one button: down standing still ducked, so LOW could not be guarded without
+  running into the blade. A thrust is now made standing, even from a duck.
+- **ROLLING is followed by 7 recovery frames** (`RISING`): standing, no blade
+  up. The spec's roll has no invulnerability, but it had no cost either, and
+  chained rolls kept a fighter under HIGH and MID almost without a break.
+- **A dive kick's knockdown (12 frames) is shorter than the kicker's landing
+  (16).** The spec does not time the kick. At the sweep's 45 frames it was a
+  guaranteed kill.
+- **A double kill moves nobody's initiative**, where the spec's
+  `onPlayerKilled` run twice would hand it to whoever was killed second. A
+  defender held at the trailing edge for a second is put back ahead of the
+  runner.
 
 ## Two notes that are not objections
 

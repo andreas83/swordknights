@@ -141,6 +141,8 @@ func _posture() -> Dictionary:
 			return _lunge()
 		Fighter.State.ROLLING:
 			return _roll()
+		Fighter.State.RISING:
+			return _ducked_pose() if f.posture() == DuelTuning.DUCKED else _rising(t)
 		Fighter.State.DIVEKICK:
 			return _divekick()
 		Fighter.State.DISARMED:
@@ -178,6 +180,25 @@ func _guard() -> Dictionary:
 		"hood_tilt": 0.1,
 		"arm_b": 1.65, "arm_b_len": 5.4,
 		"cloak_sweep": 0.7 - breath * 0.2,
+	})
+
+
+## Up out of a roll: unfolding from the crouch to the guard over the recovery
+## frames, the sword arm still low. The hurtbox is already standing height --
+## that is the price of the roll -- so the figure is drawn standing, a little
+## bowed, and the blade is not drawn up because it is not up.
+func _rising(t: float) -> Dictionary:
+	var tuning := _fighter.tuning
+	var up := clampf(t * 60.0 / maxf(1.0, float(tuning.roll_recover)), 0.0, 1.0)
+	return _pose({
+		"sink": (tuning.body_height - tuning.duck_height) * (1.0 - up) * 0.5,
+		"lean": 1.4 - up * 0.5,
+		"stance": 1.6,
+		"knee": -1.0 + up * 0.4,
+		"hem_spread": 1.4,
+		"hood_tilt": 0.25,
+		"arm_b": 1.1, "arm_b_len": 4.8,
+		"cloak_sweep": 0.9, "cloak_flare": 0.8,
 	})
 
 

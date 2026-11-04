@@ -41,24 +41,27 @@ signal knocked_down(victim_id: int)
 signal caught(catcher_id: int, thrower_id: int)
 
 ## IDLE, RUNNING, JUMPING and DUCKING are the free states: the only ones that
-## read the stance buttons or start anything. ROLLING, THRUSTING, DIVEKICK,
-## SWEEP, POUND, SNATCH and CATCH are commitments — they ignore input entirely
-## until they run out. DISARMED, SWEEP, POUND, DOWNED and SNATCH are the unarmed
-## sub-machine (plus the free states with an empty hand, where attack sweeps
-## instead of thrusting and throw snatches instead of throwing). CATCH is the
+## read the stance buttons or start anything. ROLLING, RISING, THRUSTING,
+## DIVEKICK, SWEEP, POUND, SNATCH and CATCH are commitments — they ignore input
+## entirely until they run out. RISING is the getting-up at the end of a roll:
+## standing height, blade not yet up, the price of having rolled. DISARMED,
+## SWEEP, POUND, DOWNED and SNATCH are the unarmed sub-machine (plus the free
+## states with an empty hand, where attack sweeps instead of thrusting and
+## throw snatches instead of throwing). CATCH is the
 ## moment a snatched blade is taken into the hand.
 ## DEAD overrides every other state and is left only by respawn_at().
 ##
-## SNATCH and CATCH come after DEAD rather than beside the other unarmed states
-## because the state travels in the snapshot as its ordinal: appending them left
-## every older state's number, and so the layout docs/netplay.md describes,
-## exactly as it was.
+## SNATCH, CATCH and RISING come after DEAD rather than beside the states they
+## belong with because the state travels in the snapshot as its ordinal:
+## appending them left every older state's number, and so the layout
+## docs/netplay.md describes, exactly as it was.
 enum State {
 	IDLE, RUNNING, JUMPING, DUCKING,
 	ROLLING, THRUSTING, DIVEKICK,
 	DISARMED, SWEEP, POUND, DOWNED,
 	DEAD,
 	SNATCH, CATCH,
+	RISING,
 }
 
 ## What the fighter's feet or fists are doing this frame, for DuelCombat.
@@ -123,7 +126,9 @@ var blade := DuelBlade.new()
 
 var _ducked := false
 ## Frames of mandatory stillness left after a dive kick or a ground pound
-## lands. -1 means "still in the air", 0 means "done".
+## lands. -1 means "still in the air", 0 means "done". While DOWNED it holds
+## how long this knockdown lasts, which depends on what knocked the fighter
+## down (DuelTuning.downed_frames for a sweep, kick_downed_frames for a kick).
 var _commit: int = 0
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
@@ -257,6 +262,7 @@ func read_state(from: PackedByteArray, at: int) -> void:
 ## exists while the engine is stepping it.
 func simulate(dt: float) -> void:
 	state_frame += 1
+	var was := posture()
 	_update_stance()
 	blade.step(dt, tuning, world)
 	if state == State.DEAD:
@@ -264,18 +270,26 @@ func simulate(dt: float) -> void:
 		# pit, off the balcony — and that is all it does.
 		_apply_gravity(dt)
 		_move(dt)
+		stance_changed = false
 		return
 	_decide()
 	_advance(dt)
+	# What the disarm read is built on: did the blade arrive at a height this
+	# frame? The posture, not the button, because standing up out of a duck
+	# into LOW, or out of a knockdown into MID, moves the blade into that
+	# height as surely as pressing down does -- a duck holds no height at all.
+	stance_changed = posture() != was
 
 
 ## The stance is the whole game: up is HIGH, down is LOW, neither is MID, with
-## no animation lock whatsoever. It is read only in the free states, so a
-## thrust's height is locked from the frame it starts — otherwise a single
-## button could sweep an active blade through all three heights, and the disarm
-## read below would be meaningless.
+## no animation lock whatsoever, standing still or moving. It is read only in
+## the free states, so a thrust's height is locked from the frame it starts —
+## otherwise a single button could sweep an active blade through all three
+## heights, and the disarm read below would be meaningless.
+##
+## Down is a LOW guard, not a duck: the duck is down with WALK (see
+## _advance_free), and docs/duel-combat.md argues why it is that way round.
 func _update_stance() -> void:
-	var previous := stance
 	if blade.is_held() and is_free():
 		if input.up:
 			stance = DuelTuning.Stance.HIGH
@@ -283,7 +297,6 @@ func _update_stance() -> void:
 			stance = DuelTuning.Stance.LOW
 		else:
 			stance = DuelTuning.Stance.MID
-	stance_changed = stance != previous
 
 
 ## The transition table, in priority order. DEAD never reaches here.
@@ -325,6 +338,9 @@ func _expire() -> void:
 				_enter_free()
 		State.ROLLING:
 			if state_frame > tuning.roll_frames:
+				_rise()
+		State.RISING:
+			if state_frame > tuning.roll_recover:
 				_leave_roll()
 		State.SWEEP:
 			if state_frame > tuning.sweep_frames:
@@ -333,7 +349,7 @@ func _expire() -> void:
 			if state_frame > tuning.disarmed_frames:
 				_enter_free()
 		State.DOWNED:
-			if state_frame > tuning.downed_frames:
+			if state_frame > _commit:
 				_leave_roll()
 		State.SNATCH:
 			if state_frame > tuning.snatch_frames:
@@ -359,7 +375,8 @@ func _advance(dt: float) -> void:
 					velocity.x, facing * tuning.thrust_drift, tuning.ground_accel * dt
 				)
 			_apply_gravity(dt)
-		State.ROLLING:
+		State.ROLLING, State.RISING:
+			# The rise is the roll's last frames standing up: still moving.
 			velocity.x = facing * tuning.roll_speed
 			_apply_gravity(dt)
 		State.DIVEKICK:
@@ -377,14 +394,27 @@ func _advance(dt: float) -> void:
 
 
 ## IDLE, RUNNING, JUMPING, DUCKING: top speed in two frames, stopped in three.
+##
+## WALK is footwork. Held, the fighter does not turn round for a direction --
+## it shuffles that way at walk_speed, blade still toward the opponent, so a
+## guard can give ground without showing its back -- and down with WALK is the
+## duck, planted: a fighter folded under a HIGH blade is not going anywhere.
+## Without WALK a direction is a run, and the fighter faces where it runs.
 func _advance_free(dt: float) -> void:
 	var want_x := input.axis_x
-	_ducked = grounded and input.down and want_x == 0
+	_ducked = grounded and input.down and input.walk
+	if _ducked:
+		want_x = 0
 	var accel := tuning.ground_accel if grounded else tuning.air_accel
 	var friction := tuning.ground_friction if grounded else tuning.air_friction
 	if want_x != 0:
-		facing = want_x
-		velocity.x = move_toward(velocity.x, want_x * tuning.run_speed, accel * dt)
+		var top := tuning.run_speed
+		if input.walk:
+			if grounded:
+				top = tuning.walk_speed
+		else:
+			facing = want_x
+		velocity.x = move_toward(velocity.x, want_x * top, accel * dt)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, friction * dt)
 	# Releasing jump on the way up cuts the arc short.
@@ -426,9 +456,16 @@ func _resolve_free_state() -> void:
 ## --- starting things --------------------------------------------------------
 
 ## Returns true when the press was spent on an attack.
+##
+## A thrust is made standing. Out of a duck the fighter comes up into it, so
+## the duck is a dodge and never a stance to stab from: a ducked thrust used to
+## keep the 13 px body under a HIGH blade while its own LOW blade killed, and
+## two of them met as a double kill instead of a clash.
 func _begin_attack() -> bool:
 	if blade.is_held():
+		_ducked = false
 		_enter(State.THRUSTING)
+		_sync_shape()
 		return true
 	# The unarmed sub-machine: a leg sweep from the ground knocks the opponent
 	# down, a ground pound from the air finishes one who is already down.
@@ -525,11 +562,16 @@ func catch_blade(at_stance: int, thrower_id: int) -> void:
 
 ## Swept or kicked off the feet. Keeps the sword — losing it as well would make
 ## one read end the fight, and the spec gives the finisher to the ground pound.
-func knock_down(from_x: float) -> void:
+##
+## `frames` is how long this knockdown lasts: the sweep's downed_frames by
+## default, the kick's shorter kick_downed_frames when DuelCombat says it was
+## a kick. It is held in the commitment counter, so it is snapshot state.
+func knock_down(from_x: float, frames: int = -1) -> void:
 	if state == State.DEAD or state == State.DOWNED:
 		return
 	velocity = Vector2(_away_from(from_x) * tuning.clash_knockback, -tuning.clash_knockback * 0.4)
 	_ducked = false
+	_commit = frames if frames > 0 else tuning.downed_frames
 	_enter(State.DOWNED)
 	_sync_shape()
 	if not replaying:
@@ -597,7 +639,9 @@ func strike_rect() -> Rect2:
 
 ## Which column of the combat matrix this fighter presents. A ducking, rolling
 ## or downed fighter has no stance at all — the blade is not up at any height —
-## which is exactly what the matrix's fourth column says.
+## which is exactly what the matrix's fourth column says. A RISING fighter is
+## standing and presents its stance, but with no blade up to turn anything
+## (blade_rect is empty), so every height cuts it.
 func posture() -> int:
 	if _ducked or state == State.ROLLING or state == State.DOWNED:
 		return DuelTuning.DUCKED
@@ -675,6 +719,19 @@ func _enter(next: State) -> void:
 
 func _enter_free() -> void:
 	_enter(State.JUMPING if not grounded else State.IDLE)
+
+
+## The end of a roll: the body unfolds to standing (or to a duck under a low
+## ceiling) for roll_recover frames before the blade is up and the buttons are
+## read again. Without it a roll chained into a roll kept a fighter 7 px tall
+## for 116 frames in 120, under every HIGH and MID blade there is.
+func _rise() -> void:
+	if tuning.roll_recover <= 0:
+		_leave_roll()
+		return
+	_ducked = not _can_stand()
+	_enter(State.RISING)
+	_sync_shape()
 
 
 ## Coming up out of a roll or off the floor under a low ceiling: stand into

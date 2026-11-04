@@ -82,8 +82,9 @@ func _up_and_throw_angles_the_blade_upward() -> void:
 func _a_duck_goes_under_a_high_throw_and_a_roll_under_a_mid_one() -> void:
 	var stage := Support.build(root)
 	stage.place(THROW_GAP)
-	stage.run(1, Support.UP | Support.THROW, Support.DOWN)
-	stage.run(14, 0, Support.DOWN)
+	var duck := Support.stance_bits(Support.DUCKED)
+	stage.run(1, Support.UP | Support.THROW, duck)
+	stage.run(14, 0, duck)
 	_s.check(stage.b.is_alive(), "a duck goes under a high throw")
 	stage.dispose()
 

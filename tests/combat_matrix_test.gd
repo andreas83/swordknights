@@ -35,11 +35,11 @@ const CELLS := [
 ]
 
 ## Body range is a little under 27px and blade range a little under 34px, so
-## these two gaps are "the thrust can reach the body" and "only the blades
-## meet". The LOW column needs a direction held, so it starts further out and
-## closes while the posture is being held.
+## this gap is "the thrust can reach the body". Every posture is held standing
+## still -- LOW included, which is down alone, and the duck, which is down with
+## WALK. A LOW guard used to need a direction held, running into the blade,
+## because down on the spot was the duck; that is the bug this column guards.
 const BODY_GAP := 20.0
-const CLOSING_GAP := 26.0
 
 var _s := Support.new()
 var _warm := 0
@@ -87,15 +87,11 @@ func _every_cell_resolves_as_the_table_says(mirrored: bool) -> void:
 
 func _cell(att_stance: int, def_posture: int, expected: String, mirrored: bool) -> void:
 	var stage := Support.build(root)
-	stage.place(CLOSING_GAP if def_posture == LOW else BODY_GAP)
+	stage.place(BODY_GAP)
 	var attacker := stage.b if mirrored else stage.a
 	var defender := stage.a if mirrored else stage.b
-
-	# The direction the defender holds for a LOW stance: toward the attacker,
-	# because a low guard is something you carry forward.
-	var toward := -1 if attacker.position.x < defender.position.x else 1
-	var def_bits := Support.stance_bits(def_posture, toward)
-	var att_bits := Support.stance_bits(att_stance if att_stance != LOW else DUCKED)
+	var def_bits := Support.stance_bits(def_posture)
+	var att_bits := Support.stance_bits(att_stance)
 
 	# Hold the posture for three frames first. A stance that arrives on the
 	# frame the blade does is a disarm read, not a parry, and that is a
@@ -141,8 +137,9 @@ func _the_clash_cell_needs_a_blade_that_is_actually_up() -> void:
 	stage.place(20.0)
 	# A thrusts HIGH over a ducking B: the table's one miss, and it leaves A
 	# committed to ten frames of recovery at a known stance.
-	stage.run(1, Support.UP | Support.ATTACK, Support.DOWN)
-	stage.run(4, Support.UP, Support.DOWN)
+	var duck := Support.stance_bits(DUCKED)
+	stage.run(1, Support.UP | Support.ATTACK, duck)
+	stage.run(4, Support.UP, duck)
 	_s.check(stage.a.is_alive() and stage.b.is_alive(), "the HIGH thrust passed over the duck")
 	_s.check(
 		stage.a.state == Fighter.State.THRUSTING and not stage.a.is_attacking(),
