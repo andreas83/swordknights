@@ -33,9 +33,9 @@ const RUN := [
 	[245, R],
 	# The yard cat: wait for its leap, backstep it, step in and cut the skid.
 	[89, 0], [1, L | A], [27, 0], [3, R], [1, A], [30, 0],
-	# House A by a grab; the bridge at a run; torch 1; the deck by a hop.
+	# House A by a grab; the bridge at a run; the deck by a hop, to torch 1.
 	[86, R], [16, R | J], [12, R], [20, U], [110, R], [20, R | J], [30, 0], [20, U],
-	# The deck: wait at its west end until the cat falls through the slabs.
+	# The deck: wait by the torch until the cat falls through the slabs.
 	[204, 0],
 	# Leap the broken run from its lip; run to the slabs before the tower.
 	[54, R], [18, R | J], [196, R],

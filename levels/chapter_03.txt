@@ -24,10 +24,10 @@
 ;                                                    [Caracal: develop]
 ;   5. Two roofs (47-59): house A, three slabs, house B. Run them, or fall
 ;      four tiles into the lane and climb out. Secret A is house B's face,
-;      down in the lane. Torch 1 on house B.         [crumbling: develop]
-;   6. The deck (60-83): three slabs (65-67) over the void and a Caracal
-;      beyond them. Wait at the deck's west end (60-62): it stalks you onto
-;      the slabs to crouch, and a cat cannot push off crumbling stone.
+;      down in the lane.                             [crumbling: develop]
+;   6. The deck (60-83): torch 1 at its west end, three slabs (65-67) over
+;      the void and a Caracal beyond them. Wait by the torch: it stalks you
+;      onto the slabs to crouch, and a cat cannot push off crumbling stone.
 ;                                                   [twist, both]
 ;   7. The way down is the floor (84-85): stand on the slabs before the
 ;      ruined tower and wait. R2 is on the tower's top, up its face by one
@@ -38,8 +38,11 @@
 ;  10. The collapse (103-115): runs of three between the piers. It falls in
 ;      a chain behind you; a slab gone from under you is a ledge grab to the
 ;      next pier.                      [crumbling: master; set piece]
-;  11. The tower's foot (116-127): the last Caracal, with the collapse at
-;      your back. The door is cut in the Mirror Tower's first course.
+;  11. The tower's foot (116-127): the last doves on the last lit terrace,
+;      and the last Caracal, with the collapse at your back. The door is
+;      cut in the Mirror Tower's first course. (The flock also keeps the
+;      dresser's foreground arch off the fight: a mark's cells are never
+;      dressed.)
 ;                                                    [Caracal: master]
 ;
 ; Secrets: A, house B's face in the lane (false wall; a relic and WE LEFT /
@@ -57,11 +60,11 @@
 ###                                                                                   ,######                               ####
 ###                                                                                    ######                               ####
 ###                                                                                    ######                               ####
-###                                                                       j            ######                               ####
+###                                                         t             j            ######                               ####
 ###                                                         #####,,,################,,######### ## ##                       ####
-###                           *                          t  #####   ##############                                          ####
+###                           *                             #####   ##############                                          ####
 ::              ######################         ####,,,######   ##    ##    ##    #
-::              ##               ##            ####   ######   ##    ##    ##    #           p       t                   j    D
+::              ##               ##            ####   ######   ##    ##    ##    #           p       t               v   j    D
 :A              ##               ##            ####   %::::#   ##    ##    ##    ###############&&#####,,,##,,,##,,,############
 :: @    v       ##  v    j       ##       j    ####   %*:L:#   ##    ##    ##       ##     ## #::::#      ##   ##   ############
 ###########,,###############################################   ##    ##    ##       ##     ## #:::*#      ##   ##   ############

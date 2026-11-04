@@ -14,7 +14,7 @@ extends GutTest
 ## same proof. The clear run is tests/unit/test_aqueduct_clear.gd.
 
 const LEVEL := "res://levels/chapter_03.txt"
-const TORCHES: Array[Vector2i] = [Vector2i(57, 13), Vector2i(101, 15)]
+const TORCHES: Array[Vector2i] = [Vector2i(60, 11), Vector2i(101, 15)]
 const ASSIST_PATH := "user://test_chapter_aqueduct_assist.cfg"
 
 var _level: AsciiLevel
