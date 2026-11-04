@@ -186,14 +186,20 @@ static func leap(strip: ZoneStrip, tuning: DuelTuning, me: DuelView.Body, dir: i
 ## waiting `slop` frames more would leave no safe jump, never past the lip.
 static func steer(strip: ZoneStrip, tuning: DuelTuning, me: DuelView.Body, dir: int,
 		held: int = 0, slop: int = 0) -> Dictionary:
-	if dir == 0:
-		return {"dir": 0, "jump": false, "hold": 0}
 	if not me.grounded:
-		for option: int in [dir, 0, -dir]:
+		# In the air, standing still is a choice like any other and is only
+		# taken if it comes down alive. A brain that wanted no direction --
+		# in reach, facing the other -- used to let go of the stick mid-jump
+		# and drop short into whatever the jump was over; two of them closing
+		# over a flooded court on the Floodgates did it on the same frame.
+		var options := [dir, 0, -dir] if dir != 0 else [0, me.facing, -me.facing]
+		for option: int in options:
 			var arc := leap(strip, tuning, me, option, held > 0, held)
 			if bool(arc["safe"]):
 				return {"dir": option, "jump": false, "hold": 0}
 		return {"dir": dir, "jump": false, "hold": 0}
+	if dir == 0:
+		return {"dir": 0, "jump": false, "hold": 0}
 
 	var ahead := scan(strip, tuning, me, dir)
 	var brink := _at_brink(strip, tuning, me, dir)
@@ -242,9 +248,15 @@ static func safe_jump(strip: ZoneStrip, tuning: DuelTuning, me: DuelView.Body,
 
 ## Whether a commitment started now, in the air, comes down alive: a thrust or
 ## a throw takes the steering away until it is over.
+##
+## On the ground a thrust drifts half a tile forward (thrust_drift) and cannot
+## stop for the beat, so it is unsafe if a blade or the water takes the place it
+## drifts to before it is over.
 static func safe_to_commit(strip: ZoneStrip, tuning: DuelTuning, me: DuelView.Body) -> bool:
 	if me.grounded:
-		return true
+		var drift := tuning.thrust_drift * DT * float(tuning.thrust_frames)
+		var to := me.position + Vector2(float(me.facing) * drift, 0.0)
+		return not _timed(strip, tuning, to, _clock, _clock + tuning.thrust_frames)
 	return bool(leap(strip, tuning, me, 0, false, 0, true)["safe"])
 
 

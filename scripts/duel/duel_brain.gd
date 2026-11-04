@@ -61,19 +61,24 @@ const LEVEL_NAMES: Array[String] = ["EASY", "MEDIUM", "HARD"]
 ##   blunder     chance that a thrust, a vault or a dodge goes wrong
 ##   aggression  attacks started per second of standing at the edge
 ##   throw       chance per second of throwing at a back running away
+##   contest     chance, per approach, that a runner fights a fighter in its way
+##               rather than vaulting them (twice it against a LOW blade)
 ##   slop        frames late it jumps a hazard (never past the lip; DuelFeet)
 const PROFILES: Array[Dictionary] = [
 	{
 		"reaction": 20, "anticipate": 0.4, "tell": 22, "feint": 0.0, "guard": 0.3,
 		"flick": 0.0, "blunder": 0.35, "aggression": 0.45, "throw": 0.2, "slop": 2,
+		"contest": 0.1,
 	},
 	{
-		"reaction": 13, "anticipate": 0.5, "tell": 10, "feint": 0.15, "guard": 0.65,
-		"flick": 0.25, "blunder": 0.12, "aggression": 1.0, "throw": 0.5, "slop": 1,
+		"reaction": 13, "anticipate": 0.8, "tell": 7, "feint": 0.15, "guard": 0.75,
+		"flick": 0.35, "blunder": 0.12, "aggression": 1.0, "throw": 0.5, "slop": 1,
+		"contest": 0.25,
 	},
 	{
 		"reaction": 8, "anticipate": 1.0, "tell": 4, "feint": 0.4, "guard": 0.9,
-		"flick": 0.5, "blunder": 0.04, "aggression": 1.8, "throw": 0.9, "slop": 0,
+		"flick": 0.5, "blunder": 0.04, "aggression": 1.2, "throw": 0.9, "slop": 0,
+		"contest": 0.35,
 	},
 ]
 
@@ -131,7 +136,8 @@ var _guard_left := 0
 ## Frames left fishing for a disarm, and the stance it flicks out to.
 var _flick := 0
 var _flick_base := HIGH
-## How the next vault goes over or under: 0 undecided, 1 jump, 2 roll.
+## How the next vault goes over or under: 0 undecided, 1 jump, 2 roll, and 4
+## not at all -- the fighter in the way is fought instead.
 var _vault := 0
 ## Whether the sword now in flight is being reacted to, decided once per throw.
 var _dodging := 0
@@ -139,8 +145,17 @@ var _sword_seen := false
 ## How often each of their heights has been seen: the least used is the open
 ## line most likely to stay open.
 var _seen := PackedInt32Array([1, 1, 1])
-## Frames spent waiting for a runner who is not coming.
+## How often they have been seen to thrust at each height. A fighter who holds
+## MID while walking and thrusts LOW every time is a LOW thrust coming, whatever
+## the blade shows: this is what the guard is cut to at the edge of reach.
+var _thrusts := PackedInt32Array([0, 0, 0])
+## Whether they were inside the edge of reach last frame: the guard is chosen
+## again the frame they step into it.
+var _was_close := false
+## Frames spent waiting for a runner who is not coming, and the furthest toward
+## their gate they have been seen since it started counting.
 var _waited := 0
+var _their_best := -INF
 ## Frames spent within ENGAGE of a living opponent without anyone dying.
 ## Patience running out is what ends a standoff between two careful fighters.
 var _standoff := 0
@@ -169,7 +184,10 @@ func reset(seed_value: int) -> void:
 	_dodging = 0
 	_sword_seen = false
 	_seen = PackedInt32Array([1, 1, 1])
+	_thrusts = PackedInt32Array([0, 0, 0])
+	_was_close = false
 	_waited = 0
+	_their_best = -INF
 	_standoff = 0
 
 
@@ -225,8 +243,13 @@ class Want:
 	var roll := false
 	var attack := false
 	var throw := false
-	## Down, whatever the stance: a duck, or a hand reaching for a sword.
+	## Down, whatever the stance: a hand reaching for a sword. Standing, down
+	## is the LOW guard; this only says the stance does not matter.
 	var down := false
+	## The duck: down with WALK, planted, under a HIGH blade or a scythe.
+	var duck := false
+	## WALK: move without turning round, blade still toward the other.
+	var walk := false
 	## Getting off ground that is about to kill: the direction is the way out,
 	## taken as it is. Steering would see the slab going under the feet as a
 	## lip, and stop on it.
@@ -256,7 +279,7 @@ func _mind_the_ground(view: DuelView, want: Want) -> bool:
 		return false
 	want.stance = _guard
 	if DuelFeet.duck_saves(strip, view.tuning, me, within):
-		want.down = true
+		want.duck = true
 		return true
 	want.dir = DuelFeet.refuge(strip, view.tuning, me)
 	want.flee = want.dir != 0
@@ -272,6 +295,11 @@ func _learn(view: DuelView) -> void:
 		if _seen[them.stance] > 4000:
 			for i: int in 3:
 				_seen[i] = maxi(1, _seen[i] / 2)
+	if them.alive and them.state == Fighter.State.THRUSTING and them.state_frame == 1:
+		_thrusts[clampi(them.stance, 0, 2)] += 1
+		if _thrusts[them.stance] > 60:
+			for i: int in 3:
+				_thrusts[i] /= 2
 	if them.alive and view.me.alive and absf(_their_x(view) - view.me.position.x) < ENGAGE:
 		_standoff += 1
 	if not them.alive:
@@ -306,6 +334,8 @@ func _helpless(view: DuelView) -> int:
 			left = tuning.downed_frames - now
 		Fighter.State.CATCH:
 			left = tuning.catch_settle - now
+		Fighter.State.RISING:
+			left = tuning.roll_recover - now
 		_:
 			left = 0
 	return maxi(0, left)
@@ -386,7 +416,11 @@ func _fence(view: DuelView, want: Want, hold: bool = false) -> void:
 		# Close the distance -- unless the moat or the pit is between them and
 		# they are near it, in which case the other one can do the crossing,
 		# and land in reach. Far off, it is only ground to cover.
-		var near_gap := d < ENGAGE and DuelFeet.gap_between(view.strip, me, _their_x(view))
+		# Not for ever: two fighters each waiting for the other to cross -- the
+		# Aqueduct worn through between them after a double kill put both back
+		# on their marks -- would wait out the match. After WAIT, it crosses.
+		var near_gap := d < ENGAGE and DuelFeet.gap_between(view.strip, me, _their_x(view)) \
+			and _standoff < WAIT
 		if hold or near_gap:
 			_face(want, me, toward)
 		else:
@@ -404,7 +438,9 @@ func _fence(view: DuelView, want: Want, hold: bool = false) -> void:
 			_begin_attack(view, mini(int(_p["tell"]), 2))
 			_attacking(view, want, d, toward, reach)
 		elif d < reach - 4.0 and DuelFeet.safe_step(view.strip, tuning, me, -toward):
+			# Back out of it facing them: a walk, not a run that turns round.
 			want.dir = -toward
+			want.walk = true
 
 
 ## The stance held while not attacking: their height, as often as this level
@@ -413,7 +449,13 @@ func _fence(view: DuelView, want: Want, hold: bool = false) -> void:
 ## thrust's disarm window cannot fall between.
 func _guard_stance(view: DuelView, d: float, reach: float, edge: float) -> int:
 	var them := view.them
-	var theirs := them.stance if them.posture != DuelTuning.DUCKED else MID
+	var theirs := _expected_thrust(view)
+	# Stepping into the edge of reach is when a guard matters: choose it again
+	# then, rather than up to two dozen frames later.
+	var close := d <= edge + 4.0
+	if close and not _was_close:
+		_guard_left = 0
+	_was_close = close
 	_guard_left -= 1
 	if _guard_left <= 0:
 		_guard_left = _rng.randi_range(8, 24)
@@ -431,6 +473,18 @@ func _guard_stance(view: DuelView, d: float, reach: float, edge: float) -> int:
 		else:
 			return _flick_base
 	return _guard
+
+
+## The height a thrust from them is likeliest to come at: the one they hold --
+## a ducking fighter holds LOW, and a thrust out of a duck comes up at LOW --
+## unless one height has been most of their thrusts, three times or more.
+func _expected_thrust(view: DuelView) -> int:
+	var total := _thrusts[0] + _thrusts[1] + _thrusts[2]
+	if total >= 3:
+		for line: int in [HIGH, MID, LOW]:
+			if _thrusts[line] * 2 > total:
+				return line
+	return view.them.stance
 
 
 func _begin_attack(view: DuelView, tell: int) -> void:
@@ -531,8 +585,7 @@ func _dodge(view: DuelView, want: Want) -> bool:
 			want.throw = true
 		return true
 	if low_edge > tuning.duck_height + 1.0:
-		want.down = true
-		want.stance = LOW
+		want.duck = true
 	elif low_edge > tuning.roll_height + 1.0 and eta <= 6.0 and _roll_room(view):
 		want.roll = true
 	elif eta <= 5.0:
@@ -544,7 +597,7 @@ func _dodge(view: DuelView, want: Want) -> bool:
 ## a roll into the spike pit is a roll into the spike pit.
 func _roll_room(view: DuelView) -> bool:
 	var me := view.me
-	var travel := view.tuning.roll_speed * DT * float(view.tuning.roll_frames)
+	var travel := view.tuning.roll_travel()
 	var end := me.position.x + float(me.facing) * (travel + view.tuning.body_width)
 	return me.grounded and not DuelFeet.gap_between(view.strip, me, end)
 
@@ -648,13 +701,25 @@ func _run_home(view: DuelView, want: Want) -> void:
 		_vault = 0
 		# Vaulted, and they have turned to follow. A jump comes down inside
 		# their reach and a run keeps the gap it has, so the back is open to
-		# them: roll, which is faster than they can run, until it is not.
+		# them: roll, which carries further than they can run in the time, rise
+		# included (DuelTuning.roll_travel), until it is not.
 		var reach := view.tuning.body_width + view.tuning.blade_reach
 		var chasing := them.armed and d < reach + 10.0
 		if chasing and _roll_room(view) and me.facing == dir:
 			want.roll = true
 		return
 	if d < VAULT_LOOK:
+		# Since a roll ends standing with no blade up, and a jump over a LOW
+		# blade comes down inside its reach, a vault past a fighter who is
+		# ready for it is often a death: sometimes the runner fights its way
+		# through instead, and a fighter who killed is still running home.
+		if _vault == 0 and them.armed:
+			var low := them.stance == LOW or them.posture == DuelTuning.DUCKED
+			var contest := float(_p["contest"]) * (2.0 if low else 1.0)
+			_vault = 4 if _chance(contest) else 0
+		if _vault == 4:
+			_fence(view, want)
+			return
 		want.stance = them.stance if them.posture != DuelTuning.DUCKED else MID
 		_vault_over(view, want, dir, d)
 
@@ -690,7 +755,10 @@ func _vault_over(view: DuelView, want: Want, dir: int, d: float) -> void:
 			_vault = 3 - _vault
 	elif _vault == 2 and low and not _chance(float(_p["blunder"])):
 		_vault = 1
-	var roll_from := tuning.roll_speed * DT * float(tuning.roll_frames) * 0.7
+	# A roll ends in the rise, standing with no blade up: started from here it
+	# ends a resting blade's reach past them, out of a turn and a thrust.
+	var roll_from := tuning.roll_speed * DT * float(tuning.roll_frames) \
+		- (reach + tuning.blade_rest)
 	var jump_from := reach + tuning.blade_rest + 2.0
 	if _vault == 2 and d <= roll_from and _roll_room(view):
 		want.roll = true
@@ -716,6 +784,7 @@ func _intercept(view: DuelView, want: Want) -> void:
 	var in_their_way := (me.position.x - tx) * float(their_way) > 0.0
 	if not them.alive:
 		want.stance = _guard
+		_their_best = -INF
 		return
 	if in_their_way:
 		var reach := tuning.body_width + tuning.blade_reach
@@ -726,14 +795,22 @@ func _intercept(view: DuelView, want: Want) -> void:
 				want.attack = true
 				_cool = tuning.thrust_frames + COOLDOWN
 			return
-		# Coming is moving toward their gate, now. A fighter standing in a
-		# sweep or a snatch is not on the way, however long they stand there.
+		# Coming is moving toward their gate, now: met where it stands. But the
+		# wait is only worth it while they get nearer -- a new best, not a step
+		# that way. A fighter shuffling back and forth against the trailing
+		# edge, or standing in a sweep or a snatch, is not on the way however
+		# often their feet point at it; reading the feet, the wait reset with
+		# every step and the fetch could take two minutes.
 		var coming := signf(them.velocity.x) == float(their_way)
-		if d > ENGAGE and (coming or _waited < WAIT):
+		var progress := tx * float(their_way)
+		var nearer := progress > _their_best + 2.0
+		if nearer:
+			_their_best = progress
+		if d > ENGAGE and (nearer or _waited < WAIT):
 			# The respawn put this fighter on open ground ahead of them. Wait
 			# there, blade up, facing them, while they come to it -- and go and
 			# get them if they stop coming.
-			_waited = _waited + 1 if not coming else 0
+			_waited = _waited + 1 if not nearer else 0
 			_face(want, me, toward)
 			want.stance = _guard_stance(view, d, reach, reach + tuning.blade_rest)
 			return
@@ -819,14 +896,19 @@ func _compose(view: DuelView, want: Want) -> int:
 	if _hold > 0:
 		bits |= PlayerInput.BIT_JUMP
 		_hold -= 1
+	var down := want.down or want.duck
 	if roll:
 		bits |= PlayerInput.BIT_JUMP | PlayerInput.BIT_DOWN
 	elif want.stance == HIGH:
 		bits |= PlayerInput.BIT_UP
-	elif want.stance == LOW or want.down:
+	elif want.stance == LOW or down:
 		bits |= PlayerInput.BIT_DOWN
-	if want.down:
+	if down:
 		bits = (bits | PlayerInput.BIT_DOWN) & ~PlayerInput.BIT_UP
+	# WALK is a duck with down, and a shuffle that keeps the facing without it.
+	# Never on a jump or a roll: the feet predict a jump from a run.
+	if (want.duck or want.walk) and not roll and hop == 0 and not bool(steer["jump"]):
+		bits |= PlayerInput.BIT_WALK
 	if hop > 0:
 		bits &= ~PlayerInput.BIT_DOWN
 	if dir < 0:
@@ -856,6 +938,7 @@ func _calm() -> void:
 	_vault = 0
 	_standoff = 0
 	_waited = 0
+	_their_best = -INF
 
 
 func _chance(p: float) -> bool:

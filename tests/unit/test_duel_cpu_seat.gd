@@ -74,23 +74,35 @@ func test_every_byte_is_one_a_human_could_press() -> void:
 	var bad: Array[String] = []
 	var sideways := PlayerInput.BIT_LEFT | PlayerInput.BIT_RIGHT
 	var upright := PlayerInput.BIT_UP | PlayerInput.BIT_DOWN
-	for level: int in 3:
-		var cpu := DuelCpu.new(1, level as DuelBrain.Difficulty, 70 + level)
+	# Matches until three thousand frames have been read and every button
+	# below seen pressed, a level at a time: how long a match lasts is the
+	# brain's business, not this test's, and a brain that wins quickly must not
+	# leave the bytes below unread.
+	var buttons := PlayerInput.BIT_LEFT | PlayerInput.BIT_RIGHT | PlayerInput.BIT_UP \
+		| PlayerInput.BIT_DOWN | PlayerInput.BIT_JUMP | PlayerInput.BIT_ATTACK \
+		| PlayerInput.BIT_WALK | PlayerInput.BIT_THROW
+	var played := 0
+	while (frames <= 3000 or pressed & buttons != buttons) and played < 12:
+		var level := played % 3
+		var seed_value := 70 + played
+		played += 1
+		var cpu := DuelCpu.new(1, level as DuelBrain.Difficulty, seed_value)
 		var bout := Cpu.bout(get_tree().root, _strip,
-			[Cpu.closing_bot(0, 70 + level), cpu], 2400, true)
+			[Cpu.closing_bot(0, seed_value), cpu], 2400, true)
 		for pair: Vector2i in bout["bits"]:
 			var bits := pair.y
 			pressed |= bits
 			frames += 1
 			if bits & ~0xff != 0 or bits & sideways == sideways or bits & upright == upright:
 				bad.append("%d on frame %d" % [bits, frames])
-	assert_gt(frames, 3000, "read the bytes of three matches")
+	assert_gt(frames, 3000, "read three thousand frames of bytes")
+	assert_gte(played, 3, "from every level")
 	assert_eq(bad, [] as Array[String], "bytes no stick or button could make")
 	# Every button the duel uses was pressed at least once across the three:
 	# a brain that only ever ran would pass the checks above vacuously.
 	for bit: int in [PlayerInput.BIT_LEFT, PlayerInput.BIT_RIGHT, PlayerInput.BIT_UP,
 			PlayerInput.BIT_DOWN, PlayerInput.BIT_JUMP, PlayerInput.BIT_ATTACK,
-			PlayerInput.BIT_THROW]:
+			PlayerInput.BIT_WALK, PlayerInput.BIT_THROW]:
 		assert_ne(pressed & bit, 0, "bit %d was pressed" % bit)
 
 
