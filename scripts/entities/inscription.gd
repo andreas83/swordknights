@@ -27,6 +27,9 @@ const AUTHORED := {
 	"The Long Arcade": [
 		["SAME MARK", "SAME GATE"],
 	],
+	"The Aqueduct": [
+		["WE LEFT", "BY NIGHT"],
+	],
 }
 
 ## Two lines of at most nine letters. The smallest cut sets about seven units

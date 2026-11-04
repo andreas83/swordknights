@@ -56,7 +56,10 @@ const A := PlayerInput.BIT_ATTACK
 const PROGRAMS := {
 	"sun_terrace": {"level": "res://levels/level_01.txt", "steps": "_sun_terrace"},
 	"arena": {"level": "", "steps": "_arena"},
+	"aqueduct": {"level": "res://levels/chapter_03.txt", "steps": "_aqueduct"},
 }
+## Chapter III's clear run lives with the test that plays it.
+const AQUEDUCT_RUN := "res://tests/unit/test_aqueduct_clear.gd"
 
 ## A floor with two guards and room to fight them: every way the prince and a
 ## guard can meet -- the swing, the air slash, the plunge, the stomp, the
@@ -177,6 +180,12 @@ func _advance() -> bool:
 				Input.action_release(StringName(step[1]))
 	_left -= 1
 	return true
+
+
+## Spawn to door through The Aqueduct: the clear run its test plays, read from
+## that test so the two can never disagree.
+func _aqueduct() -> Array:
+	return (load(AQUEDUCT_RUN) as GDScript).get_script_constant_map()["RUN"]
 
 
 func _finish() -> void:

@@ -1,0 +1,76 @@
+; The Aqueduct
+;! time sunset
+;
+; Chapter III of The Last Light, at sunset: the masons' ruined quarter, then
+; the aqueduct that crosses the ravine to the Mirror Tower. The old stone is
+; tired, and the King's cat hunts across it. docs/campaign.md has the design;
+; this is its level, 128 x 28, built from docs/campaign/drafts/chapter_03.txt.
+;
+; Legend beyond scripts/world/tiles.gd's terrain:
+;   ,  crumbling stone (scripts/mechanisms/crumbling_stone.gd)
+;   j  Caracal (scripts/entities/caracal.gd)
+;   v  doves (scripts/entities/dove_flock.gd)
+;
+; Beats, left to right (columns):
+;   1. The masons' gate (0-10). Doves on the flags by the spawn.
+;   2. The first crumble (11-12): two slabs over a cellar two deep. Walk on
+;      and they let you down, harmlessly; run and they fall behind you.
+;      Secret C is the cellar's east wall.          [crumbling: introduce]
+;   3. The walk (16-37), grabbed onto from the gate. Under it a walled yard
+;      where a Caracal hunts doves: crouch, pounce, miss, skid. It cannot
+;      reach you up there. R1 on the walk.           [Caracal: introduce]
+;   4. The cat's yard (35-46). Drop in off the walk's end, under which there
+;      is room to backstep: backstep the pounce, cut it in the skid.
+;                                                    [Caracal: develop]
+;   5. Two roofs (47-59): house A, three slabs, house B. Run them, or fall
+;      four tiles into the lane and climb out. Secret A is house B's face,
+;      down in the lane. Torch 1 on house B.         [crumbling: develop]
+;   6. The deck (60-83): three slabs (65-67) over the void and a Caracal
+;      beyond them. Wait at the deck's west end (60-62): it stalks you onto
+;      the slabs to crouch, and a cat cannot push off crumbling stone.
+;                                                   [twist, both]
+;   7. The way down is the floor (84-85): stand on the slabs before the
+;      ruined tower and wait. R2 is on the tower's top, up its face by one
+;      crumbling stone: grab it, stand, jump at once.  [crumbling: twist]
+;   8. The channel (82-100): a sentinel in the low dark, red light through
+;      the vents. Secret B is the cracked floor over the wide pier.
+;   9. Torch 2 at the channel's mouth (101).
+;  10. The collapse (103-115): runs of three between the piers. It falls in
+;      a chain behind you; a slab gone from under you is a ledge grab to the
+;      next pier.                      [crumbling: master; set piece]
+;  11. The tower's foot (116-127): the last Caracal, with the collapse at
+;      your back. The door is cut in the Mirror Tower's first course.
+;                                                    [Caracal: master]
+;
+; Secrets: A, house B's face in the lane (false wall; a relic and WE LEFT /
+; BY NIGHT); B, the channel's floor over the wide pier (cracked); C, the
+; first cellar's east wall (cracked). Relics: R1, R2 and one per secret.
+; Par 2:15.
+
+
+
+
+                                                                                          *                                 ####
+                                                                                       ######                               ####
+###                                                                                    ######                               ####
+###                                                                                    ######                               ####
+###                                                                                   ,######                               ####
+###                                                                                    ######                               ####
+###                                                                                    ######                               ####
+###                                                                       j            ######                               ####
+###                                                         #####,,,################,,######### ## ##                       ####
+###                           *                          t  #####   ##############                                          ####
+::              ######################         ####,,,######   ##    ##    ##    #
+::              ##               ##            ####   ######   ##    ##    ##    #           p       t                   j    D
+:A              ##               ##            ####   %::::#   ##    ##    ##    ###############&&#####,,,##,,,##,,,############
+:: @    v       ##  v    j       ##       j    ####   %*:L:#   ##    ##    ##       ##     ## #::::#      ##   ##   ############
+###########,,###############################################   ##    ##    ##       ##     ## #:::*#      ##   ##   ############
+##########    &:::##########################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+##########    &::*##########################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+############################################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+############################################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+############################################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+############################################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+############################################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+############################################################   ##    ##    ##       ##     ## ######      ##   ##   ############
+############################################################   ##    ##    ##       ##     ## ######      ##   ##   ############
