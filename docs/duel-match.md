@@ -196,6 +196,25 @@ presentable event (`stone`), so a slab's fall rings its dust and sound once,
 and what the floor looks like is read from the state, never from the beat --
 the rope's rule from "Corrected outcomes".
 
+Measured by `tests/unit/test_duel_strip_net.gd`, a host and a client on every
+strip for 720 frames, each in a physics world of its own:
+
+| Link | Verified snapshots (each strip) | Corrections | Desyncs |
+| --- | --- | --- | --- |
+| clean | 359 | 301 to 304 | 0 on every strip |
+| laggy (6 ± 2 frames) | 359 | 323 | 0 on every strip |
+| lossy (3 ± 1, 15% of snapshots dropped) | 295 | 266 | 0 on every strip |
+
+and each gimmick is rewound to a snapshot just before it acts -- a cut begins,
+the water moves, a slab falls -- and replayed for 120 to 200 frames with every
+byte of every frame equal. With the stones left out of the snapshot the
+Aqueduct desynced 94 times on the clean link and its replay parted on all 160
+frames; the test was seen to fail so. Two matches in one physics space are not
+two devices: built in one space, as `tests/match_net_test.gd` builds the Tug of
+War's, the Aqueduct's laggy run parted by 1.2e-4 px beside a slab -- the
+engine's float noise, across a 1/256 quantum, from the other match's ground
+and slabs overlapping its own -- which in separate spaces it never does.
+
 ### Told before it kills
 
 Every hazard is told at least **27 frames** ahead -- the adventure's one
@@ -247,21 +266,45 @@ enough, and otherwise goes to the nearer safe footing (`DuelFeet.refuge()`).
 A wall too tall to hop from a standstill -- a chimney -- is backed off from for a
 run-up. The blunder knob does not reach any of it.
 
-Computer against computer, each level against itself, six-minute limit,
-three seeds a level unless said:
+Computer against computer, each level against itself, as the suite plays it
+(two seeds a level, a six-minute limit): deaths to the ground of all deaths,
+and the longest match in frames. Every match finished.
 
 | Strip | EASY | MEDIUM | HARD |
 | --- | --- | --- | --- |
-| Clockwork Well (8 seeds) | 8 of 8 finish, mean 1,809 frames; 0 of 16 deaths to hazards | 8 of 8, mean 6,893, longest 12,402; 3 of 93 | 8 of 8, mean 2,357; 1 of 26 |
-| Floodgates | 3 of 3, mean 935; 0 of 4 | 3 of 3, mean 2,878; 0 of 15 | 3 of 3, mean 1,459; 0 of 8 |
-| Aqueduct | 3 of 3, mean 939; 0 of 3 | 3 of 3, mean 1,194; 0 of 5 | 3 of 3, mean 1,787; 0 of 10 |
-| Rooftops | 3 of 3, mean 1,392; 0 of 4 | 3 of 3, mean 1,569; 0 of 7 | 3 of 3, mean 1,866; 0 of 8 |
+| Clockwork Well | 0 of 3; 2,410 | 1 of 30; 12,402 | 0 of 6; 2,102 |
+| Floodgates | 0 of 2; 940 | 0 of 10; 3,957 | 0 of 7; 1,743 |
+| Aqueduct | 0 of 2; 941 | 0 of 2; 901 | 0 of 9; 2,695 |
+| Rooftops | 0 of 3; 2,153 | 0 of 4; 1,925 | 0 of 3; 1,848 |
+
+Eight seeds a level on the Well, measured while tuning: every match finished;
+EASY died to the ground 0 times in 16 deaths, MEDIUM 3 in 93, HARD 1 in 26.
 
 `tests/unit/test_duel_strip_cpu.gd` holds every pairing on every strip to an end
 inside six minutes, HARD to one hazard death in twenty and every level to one in
 eight. The Well's evenly matched MEDIUM pairs are the long ones: the rope goes
 back and forth for up to three and a half minutes, because a runner home waits
 for the beat and the chaser catches up while it does.
+
+### Open
+
+- **Judged on renders, not on a phone.** The Well at night is the darkest
+  strip; its blades, torches and fighters are lifted out of the dark
+  (`MatchDusk.LIT`), but whether the slots' tell reads at arm's length on a
+  phone wants a phone.
+- **The computer survives the strips; it does not use them.** It waits for
+  the beat, keeps off a filling court and steps off a burning slab, but never
+  times a thrust to a scythe, lures anyone onto cracked stone or holds the
+  stones against a runner while the tide is in. A person who learns the
+  strip will out-think it there.
+- **The Tug of War's own netplay test still builds both peers in one physics
+  space.** It passes, and the stones that showed the cross-talk are not on
+  it; moving it to a world per peer, as the strips' test does, is a one-line
+  change worth making.
+- **No LONGER WARNINGS in a duel.** The assist stretches the campaign's tells;
+  a duel's are frames both phones must agree on, so it does not reach them.
+- **A strip is five zones.** The catalogue and the rules allow three to five;
+  every strip uses five, and a shorter strip -- a faster match -- is untried.
 
 ## The camera
 
