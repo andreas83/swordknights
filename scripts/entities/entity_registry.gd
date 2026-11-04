@@ -76,6 +76,8 @@ static func kinds() -> Dictionary:
 		"sun_seal": SunSeal,
 		"sun_secret": SunSeal,
 		"glassbearer": Glassbearer,
+		"scythe": Scythe,
+		"spike_slot": SpikeSlot,
 	}
 	out.merge(_for_tests)
 	return out

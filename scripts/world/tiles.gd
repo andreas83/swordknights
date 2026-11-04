@@ -115,6 +115,8 @@ const MECHANISM_LEGEND := {
 	"x": "sun_mirror", ## turned a quarter by the sword; starts facing up
 	"O": "sun_seal", ## a door with a sun carved in it: opens when lit
 	"Q": "sun_secret", ## the same seal guarding a secret room (SEAL_LEGEND)
+	"z": "scythe", ## a blade on a beat, in a doorway or a shaft (Scythe)
+	"i": "spike_slot", ## spikes on a beat, in a grille in the floor (SpikeSlot)
 }
 ## The terrain a mechanism glyph's cell is in the grid. Only for something
 ## that IS terrain and stays it, like a plate, which is a floor stone: the
