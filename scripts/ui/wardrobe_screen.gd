@@ -184,6 +184,12 @@ func back() -> void:
 		get_tree().change_scene_to_file(MENU_SCENE)
 
 
+## Android's Back is SWORD on a page: one page back (docs/ui.md, "Ways back").
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		back()
+
+
 ## A tap at `at`, in this control's coordinates. Returns true if it landed on
 ## a row. Public so a test can tap without synthesising a touch.
 func tap(at: Vector2) -> bool:

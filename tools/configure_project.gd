@@ -40,6 +40,13 @@ func _apply_settings() -> void:
 		"application/config/icon": "res://icon.svg",
 		"application/boot_splash/show_image": false,
 		"application/boot_splash/bg_color": Color("2b0a14"),
+		# Android's Back is a way back, not a way out. Left at Godot's default
+		# it quit the app from every screen -- mid-level, mid-match, mid-
+		# wardrobe -- with nothing saved since the last chapter clear. Off, the
+		# press arrives as NOTIFICATION_WM_GO_BACK_REQUEST and each screen
+		# answers it as its own SWORD or PAUSE would (docs/ui.md, "Ways
+		# back"); only the title screen, which is the root, quits.
+		"application/config/quit_on_go_back": false,
 
 		# Fixed virtual height with an aspect-derived width: the character reads
 		# the same size on every device, and a tall phone sees more of the room

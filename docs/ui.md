@@ -206,7 +206,7 @@ route, round it yourself.
 | Chapter select | `scripts/ui/chapter_select.gd`, `scenes/chapter_select.tscn` |
 | Duel page | `scripts/ui/duel_select.gd`, `scripts/ui/duel_choice.gd`, `scenes/duel_select.tscn` |
 | Level HUD, title and chapter cards, complete overlay | `scripts/ui/hud.gd` |
-| The pause menu, in a level and in a duel | `scripts/ui/pause_menu.gd` |
+| The pause menu, in a level and in a duel | `scripts/ui/pause_menu.gd`; a level's rows and when it opens, `scripts/core/game_pause.gd` |
 | The dawn's words | `scripts/campaign/ending_card.gd`, over `scripts/campaign/dawn_frame.gd` |
 | Touch controls | `scripts/ui/touch_controls.gd`, `scripts/ui/touch_surface.gd` |
 | Duel HUD | `scripts/duel/match_hud.gd` |
@@ -641,7 +641,7 @@ clock, the relics and the secrets.
 It is a page over a scrim, not an overlay in the band, and the world shows
 dimly through it, stopped. A resume chosen with JUMP or SWORD waits for the
 button to come up, so the press is not also the prince's first jump or swing
-(`Game._resume()`); the duel holds its step the same way.
+(`GamePause.resume()`); the duel holds its step the same way.
 
 | Mode | Rows | Why |
 | --- | --- | --- |
@@ -686,6 +686,41 @@ behind it found three dead ends and two traps:
 
 The title screen is the one screen with no way back: it is the root. Its
 buttons say OPEN.
+
+**Android's Back.** Godot quits on Back unless told not to, so the phone
+build closed from every screen — mid-level, mid-match, from the wardrobe —
+with nothing saved since the last chapter clear.
+`application/config/quit_on_go_back` is off (`tools/configure_project.gd`),
+and Back arrives as `NOTIFICATION_WM_GO_BACK_REQUEST`, which each screen
+answers as the button it already has for going back:
+
+| Where | Back does |
+| --- | --- |
+| Play: a level, a chapter, Endless, the feel lab, a duel on one device | PAUSE: opens the pause menu, and closes it again |
+| The complete screen, a finished duel | its SWORD / PAUSE: leaves |
+| An online match | opens and closes the menu that does not stop the match |
+| A page: chapter select, duel page, wardrobe, settings | SWORD: one page back |
+| The lobby | a text page to the list, the list to the duel page |
+| The dawn, a ruin that would not generate | its buttons: back |
+| The title screen | closes the app |
+
+Only one node per screen answers — the screen, not a panel on it — because
+the engine sends the notification to every node from the root down, and a
+page and its panel both stepping back would be two presses.
+`tests/unit/test_back_button.gd` sends it that way, through each scene's own
+frame, and its guard fails any scene in neither its routes nor its
+exemptions.
+
+**When the app goes away.** A call, a switch to another app or the
+notification shade pulled down sends `NOTIFICATION_APPLICATION_PAUSED` or
+`NOTIFICATION_APPLICATION_FOCUS_OUT`, and wherever the game can stop it
+opens the pause menu: a level, a chapter, Endless, a duel on one device. The
+player comes back to a menu, not to a prince who died while the phone was at
+an ear. An online match does nothing: the other phone is stepping it, and the
+host's simulation never waits on this one. Neither Back nor going away acts
+inside the notification: both are held for the next physics step and read
+there with the buttons, since they are input, and a request that lands behind
+a wipe or in the death beat waits for play rather than being dropped.
 
 ---
 

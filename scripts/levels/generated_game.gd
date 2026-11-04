@@ -156,11 +156,22 @@ func _process(_delta: float) -> void:
 		return
 	if Input.is_action_just_pressed("attack") or Input.is_action_just_pressed("pause") \
 			or Input.is_action_just_pressed("jump"):
-		_stranded = false
-		if leave.is_valid():
-			leave.call()
-		else:
-			get_tree().change_scene_to_file(MENU_SCENE)
+		_go_back()
+
+
+## Android's Back leaves a ruin that would not generate, as its buttons do. A
+## ruin that did is the game's to answer (Game._notification()).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST and _stranded:
+		_go_back()
+
+
+func _go_back() -> void:
+	_stranded = false
+	if leave.is_valid():
+		leave.call()
+	else:
+		get_tree().change_scene_to_file(MENU_SCENE)
 
 
 func _mount_readout() -> void:

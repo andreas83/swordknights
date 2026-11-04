@@ -69,6 +69,10 @@ var _demo_frame := 0
 var _held_over := false
 ## Both seats' computers, for `--demo-cpu`; empty otherwise.
 var _demo_cpus: Array[DuelCpu] = []
+## Android's Back and the app losing the screen, as _notification heard them,
+## for the next physics step to answer (_pause_pressed(), _went_away()).
+var _back_asked := false
+var _away := false
 
 
 func _ready() -> void:
@@ -265,7 +269,11 @@ func _physics_process(delta: float) -> void:
 		return
 
 	_label_thumbs()
-	if Input.is_action_just_pressed("pause"):
+	var pause := _pause_pressed()
+	# Going away stops a match on one device: nobody else is waiting on it.
+	if _went_away() and not menu.is_open() and fight.phase != DuelMatch.Phase.MATCH_OVER:
+		pause = true
+	if pause:
 		if fight.phase == DuelMatch.Phase.MATCH_OVER:
 			_to_menu()
 			return
@@ -303,6 +311,38 @@ func _physics_process(delta: float) -> void:
 
 	_step()
 	_follow_the_match()
+
+
+## --- the app ----------------------------------------------------------------
+##
+## Android's Back is PAUSE here -- it opens the menu, closes it, and leaves a
+## finished match as PAUSE does -- and the app losing the screen (a call, a
+## switch to another app) opens the menu as if PAUSE had been pressed. Both
+## arrive as notifications, outside any frame, so they are held for the next
+## physics step and read there with the buttons: the match is stepped from
+## inputs read at one point in the frame, and these are inputs.
+
+func _notification(what: int) -> void:
+	match what:
+		NOTIFICATION_WM_GO_BACK_REQUEST:
+			_back_asked = true
+		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT:
+			_away = true
+
+
+## PAUSE this step: the action, or Back. Spends the Back.
+func _pause_pressed() -> bool:
+	var asked := _back_asked
+	_back_asked = false
+	return asked or Input.is_action_just_pressed("pause")
+
+
+## Whether the app lost the screen since the last step. Spends it, so a call
+## taken in the lobby does not open a menu over the match that follows.
+func _went_away() -> bool:
+	var away := _away
+	_away = false
+	return away
 
 
 ## --- the menu ---------------------------------------------------------------

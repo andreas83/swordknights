@@ -65,6 +65,12 @@ func _process(delta: float) -> void:
 		leave()
 
 
+## Android's Back is either button here: back to the chapters, once it can be.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		leave()
+
+
 func _input(event: InputEvent) -> void:
 	var touch := event as InputEventScreenTouch
 	if touch != null and touch.pressed and leave():

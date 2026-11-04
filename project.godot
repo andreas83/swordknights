@@ -13,6 +13,7 @@ config_version=5
 config/name="Swordknights"
 config/description="A mobile platform adventure in the spirit of Prince of Persia."
 run/main_scene="res://scenes/boot.tscn"
+config/quit_on_go_back=false
 config/features=PackedStringArray("4.5", "GL Compatibility")
 boot_splash/bg_color=Color(0.16862746, 0.039215688, 0.078431375, 1)
 boot_splash/show_image=false

@@ -70,6 +70,9 @@ var _offer_rect := Rect2()
 ## by default; Godot cannot install a package without an Android plugin, and
 ## the browser's download-then-install is the path Android already trusts.
 var opener := Callable(OS, "shell_open")
+## Test seam: what Android's Back does on this screen, which is the root and
+## has nothing behind it: the app closes. A test must never quit its runner.
+var quit_app := Callable()
 
 @onready var _sky: ParallaxSky = $Sky/ParallaxSky
 
@@ -219,6 +222,21 @@ func _input(event: InputEvent) -> void:
 	if _offer_rect.has_point(local.position):
 		get_viewport().set_input_as_handled()
 		take_offer()
+
+
+## Android's Back: closes the settings page, as SWORD does, or -- on the
+## title screen itself, the root -- closes the app. With
+## `quit_on_go_back` off (tools/configure_project.gd) this is the only place
+## Back quits, rather than every screen.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_WM_GO_BACK_REQUEST:
+		return
+	if _settings != null and _settings.visible:
+		_settings.back()
+	elif quit_app.is_valid():
+		quit_app.call()
+	elif is_inside_tree():
+		get_tree().quit()
 
 
 func _open_settings() -> void:

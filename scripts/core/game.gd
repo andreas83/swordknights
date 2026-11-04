@@ -53,7 +53,7 @@ var advance_label := "DESCEND"
 var quit_scene := MENU_SCENE
 ## --- the pause menu --- what its last two rows say, from the mode: what
 ## starting over is (the level, the chapter, the ruin) and where leaving goes.
-## See _menu_rows() for the list and why it is that list.
+## See GamePause for the list and why it is that list.
 var restart_label := "RESTART LEVEL"
 var quit_label := "QUIT TO TITLE"
 ## Test seam: what quitting does instead of the wipe to `quit_scene`, which
@@ -115,10 +115,10 @@ var secrets := SecretKeeper.new()
 # --- blood --- every foe's death, and the prince's wounds, as blood that
 # stays for the life of the level. See scripts/world/bloodshed.gd.
 var blood: Bloodshed
-## --- the pause menu --- and the frame a resume from it waits for (see
-## _resume()).
+## --- the pause menu --- the list (PauseMenu), and when it opens and what
+## its rows do here (GamePause).
 var menu: PauseMenu
-var _resuming := false
+var pause := GamePause.new(self)
 
 
 func _ready() -> void:
@@ -185,7 +185,7 @@ func _ready() -> void:
 	# --- the pause menu --- last, so it is the last child and a tap on its
 	# rows is taken before the touch controls can start a stick with it.
 	menu = PauseMenu.install(self)
-	menu.chosen.connect(_on_menu_chosen)
+	menu.chosen.connect(pause.choose)
 
 	# --- feel/flow (additive) --- lift the shadow off whatever just loaded. A
 	# no-op when the previous scene already drove the wipe.
@@ -203,30 +203,14 @@ func _physics_process(delta: float) -> void:
 		_apply_freeze()
 	if stopped:
 		return
-	# --- the pause menu --- a resume chosen with JUMP or SWORD lands here,
-	# once the button that chose it is up, so the press is not also the
-	# prince's first jump or swing (see _resume()).
-	if _resuming and not (Input.is_action_pressed("jump") or Input.is_action_pressed("attack")):
-		_resuming = false
-		if phase == Phase.PAUSED:
-			_set_phase(Phase.PLAYING)
-
-	# --- feel/flow (additive) --- a transition owns the screen while it
-	# runs, so nothing queues a second one behind it.
-	if Input.is_action_just_pressed("pause") and not Flow.busy():
-		if phase == Phase.PLAYING:
-			_set_phase(Phase.PAUSED)
-			menu.open(_menu_rows())
-			GameAudio.cue("pause_in")
-		elif phase == Phase.PAUSED and menu.is_open():
-			menu.close()
-			_set_phase(Phase.PLAYING)
-			GameAudio.cue("pause_out")
+	# --- the pause menu --- PAUSE, Back, the app going away, and a resume
+	# landing, read in this step (GamePause.step()).
+	pause.step()
 
 	match phase:
 		Phase.PAUSED:
 			if not Flow.busy():
-				menu.caption = _menu_caption()
+				menu.caption = pause.caption()
 				menu.step(delta)
 		Phase.COMPLETE:
 			if Flow.busy():
@@ -264,69 +248,10 @@ func _set_phase(next: Phase) -> void:
 	_label_thumbs()
 
 
-## --- the pause menu ---------------------------------------------------------
-##
-## RESUME, RESTART FROM TORCH, RESTART <the mode's unit>, QUIT TO <where the
-## mode came from>. Each is something a player pauses to do, in the order
-## they are reached for:
-##
-## - **Resume** first and under the cursor, so pause-then-JUMP is the
-##   cheapest thing on the list and a stray pause costs nothing.
-## - **From the torch** is what a death does, without the death: for a player
-##   who has walked into a state they would rather not play out -- a gate shut
-##   behind them, a relic fallen out of reach. It keeps what a death keeps
-##   (the clock runs, the latches hold, the fallen stay down) because it IS
-##   the respawn, and before any torch is taken it is dimmed, since it would
-##   be the next row.
-## - **Restart** is the level from nothing -- clock, relics, secrets -- for a
-##   player going for a clean run; in the campaign it is the chapter, in
-##   Endless the same ruin, never a new one: a roll is reported by its seed.
-## - **Quit** is last and furthest from the thumb, and goes where the mode
-##   came from: the chapter select in the campaign, the title screen
-##   otherwise. It is the only way out, and it is never one press from play.
-func _menu_rows() -> Array[Dictionary]:
-	return [
-		{"id": &"resume", "title": "RESUME", "enabled": true},
-		{"id": &"torch", "title": "RESTART FROM TORCH",
-			"enabled": not checkpoint.is_equal_approx(level.spawn_world_position())},
-		{"id": &"restart", "title": restart_label, "enabled": true},
-		{"id": &"quit", "title": quit_label, "enabled": true},
-	]
-
-
-func _menu_caption() -> String:
-	var said := "%s  ·  %d/%d RELICS" % [ChapterSelect.format_time(elapsed), relics,
-		relics_total]
-	if secrets.total > 0:
-		said += "  ·  SECRETS %d/%d" % [secrets.count, secrets.total]
-	return said
-
-
-func _on_menu_chosen(id: StringName) -> void:
-	if phase != Phase.PAUSED or Flow.busy():
-		return
-	match id:
-		&"resume":
-			_resume()
-		&"torch":
-			menu.close()
-			Flow.wipe(self, _respawn, Flow.Pace.FAST)
-		&"restart":
-			menu.close()
-			Flow.wipe(self, _restart)
-		&"quit":
-			menu.close()
-			_quit()
-
-
-## Back to play once the button is up. The press that chose RESUME is JUMP or
-## SWORD, and the prince finds his presses as edges against what he last saw
-## held -- which, frozen, was nothing -- so thawed while it is down he would
-## jump or swing with it.
-func _resume() -> void:
-	menu.close()
-	GameAudio.cue("pause_out")
-	_resuming = true
+## --- the app --- Android's Back and the app losing the screen, for the
+## pause menu to answer in the next step (GamePause, "Back, and going away").
+func _notification(what: int) -> void:
+	pause.hear(what)
 
 
 ## Leaves the level for `quit_scene` behind the wipe: the pause menu's last

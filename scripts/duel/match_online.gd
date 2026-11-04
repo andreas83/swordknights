@@ -84,6 +84,15 @@ func _physics_process(delta: float) -> void:
 		transport.poll()
 	var thumbs := lobby.thumb_labels()
 	TouchControls.label(self, thumbs[0], thumbs[1])
+	# Nothing to stop in the lobby. Back is read even while a field is being
+	# typed in -- it is how a phone leaves one -- but PAUSE is not: P is a
+	# letter as well as a key that pauses.
+	_went_away()
+	var back := _back_asked
+	_back_asked = false
+	if back:
+		_lobby_back()
+		return
 	if lobby.is_typing():
 		return
 	lobby.drive()
@@ -134,14 +143,20 @@ func over_jump_label() -> String:
 
 func _drive_online_menu(delta: float) -> void:
 	_label_thumbs()
+	var pause := _pause_pressed()
+	# The other phone is still stepping the match, and the host's simulation
+	# must never wait on this one: losing the screen opens nothing here. The
+	# fighter stands still while the app is away, as if the phone were put
+	# down, because nothing is sent from a phone that is not running.
+	_went_away()
 	var over := fight.phase == DuelMatch.Phase.MATCH_OVER
 	if over:
 		menu.close()
 		hud.footer = "SWORD OR PAUSE TO LEAVE"
-		if Input.is_action_just_pressed("pause") or Input.is_action_just_pressed("attack"):
+		if pause or Input.is_action_just_pressed("attack"):
 			_to_menu()
 		return
-	if Input.is_action_just_pressed("pause"):
+	if pause:
 		if menu.is_open():
 			menu.close()
 		else:

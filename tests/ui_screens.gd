@@ -201,14 +201,14 @@ func _pose(shot: Dictionary) -> void:
 				# screen; the card gets its own shot.
 				hud.show_title("")
 		"pause":
-			# The pause menu, opened as PAUSE opens it (Game._menu_rows()).
+			# The pause menu, opened as PAUSE opens it (GamePause.rows()).
 			var game := _stage as Game
 			if game != null and game.phase == Game.Phase.PLAYING:
 				hud.update_model(2, 3, 1, 3)
 				hud.show_title("")
 				game._set_phase(Game.Phase.PAUSED)
-				game.menu.caption = game._menu_caption()
-				game.menu.open(game._menu_rows())
+				game.menu.caption = game.pause.caption()
+				game.menu.open(game.pause.rows())
 				game._label_thumbs()
 		"complete":
 			var game := _stage as Game

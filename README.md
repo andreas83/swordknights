@@ -74,8 +74,13 @@ repository owner should set up (the `DEBUG_KEYSTORE_B64` secret), is in
 | Pick up     | Down over the sword | Down          | Stick down over it         |
 | Sweep       | Sword with no sword | X / B         | **SWORD** with no sword    |
 | Walk (slow) | `Shift`             | L1            | Small stick deflection     |
-| Pause       | `Esc` / `P`         | Start         | **II**                     |
-| Mute        | `M`                 | —             | —                          |
+| Pause       | `Esc` / `P`         | Start         | **II**, or Android's Back  |
+| Mute        | `M`                 | —             | The horn by **II**         |
+
+On a phone, Back is a way back, never a way out of the middle of something:
+in play it pauses, on a page it goes back a page, and only the title screen
+closes the app. Taking a call or switching apps pauses the game too, except
+an online duel, which the other phone is still playing.
 
 Ledge grabs happen automatically when you fall past a grabbable corner while
 moving into it; press up (or jump) to mantle, down to let go. Hold down and
