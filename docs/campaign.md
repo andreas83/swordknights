@@ -641,7 +641,8 @@ The scripted clear run below is that line, and clears in 56 s.
 the great mirror's beam reaches the Well: the square and the Well's mouth,
 the hall and its lift, the face in shade, the first light and the stairwell,
 the shaft's lift, R5 and R6, the roof, and the summit's great mirror with the
-last ray falling the tower's whole height.*
+last ray falling the tower's whole height. `tools/level_tour.gd -- --level
+res://levels/chapter_04.txt --face 5,6,DOWN` renders it.*
 
 **As built.** Building the draft changed these, each because building or
 playing it showed a flaw:

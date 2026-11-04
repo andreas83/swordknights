@@ -114,13 +114,40 @@ Presses are forgiven at both ends: a jump made a moment before you land still
 fires, a jump just after running off an edge still counts, and a quick tap of
 jump is a short hop rather than nothing.
 
-**Adventure** is *The Last Light*, played chapter by chapter from the chapter
-select: CONTINUE carries on from the first chapter you have not cleared, and
-each chapter keeps your best time and the most relics and secrets you have
-found in it. Clearing a chapter opens the next; jump on the complete screen
-plays it. Chapter I, the Sun Terrace, is built; the chapters after it are
-listed and marked as still being built. There is one assist, **longer
-warnings**, under SETTINGS: every foe's tell lasts half as long again.
+**Adventure** is *The Last Light*: one evening in a stone city built to
+keep the sun, crossed chapter by chapter as the light goes down. The King has
+turned the city's mirrors away to keep the last light for himself, and its
+last swordknight -- whose blade, like every swordknight's, is polished to a
+mirror -- has until nightfall to send it down the Sun Well and then follow it.
+
+| | Chapter | Hour | What it is built on | The foe, and the move it is for |
+| --- | --- | --- | --- | --- |
+| I | The Sun Terrace | late afternoon | the ledge grab, ladders, secrets | the sentinel — the sword |
+| II | The Long Arcade | golden hour | counterweights: plates, portcullises, lifts, an iron grate | the Bastion, behind his pavise — the plunge |
+| III | The Aqueduct | sunset | crumbling stone over a ravine | the Caracal, the King's hunting cat — the backstep |
+| IV | The Mirror Tower | dusk | sun mirrors and sun-sealed doors: aim the low sun | the Glassbearer and his burning glass — the parry, sending his bolt home |
+| V | The Sun Well | night, lit by fire | scythes and spike slots on the music's beat | the owl, which takes what is off the stone — the air slash |
+| — | The Eclipse | night | the Vault of the kept sun | the King: four phases, each an earlier foe's lesson, ending on the parry |
+
+and then the dawn.
+
+![The Last Light: each chapter under its card at its hour, the Eclipse, and the dawn](docs/campaign/campaign.png)
+
+Every foe answers every move the prince has -- the sword,
+the plunge, the stomp, the parry, the backstep, the roll, the dive kick, the
+sweep and the thrown sword -- each in its own way, the same in every chapter
+([`docs/campaign.md`](docs/campaign.md), "The bestiary"); every threat is told
+27 frames ahead by a pose, a glint and a sound; and the hour is a grade over
+the whole city, with what you must read lifted out of it. A steady clear of
+the whole campaign takes a little over four minutes of play; a first one with
+deaths, twenty or so.
+
+The chapter select is a place: CONTINUE carries on from the first chapter
+you have not cleared, and each chapter keeps your best time and the most
+relics and secrets you have found in it. Clearing a chapter opens the next;
+jump on the complete screen plays it, under its own card. There is one
+assist, **longer warnings**, under SETTINGS: every foe's tell and every timed
+window that guards a death lasts half as long again.
 
 Every torch you reach on foot is a checkpoint: the flame flares, and a death
 sends you back there rather than to the start. Relics you picked up and guards
@@ -129,9 +156,11 @@ you cut down stay that way; the clock keeps running.
 The city keeps **secret rooms** behind bricked-up doorways. Look for the
 outline of an arch filled in with smaller stones: air moving through its
 joints means you can walk through it; a crack shedding grit means your sword
-can open it, and a cracked floor gives under a plunge. The Sun Terrace hides
-three, the complete screen counts them, and some Endless ruins hide one. None
-is ever the way to the door, and none can trap you.
+can open it, a cracked floor gives under a plunge, and in the Mirror Tower one
+door opens only to the sun. Every chapter hides three, the complete screen
+counts them, and one in each chapter holds the masons' inscription; read in
+order, they are the story. Some Endless ruins hide one too. None is ever the
+way to the door, and none can trap you.
 
 **Endless** is a descent: each ruin you escape leads down into a new one, a
 step harder, from a gentle first ruin up to the generator's hardest. The ruin
@@ -356,8 +385,11 @@ In progress: the duel's open items, listed under *Status* in
 [`docs/duel-match.md`](docs/duel-match.md). The specification and the
 objections to it are in [`docs/duel-spec.md`](docs/duel-spec.md).
 
-Not built yet: more hand-authored levels, enemy AI beyond a patrol route,
-cutscenes.
+The Adventure, *The Last Light*, is built: five chapters, the Eclipse and the
+dawn, each proved reachable and played end to end by a frozen clear run
+(`tests/unit/test_campaign_run.gd`); its bible and open items are in
+[`docs/campaign.md`](docs/campaign.md). Not built: cutscenes, on purpose --
+the story is told by cards, inscriptions, the city and its set pieces.
 
 ## History
 
