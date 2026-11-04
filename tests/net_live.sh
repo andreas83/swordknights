@@ -15,6 +15,9 @@
 #                by the four-letter code the first one printed
 #   3. LOOKLESS  direct again, with a guest that sends no look -- byte for byte
 #                the HELLO this build sends when it has no look to send
+#   4. STRIP     direct again, the host on the Clockwork Well and the guest
+#                starting on the Tug of War: the guest must end up on the
+#                host's strip, and the duel then run on it without a desync
 #
 # In the first two, each peer sends a different chosen look in the handshake,
 # and each must report the other's arriving intact: over a socket, and through
@@ -32,6 +35,7 @@ WORK="$(mktemp -d)"
 RELAY_PORT="${RELAY_PORT:-45678}"
 DIRECT_PORT="${DIRECT_PORT:-45679}"
 OLD_PORT="${OLD_PORT:-45680}"
+STRIP_PORT="${STRIP_PORT:-45681}"
 FRAMES="${FRAMES:-300}"
 # Two looks that are nobody's default, so a fallback cannot pass for arrival.
 HOST_LOOK="figure=heroine,outfit=saffron,accent=pale,hair=gold,skin=copper"
@@ -170,15 +174,29 @@ same old_host look_error "" "which is not an error"
 same old_host got_look "$DEFAULT_LOOK" "and shows the guest as the default"
 
 echo
+echo "=== 4. a host on another strip, direct on 127.0.0.1:$STRIP_PORT ==="
+peer strip_host --mode direct-host --port "$STRIP_PORT" --look "$HOST_LOOK" --strip well &
+HOST_PID=$!
+sleep 3
+peer strip_guest --mode direct-guest --url "ws://127.0.0.1:$STRIP_PORT" \
+  --look "$GUEST_LOOK" --strip tug &
+GUEST_PID=$!
+wait "$HOST_PID" "$GUEST_PID"
+judge strip_host strip_guest
+same strip_host strip "well" "the host fought on its own strip"
+same strip_guest strip "well" "the guest was moved onto the host's strip"
+
+echo
 echo "  relay said:"
 sed -n 's/^/       /p' "$WORK/relay.log" | grep -E "room|peer" | head -8
 
 echo
 if [ "$fail" -eq 0 ]; then
-  echo "PASS  net_live  (two processes: direct, relayed, and a lookless guest)"
+  echo "PASS  net_live  (two processes: direct, relayed, a lookless guest, a strip)"
 else
   echo "FAIL  net_live"
-  for n in direct_host direct_guest room_host room_guest old_host old_guest; do
+  for n in direct_host direct_guest room_host room_guest old_host old_guest \
+      strip_host strip_guest; do
     [ -f "$WORK/$n.log" ] && { echo "--- $n ---"; tail -15 "$WORK/$n.log"; }
   done
 fi

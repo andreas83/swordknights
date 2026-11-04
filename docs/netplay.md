@@ -575,8 +575,10 @@ starts the relay and two independent headless Godot processes and makes them
 duel through real sockets, direct and relayed, then judges what they wrote. It
 is the only check that the transport, the relay, the room codes and the
 handshake work as a system rather than individually. Each peer sends a
-different look and must report the other's arriving intact, and a third round
-seats a guest that sends no look at all.
+different look and must report the other's arriving intact, a third round
+seats a guest that sends no look at all, and a fourth puts the host on the
+Clockwork Well and the guest on the Tug of War: the guest must report the
+host's strip and the duel on it run without a divergence.
 
 The looks' own tests are GUT tests, because nothing in them steps a match:
 `tests/unit/test_net_look_wire.gd` and `tests/unit/test_net_look_session.gd`.

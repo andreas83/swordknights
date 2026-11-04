@@ -21,6 +21,13 @@ extends SceneTree
 ## read the way match_online.gd reads it (`got_look`), so the script can check
 ## a chosen look really crossed the socket and the relay.
 ##
+## `--strip well` puts this peer's match on that strip before it connects. A
+## host plays it; a guest starts on it and switches to whatever the host's
+## WELCOME names, the way match_online.gd's scene does (DuelMatch.set_arena).
+## The report says which strip the match ended up on (`strip`), so the script
+## can check that a guest on the Tug of War was moved onto the host's strip
+## across a real socket.
+##
 ## Runs at real time on purpose: no --fixed-fps. Two processes talking over a
 ## socket have to agree about how fast a second is.
 
@@ -37,6 +44,8 @@ var code_out := ""
 var patience_frames := 1800
 ## The look sent in the handshake, as ids. Empty sends none.
 var look_ids := {}
+## The strip this peer's match starts on.
+var strip_id := DuelStrips.TUG
 
 var _duel: DuelMatch
 var _transport: WsTransport
@@ -96,10 +105,14 @@ func _physics_process(_delta: float) -> bool:
 ## --- setting up -------------------------------------------------------------
 
 func _open() -> void:
-	_duel = Support.spawn_match(root)
+	_duel = Support.spawn_match(root, DuelStrips.open(strip_id))
 	if _duel == null:
 		_finish("the match would not build")
 		return
+	# What the online scene's use_strip() does, without the drawing.
+	_duel.arena_switch = func(id: String) -> bool:
+		var next := DuelStrips.open(id)
+		return next != null and _duel.build(next)
 	_transport = WsTransport.new()
 	_transport.room_assigned.connect(_on_room_assigned)
 
@@ -185,6 +198,7 @@ func _finish(note: String) -> bool:
 		"got_look=%s" % _look_text(
 			CharacterLook.from_ids(_session.remote_look).to_ids() if _session != null else {}),
 		"look_error=%s" % (_session.remote_look_error if _session != null else ""),
+		"strip=%s" % (_duel.strip.id if _duel != null else "none"),
 	])
 	var text := "\n".join(lines)
 	print("[%s] %s" % [mode, note])
@@ -262,6 +276,9 @@ func _parse_args() -> void:
 				i += 2
 			"--look":
 				look_ids = _parse_look(value)
+				i += 2
+			"--strip":
+				strip_id = value
 				i += 2
 			_:
 				i += 1
