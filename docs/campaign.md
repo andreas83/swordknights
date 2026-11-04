@@ -1173,7 +1173,6 @@ pilot clears it in 62.85 s.
 
 | | Planned | Built | Why |
 | --- | --- | --- | --- |
-| the shove | as the Bastion's: no heart | costs a heart | the Shield's only threat; without it phase 1 cannot hurt and the plunge is the only thing in the room |
 | bolts | a 27-frame tell per volley | each bolt its own 27-frame charge, 15 frames of rest before it: 42 apart | every threat told 27 frames ahead; the spacing is unchanged, and under the assist only the charge stretches |
 | a wound in phase 2 | — | puts out what is left of the volley | otherwise one perfect volley ends the phase and the 150/180/210 escalation is never seen |
 | a pounce that lands | skids 40 frames | recovers 33 with no opening; only a miss skids | taking the hit and cutting him in the skid made the backstep optional |
@@ -1183,6 +1182,17 @@ pilot clears it in 62.85 s.
 | a prince on a gallery | — | out of every attack from phase 2 on | a breather that wins nothing |
 | the vault | — | the kept sun draws the room it lights: a plain back wall under the tiles and its light in flat rings | underground, the night sky's city must not show, and the backdrop tile is too busy for a hall |
 | the music in the dark | `AudioDirector.set_intensity(0)` | `PlayerAudio.HUSH`: while the King is in it, the intensity `PlayerAudio` asks for is the bed | `PlayerAudio` sets the intensity every frame, so a one-off call would be overwritten on the next |
+
+**The shove takes no heart, as the Bastion's does not** (decided in the
+campaign's QA pass). It was first built to cost one -- "the Shield's only
+threat; without it phase 1 cannot hurt". It was put back to the plan because
+a phase is its lesson, rules and all: Chapter II teaches that a shove is a
+push, not a blade, and that its danger is the ground behind you, and the
+vault's floor is flat. The bible's four steps say the same from the other
+side: a lesson's first contact cannot hurt, and the Shield is the finale's
+first step, so it costs a pass -- ten seconds -- and the hearts are spent
+from the Burning on. Through Game's shove (`FoeDanger.push`, the Bastion's
+`SHOVE_PUSH` and `SHOVE_STAGGER`), so it grants no grace either.
 
 ### The doves — the city's life
 

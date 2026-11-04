@@ -107,6 +107,23 @@ func test_the_shield_rings_off_a_sword_from_the_front() -> void:
 	_held.bits = 0
 
 
+## The Bastion's lesson, rules and all: his shove throws the prince back
+## across the floor and takes no heart, as a Bastion's does in Chapter II.
+func test_the_shield_s_shove_throws_back_and_takes_no_heart() -> void:
+	await _arena(Eclipse.Phase.SHIELD, 240.0)
+	var shoved := [false]
+	var from := [0.0]
+	await wait_until(func() -> bool: return _king.state == Eclipse.State.SHOVE, 8.0)
+	from[0] = _game.player.position.x
+	for _frame: int in 30:
+		await wait_physics_frames(1)
+		if absf(_game.player.position.x - from[0]) > 16.0:
+			shoved[0] = true
+	assert_true(shoved[0], "standing in front of him, the prince was thrown back")
+	assert_eq(_game.player.health, Tuning.MAX_HEALTH, "and lost no heart: a shove is a push")
+	assert_eq(_game.deaths, 0)
+
+
 func test_the_shield_falls_to_a_plunge_and_its_rebound() -> void:
 	await _arena(Eclipse.Phase.SHIELD, 240.0)
 	# The pilot climbs the west gallery and waits there for his pause.

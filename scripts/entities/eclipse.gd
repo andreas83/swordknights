@@ -17,12 +17,22 @@ extends Foe
 ## | ECLIPSE | the Caracal | a cut while he skids, after a pounce the backstep let by | 2 |
 ## | FINALE | the parry | the whole kept sun, parried back into the disc | 1 |
 ##
-## The escalation is in what each phase adds to the one before: phase 1 has
-## one threat, told by the shove's draw; phase 2 keeps the shove for a prince
-## who stands at his feet and throws bolts at everyone else, each faster
-## volley than the last; phase 3 puts the vault out and comes for you; the
-## finale is one blow, told twice as long as anything else in the game,
-## because it is the only one that is the whole fight at once.
+## The escalation is in what each phase adds to the one before: phase 1 costs
+## only time -- its shove is a Bastion's, a throw back across the floor that
+## takes no heart; phase 2 keeps the shove for a prince who stands at his feet
+## and throws bolts at everyone else, each faster volley than the last;
+## phase 3 puts the vault out and comes for you; the finale is one blow, told
+## twice as long as anything else in the game, because it is the only one
+## that is the whole fight at once.
+##
+## The shove takes no heart because a phase is its lesson, rules and all.
+## Chapter II teaches that a Bastion's shove is a push, not a blade -- "no
+## heart lost"; its danger is the ground behind you -- and the bible's first
+## step of every lesson is that first contact cannot hurt. A King whose
+## Bastion phase shoved for a heart would be teaching a different foe at the
+## exam. The vault's floor is flat, so by the Bastion's own rule the shove
+## costs the pass, not a heart: the Shield is the fight's safe first step,
+## and the hearts are spent from the Burning on.
 ##
 ## ## Fair on a phone
 ##
@@ -127,7 +137,9 @@ const PAUSE_INSET := 8.0
 const PASS_WOUNDS := 2
 
 ## The shove: the Bastion's, lower and heavier. Within a tile in front of him
-## on his floor, he draws it for the telegraph and lunges SHOVE_LUNGE.
+## on his floor, he draws it for the telegraph and lunges SHOVE_LUNGE; it
+## throws the prince back as a Bastion's does (Bastion.SHOVE_PUSH) and takes
+## no heart.
 const ENGAGE_GAP := 16.0
 const SHOVE_LUNGE := 16.0
 const SHOVE_REACH := 12.0
@@ -328,9 +340,13 @@ func is_engaged() -> bool:
 func dangers() -> Array[FoeDanger]:
 	var out: Array[FoeDanger] = []
 	if state == State.SHOVE:
-		# A shove is not a blade: nothing to parry. A backstep slides out of
-		# it, as out of a Bastion's.
-		out.append(FoeDanger.make(shove_rect(), position.x))
+		# A shove is not a blade: nothing to parry, and no heart -- a
+		# Bastion's push and stagger. A backstep slides out of it, as out of
+		# a Bastion's.
+		var shove := FoeDanger.make(shove_rect(), position.x, 0)
+		shove.push = Bastion.SHOVE_PUSH
+		shove.stagger = Bastion.SHOVE_STAGGER
+		out.append(shove)
 	elif _slam_live():
 		# A body coming down, not a blade: the parry is simply hit, as a
 		# cat's pounce goes under a raised guard. The backstep lets it by.
