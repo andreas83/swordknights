@@ -321,6 +321,18 @@ func test_a_cat_breaks_what_it_pushes_off_and_the_run_follows() -> void:
 	assert_false(CrumblingStone.break_under(_game.level, at), "nothing left to break")
 
 
+func test_a_foe_with_weight_breaks_a_slab_at_once() -> void:
+	await _play(SENTRY)
+	var guard: Patrol = null
+	for node: Node in _game.get_node("Entities").get_children():
+		if node is Patrol:
+			guard = node as Patrol
+	guard.position = Vector2(13.0 * 16.0 + 8.0, 6.0 * 16.0)
+	guard.velocity = Vector2.ZERO
+	await wait_physics_frames(3)
+	assert_false(_stone().holds(1), "a guard knocked onto it goes straight through")
+
+
 func test_a_sentinel_treats_crumbling_stone_as_the_end_of_his_beat() -> void:
 	await _play(SENTRY)
 	var guard: Patrol = null

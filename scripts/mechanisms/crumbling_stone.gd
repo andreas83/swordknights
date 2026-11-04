@@ -25,9 +25,10 @@ extends Mechanism
 ##
 ## A Caracal is light enough to walk it without lighting anything, but its
 ## push-off and its landing break a slab outright (break_under()), so a cat
-## that crouches on crumbling stone falls through it. Sentinels -- and any
-## foe that walks a beat -- treat it as the end of the floor (gives_way()).
-## Nothing else lights a fuse.
+## that crouches on crumbling stone falls through it. Any foe with weight
+## that ends up on it -- a Bastion, a guard knocked back onto it -- breaks it
+## at once (Weight). Sentinels, and any foe that walks a beat, treat it as
+## the end of the floor (gives_way()), so they never choose to.
 ##
 ## ## A trap, not a deed
 ##
@@ -120,11 +121,20 @@ func _setup() -> void:
 ## Feet on a whole slab light it. Any part of the feet: a body standing on the
 ## stone beside a slab but overhanging it lights it too, and the slab goes
 ## from under the part of him it held.
+##
+## A foe with weight (Foe.has_weight(): a guard, a Bastion) is too heavy for
+## it at all, and the slab under him goes at once; a cat has none, and walks it.
 func meet(contact: Contact) -> void:
-	if not contact.alive or not contact.grounded:
-		return
 	for index: int in cells.size():
-		if _state[index] == Slab.WHOLE and _feet_on(contact, cells[index]):
+		if not holds(index):
+			continue
+		var box := cell_rect(cells[index])
+		for foe: Foe in Weight.foes(self):
+			if Weight.foe_on(foe, box.position.y, box.position.x, box.end.x):
+				_give_way(index)
+				break
+		if _state[index] == Slab.WHOLE and contact.alive and contact.grounded \
+				and _feet_on(contact, cells[index]):
 			_light(index, fuse_frames())
 
 
