@@ -64,6 +64,13 @@ compose them and smooth the result. That is not a testing affectation: it is
 the only way to argue about "what does the camera do when the character is
 falling and hanging at the same time" without standing in front of a ledge.
 
+The camera smooths on the physics step (`CAMERA2D_PROCESS_PHYSICS`), not the
+display's, because the frame is a rule of play: a foe acts only while the
+camera shows it (`CameraView`), and it reads the frame without the shake or
+the settle (`GameCamera.frame_centre()`). Smoothed per rendered frame, the
+frame -- and with it when a cat first saw the prince -- depended on the
+display's rate (`tests/unit/test_camera_view.gd`).
+
 - **Lead** scales with speed, not with facing: `|velocity.x| / RUN_SPEED`. A
   standstill leads by nothing, so the frame settles on the character instead
   of sitting permanently off to one side. Extending the lead uses

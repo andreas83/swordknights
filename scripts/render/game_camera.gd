@@ -81,6 +81,16 @@ var _shake_offset := Vector2.ZERO
 
 
 func _ready() -> void:
+	# Smoothed on the simulation's clock, not the display's. The frame is a
+	# rule of play -- a foe acts only while the camera shows it (CameraView)
+	# -- so where it is has to be a fact of the physics step. Smoothed per
+	# rendered frame, it was a function of the frame rate: the same input
+	# played on a faster display, or in a test run faster than the wall
+	# clock, put the frame elsewhere, a cat saw the prince a frame sooner,
+	# and a frozen clear run took a scratch it never took at 60 fps
+	# (tests/unit/test_campaign_run.gd found it). Everything the frame
+	# follows moves on the physics step anyway, so the image loses nothing.
+	process_callback = Camera2D.CAMERA2D_PROCESS_PHYSICS
 	position_smoothing_enabled = true
 	position_smoothing_speed = 9.0
 	drag_horizontal_enabled = true
@@ -160,6 +170,14 @@ static func anchor_for(previous: float, foot_y: float, fall_speed: float,
 	if fall_speed > 0.0:
 		return maxf(previous, foot_y - FALL_SLACK)
 	return previous
+
+
+## The centre of the frame as play reads it (CameraView): where the camera
+## holds, without the shake or the settle laid over the image. A shake is
+## random and a settle is a beat of feel; neither may decide whether a foe
+## sees the prince.
+func frame_centre() -> Vector2:
+	return get_screen_center_position() - offset
 
 
 ## --- per frame -------------------------------------------------------------

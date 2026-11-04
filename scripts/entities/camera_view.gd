@@ -11,10 +11,12 @@ extends RefCounted
 ## is off screen: a blade is heard where it is seen.
 ##
 ## The camera never zooms (GameCamera), so the frame is the viewport's size
-## around the camera's screen centre -- shake and settle included, because
-## that is what the player is looking at. With no camera at all (a unit test
-## stepping a foe on its own), everything is in view: the rule is about the
-## screen, and there is none.
+## around where the camera holds (GameCamera.frame_centre()). Not the shaken
+## image: the shake is random, and a foe's decision is the simulation's, so it
+## must come out the same on every run and at every frame rate -- which is
+## also why the camera smooths on the physics step. With no camera at all (a
+## unit test stepping a foe on its own), everything is in view: the rule is
+## about the screen, and there is none.
 
 
 ## The rectangle of the world the current camera shows, or an infinite one
@@ -29,7 +31,10 @@ static func rect_for(node: Node) -> Rect2:
 	if camera == null:
 		return everything()
 	var size := viewport.get_visible_rect().size
-	return Rect2(camera.get_screen_center_position() - size * 0.5, size)
+	var centre := camera.get_screen_center_position()
+	if camera is GameCamera:
+		centre = (camera as GameCamera).frame_centre()
+	return Rect2(centre - size * 0.5, size)
 
 
 ## Whether any part of `rect` is on screen.
