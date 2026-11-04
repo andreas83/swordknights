@@ -63,6 +63,9 @@ func _ready() -> void:
 func place(site: EntitySite) -> void:
 	position = site.at
 	checkpoint = site.checkpoint
+	# At night the fire is the light: a pool of it on the stone around the
+	# torch (FireLight), which goes out with the torch.
+	FireLight.kindle(self, site.level)
 
 
 ## Claimed by reaching it on your feet: grounded, on the torch's own floor --

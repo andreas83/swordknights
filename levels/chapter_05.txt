@@ -1,0 +1,109 @@
+; The Sun Well
+;
+; Chapter V of The Last Light (docs/campaign.md, "V. The Sun Well"). Night.
+; The last light the tower sent down is kept in the Well under the city, and
+; the King has gone down after it. Underground the only light is fire. The
+; Well's machinery keeps time: 72 beats a minute, which at 60 Hz is exactly
+; 50 frames a beat, so every blade here cuts on the beat or the off-beat.
+;
+;! time night
+;! channel 4 beat 0
+;! channel 5 beat 50
+;! checkpoints route
+;
+; Legend (scripts/world/tiles.gd): # solid, : backdrop, H ladder, @ spawn,
+; * relic, t torch, p sentinel, & cracked, % false wall, L inscription,
+; | column, D the Vault's door. 4 and 5 are mason's marks: stone carved
+; with the beat channel of the one blade each touches. z scythe (Scythe),
+; i spike slot (SpikeSlot), Y owl (Owl), [ ] the lift's slab at home and '
+; its travel (Lift).
+;
+; Beat sheet, from the top left down to the bottom right:
+;   1. The night square. The Well's mouth stands open, and on the flags
+;      before it, where the doves pecked by day, an owl, hooting softly.
+;   2. The mouth's ladder. On the rungs you are off the stone and the owl
+;      spreads its wings; you are under the square's floor, out of its
+;      sight, before it stoops, and it folds.     [owl: introduce]
+;   3. The rim gallery. Torch 1. A scythe keeps time in a doorway: a
+;      pendulum parked high, then ratchet, cut, park on the other side. Go
+;      through while the doorway is empty. R1 past it. Secret A by the
+;      ladder.                                     [blades: introduce]
+;   4. Five tiles down, the spike corridor: slots off the beat, slots on
+;      it, a scythe off it. Run the rhythm.        [blades: develop]
+;   5. The sump. Five down, under an owl in a niche in the west wall, the
+;      way you came down. Out by a hop to the shelf and a hang to the rim:
+;      a decisive climber is up before it can stoop, or climb while it pulls
+;      up, or jump and slash it. R2 on a lone stone over the sump, a jump
+;      from the corridor or a grab from the shelf, in the owl's sight. Secret
+;      B in the wall under the owl. Torch 2 on the rim.  [owl: develop]
+;   6. The throat: a ten-second lift ride down twenty-six courses, a
+;      scythe every four from alternate walls on alternate beats. The slab
+;      is two cells wide and each scythe sweeps one half: stand on the other
+;      half, and step across in time -- left, right, left.
+;                                      [blades: twist; SET PIECE]
+;   7. Torch 3, on the landing at the throat's foot, where the ride comes
+;      out through a doorway the hall cannot see into. Secret C in the
+;      floor beside it.
+;   8. The antechamber. A sentinel's hall, a step up from the landing,
+;      under an owl on a column: fight him on your feet, and hop short. Off
+;      the hall's end, three tiles to the scythe's door: there, jump half a
+;      height between the cut and the off-beat, step back, and the owl's
+;      dive reaches into the door as the blade comes through on the beat --
+;      the machine kills it. Then two slots under a second owl watching from
+;      the far wall, which takes anything that jumps: run them on the beat
+;      instead of hopping them.  [owl: twist and master; blades: master]
+;   9. The Vault's door. Beyond it, the Eclipse: the campaign's finale, its
+;      own entry and its own level.
+;
+; Relics: R1 (the rim gallery), R2 (the lone stone over the sump), and one
+; in each secret: five. Par 2:30 for this chapter; the bible's 4:00 is with
+; the Eclipse.
+;
+                              #################################################################
+                              #################################################################
+                              #################################################################
+##                 ############################################################################
+##                 ############################################################################
+::                 ############################################################################
+::                 ############################################################################
+::                 ############################################################################
+::@          Y     ############################################################################
+#################H ############################################################################
+########         H          4        ################                  ########################
+########         H          z        ################                  ########################
+########         H   t      z   *    ################                  ########################
+#############&&###################   ################                  ########################
+###########::::::#################   ################                  ########################
+###########*::L::#############                   5                     ########################
+##############################                   z                     ########################
+##############################         ii   ii   z      *     t        ########################
+#######################################5####4########   #   #########[]########################
+####################################################Y       #########''########################
+#####################################################       #########''########################
+################################################::::%     ###########''########################
+################################################*:::%       ########4z'########################
+#####################################################################z'########################
+#####################################################################''########################
+#####################################################################''########################
+#####################################################################'z5#######################
+#####################################################################'z########################
+#####################################################################''########################
+#####################################################################''########################
+####################################################################4z'########################
+#####################################################################z'########################
+#####################################################################''########################
+#####################################################################''########################
+#####################################################################'z5#######################
+#####################################################################'z########################
+#####################################################################''#         #            #
+#####################################################################''#    Y    #            #
+####################################################################4z'#    |    #            #
+#####################################################################z'#    |    #            #
+#####################################################################''#    |    #            #
+#####################################################################''#    |    #          Y #
+#####################################################################''     |p   4          # #
+#####################################################################'' t#&&##   z            #
+#####################################################################''###:::#   z   ii      D#
+##########################################################################::*########5#########
+###############################################################################################
+###############################################################################################

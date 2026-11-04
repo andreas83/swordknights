@@ -14,9 +14,8 @@ extends GutTest
 ## - it acts only while the camera shows it, and dies to a blade it flies
 ##   through on the beat;
 ## - "off the stone" is one query on Player, and Game hands it to every foe;
-## - a grab and an immediate mantle beat the spread, and folding takes long
-##   enough that a hop and a climb straight after it are over first;
-## - in the real scene, an air slash kills it.
+## - in the real scene, a grab and an immediate mantle beat it even when it
+##   saw the jump, and an air slash kills it.
 
 const GAME_SCENE := "res://scenes/game.tscn"
 const FRAME := 1.0 / 60.0
@@ -339,6 +338,46 @@ func test_a_folding_owl_does_not_spread_again_at_once() -> void:
 	assert_eq(owl.state, Owl.State.FOLD, "off the stone again, but it is still folding")
 	_tick(owl, 4)
 	assert_eq(owl.state, Owl.State.SPREAD, "and spreads once it has folded")
+
+
+## Chapter V's sump, played: from its floor, a hop to the shelf and straight
+## on up to the rim. The hop draws the spread, touching the shelf folds it,
+## and the climb is over inside the fold -- so the owl in the west wall never
+## stoops at a decisive climber.
+func test_in_the_sump_a_decisive_climb_is_never_stooped_at() -> void:
+	var game := (load(GAME_SCENE) as PackedScene).instantiate() as Game
+	game.level_path = "res://levels/chapter_05.txt"
+	add_child_autofree(game)
+	var input := ScriptedInput.new()
+	game.player.input = input
+	await wait_physics_frames(2)
+	game.player.position = Vector2(56.0 * 16.0, 23.0 * 16.0)
+	game.camera.setup(game.player, game.level.world_size())
+	var owl: Owl = null
+	for node: Node in game.get_node("Entities").get_children():
+		if node is Owl and absf((node as Owl).perch.x - 52.5 * 16.0) < 8.0:
+			owl = node as Owl
+	assert_not_null(owl, "the sump's owl, in its niche")
+	var program: Array[int] = []
+	for step: Array in [[40, 0], [10, PlayerInput.BIT_RIGHT],
+			[18, PlayerInput.BIT_RIGHT | PlayerInput.BIT_JUMP], [6, PlayerInput.BIT_RIGHT],
+			[24, PlayerInput.BIT_RIGHT | PlayerInput.BIT_JUMP], [30, PlayerInput.BIT_UP],
+			[40, 0]]:
+		for _frame: int in int(step[0]):
+			program.append(int(step[1]))
+	var seen := {}
+	var driver := Driver.new()
+	driver.think = func(frame: int) -> void:
+		input.bits = program[mini(frame, program.size()) - 1]
+		if frame > 40:
+			seen[owl.state] = true
+	add_child_autofree(driver)
+	await wait_physics_frames(program.size() + 4)
+	assert_true(seen.has(Owl.State.SPREAD), "it saw him off the stone")
+	assert_true(seen.has(Owl.State.FOLD), "and folded")
+	assert_false(seen.has(Owl.State.STOOP), "and never stooped")
+	assert_almost_eq(game.player.position.y, 18.0 * 16.0, 0.5, "he is up on the rim")
+	assert_eq(game.player.health, Tuning.MAX_HEALTH, "untouched")
 
 
 ## The stoop met by the move it is for: the prince jumps into it and slashes,

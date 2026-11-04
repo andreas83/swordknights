@@ -92,6 +92,16 @@ presentation, as built"). Its tone is taken from the band behind its crown —
 a step toward ink while that band has light in it, a step up out of the ink
 once it has none — because any fixed tone matches some hour's sky exactly.
 
+**At night the fire is the light.** Every torch in a night level kindles a
+`FireLight` (`scripts/render/fire_light.gd`): two flat discs of `LIGHT_WARM`
+and `MID`, added onto the stone and backdrop cells within reach and cut to
+them, so the masonry round the flame is lit with a hard edge and the air is
+not -- no halo, no glow, nothing the art direction forbids. Its radii step with
+the flame's own 12 fps clock. It is drawn on the terrain and under everything
+that moves, and the grade does not take it down: in the Sun Well a ledge in a
+torch's pool is a warm line against the dark, which is how a night level reads
+its floors.
+
 `tools/screenshot.gd --level <file> --time <stop>` plays any level at any hour
 without editing it, which is how a chapter is judged at its stop:
 
@@ -99,6 +109,11 @@ without editing it, which is how a chapter is judged at its stop:
 xvfb-run -a godot --path . --rendering-driver opengl3 --script tools/screenshot.gd -- \
   --level res://levels/level_01.txt --time dusk --out /tmp/dusk --shots 3,5.5 --hold move_right
 ```
+
+`--at col,row` starts the prince in a cell instead of at the spawn, with the
+camera on him, so a beat deep in a long level is looked at without playing up
+to it; `--resolution 1280x720` is a 320-unit screen and `1760x720` a 440-unit
+one.
 
 ## The dawn: one frame lit from the east
 
@@ -487,7 +502,7 @@ only the header prefix differs, so converting a draft is one substitution,
 | `; @channel 2 hold 4.0` | `;! channel 2 hold 4.0` |
 | `; @channel 4 beat 0` | `;! channel 4 beat 0` (the drafts' 50-frame beats are the default 100-frame period's halves) |
 | digits `1`–`9` beside a mechanism | the same: mason's marks |
-| `o ! [ ] ' , x O Q z i` | the same, once registered in `Tiles.MECHANISM_LEGEND` (`o` with `MECHANISM_TERRAIN` solid) |
+| `o ! [ ] ' , x O Q z i` | the same, once registered in `Tiles.MECHANISM_LEGEND` (`o` with `MECHANISM_TERRAIN` solid); `[ ] '` (Lift), `z` (Scythe) and `i` (SpikeSlot) are |
 | `w j g Y E` | the same, in `Tiles.ENTITY_LEGEND` and `EntityRegistry.kinds()` |
 
 `;!` rather than `; @`, because a directive must never be mistaken for prose:

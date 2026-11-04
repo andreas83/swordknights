@@ -33,6 +33,9 @@ const AUTHORED := {
 	"The Mirror Tower": [
 		["NO KING", "KEEPS IT"],
 	],
+	"The Sun Well": [
+		["THE SUN", "REMEMBERS"],
+	],
 }
 
 ## Two lines of at most nine letters. The smallest cut sets about seven units

@@ -643,7 +643,9 @@ runs blind through the real scene under the death watch: as the game ships,
 ### V. The Sun Well — night
 
 [`chapter_05.txt`](campaign/drafts/chapter_05.txt) · 115 × 64 ·
-[stand-in](campaign/drafts/chapter_05_static.txt)
+[stand-in](campaign/drafts/chapter_05_static.txt) · **built:**
+[`levels/chapter_05.txt`](../levels/chapter_05.txt), 95 × 48, to the Vault's
+door (*As built*, below)
 
 **The place.** The Well under the city: a night square with the mouth open in
 it, then the Well's machinery — galleries, a spike corridor, a sump, the
@@ -707,6 +709,36 @@ galleries, for the fight; one in each secret.
 
 **Expert line, about 1:45 with the Eclipse:** run every rhythm without
 stopping, never hop a slot, and plunge the Eclipse twice per pass.
+
+#### As built
+
+The chapter is `levels/chapter_05.txt`, 95 × 48, and it ends at the Vault's
+door. The Vault and the Eclipse are the campaign's finale entry, built as a
+level of their own (`Campaign`, "A finale is an entry"), so torch 4 and the
+two gallery hearts belong to that level, not this one: this chapter has three
+torches and five relics. **Par for the chapter alone is 2:15**; the bible's
+4:00 is with the Eclipse. A scripted clear with no warps, no kills and no
+death runs it in **34.8 s**, with LONGER WARNINGS off and on
+(`tests/unit/test_sun_well.gd`).
+
+Building it in the engine turned up flaws the draft's stand-in could not
+show, because the stand-in has no owl, no blade and no clock. Each was fixed
+in the level, and each is now a rule (*Rules learned while drafting*):
+
+| Draft | Built | Why |
+| --- | --- | --- |
+| the square's owl on a cornice over the mouth, 9–10 tiles from it | on the flags before the mouth, where the doves pecked; the square six columns wider, the spawn out of its reach | eight tiles is its reach, and on a cornice it was out of it and above the top of the frame; and a perch sees past its own stone only at a shallow angle, so from the floor the mouth's lip hides everything under the square -- the spread folds whether he drops or climbs down |
+| floor on the far side of the mouth | a sheer wall | a runner dropping into the mouth caught the far floor's lip and hung there in the owl's face: the first contact hurt |
+| the sump's owl on a slab over the shelf | in a niche in the sump's west wall, the way you came down, a stone above secret B's false wall | from straight above, its own slab hid the climb; from the west it sees the hop and the hang across open air. Touching the seal, the niche was flooded into the secret room and the owl was blind |
+| R2 on the corridor's last stone | on a lone stone over the sump: a jump from the corridor or a grab from the shelf, in the owl's sight | on the way down, R2 was not a harder route |
+| the sump one column wider | a column narrower | the hang was a pixel outside the niche owl's eight tiles |
+| the antechamber open to the throat, the sentinel's floor running to the lift | the throat's wall comes down to a doorway at its foot; the sentinel's hall a step up from the landing, ending three tiles short of the scythe's door | the first owl stooped at the lift's rider (the ride is the chapter's breather), the sentinel stood raised at the lift's far stop, and the hall's end dropped the runner onto the scythe's lintel, which stopped him dead and off the beat |
+| the first owl over the hall on a slab | on a column in the hall, where its dive at a jump by the door runs into the door | the twist: draw its stoop through the cut on the beat. A half-height jump at the door's lip anywhere from frame 26 to 47 of the beat, and a step back, does it -- a 21-frame window, measured. In testing the machine also cut it out of the air when it chased the rider down the throat, before that was closed off |
+
+The throat is the real lift (`scripts/mechanisms/lift.gd`): twenty-six
+courses, a scythe every four from alternate walls on alternate beats. Ridden
+from frame 0 of any beat, the cuts that reach the rider from opposite walls
+are never closer than 41 frames apart (`BeatProof`, *the ride*).
 
 ---
 
@@ -988,9 +1020,33 @@ exposed; a roof is cover; a scythe's cut kills it if its stoop crosses one on
 the beat. **With the sentinel:** fighting a sentinel on the ground is safe —
 until you hop to slash him.
 
-**Audio:** a soft two-note `hoot` (to be built) while it watches, louder on
+**Audio:** a soft two-note `hoot` while it watches, louder on
 the spread under `cloth` 0.9; the stoop's rush (`jump` 0.7, −8 dB); a hit
 (`guard_hit` 1.6).
+
+**As built** (`scripts/entities/owl.gd`, `owl_art.gd`; the pose sheet is
+[`docs/owl-poses.png`](owl-poses.png)). Four rules the bible did not have,
+each found by playing it:
+
+- **Folding takes half a second** (`Owl.FOLD_TIME`), and it does not spread
+  again until it has. That is what makes "a decisive climber is on the stone
+  before it can stoop" true where the owl sees the jump as well as the hang:
+  a hop to a shelf draws the spread, touching the shelf folds it, and the
+  climb from the shelf is over before the owl is ready again. A climber who
+  stops on the shelf is fair game.
+- **It sees past its own perch only at a shallow angle.** An owl on a beam or
+  a cornice cannot see what is under it; its stone is in the way. Perch it on
+  a column (decoration, which hides nothing), in a niche, or on the floor.
+- **It acts only while the camera shows it** (`CameraView`), so a perch more
+  than about five tiles above the prince's floor is above the frame, and the
+  owl on it does nothing.
+- **Off the stone is decided by the feet** (`Owl.off_the_stone()`), not
+  by the state's name: on the frame he lands he is still FALL, and he is on
+  the stone. Game hands it to every foe as `Foe.target_off_stone`.
+
+The air slash kills it, as do a ground swing as it pulls up past, a plunge or
+a stomp onto it, and any blade's cut it flies through on the beat
+(`BeatBlade.GROUP`).
 
 ### The Eclipse — the boss (Chapter V)
 
@@ -1437,14 +1493,41 @@ their tell as a pose (drawn back, rattling) and a sound, never as a colour
 change alone.
 
 **Audio:** the ratchet (`ladder` 1.8, −8 dB, three times); the cut (`sword`
-0.9); the slots (`masonry` 2.0 under `sword_hit` 1.6, −10 dB).
+0.9); the slots (`masonry` 2.0 under `sword_hit` 1.6, −10 dB). Under them,
+while any blade is on screen, the Well's **escapement** knocks once on every
+beat (`ladder` 0.75, −15 dB, unvaried): the machine keeping time, in the
+ratchet's own timbre a fifth down, so a player has the pulse to run a rhythm
+to before the first ratchet ticks. It is one knock however many blades are in
+view.
+
+**As built** (`scripts/mechanisms/beat_blade.gd`, `scythe.gd`,
+`spike_slot.gd`). A scythe hung from a lintel is a pendulum that **parks high
+on alternate sides** -- tick, tock -- not one that hangs in the doorway at
+rest: hung straight down it was at the height of a runner's knees, and he
+walked through a blade that did not hurt, which is danger with two looks. An
+empty doorway is the way through. A wall scythe lives in a slot in the stone
+and comes out of it only for its tell and its cut. The first cut on a beat's
+clock waits for a whole tell, since the clock restarts at every respawn. With
+LONGER WARNINGS on, the tell widens to 41 frames into the rest; the cut, the
+beat and the opening keep their places, which the assist promises.
 
 **Reachability.** Blades are timing hazards, which the proof leaves out
 exactly as it leaves out a sentinel's cut — the stand-ins draw them as empty.
-Each beat channel needs its own check instead (to be built): every blade's
-start-across window at a run must be at least the parry's 12 frames, and in a
-run of blades the gap between consecutive cuts must cover the run between
-them with the same 25% slack the races get.
+Each blade files its timing through its reach hook (`ReachModel.note()`) for
+its own check, `BeatProof` (`scripts/mechanisms/beat_proof.gd`):
+
+- every blade fits its period, its tell widened by the assist included;
+- every blade's start-across window at a run (or a ladder's speed) is at
+  least the parry's 12 frames -- the proof measures a scythe's 74 and two
+  slots' 42 from the bodies' own widths;
+- blades within six tiles on one floor are one run, and run straight through
+  without stopping, the moments to set off from span at least a quarter of
+  the period, either way: the races' 25% slack, as a window;
+- blades in a lift's shaft are a **ride**: each sweeps only part of the slab,
+  its tell covers the step across with that slack, and for every moment the
+  lift could set off, cuts that reach the rider from opposite walls come at
+  least 20 frames apart -- no two threats needing different answers inside
+  20 frames. The throat's least gap is 41.
 
 ---
 
@@ -1503,6 +1586,20 @@ Each of these was a failure in a draft before it was a rule.
   had that bug.
 - **Torches must approach the door in x.** Every draft is laid out so they do
   (below).
+
+Building Chapter V in the engine added these (its *As built*):
+
+- **A hole the prince should drop through has no lip on its far side.** At a
+  run he crosses it falling with his hands out, and catches the far floor.
+- **An owl's perch is a column, a niche or the floor**, never a slab over
+  what it must watch: it sees past its own stone only at a shallow angle.
+- **Nothing that is an entity may touch a seal.** A torch beside a cracked
+  floor, or an owl's niche beside a false wall, is flooded into the secret
+  room it guards.
+- **A drop leaves runway before a blade's door.** Dropped onto the door's
+  lintel, the runner stops dead and arrives off the beat.
+- **No foe's beat reaches a lift's stop**, and no owl sees a ride: the
+  rider cannot leave, so a threat there is not a choice.
 
 ### Checkpoints in tall chapters
 
@@ -1649,11 +1746,11 @@ thing they guard broken (`CLAUDE.md`).
    the parry's 30 px of approach, the backstep failing, no aim in shade, and a
    mirror redirecting a bolt into a seal.
 10. **Blades on the beat.** Beat channels, scythes, slots, and the window
-    check. *Done when* `tests/unit/test_blades.gd` (to be built) shows a blade
+    check. *Done when* `tests/unit/test_blades.gd` (built) shows a blade
     cuts on physics frame 100 k + its phase whatever the display's frame
     rate, and refuses a window under 12 frames.
 11. **The owl.** "Off the stone" as one query on `Player`. *Done when*
-    `tests/unit/test_owl.gd` (to be built) shows it folds for a prince back on
+    `tests/unit/test_owl.gd` (built) shows it folds for a prince back on
     the stone, cannot catch a grab-and-mantle, and dies to an air slash.
 12. **The Eclipse.** The arena, the four parts, the runtime eclipse grade,
     and phases kept through deaths. *Built* (above, "As built"). *Done when*

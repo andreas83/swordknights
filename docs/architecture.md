@@ -323,10 +323,25 @@ Three rules:
    every bit the checkpoint proof keeps is a latch -- it leans on that; a mechanism that needs
    another (a race against a hold) changes `ReachSearch` as well.
 
-The framework ships with no real mechanism, only the toys that prove it — a
-stone plate and a portcullis on one mason's mark, in
-`tests/unit/test_mechanisms.gd` (in play) and
+The framework ships with toys that prove it — a stone plate and a portcullis
+on one mason's mark, in `tests/unit/test_mechanisms.gd` (in play) and
 `tests/unit/test_reach_mechanisms.gd` (in the proof). Copy their shape.
+
+**A mechanism the search cannot see still owes a proof.** A blade on a beat
+(`scripts/mechanisms/beat_blade.gd`) is air between its cuts, and the search
+has no clock, so its reach hook changes no cell: it files its timing with
+`model.note(&"beat", …)`, and `BeatProof` reads `model.notes(&"beat")` to
+prove every crossing's window and slack -- found through the same hooks, from
+the same marks, as the search finds its gates. Notes leave the model empty,
+so a level that only files notes keeps the plain search. A hook that must
+read the cells round its mark (a scythe cut into a ladder shaft is still a
+ladder) has the level as `model.level`.
+
+**A foe or a trap asks what the camera shows** through `CameraView`
+(`scripts/entities/camera_view.gd`), and a foe that hunts what is not
+standing reads `target_off_stone`, which Game writes beside `target_rect`
+from `Owl.off_the_stone()` -- the owl (`scripts/entities/owl.gd`) is
+both.
 
 ### Adding a chapter
 
