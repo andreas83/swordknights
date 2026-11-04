@@ -117,14 +117,14 @@ tone at least 15 from every surface, `BLOOD`'s chroma 0.02 above the stone's
 most, 12° of hue from the crimson stone, and the glint 15 from `SHADOW` and
 `SHADOW_DEEP`, which is where `BLOOD` is weakest.
 
-**The hour does not dim it.** The stone is drawn by an unshaded shader, so
-neither the duel's dusk nor a chapter's hour reaches it. Blood drawn on the
-canvas did get the multiply, so it went dark exactly where the light was
-going: on the last rooms of the duel and in the night chapters. It is now lit
-like the stone it lies on: the duel's field joins `MatchDusk.LIT`, and the
-adventure's takes its hour's multiply back off each frame (but not the
-Eclipse's dimming, which reaches the stone too, so blood does not glow in
-the dark).
+**Lit like the stone it lies on.** The stone is drawn by an unshaded shader,
+which no canvas multiply reaches. In the duel the dusk never touches it, so
+the duel's field joins `MatchDusk.LIT` and a kill in the last room is as red
+as one at noon. In the adventure the chapter's hour is laid on the stone by
+hand, through the shader's tint (`WorldGrade`), so blood on the canvas takes
+the same multiply as the stone under it and needs nothing of its own: graded
+alike, the better of its two tones still stands off every stone at every hour,
+scaled by the light the hour leaves (`tests/unit/test_blood_ramp.gd`).
 
 **Not cartoonish.** The rest of the art direction still holds: opaque, hard
 edged, one to three pixels, on the grid. The glint is a single pixel and is

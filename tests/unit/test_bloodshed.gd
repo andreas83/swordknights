@@ -226,9 +226,11 @@ func test_a_kill_leaves_a_pool_and_so_does_the_princes_death() -> void:
 		"his death throws more than a wound and fewer than a kill")
 
 
-## The tiles take no hour (their shader is unshaded), so the blood on them must
-## not either: the hour's multiply, times the blood's own modulate, is white.
-## Seen to fail: with _grade_like_the_stone() not called, this is the night.
+## Blood takes the stone's light: the hour's multiply lands on the blood
+## through the canvas and on the stone through the world shader's tint, and
+## they are the same colour -- the blood neither lifted above its floor nor
+## darkened twice. Seen to fail with the old correction that took the hour
+## back off the blood, which left it an hour brighter than its stone.
 func test_the_blood_takes_the_stones_light_at_night() -> void:
 	var data := AsciiLevel.new()
 	data.parse(FLOOR + "\n;! time night\n")
@@ -240,10 +242,12 @@ func test_the_blood_takes_the_stones_light_at_night() -> void:
 	assert_not_null(grade, "a night level is graded")
 	if grade == null:
 		return
-	var seen := _game.blood.modulate * grade.color
-	assert_almost_eq(seen.r, 1.0, 0.001, "red as the stone")
-	assert_almost_eq(seen.g, 1.0, 0.001, "green as the stone")
-	assert_almost_eq(seen.b, 1.0, 0.001, "blue as the stone")
+	var on_blood := _game.blood.modulate * grade.color
+	var material := _game.level.tilemap.material as ShaderMaterial
+	var on_stone: Color = material.get_shader_parameter(&"tint")
+	assert_true(on_blood.is_equal_approx(on_stone),
+		"the blood's light %s is the stone's %s" % [on_blood, on_stone])
+	assert_true(on_stone.is_equal_approx(TimeOfDay.NIGHT), "and that is the night's")
 
 
 func test_a_checkpoint_respawn_keeps_the_blood_and_a_restart_clears_it() -> void:

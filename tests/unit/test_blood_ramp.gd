@@ -195,6 +195,32 @@ func test_every_surface_is_far_from_one_of_the_two_tones() -> void:
 		% [worst_name, worst])
 
 
+## In a level the hour lands on the blood and on the stone alike (WorldGrade:
+## the canvas multiply on the one, the world shader's tint on the other), so
+## what the eye compares at each hour is the blood graded beside the stone
+## graded. The two-tone rule holds there too, hour by hour, scaled by the
+## light the hour leaves: a contrast is seen in the light there is.
+func test_graded_alike_the_blood_still_stands_off_the_stone() -> void:
+	var hours := {"dusk": MatchDusk.DUSK, "night": TimeOfDay.NIGHT}
+	for stop: String in ["golden", "sunset"]:
+		var level := AsciiLevel.new()
+		level.parse("; t\n;! time %s\n#\n" % stop)
+		hours[stop] = TimeOfDay.grade_of(level)["world"]
+	for hour: String in hours:
+		var k: Color = hours[hour]
+		var worst := INF
+		var worst_name := ""
+		for name: String in _stone():
+			var tone: Color = _stone()[name] * k
+			var best := maxf(_de(Palette.BLOOD * k, tone), _de(Palette.BLOOD_DRIED * k, tone))
+			if best < worst:
+				worst = best
+				worst_name = name
+		gut.p("%s: the nearest graded stone, %s, is %.1f off" % [hour, worst_name, worst])
+		assert_gte(worst, TWO_TONE_MIN * clampf(k.get_luminance(), 0.0, 1.0),
+			"%s: %s graded is %.1f from the blood graded" % [hour, worst_name, worst])
+
+
 func test_blood_is_set_apart_by_chroma_and_hue() -> void:
 	var most := 0.0
 	for tone: Color in _stone().values():

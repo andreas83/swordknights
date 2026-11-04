@@ -482,8 +482,9 @@ fifth accent: blood") — opaque, one to three pixels, snapped to the grid every
 frame. No glow, no alpha, no fade. Every mark is two tones, because the fresh
 red is weakest on the mid crimson and the dried tone on the darkest stone,
 and each is strong where the other is weak. It is graded like the stone: a
-chapter's hour, which the stone's shader never takes, is taken back off the
-blood, so a kill at sunset or at night is as red as one in the afternoon.
+chapter's hour lands on the blood through the canvas and on the stone through
+the world shader's tint, the same multiply, so a kill at night is as dark as
+the stone it lies on and no darker.
 
 **Phones.** At most 64 drops in the air, 240 stains and 48 pools in a level,
 in fixed arrays drawn as rects in one pass; past a cap the oldest goes. The

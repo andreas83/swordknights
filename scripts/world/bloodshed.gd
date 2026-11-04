@@ -46,15 +46,16 @@ extends Node2D
 ##
 ## ## Lit like the stone it lies on
 ##
-## The tiles are drawn by an unshaded shader, so a level's hour (WorldGrade)
-## never lands on the stone -- but it lands on everything else on the canvas,
-## and blood under the sunset or night multiply went out against the stone it
-## was spilled on. Each frame the hour's multiply is taken back off this node,
-## so blood is graded exactly as the stone is: not at all by the hour, and by
-## the same factor as the stone when the world is put out (WorldGrade.dim). It
-## does not join MatchDusk.LIT, because the lit group is lifted out of that
-## dim too, and blood glowing in the Eclipse's dark would be a light source.
-##
+## Blood is graded exactly as the stone under it, by doing nothing: it is on
+## the world's canvas, so the hour's multiply (WorldGrade) and the King's dim
+## both land on it, and WorldGrade lays the same multiply on the stone through
+## the world shader's tint. It was once undone here each frame, while the
+## unshaded stone took no hour and blood under the sunset or night multiply
+## went out against the stone it was spilled on; with the stone graded, that
+## correction would have lifted the blood a whole hour above its floor. It
+## does not join MatchDusk.LIT, because the lit group is lifted out of the
+## grade, and blood glowing at night would be a light source.
+
 ## ## Capped for phones
 ##
 ## Drops live in one fixed PackedFloat32Array, like PlayerFx's dust: nothing
@@ -299,10 +300,6 @@ func stain_colours() -> Array[Color]:
 
 ## --- per-frame ----------------------------------------------------------------
 
-func _process(_delta: float) -> void:
-	_grade_like_the_stone()
-
-
 func _physics_process(delta: float) -> void:
 	if Flow.is_hitstopped() or (_frozen.is_valid() and bool(_frozen.call())):
 		return
@@ -317,15 +314,6 @@ func _physics_process(delta: float) -> void:
 		_step_drop(at, delta)
 	if moved:
 		queue_redraw()
-
-
-## The hour's multiply taken back off: the canvas multiply is the hour times
-## the dim, and this leaves only the dim, which is what the stone gets
-## through the world shader's tint. See "Lit like the stone it lies on".
-func _grade_like_the_stone() -> void:
-	var grade := get_tree().get_first_node_in_group(WorldGrade.GROUP) as WorldGrade
-	var hour: Color = Color.WHITE if grade == null else grade.grade.get("world", Color.WHITE)
-	modulate = Color.WHITE / hour
 
 
 func _step_drop(at: int, delta: float) -> void:
