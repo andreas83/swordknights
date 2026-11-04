@@ -529,6 +529,18 @@ body, which the prince and the foes ride as they stand on terrain. To the
 proof an unwired lift is a ladder between its stops with the lower slab as
 floor; a wired one is floor at whichever stop its wire puts it.
 
+### Hatches
+
+`h` is an iron grate set in a floor (`scripts/mechanisms/hatch.gd`): a
+one-way floor in the grid (`MECHANISM_TERRAIN`), so it collides, grabs and is
+proved exactly as `=` is, drawn as ink bars under a sunlit frame instead of
+stone. It is walked on, dropped through with down + JUMP, and plunged
+through with down + SWORD -- which on any one-way floor is the plunge through
+it (`Player._plunge_through()`). The sun falls through it down the sun's own
+lane, two across for one down, to the first stone below: a hard-edged band,
+a lit patch, a few motes, drawn over whatever stands in it, so a level puts
+what the hatch is for where the light lands.
+
 ### Plates and gates
 
 `o` is a pressure plate: one of the floor's own stones (`MECHANISM_TERRAIN`

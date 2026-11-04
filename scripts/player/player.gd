@@ -436,6 +436,9 @@ func _start_sword(delta: float, want_x: int, walking: bool, grounded: bool) -> b
 		if _reads_backstep(want_x):
 			_start_backstep(delta)
 			return true
+		if input.down and _on_one_way_floor():
+			_plunge_through()
+			return true
 		_enter(State.ATTACK)
 		attacked.emit()
 		return true
@@ -451,6 +454,38 @@ func _start_sword(delta: float, want_x: int, walking: bool, grounded: bool) -> b
 		_steer(delta, want_x, walking, false)
 	attacked.emit()
 	return true
+
+
+## Down + SWORD on a one-way floor: through it, point first. The plunge is
+## the move that beats what is under a floor -- a Bastion under a hatch --
+## and asking a thumb for down + JUMP and then down + SWORD inside a two-tile
+## fall made it a move nobody found (docs/campaign.md, Chapter II, "As
+## built"). On stone, down + SWORD is the swing it always was; down + JUMP is
+## still the plain drop.
+func _plunge_through() -> void:
+	_drop_through = 0.25
+	_jump_buffer = 0.0
+	_coyote = 0.0
+	velocity = Vector2(0.0, Tuning.MAX_FALL_SPEED)
+	_enter(State.PLUNGE)
+	attacked.emit()
+
+
+## Every cell under the feet is a one-way floor: none of it stone, so there
+## is something to plunge through.
+func _on_one_way_floor() -> bool:
+	if level == null:
+		return false
+	var half := Tuning.BODY_WIDTH * 0.5
+	var row := floori((position.y + 1.0) / TILE)
+	var found := false
+	for column: int in range(floori((position.x - half) / TILE),
+			floori((position.x + half - 0.001) / TILE) + 1):
+		var kind := level.kind_at_cell(Vector2i(column, row))
+		if kind == Tiles.Kind.SOLID:
+			return false
+		found = found or kind == Tiles.Kind.PLATFORM
+	return found
 
 
 ## Whether this press of SWORD, on the ground, is a backstep: the stick held

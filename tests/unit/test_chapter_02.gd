@@ -34,7 +34,7 @@ const D := PlayerInput.BIT_DOWN
 const J := PlayerInput.BIT_JUMP
 const A := PlayerInput.BIT_ATTACK
 ## The clear run, authored by a controller that watched the game and then
-## frozen: 86 steps, 2041 physics frames. Step one applies on the first frame
+## frozen: 71 steps, 2001 physics frames. Step one applies on the first frame
 ## the level plays.
 const CLEAR_RUN := [
 	[112, R], [1, 0], [13, R | J], [32, R], [163, 0], [20, R], [240, 0], [1, A], [1, 0],
@@ -42,11 +42,9 @@ const CLEAR_RUN := [
 	[1, 0], [1, A], [1, 0], [1, A], [1, 0], [1, A], [69, R], [20, R | J], [26, R], [1, D | A],
 	[2, D], [10, R | J], [6, J], [1, D], [1, D | A], [3, D], [34, 0], [186, R], [1, R | J],
 	[20, R], [4, U], [122, R], [1, 0], [72, R], [1, R | J], [142, R], [1, 0], [20, R | J],
-	[4, U], [18, R], [1, 0], [72, R], [10, 0], [19, L], [1, 0], [1, D], [1, D | J], [1, D],
-	[1, D | A], [3, D], [1, D | A], [1, D], [1, D | A], [1, D], [1, D | A], [1, D], [1, D | A],
-	[1, D], [8, 0], [4, U], [19, 0], [9, R], [12, 0], [2, D], [1, D | J], [1, D], [15, 0],
-	[180, R], [20, R | J], [59, R], [20, R | J], [36, R], [20, R | J], [14, R], [16, R | J],
-	[74, R],
+	[8, R], [4, U], [18, R], [1, 0], [81, R], [1, 0], [1, D], [1, D | A], [14, D], [12, 0],
+	[1, D], [1, D | A], [2, D], [35, 0], [171, R], [20, R | J], [59, R], [20, R | J], [37, R],
+	[20, R | J], [14, R], [16, R | J], [73, R],
 ]
 
 
@@ -125,6 +123,36 @@ func test_every_race_beats_its_hold_with_a_quarter_to_spare() -> void:
 		assert_eq(hold, float(bible[1]), "race %s holds as the bible says" % wire)
 		wires[wire] = true
 	assert_eq(wires.size(), BIBLE.size(), "all six races were measured")
+
+
+## The corridor's answer is in the level, not in the player's head: an iron
+## grate in its roof right over the Bastion's post, three wide with him
+## under the middle so that a plunge through it lands on his helm and no
+## stone rim is in reach of a prince bouncing off it -- and a grate seen
+## first over a harmless drop, the balcony's, where the street runs under it.
+func test_the_corridor_is_answered_by_a_grate_taught_before_it() -> void:
+	var level := _level()
+	var grates: Array[Dictionary] = []
+	var corridor_bastion := Vector2i(-1, -1)
+	for mark: Dictionary in level.entities:
+		if String(mark["kind"]) == "hatch":
+			grates.append(mark)
+		if String(mark["kind"]) == "bastion" and (mark["cell"] as Vector2i).x in range(78, 95):
+			corridor_bastion = mark["cell"]
+	assert_eq(grates.size(), 2, "two grates: the balcony's and the corridor's")
+	if grates.size() != 2:
+		return
+	var first: Array[Vector2i] = Mechanism.mark_cells(grates[0])
+	var corridor: Array[Vector2i] = Mechanism.mark_cells(grates[1])
+	assert_lt(first[0].x, corridor[0].x, "the balcony's grate comes first")
+	assert_eq(level.kind_at(first[0].x, first[0].y), Tiles.Kind.PLATFORM, "a one-way floor")
+	assert_eq(corridor.size(), 3, "the corridor's is three wide")
+	assert_eq(corridor[1].x, corridor_bastion.x, "with the Bastion under its middle")
+	assert_eq(corridor_bastion.y - corridor[0].y, 2, "two courses below it")
+	assert_eq(level.kind_at(corridor[0].x - 1, corridor[0].y), Tiles.Kind.SOLID,
+		"set flush in a roof of stone, not a notch you sink into")
+	assert_eq(level.kind_at(corridor[0].x, corridor[0].y - 1), Tiles.Kind.EMPTY,
+		"and walked on like the roof either side of it")
 
 
 ## --- played -----------------------------------------------------------------------------

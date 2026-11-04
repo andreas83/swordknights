@@ -103,6 +103,7 @@ const MECHANISM_LEGEND := {
 	"o": "plate", ## a pressure plate: a floor stone (scripts/mechanisms/plate.gd)
 	"!": "gate", ## a portcullis, hung from a lintel (scripts/mechanisms/gate.gd)
 	",": "crumbling", ## scripts/mechanisms/crumbling_stone.gd
+	"h": "hatch", ## an iron grate in a floor: a one-way floor, drawn as iron (hatch.gd)
 }
 ## The terrain a mechanism glyph's cell is in the grid. Only for something
 ## that IS terrain and stays it, like a plate, which is a floor stone: the
@@ -111,6 +112,7 @@ const MECHANISM_LEGEND := {
 ## own collision (Mechanism.set_kind()).
 const MECHANISM_TERRAIN := {
 	"o": Kind.SOLID, ## a plate is the floor's own stone, and stays it
+	"h": Kind.PLATFORM, ## a hatch is a one-way floor, and stays one
 }
 ## Mason's marks: stone carved with a channel number. A mark wires the one
 ## mechanism it touches, up, down, left or right -- same mark, same channel --

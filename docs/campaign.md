@@ -299,7 +299,7 @@ hanging beside every gate is its clock.
 | --- | --- | --- |
 | introduce | the courtyard (x 29) | posted under the rampart's lip, where jumping off puts you above him; a shove here only puts you against a wall |
 | develop | the weighed gate (x 65) | leap him, or plunge him and race |
-| twist | the corridor (x 84) | two tiles high: no leap, no height to plunge from — so go up onto the roof and drop through the hatch onto him |
+| twist | the corridor (x 85) | two tiles high: no leap, no height to plunge from — the sun falls through an iron grate in the roof onto his helm, so go up onto the roof and plunge through the grate (down + SWORD) onto him |
 | master | the arcade's last bay (x 115) | a Bastion in the middle of a race |
 
 **Beat sheet** (12 beats; the draft's header has them in full):
@@ -312,7 +312,7 @@ hanging beside every gate is its clock.
 6. Torch 1.
 7. The balcony — optional: a grab onto one course of stone over the street, a sentinel on four tiles of it, R2.
 8. The weighed gate. *(counterweights: twist; Bastion: develop)*
-9. The corridor and its hatch. *(Bastion: twist)*
+9. The corridor and its grate. *(Bastion: twist)*
 10. Torch 2.
 11. **The Long Arcade.** *(master; set piece)*
 12. The plaza and the door.
@@ -359,6 +359,40 @@ it showed a flaw:
 - **The corridor's roof runs on to the arcade's wall.** As drafted it stopped
   two tiles short, and a prince could walk the roof and drop down past the
   Bastion; now the hatch is the way down.
+- **The corridor's hatch is an iron grate the sun falls through** -- after
+  the owner played it on a phone and called it "a weird situation". As
+  drafted it was a notch in a two-course roof with a one-way floor at its
+  foot: it read as a glitch, a gap in the stone the prince sank into; the
+  way through it was a drop and then a plunge inside a two-tile fall,
+  which nobody found; and from inside the tunnel the shield had no answer
+  and nothing pointed at the one there was. Now:
+  - the roof is one course, with the grate (`h`, `scripts/mechanisms/
+    hatch.gd`) set flush in it, three wide, walked on like the stone either
+    side;
+  - **down + SWORD on any one-way floor plunges through it**
+    (`Player._plunge_through()`), one press, everywhere; down + JUMP is still
+    the plain drop, and on stone down + SWORD is still the swing;
+  - sunlight falls through the grate down the sun's own lane, two across for
+    one down -- every shadow in the game runs on it, so the shaft is drawn
+    at it, not straight down -- and the Bastion stands under the grate's
+    middle, where the shaft crosses his helm: from inside the tunnel the
+    light points up at the way, from the roof down at him;
+  - three wide with him under the middle, no stone rim is in reach of a
+    prince bouncing off his helm: at two wide the rebound's fall caught the
+    rim in a ledge grab and hung him in the hatch, between the two plunges;
+  - the climb onto the roof is three courses, a grab; and the grate is shown
+    first, safely, in the balcony's east half, which everyone walks under
+    and sees the sun come through before the corridor needs it;
+  - his turn already comes when a prince ends up behind him, so a roll past
+    his shield to his open back is an answer from inside the moment the
+    adventure has one.
+
+  The rest of the chapter was checked for the same failure -- a solution
+  the chapter never taught or showed -- and holds: the plate and gate are
+  taught by gate 1, the lift by its chains and slab, the plunge on the
+  courtyard Bastion by the drop off the rampart's lip above him (and the
+  Sun Terrace before it), the weighed gate's leap and the arcade's kerb and
+  pit are the jump, and the secrets are optional by construction.
 - **The second bay's hold is 1.7 s, not 1.6.** The kerb's hop is an arc the
   proof charges frame by frame: 1.21 s of run, 76% of 1.6 — past the 25%
   slack every race must keep. At 1.7 it is 71%, and the gate still falls

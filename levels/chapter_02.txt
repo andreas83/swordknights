@@ -19,6 +19,8 @@
 ;   1-9  mason's mark: stone carved with a channel number, wiring the one
 ;        mechanism it touches. Same mark, same gate.
 ;   [ ]  the lift's slab at its home stop     '  the lift's shaft
+;   h  an iron grate in a floor: walk it, drop through it (down + JUMP),
+;      or plunge through it (down + SWORD); the sun falls through it
 ;   w  Bastion: a posted guard behind a tall shield
 ;
 ; Beat sheet, left to right (columns):
@@ -37,13 +39,17 @@
 ;                                                     [counterweights: develop]
 ;   6. Torch 1 (56).
 ;   7. The balcony (58-61). Optional: a grab onto one course of stone, a
-;      sentinel on four tiles of it, R2. The street runs on underneath.
+;      sentinel on four tiles of it, R2. The street runs on underneath, and
+;      the balcony's east half is an iron grate the sun falls through: the
+;      hatch shown, safely, before the corridor needs one.
 ;   8. The weighed gate (62-72). A Bastion's weight on plate 3 holds gate 3
 ;      open: leap him and walk through, or plunge him and race its 2.2 s.
 ;                                                     [counterweights: twist]
 ;   9. The corridor (78-94). Two courses high, a Bastion in it: no leap, no
-;      height to plunge from. Grab onto the roof, drop through the hatch,
-;      plunge.                                        [Bastion: twist]
+;      height to plunge from. The sun falls through an iron grate in its
+;      roof, three wide, onto his helm under its middle. Up onto the roof (three courses, a grab), and
+;      down + SWORD on the grate: through it, point first, onto him.
+;                                                     [Bastion: twist]
 ;  10. Torch 2 (91), at the corridor's far end.
 ;  11. The Long Arcade (95-119). Four plates, four gates, each hold about
 ;      half a second behind a prince running flat out: click, run, slam. A
@@ -72,10 +78,10 @@
 ###       ###                          ##           ###               ###                    ###########################
 ###       ###          p               ##           ###               ###                    ###########################
 ###       ###    ''#######             ##           ###   * p         ###                    #####4######5######6######7
-::        ###    ''#######             ##           ###   ####        ###     ######  ######### | !    | !      !    | !
-::        #1#  * ''#######             ##           #2#               #3#     ######==######### | !    | !      !    | !
+::        ###    ''#######             ##           ###   ##hh        ###                     # | !    | !      !    | !
+::        #1#  * ''#######             ##           #2#               #3#     ######hhh######## | !    | !      !    | !
 :A         !   ##''##::::%                     ##    !                 !                        | !    | !      !    | !
-:: @       !   ##''##*:::%   w                 ##    !  t        w     !            w      t    | !   #| !      !  w | !    D
+:: @       !   ##''##*:::%   w                 ##    !  t        w     !             w     t    | !   #| !      !  w | !    D
 #######o#########[]########################o#####&&##############o#############################o####o######o   ####o##########
 #######1###################################2####:::::############3#############################4####5######6   %::#7##########
 ################################################::L:*#######################################################   %:*############

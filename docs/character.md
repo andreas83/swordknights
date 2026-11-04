@@ -117,8 +117,8 @@ and `tests/unit/test_specials.gd` pins each risk and reward against
 
 | | **Plunge** | **Parry** |
 | --- | --- | --- |
-| Touch | stick **down** + **SWORD**, in a jump or a fall | stick **up** + **SWORD**, on the ground |
-| Keyboard / pad | down + sword in the air | up + sword |
+| Touch | stick **down** + **SWORD**, in a jump or a fall -- or standing on a one-way floor, which it plunges through (`Player._plunge_through()`) | stick **up** + **SWORD**, on the ground |
+| Keyboard / pad | down + sword in the air, or on a one-way floor | up + sword |
 | What it does | gives up the run (`velocity.x` 0), drops at `MAX_FALL_SPEED` with the point `PLUNGE_REACH` (8 px) under the feet; no steering, no ledge | plants the feet and raises the blade for `PARRY_TIME` (24 frames); it turns a cut only in the first `PARRY_ACTIVE` (12) and only from the front |
 | Reward | a heart from where the guard cannot answer: his cut stops at `CUT_HIGH` (18 px), below the top of his own helm, so a body coming down on him is out of it; then it springs back off him (`STOMP_BOUNCE`, as a stomp does) into a jump that can plunge again | no wound to the guard, but his sabre is thrown wide and he reels where he stands for `PARRIED_TIME` (54 frames) — longer than the 33 of a whiffed cut, with the prince already inside reach — and the riposte skips the parry's recovery |
 | Risk | a plunge that meets stone bites it and holds the prince for `PLUNGE_RECOVER` (25 frames), jump or no jump; landed in front of a guard that raises on him, 25 frames plus the sword's lead is longer than the raise, so he eats the cut. Over a pit there is no grab to save it | thrown on sight, it is down again 15 frames before the cut lands and the recovery holds him there: the swing is the answer to a raise caught early, the parry to one caught late (after about frame 23, where a swing no longer lands first) |
