@@ -1,0 +1,121 @@
+; The Mirror Tower
+;
+; Chapter IV of The Last Light, 46 x 52, at dusk. The design is
+; docs/campaign.md ("IV. The Mirror Tower"); this is its level, built from
+; docs/campaign/drafts/chapter_04.txt. The lower town is already in the
+; city's shadow; only the tower's upper courses are still gold. Climb toward
+; the light, and send the last of it down the Well.
+;
+;! time dusk
+;! horizon 32
+;! channel 9 latch
+;! checkpoints route
+;! mark G sun_mirror great=1 sunset=9
+;
+; Legend, beyond the usual (scripts/world/tiles.gd):
+;   x  sun mirror: turned a quarter clockwise by the sword, starts facing up
+;   G  the great mirror: a sun mirror, drawn large, and the one whose
+;      wire, 9, sets the sun when it latches (the mark above)
+;   O  sun-seal door: opens when light rests on it, and stays open
+;   Q  sun-sealed secret: the same seal over a secret room
+;   g  Glassbearer: fires sunbolts while his glass is in the sun
+;   9  mason's mark: the Well's mouth and the great door share wire 9
+;   [ ] '  Chapter II's lift: the slab at its home stop and its shaft. Both
+;          of the tower's lifts are ridden, from the bottom up, and go home
+;          when they are left (scripts/mechanisms/lift.gd).
+;
+; Beat sheet, bottom to top (rows):
+;   1. The square (47). Spawn by the Well's mouth, a sun carved in it, dark.
+;      A Glassbearer paces in the city's shadow, his glass dull: a glass only
+;      burns in the sun.                       [Glassbearer: introduce]
+;   2. The hall (44-47). A sentinel, and Chapter II's lift up a floor.
+;      Secret A off the room it reaches; secret C in the hall's floor.
+;   3. The face, in shade (32-40). Out onto the balconies: torch 1, a grab,
+;      R1, a grab.
+;   4. The first light (31): the horizon. The mirror on the balcony throws
+;      the sun at the sky. Strike it once: it turns east, into the sun
+;      carved on door 1, which fills and opens.      [mirrors: introduce]
+;   5. The stairwell (22-31). The open door lets the sun onto mirror A; A
+;      throws it up to B; strike B east, into door 2. Torch 2. Secret B:
+;      strike A east instead, into the sun-sealed doorway.
+;                                                    [mirrors: develop]
+;   6. The lift shaft (19-27), up to R5.
+;   7. R5 (17-19). A Glassbearer on the balcony outside fires through the
+;      window. Parry his bolt home. Torch 3.  [Glassbearer: develop]
+;   8. R6 (9-15). No sun reaches in. The Glassbearer outside fires through
+;      the doorway at anything in line, and mirror C stands in the line:
+;      strike D east, stand behind C and let him shoot -- C throws his bolt
+;      up to D, D into door 3. Kill him instead and mirror E, outside in the
+;      sun, does the same work. R2 on the pillar three tiles out.
+;                                   [mirrors + Glassbearer: twist]
+;   9. The stair and the roof hatch. Torch 4 on the roof.
+;  10. The summit (6). A Glassbearer in the last gold, a sentinel at the
+;      parapet, and the great mirror hanging off its end, throwing the sun at
+;      the sky. Strike it twice: east -- the beam runs the roof to the great
+;      door's step -- then down. The beam falls the tower's whole height into
+;      the Well's mouth; the mouth carries mark 9, and so does the great door,
+;      which opens as the sun goes under.
+;                       [mirrors + Glassbearer: master; SET PIECE]
+;
+; Secrets:
+;   A. The room the lift reaches: its east wall is cracked. A relic and
+;      NO KING / KEEPS IT.
+;   B. The stairwell's east wall: a doorway with a sun carved in it (Q).
+;      Turn mirror A east -- away from B -- and it opens. A relic.
+;   C. The hall's floor: cracked, two wide. A relic.
+;
+; Relics: R1 (balcony E4), R2 (the pillar), and one in each secret: five.
+; Par 3:00.
+;
+                                       ###
+                                       ###
+                                       ###
+                                       #9#
+                                        O
+                                        O  D
+  #  G   g              p     t    H  ########
+  ### ############################ H##########
+                ################## H##########
+                ################## H##########
+                ################## H##########
+                ################## H##########
+                #            ##### H##########
+                #   x        O     H##########
+                 ===         O     H##########
+        *    xg  H  x       ##################
+        ##   ####H ###########################
+                #H                ############
+                #H                ############
+                #H                ############
+           g     H        t       ############
+         #####################''  ############
+                #            #''  ############
+                #            #''  ############
+                #            #''  ############
+                #            #''  ############
+                #            O''  ############
+                # x          O''  ############
+                #  ###       #[]##############
+                #            #################
+                O            Q::::############
+            x   O x      t   Q:::*############
+           ###################################
+                ##############################
+                ##############################
+         *      ##############################
+        ###              #####################
+                         #####################
+                         &::::################
+             t           &:L:*################
+            ###########''#####################
+                #######''#####################
+                #######''#####################
+                #######''#####################
+                       ''#####################
+                       ''#####################
+                       ''#####################
+  @        g         p ''#####################
+#####OO9##########&&###[]#####################
+#####::##########::::#########################
+#####::##########*:::#########################
+##############################################

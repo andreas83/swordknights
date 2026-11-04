@@ -511,8 +511,10 @@ not leave the prince room, so darkening it is a grade question, left open.
 
 ### IV. The Mirror Tower — dusk
 
-[`chapter_04.txt`](campaign/drafts/chapter_04.txt) · 46 × 52 ·
-[stand-in](campaign/drafts/chapter_04_static.txt)
+**Built:** [`levels/chapter_04.txt`](../levels/chapter_04.txt) · 46 × 52
+(drafted as [`chapter_04.txt`](campaign/drafts/chapter_04.txt), with its
+[stand-in](campaign/drafts/chapter_04_static.txt); *As built*, below, says what
+building it changed and why).
 
 **The place.** The tower that has been in the sky since Chapter I: a square
 of shaded town at its foot, balconies up its sunlit west face, rooms and lift
@@ -527,7 +529,7 @@ falling dark, and the wonder of making light go where you want.
 | --- | --- | --- |
 | introduce | the first sunlit balcony (x 12, y 31) | a mirror throws the sun at the sky; strike it once and it turns east, into the sun carved on a door, which fills and opens |
 | develop | the stairwell (A at x 18, B at x 18, y 27) | opening the door lets the sun onto mirror A; A throws it up to B; strike B into door 2 |
-| twist | the dark room R6 (C, D at x 20) | no sun reaches in, so the Glassbearer's bolts are the light: mirror C stands in his line of fire and throws his bolts up to D |
+| twist | the dark room R6 (C at x 20, y 15; D at x 20, y 13) | no sun reaches in, so the Glassbearer's bolts are the light: mirror C stands in his line of fire and throws his bolts up to D |
 | master | the summit | strike the great mirror twice — east, then down — under a Glassbearer's fire, and send the beam down the tower's whole height |
 
 **New foe: the Glassbearer** (the parry).
@@ -535,9 +537,9 @@ falling dark, and the wonder of making light go where you want.
 | Step | Where | What is learned |
 | --- | --- | --- |
 | introduce | the square (x 11) | in the city's shadow his glass is dull: a glass only burns in the sun |
-| develop | R5 (bolt through the window from x 12, y 19) | parry the bolt home and it kills him |
+| develop | R5 (bolt through the window slot from x 11, y 20) | parry the bolt home and it kills him |
 | twist | R6 (from x 14, y 15) | stand behind mirror C and let him shoot: his bolts open the door |
-| master | the summit (x 19, y 6) | in the last gold, between you and the great mirror |
+| master | the summit (x 9, y 6) | in the last gold, between you and the great mirror |
 
 **Beat sheet** (10 beats, bottom to top):
 
@@ -558,10 +560,11 @@ past every balcony you climbed, the whole height of the tower, into the Well's
 mouth in the square — which carries mark 9, as does the great door on the
 roof. The door opens as the sun goes under, and the chapter ends at night.
 
-**Checkpoints.** Four torches, each a floor or two apart (about 30–40 s of
-climbing each). They sit at columns 13, 25, 26 and 30 on the way to a door at
-43, so today's x-measured checkpoint order holds (see *Checkpoints in tall
-chapters*, below).
+**Checkpoints.** Four torches, each a floor or two apart (about 10–15 s of
+climbing each at a clear run's pace). The level says `;! checkpoints route`, so
+"further on" is measured along the proved route rather than toward the door's
+column (see *Checkpoints in tall chapters*, below);
+`tests/unit/test_chapter_04.gd` holds the four in order, bottom to top.
 
 **Relics.** Five: R1 on balcony E4, R2 on a pillar three tiles out from the
 Glassbearer's balcony (the harder route: a three-tile jump over a long fall),
@@ -575,6 +578,67 @@ one in each secret.
 
 **Expert line, about 55 s:** kill the summit Glassbearer with his own bolt;
 take R6 by letting the Glassbearer outside do the work; never stop at a lift.
+The scripted clear run below is that line, and clears in 56 s.
+
+![Chapter IV as built, the whole tower in one frame as the last ray goes down](campaign/chapter-04-tour.png)
+
+*The Mirror Tower as built, rendered by the game at 1:1 at dusk, on the frame
+the great mirror's beam reaches the Well: the square and the Well's mouth,
+the hall and its lift, the face in shade, the first light and the stairwell,
+the shaft's lift, R5 and R6, the roof, and the summit's great mirror with the
+last ray falling the tower's whole height.*
+
+**As built.** Building the draft changed these, each because building or
+playing it showed a flaw:
+
+- **The great door is a sun-seal on mark 9 that stands on a step**, not a
+  portcullis on the roof's floor. A portcullis is Chapter II's, and the great
+  mirror's first strike (east) sends its beam along the roof: with the door at
+  floor level, any door that light opens would have opened on that strike
+  and skipped the set piece. On a one-tile step the east beam lights the
+  doorstep under the door, and only the Well's mouth, latching wire 9, opens
+  it.
+- **D moved down beside C, and door 3 to the dark room's own floor.** The
+  dressing put the summit's colonnade over the roof, its shadow used up the
+  roof's reach, and D, as drafted, stood in sunlight in the dressed mask --
+  struck east, it opened door 3 alone, with no Glassbearer and no C. D now
+  hangs at (20, 13), where the tower's west wall shades it whatever the
+  dressing does, and door 3 stands on a one-step sill at the room's east
+  end, in D's row. The upper room it used to need is stone.
+- **R5's floor is a course lower and its west side is a wall with a slot.**
+  As drafted, R2's pillar and R6's balcony shaded the R5 Glassbearer's glass
+  at his post, and the way up out of R5 was at its east end, fifteen tiles
+  from him: he never fired. Now his balcony is out of their shadow, his bolt
+  comes through a slot a prince cannot pass, and the ladder up to R6 is at
+  R5's west end, so the way on crosses his line of fire.
+- **Every ladder that pierces a floor has an open cell beside it.** A
+  one-wide hole through a floor admits a body only within 3.5 px of the
+  ladder's middle, and the prince is not centred on a ladder; the roof's
+  ladder now rises against the tower's wall with a two-wide hatch, and R5's
+  has a two-wide hole into R6. The summit's foes treat the hatch as the end
+  of their beat.
+- **The great mirror hangs in a one-cell slot with a stone bastion beyond
+  it.** As drafted it hung off the parapet's open end, and a prince struck
+  by a bolt or a cut while striking it was thrown backwards off a forty-tile
+  drop -- a death the fall rule now makes certain.
+- **The Glassbearers are posted**, each keeping a beat of a tile and a half
+  either side of his post (`Glassbearer.BEAT`). As built at first, R6's
+  walked in through the doorway he was meant to fire through. The summit's
+  is posted in the last gold at the parapet's west end, the sentinel mid-roof.
+- **The sun goes under.** The great mirror carries `sunset=9`: when the
+  Well's mouth latches wire 9, three seconds later nothing is lit by the sun,
+  and the grade walks to night while the great door opens. The chapter ends
+  at night, as the beat sheet says.
+- **Chapter II's lift** carries both shafts, as drafted; the stand-in's
+  ladders were used only until it landed.
+
+The proof opens every door through its mirrors (*Sun mirrors and sun-seals*,
+below) and `tests/unit/test_chapter_04.gd` holds the chapter to everything a
+draft was held to -- the door, the secrets audit, every torch along the route,
+every relic, every beam and seal, the dressed mask's agreement, each
+Glassbearer's glass lit or dull at his post -- and plays two scripted clear
+runs blind through the real scene under the death watch: as the game ships,
+56.0 s against a par of 3:00, and with LONGER WARNINGS on, 55.6 s.
 
 ### V. The Sun Well — night
 
@@ -864,11 +928,32 @@ sentinel takes it, or parry it into him. **With terrain:** the sun mask
 decides where he can fire, mirrors decide where his bolts go, and seals open
 to them.
 
-**Audio:** the aim (a rising whine over 27 frames: `glass_charge` (to be
-built), a sine sweep 900 → 1800 Hz); the shot (`sword` 1.8, −6 dB); a bolt on
-stone (`sword_hit` 1.9, −12 dB); a bolt parried (`sword_hit` 1.35 — the
-parry's own clang, so it is heard as the same act); death (`guard_hit` 1.2 and
-a `shatter` (to be built)).
+**Audio:** the aim (a rising whine over 27 frames: `glass_charge`, a sine
+sweep 900 → 1800 Hz, pitched down to last the longer aim with LONGER
+WARNINGS on); the shot (`sword` 1.8, −6 dB); a bolt on stone (`sword_hit` 1.9,
+−12 dB); a bolt turned by a mirror (`sword_hit` 2.1, −14 dB); a bolt parried
+(`sword_hit` 1.35 — the parry's own clang, so it is heard as the same act);
+death (`guard_hit` and `shatter`).
+
+**As built.** `scripts/entities/glassbearer.gd`, `glassbearer_art.gd` and
+`sunbolt.gd`; his states are sheeted in
+[`docs/glassbearer-poses.png`](glassbearer-poses.png)
+(`tools/glassbearer_poses.gd`). Three decisions the table above leaves open:
+
+- **He is posted.** He walks a beat of a tile and a half either side of his
+  post (`BEAT`) and turns at its end as at a wall: what he does depends on
+  where he stands -- in the sun or not, at a window or not -- so the level
+  designs his station, and one that wandered in through the doorway he was
+  posted to fire through would be another chapter.
+- **On screen** is measured from the prince, deterministically: the
+  viewport's half-width less the camera's look-ahead and its drag. A wider
+  phone sees him act from further away, as it shows him from further away.
+- **The sunbolt is light and a blow both.** Mirrors turn it from their
+  pivot, a mirror mid-turn swallows it, a seal takes it as a full fill, it
+  stops where a beam stops, and until a parry turns it, it costs any body it
+  meets a heart -- the prince, a sentinel, another Glassbearer -- except the
+  hand that threw it. `Sunbolt.make()` takes a speed, so a boss's volleys can
+  be the same bolt thrown harder.
 
 ### The owl — the air slash (Chapter V)
 
@@ -1276,13 +1361,60 @@ ticks rising — the `relic` voice at eight pitches); a seal opening (`secret`).
 **Reachability.** A seal on the route is openable when some setting of the
 mirrors routes a lit source into it, and every mirror whose setting differs
 from its start can be struck from a cell reachable with that seal shut. The
-proof (to be built) can enumerate settings — four per mirror, at most three
-mirrors, 64 combinations — tracing each beam over the level with the doors
-in their states. Two more checks keep it honest: every sunlit mirror and post
-must be lit in the **dressed** mask (`SunShadow.last_mask`), because a planter
-or a balustrade the dresser adds can shade a mirror the bare terrain does
-not; and every beam's path must stay clear of anything the dresser could put
-in it (decoration never collides, but a standing decoration casts).
+proof enumerates settings — four per mirror, at most three mirrors, 64
+combinations — tracing each beam over the level with the doors in their
+states. Two more checks keep it honest: every sunlit mirror and post must be
+lit in the **dressed** mask (`SunShadow.last_mask`), because a planter or a
+balustrade the dresser adds can shade a mirror the bare terrain does not; and
+every beam's path must stay clear of anything the dresser could put in it
+(decoration never collides, but a standing decoration casts).
+
+**As built.** `scripts/mechanisms/sun_mirror.gd`, `sun_seal.gd` and the art
+beside them; the light itself is one tracer, `scripts/mechanisms/sun_light.gd`,
+that the game, the drawing and the proof all call, so a beam the player sees
+is a beam the proof traced. The proof is `scripts/levels/sun_proof.gd`, reached
+through each door's reach hook:
+
+- **Puzzles** are the mirrors that can light one another, traced with every
+  door open (the furthest light ever goes). A puzzle of more than three is
+  refused, and so are two mirrors side by side, which the parser would make
+  one.
+- For every setting of a puzzle, under every state of the doors its light
+  meets, the light is traced, and a door it rests on gets a **guarded latch**:
+  standing where a turned mirror of that setting is struck, with those doors
+  open, the door's wire latches (`ReachModel.latch_on_stand(cells, channel,
+  needs)`). Still a latch, so the checkpoint proof's argument holds. Mirrors
+  are no bits: they reset at a respawn and turn back as easily as forward.
+- The latch assumes the prince can make the whole setting from where he
+  strikes. **Locality** proves it: under every mask the search can strike from
+  with the door shut, every mirror the setting depends on -- turned, or
+  carrying its light -- can be reached and come back from with the doors held
+  as they are. A puzzle the player could leave broken behind a one-way drop
+  is refused.
+- "Reachable with that seal shut" is asked of a model in which that seal's
+  wire never comes on, so the door can never be the way to its own key; a
+  door on a wire another seal latches (the great door) is opened by that
+  seal's light.
+- The sun in the proof is the shadow solve itself, run once per level on the
+  bare terrain without its dressing, plus the rule that a shut door within
+  the shadow's reach is stone in the light's way (the static mask cannot know
+  a door). The game reads the dressed mask with the same door rule, so the
+  only difference between the two is the dressing -- which
+  `tests/unit/test_mirrors.gd` and the chapter's test hold equal for every
+  mirror in every state of its doors.
+
+A wired seal is a trigger and a receiver both: lit, it latches its wire;
+when its wire comes on from elsewhere it fills as if lit. An unwired one
+latches a wire of its own (`sun@x,y`), which is how an opened door outlives a
+respawn. `Q` is a mechanism and a seal at once: the secret keeper owns its
+room, as it owns every secret's, and the seal opens it through
+`Contact.reveal_secret()` when full. A mirror declared `sunset=<wire>` sets the
+sun three seconds after that wire latches (Chapter IV's great mirror). The
+beam is two tones exactly as written, broader by a pixel each for the great
+mirror's last ray, and its dust is drawn by the beam itself, motes that catch
+the light only beside the band. Beams stop at a gate's stone like any stone;
+a portcullis's bars and a Bastion's shield are not yet told apart from it,
+which no chapter with mirrors needs yet.
 
 ### Blades on the beat (Chapter V)
 
@@ -1509,12 +1641,12 @@ thing they guard broken (`CLAUDE.md`).
    backstep's remainder plus a swing's lead, the parry failing, and a cat
    falling through crumbling stone it pushes off; `tests/unit/test_doves.gd`
    the cat on the doves.
-8. **Mirrors and seals.** Including `Q` in `SEAL_LEGEND` and the beam proof.
-   *Done when* `tests/unit/test_mirrors.gd` (to be built) turns a mirror with
+8. **Mirrors and seals.** *(Done.)* Including `Q` in `SEAL_LEGEND` and the beam proof.
+   *Done when* `tests/unit/test_mirrors.gd` turns a mirror with
    each sword move, fills and drains a seal, proves Chapter IV's doors, and
    fails a mirror shaded by dressing.
 9. **The Glassbearer and the sunbolt.** *Done when*
-   `tests/unit/test_glassbearer.gd` (to be built) pins the bolt over a crouch,
+   `tests/unit/test_glassbearer.gd` *(done)* pins the bolt over a crouch,
    the parry's 30 px of approach, the backstep failing, no aim in shade, and a
    mirror redirecting a bolt into a seal.
 10. **Blades on the beat.** Beat channels, scythes, slots, and the window
