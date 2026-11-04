@@ -10,6 +10,8 @@ extends GutTest
 ## test that called its step by hand would pass with the scene wired wrong.
 
 const SCENE := preload("res://scenes/duel_match_cpu.tscn")
+## The seed the scene-stepping test pins the computer to.
+const SEED := 7
 ## Never the real saves: the scene reads the looks and the level from here.
 var _wardrobe := UserData.at("user://test_duel_cpu_mode_wardrobe.cfg")
 var _choice := UserData.at("user://test_duel_cpu_mode_choice.cfg")
@@ -85,6 +87,13 @@ func test_the_scene_steps_both_seats() -> void:
 	_choose(DuelBrain.Difficulty.MEDIUM)
 	var scene := _open()
 	var fight := scene.get_node(^"World/Match") as DuelMatch
+	# The scene seeds the computer from the clock unless told otherwise, and an
+	# unlucky seed could have it hold its ground: pin one, so the test measures
+	# the seat and not the dice.
+	var cpu := scene.get("cpu") as DuelCpu
+	assert_not_null(cpu, "the scene has a computer seat")
+	cpu.reset(SEED)
+	cpu.watch(fight)
 	var start_cpu := fight.fighter_position(1)
 	var start_you := fight.fighter_position(0)
 	await wait_physics_frames(150)
