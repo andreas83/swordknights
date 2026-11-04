@@ -119,7 +119,7 @@ func _capture(index: int) -> void:
 func _take_the_prince() -> void:
 	if _drive == "" or _driving:
 		return
-	var game := root.get_meta("screenshot_target") as Game
+	var game := _game()
 	if game == null or game.player == null:
 		return
 	var script := load(_drive) as Script
@@ -135,13 +135,22 @@ func _take_the_prince() -> void:
 ## tree. During _initialize it is not yet, and the game's _ready would put
 ## the prince back on the spawn.
 func _stand_at() -> void:
-	var game := root.get_meta("screenshot_target") as Game
+	var game := _game()
 	if game == null or _at.x < 0 or not game.is_node_ready():
 		return
 	game.checkpoint = Vector2((float(_at.x) + 0.5) * Level.TILE, float(_at.y + 1) * Level.TILE)
 	game.player.respawn(game.checkpoint)
 	game.camera.setup(game.player, game.level.world_size())
 	_at = Vector2i(-1, -1)
+
+
+## The game being shown: the scene itself, or under --chapter the one the
+## campaign is playing, so --at and --drive work inside a chapter as well.
+func _game() -> Game:
+	var target: Variant = root.get_meta("screenshot_target", null)
+	if target is CampaignGame:
+		return (target as CampaignGame).game()
+	return target as Game
 
 
 ## The level to play: the scene's own file, or --level's, at --time's hour.

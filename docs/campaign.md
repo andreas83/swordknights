@@ -58,6 +58,51 @@ twenty to twenty-five minutes. Every chapter fits inside one full-resolution
 shadow mask (`SunShadow.MAX_MASK_PX`, 2048 px, is 128 tiles), so no chapter's
 shadows go soft.
 
+### The campaign, played
+
+The whole of *The Last Light*, played end to end through the real
+`CampaignGame` by each entry's frozen clear run -- every card, every complete
+screen, JUMP to go on, the dawn, and back to the chapter select -- under the
+death watch (`tests/unit/test_campaign_run.gd`, which holds every row's par
+and clear run to this table, and fails when a run moves without it):
+
+| | Entry | Hour | Par | Clear run | Hearts lost | Threats on screen | New in it |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| I | The Sun Terrace | late afternoon | 1:00 | 14.37 s | 0 | 1 | the sentinel; the ledge grab, the ladder, the secrets |
+| II | The Long Arcade | golden hour | 1:45 | 32.85 s | 0 | 6 | the Bastion; plates, gates, lifts, the grate |
+| III | The Aqueduct | sunset | 2:15 | 32.15 s | 0 | 5 | the Caracal; crumbling stone (and the doves) |
+| IV | The Mirror Tower | dusk | 3:00 | 55.93 s | 1 | 7 | the Glassbearer; mirrors, sun-seals |
+| V | The Sun Well | night | 2:15 | 34.82 s | 0 | 44 | the owl; scythes and spike slots |
+| — | The Eclipse | night | 1:45 | 79.07 s | 0 | 9 | the King; the kept sun |
+
+Four minutes ten seconds on the game's clocks, 4:20 from the first frame to
+the last door with the cards and the complete screens between; the pars add
+to 12:00. *Threats on screen* counts each live window that opened where the
+camera showed it -- a foe's strike, a blade's cut -- and each shot loosed; by
+the foe contract every one was told 27 frames ahead. The clear runs are
+steady lines, not tours: they take no secret, and they read every threat
+they meet, which is why only Chapter IV's, which walks into one bolt, loses
+a heart.
+
+What it says about the curve (*A difficulty curve*, below):
+
+- **One new foe and one new family a chapter, every time** -- the restraint
+  rule holds to the letter, and the finale adds only the King and his light.
+- **Chapter IV is the rest it was meant to be.** Its threats come at one in
+  eight seconds, against one in five in II and III: puzzle pace before the
+  steepest chapter.
+- **Chapter V is the steepest by far**, more than one threat a second, almost
+  all of them the machine's: the blades keep the beat whether or not a foe is
+  near, which is the chapter's note.
+- **Chapter I's sentinels can be run past.** The steady line passes both
+  without a blow exchanged, so the sword -- the one lesson the chapter's foe
+  is for -- is taught only to a player who chooses to fight. Every other
+  chapter's foe stands where its lesson cannot be skipped. Left open: the
+  owner's Chapter I changes only in presentation.
+
+The contact sheet of the run, one key frame of each entry at its hour, is
+[`campaign/campaign.png`](campaign/campaign.png).
+
 ### Story without words
 
 No dialogue, no cutscene text. The story is told by four things only.
@@ -1650,6 +1695,13 @@ laid out so that their torches strictly approach the door's column, and today's
 rule holds for all of them. A future vertical level will not be so lucky, so
 the build plan asks for progress measured along the proved route instead.
 
+**Built:** `;! checkpoints route` (`ReachRoute`, Chapter IV). The route walks
+the search's own moves (`ReachSearch.moves_from()`), so it follows a race off
+a held plate and a crumbling stand's fuse as the proof does. It was first
+built on the solver's moves alone, which could not cross a held gate: on
+Chapter II nothing reached the door, the spawn included, so no chapter with a
+race could have used it (`tests/unit/test_route_checkpoints.gd`).
+
 ---
 
 ## What makes it stand out
@@ -1708,13 +1760,6 @@ only where they mean something. No mechanism inside a race that is not the
 race. At most one beam puzzle on screen, three mirrors to a puzzle. Every new
 voice is justified against the existing catalogue first. When in doubt,
 remove something (`docs/art-direction.md`).
-
-**Built:** `;! checkpoints route` (`ReachRoute`, Chapter IV). The route walks
-the search's own moves (`ReachSearch.moves_from()`), so it follows a race off
-a held plate and a crumbling stand's fuse as the proof does. It was first
-built on the solver's moves alone, which could not cross a held gate: on
-Chapter II nothing reached the door, the spawn included, so no chapter with a
-race could have used it (`tests/unit/test_route_checkpoints.gd`).
 
 ---
 
