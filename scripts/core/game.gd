@@ -152,6 +152,9 @@ func _ready() -> void:
 	# The backstep's weight going onto the rear foot: a single pixel of dip,
 	# the lightest settle in the game. The lead is held by the camera itself.
 	player.backstepped.connect(func() -> void: camera.settle(BACKSTEP_SETTLE))
+	# --- the duel's moves --- a kick or a sweep reaches each foe once, as a
+	# swing does.
+	player.kicked.connect(func() -> void: _struck.clear())
 	# --- secrets ---
 	secrets.setup(level, player)
 	secrets.furnish(_entities)
@@ -387,8 +390,10 @@ func _resolve_interactions() -> void:
 
 ## The prince as this frame's pass sees him. Read once, before anything is
 ## met, so every entity on the frame sees the same body and the same blade.
-func _read_contact(body: Rect2) -> void:
-	_contact.body = body
+func _read_contact(_body: Rect2) -> void:
+	# --- the duel's moves --- what a foe aims at: the body, tucked under a
+	# roll. The world's checks keep the standing body (PrinceMoves.hurt_rect()).
+	_contact.body = player.moves.hurt_rect()
 	_contact.blade = player.attack_rect()
 	_contact.feet = player.position
 	_contact.velocity = player.velocity
@@ -418,6 +423,9 @@ func _resolve_foe(foe: Foe) -> void:
 	if not foe.is_alive():
 		return
 	var id := foe.get_instance_id()
+	_resolve_thrown(foe) # --- the duel's moves ---
+	if _resolve_feet(foe, id): # --- the duel's moves ---
+		return
 	if _contact.has_blade() and not _struck.has(id) \
 			and _contact.blade.intersects(foe.hurt_rect()):
 		_struck[id] = true
@@ -458,6 +466,9 @@ func _resolve_danger(danger: FoeDanger, body: Rect2) -> bool:
 		# to either of them -- the guard's own cut is its sound, and the
 		# missing hit is the read. No riposte, no reel: see Player.evades().
 		pass
+	elif danger.rollable and player.moves.rolling_under():
+		# --- the duel's moves --- the roll: under it, from either side.
+		pass
 	elif danger.damage <= 0:
 		# A shove: thrown back and staggered, no heart and no grace, so a
 		# shield is a wall even to a prince who was just hit (FoeDanger).
@@ -491,6 +502,45 @@ func _resolve_shot(shot: FoeProjectile) -> void:
 		_sword_hit(foe, outcome)
 		shot.spend()
 		return
+
+
+## --- the duel's moves ---------------------------------------------------------
+##
+## The thrown sword in flight against one foe: the first it reaches takes it
+## as Blow.THROWN from the side it flew in from, and it falls there. Presented
+## as a sword's blow, because it is one -- a wound, or the clang off a shield.
+func _resolve_thrown(foe: Foe) -> void:
+	var blade := player.moves.blade
+	if not blade.is_flying() or not blade.rect().intersects(foe.hurt_rect()):
+		return
+	var outcome := foe.take_blow(Foe.Blow.THROWN, blade.strike_from_x())
+	if outcome == Foe.Outcome.NONE:
+		return
+	player.moves.blade_struck()
+	_sword_hit(foe, outcome)
+
+
+## The feet against one foe: a dive kick's heel or a sweep's leg, once a kick
+## per foe. True when they reached it, which takes the frame from the foe's
+## dangers as a sword's blow does. A dive kick springs the prince back off
+## whatever it reached, a wall included.
+func _resolve_feet(foe: Foe, id: int) -> bool:
+	var feet := player.moves.strike_rect()
+	if not feet.has_area() or _struck.has(id) or not feet.intersects(foe.hurt_rect()):
+		return false
+	_struck[id] = true
+	var outcome := foe.take_blow(player.moves.strike_blow(), player.global_position.x)
+	match outcome:
+		Foe.Outcome.NONE:
+			return false
+		Foe.Outcome.BLOCKED:
+			_on_blocked(foe)
+		_:
+			# The duel's knock-down voice: a body hit, not a blade in it.
+			GameAudio.cue(&"guard_hit", {"pitch": 0.85, "volume_db": -2.0})
+			_impact(foe.impact_point(), Flow.HURT_FRAMES, 1.4, 0.5)
+	player.moves.rebound()
+	return true
 
 
 ## A swing, an air slash or a sent-back shot met a foe.

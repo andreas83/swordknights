@@ -92,9 +92,10 @@ func _action_names() -> Dictionary:
 		"ui_confirm_action": [[KEY_SPACE, KEY_ENTER], [JOY_BUTTON_A]],
 
 		# --- duel: raise the sword to block --------------------------------
-		# The eighth and last input bit. Shared by the adventure (where nothing
-		# reads it yet) and by the online duel, whose local seat drives the
-		# unsuffixed actions so the gamepad and the touch controls keep working.
+		# The eighth and last input bit. Shared by the adventure, where it is
+		# the sword throw (scripts/player/prince_moves.gd), and by the online
+		# duel, whose local seat drives the unsuffixed actions so the gamepad
+		# and the touch controls keep working.
 		"guard": [[KEY_Q, KEY_L], [JOY_BUTTON_RIGHT_SHOULDER]],
 
 		# --- duel: two seats on one keyboard -------------------------------

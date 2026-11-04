@@ -43,6 +43,7 @@ const SKIP_FADE := 0.25
 const CARD_READ := 2.2
 const PLAY_ACTIONS: Array[StringName] = [
 	&"jump", &"attack", &"move_left", &"move_right", &"move_up", &"move_down", &"guard",
+	&"throw",
 ]
 ## The secret banner is quicker than the title: it interrupts play rather than
 ## opening it, so it says its piece and gets out of the way of the room.

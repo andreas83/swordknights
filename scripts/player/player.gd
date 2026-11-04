@@ -25,6 +25,14 @@ signal plunge_landed()
 ## Back + SWORD came out as a backstep: the feet push off. The dust, the cloth
 ## and the camera's dip hang off this, so none of them reads the state machine.
 signal backstepped()
+## --- the duel's moves (scripts/player/prince_moves.gd) --- down + JUMP on
+## stone came out as a roll; a dive kick or a sweep began (Game clears the
+## feet's memory of who they reached on it); the sword left the hand; and it
+## is back in the hand, picked up or flown home.
+signal rolled()
+signal kicked()
+signal threw()
+signal rearmed()
 
 ## New states go on the end, so a state's number never changes under anything
 ## that has stored one.
@@ -34,6 +42,7 @@ enum State {
 	HANG, CLIMB_UP, LADDER,
 	ATTACK, HURT, DEAD,
 	AIR_SLASH, PLUNGE, PLUNGE_LAND, PARRY, BACKSTEP,
+	ROLL, DIVE_KICK, KICK_LAND, THROW, SWEEP, PICKUP,
 }
 
 const TILE := 16.0
@@ -51,6 +60,9 @@ var last_impact: float = 0.0
 ## Input is read through this indirection so a replay, an AI or a network peer
 ## can drive the character with the exact same code path as a local player.
 var input: PlayerInput = LocalInput.new()
+## --- the duel's moves --- the roll, the dive kick, the throw and the sword
+## itself, wherever it is. See scripts/player/prince_moves.gd.
+var moves := PrinceMoves.new(self)
 
 var _coyote: float = 0.0
 var _jump_buffer: float = 0.0
@@ -114,6 +126,7 @@ func respawn(at: Vector2) -> void:
 	_fall_top = at.y
 	_fell = false
 	_set_crouched(false)
+	moves.rearm() # --- the duel's moves --- a respawn always gives the sword back
 
 
 func is_alive() -> bool:
@@ -249,6 +262,7 @@ func _physics_process(delta: float) -> void:
 		_jump_buffer = Tuning.JUMP_BUFFER
 	if input.just_pressed_attack:
 		_attack_buffer = Tuning.ATTACK_BUFFER
+	moves.step(delta) # --- the duel's moves ---
 
 	# One-way platforms are a separate physics layer, so dropping through is
 	# simply ignoring that layer for a moment.
@@ -310,6 +324,9 @@ func _update_free(delta: float) -> void:
 			_slide_back(delta)
 			if state_time >= Tuning.BACKSTEP_TIME:
 				_enter(State.IDLE)
+		State.ROLL, State.DIVE_KICK, State.KICK_LAND, State.THROW, State.SWEEP, \
+		State.PICKUP:
+			moves.update(delta, want_x, grounded) # --- the duel's moves ---
 		State.LAND:
 			_land_timer -= delta
 			velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * delta)
@@ -356,7 +373,7 @@ func _update_free(delta: float) -> void:
 	if rising and velocity.y < 0.0 and not input.jump and cut_allowed:
 		velocity.y *= Tuning.JUMP_CUT_MULTIPLIER
 
-	if grounded and input.down and input.just_pressed_jump:
+	if grounded and input.down and input.just_pressed_jump and state != State.ROLL:
 		_drop_through = 0.25
 		# The press asked for the drop, not a jump: spent here, or it waits
 		# in the buffer and coyote time fires it on the next frame, back up
@@ -374,6 +391,8 @@ func _update_free(delta: float) -> void:
 
 
 func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) -> void:
+	if moves.try_start(delta, want_x, grounded): # --- the duel's moves ---
+		return
 	# Buffered, like jump: a press from the end of a fall, a turn, a landing or
 	# the tail of the last swing comes out here, on the first frame it can.
 	if _attack_buffer > 0.0 and _start_sword(delta, want_x, walking, grounded):
@@ -428,6 +447,8 @@ func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) ->
 ## past a stick that has drifted. False when the sword cannot come out from
 ## this state, so the press stays buffered.
 func _start_sword(delta: float, want_x: int, walking: bool, grounded: bool) -> bool:
+	if not moves.armed(): # --- the duel's moves --- no blade: the sweep
+		return moves.start_unarmed(delta, want_x, grounded)
 	if grounded:
 		_attack_buffer = 0.0
 		if input.up:
@@ -617,7 +638,8 @@ func _steer(delta: float, want_x: int, walking: bool, grounded: bool) -> void:
 func _jump_allowed() -> bool:
 	match state:
 		State.ATTACK, State.AIR_SLASH, State.CROUCH, State.PLUNGE, State.PLUNGE_LAND, \
-		State.PARRY, State.BACKSTEP:
+		State.PARRY, State.BACKSTEP, \
+		State.ROLL, State.DIVE_KICK, State.KICK_LAND, State.THROW, State.SWEEP, State.PICKUP:
 			return false
 		_:
 			return true
@@ -645,6 +667,8 @@ func _on_touch_ground(impact: float) -> void:
 		# LAND: the landing is always hard, and this is its recovery.
 		_enter(State.PLUNGE_LAND)
 		plunge_landed.emit()
+		return
+	if moves.on_touch_ground(): # --- the duel's moves --- the heel meets stone
 		return
 	if state == State.AIR_SLASH and impact < Tuning.SOFT_LAND_SPEED:
 		# A slash that lands finishes on the feet: the same swing at the same
@@ -733,7 +757,7 @@ func _resolve_air_state() -> void:
 	# keeps its hands off ledges: they are holding a sword.
 	match state:
 		State.ATTACK, State.AIR_SLASH, State.HURT, State.PLUNGE, State.PLUNGE_LAND, \
-		State.PARRY:
+		State.PARRY, State.DIVE_KICK, State.THROW, State.ROLL:
 			return
 	if velocity.y > 0.0:
 		if state != State.FALL:

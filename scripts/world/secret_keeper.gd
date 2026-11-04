@@ -15,7 +15,10 @@ extends RefCounted
 ##   down on a cracked floor, which then lets the character through into the
 ##   cellar under it, still plunging. A plunge that lands squarely on the
 ##   crack in a frame the blade was not checked (Player emits plunge_landed on
-##   the frame it touches down) opens it too.
+##   the frame it touches down) opens it too. So does a thrown sword's point
+##   going into it (PrinceBlade.bite): it is the same blade, and a crack seen
+##   across a gap is a crack worth throwing at. Safe by the proof already --
+##   every combination of open secrets is audited never to be a trap.
 ##
 ## A hard landing does not open anything: a fall the player did not choose is
 ## luck, and secrets are for looking, not for luck.
@@ -111,6 +114,9 @@ func resolve(player: Player) -> int:
 			var cut := _overlap(blade, secret["seal"])
 			if cut.has_area():
 				return _find(index, cut.get_center())
+		var thrown := _overlap(player.moves.blade.bite, secret["seal"])
+		if thrown.has_area():
+			return _find(index, thrown.get_center())
 		if plunged:
 			var point := Rect2(body.position.x, body.end.y, body.size.x, Tuning.PLUNGE_REACH)
 			var bite := _overlap(point, secret["seal"])

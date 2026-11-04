@@ -176,6 +176,87 @@ const BACKSTEP_REARM := 0.2
 ## more final than a running one.
 const BACKSTEP_READ := 0.1
 
+# The duel's moves, as the adventure has them: the roll, the dive kick, the
+# sword throw and the unarmed sweep (docs/character.md, "The duel's moves in
+# the adventure"). None of them feeds the grammar, and each is held out of it
+# by a rule a test pins rather than by hope:
+#
+# - the roll stops at the lip of any drop, as the backstep does
+#   (Player._careful()), keeps the standing body's collision shape, so it
+#   enters no space a walk cannot, and covers less floor a second than a run
+#   (roll_distance() over ROLL_TIME is under RUN_SPEED);
+# - the dive kick is never faster across than a run nor slower down than the
+#   hardest fall, so from any height it lands nearer than a steered fall
+#   from the same frame would;
+# - the throw and the sweep do not move the prince at all.
+#
+# So LevelReachability offers none of them, and a level can need none.
+
+## THE ROLL: down + JUMP with the feet on stone and not at a run. The tuck --
+## the part that travels, low, under anything set against a standing man --
+## and then the rise, during which nothing comes out: no swing, no jump, no
+## throw. 21 frames of tuck, 40 px: from where a guard raises, through him,
+## and up again inside a swing's reach of his back (tests/unit/test_roll.gd).
+const ROLL_TUCK := 0.35
+const ROLL_SPEED := 115.0
+## The rise. 12 frames: the price, and short enough that a roll under a
+## Bastion's shield leaves his whole 30-frame turn to cut his back in
+## (tests/unit/test_roll_foes.gd).
+const ROLL_RECOVER := 0.2
+const ROLL_TIME := ROLL_TUCK + ROLL_RECOVER
+## How tall the body is to a foe while tucked. Under a 13-px crouch, so a
+## sunbolt at chest height goes over it as it goes over a crouch; over the
+## sentinel's lowest edge (3 px), so the blade passes it only by the roll's
+## window, never by its height.
+const ROLL_HEIGHT := 9.0
+
+## THE DIVE KICK: down + JUMP in a jump or a fall. A straight line, heel
+## first: never faster across than the run, as fast down as anything falls.
+## Those two bounds are the whole argument that it adds no reach (above).
+const DIVE_KICK_DRIFT := 80.0
+const DIVE_KICK_DROP := MAX_FALL_SPEED
+## How far in front of the body, and below the feet, the heel reaches.
+const DIVE_KICK_REACH := 8.0
+## A kick that met stone instead of a foe: planted for this long. The
+## plunge's rule (tests/unit/test_specials.gd), so a kick that misses in
+## front of a guard cannot be swung out of before his cut.
+const DIVE_KICK_RECOVER := 0.4
+## Off a foe the heel springs him up as a stomp does, and back this fast.
+const KICK_RECOIL := 60.0
+
+## THE THROW: THROW, armed, standing or in the air. The arm goes forward for
+## THROW_TIME, and the blade leaves the hand at THROW_RELEASE.
+const THROW_TIME := 0.2
+const THROW_RELEASE := 0.067
+## The blade flies level at this speed, this high above the feet, for this
+## far, and then it falls. Six tiles: half a Glassbearer's aim, so a throw
+## at one is a throw from inside his range.
+const THROW_SPEED := 300.0
+const THROW_HEIGHT := 14.0
+const THROW_RANGE := 96.0
+const THROW_SIZE := Vector2(10.0, 3.0)
+## A blade lying unclaimed this long flies back to the hand by itself, and
+## one that is lost -- in water, on spikes, under the level -- after this. A
+## throw costs the sword for as long as the player chooses to leave it, and
+## never for longer than RECALL_TIME (docs/character.md argues the choice).
+const RECALL_TIME := 4.0
+const RECALL_LOST := 0.5
+const RETURN_SPEED := 360.0
+## Taking the blade back off the floor: down, over it. The stoop is short.
+const PICKUP_TIME := 0.15
+
+## THE SWEEP: SWORD with no sword. The duel's leg along the floor: live from
+## SWEEP_FROM to SWEEP_TO, reaching SWEEP_REACH, a band SWEEP_HEIGHT tall at
+## the feet. It wounds nothing; it rocks what it reaches. The reach is the
+## duel's 13 px made a sword's and a pixel more, because a sentinel raises
+## 14 px off, and a sweep that fell short of a raise would leave a prince
+## without his sword nothing to answer one with but his feet going away.
+const SWEEP_TIME := 0.27
+const SWEEP_FROM := 0.05
+const SWEEP_TO := 0.135
+const SWEEP_REACH := ATTACK_REACH + 1.0
+const SWEEP_HEIGHT := 8.0
+
 # Landing.
 #
 # Both thresholds sit above flat_jump_land_speed(), which is the whole point:
@@ -389,6 +470,18 @@ static func backstep_distance() -> float:
 	var t := 0.0
 	while t < BACKSTEP_SLIDE:
 		distance += backstep_speed(t) * dt
+		t += dt
+	return distance
+
+
+## How far a roll on open floor carries the body, in pixels: ROLL_SPEED for
+## every frame of the tuck, integrated at 60 Hz as backstep_distance() is.
+static func roll_distance() -> float:
+	var dt := 1.0 / 60.0
+	var distance := 0.0
+	var t := 0.0
+	while t < ROLL_TUCK - 0.0001:
+		distance += ROLL_SPEED * dt
 		t += dt
 	return distance
 

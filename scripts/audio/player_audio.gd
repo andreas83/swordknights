@@ -32,6 +32,14 @@ const STEP_RATES := {
 }
 
 ## States whose entry moves the cloak enough to be heard, and how loud.
+## --- the duel's moves --- state entered -> [voice, volume_db, pitch], the
+## duel's own for the same move (FighterAudio.ON_ENTER), so a player who has
+## heard a dive kick in the duel hears one here.
+const MOVE_VOICES := {
+	Player.State.ROLL: ["cloth", -2.0, 1.0],
+	Player.State.DIVE_KICK: ["jump", -2.0, 0.85],
+	Player.State.SWEEP: ["sword", -4.0, 0.72],
+}
 const CLOTH_ON_ENTER := {
 	Player.State.JUMP: -2.0,
 	Player.State.FALL: -6.0,
@@ -87,6 +95,11 @@ func _ready() -> void:
 	_player.attacked.connect(_on_attacked)
 	_player.hurt.connect(_on_hurt)
 	_player.died.connect(_on_died)
+	# --- the duel's moves --- the duel's own throw (FighterAudio's
+	# blade_thrown) and the catch's slap of steel into a palm, pitched up so
+	# it is not heard as a parry.
+	_player.threw.connect(func() -> void: _play("sword", {"pitch": 0.7, "volume_db": -2.0}))
+	_player.rearmed.connect(func() -> void: _play("catch", {"pitch": 1.3, "volume_db": -4.0}))
 
 
 ## --- cadence (pure, so the test can pin it without a scene) ----------------
@@ -119,7 +132,7 @@ static func event_names() -> PackedStringArray:
 	return PackedStringArray([
 		"step_run", "step_walk", "ladder", "cloth", "jump",
 		"land_soft", "land_hard", "ledge_grab", "climb",
-		"sword", "hurt", "die", "masonry",
+		"sword", "hurt", "die", "masonry", "catch",
 	])
 
 
@@ -205,6 +218,10 @@ func _on_state_entered(state: int) -> void:
 		# whoosh under the cloth rather than a swing, so the ear does not
 		# hear an attack in a move that is not one.
 		_play("sword", {"pitch": 0.7, "volume_db": -10.0})
+	# --- the duel's moves --- the duel's voices for them (FighterAudio).
+	if MOVE_VOICES.has(state):
+		var row: Array = MOVE_VOICES[state]
+		_play(String(row[0]), {"volume_db": float(row[1]), "pitch": float(row[2])})
 
 
 func _on_jumped() -> void:
