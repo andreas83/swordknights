@@ -52,7 +52,8 @@ func before_each() -> void:
 	# Standing, and not held by a hitstop left over from another test.
 	for _frame: int in 30:
 		await wait_physics_frames(1)
-		if _game.player.state == Player.State.IDLE and not Flow.is_hitstopped():
+		if _game.player.state == Player.State.IDLE and _game.player.is_grounded() \
+				and not Flow.is_hitstopped():
 			break
 
 

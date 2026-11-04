@@ -149,7 +149,8 @@ func _play(text: String) -> void:
 	_game.player.attacked.connect(func() -> void: _swings += 1)
 	for _frame: int in 30:
 		await wait_physics_frames(1)
-		if _game.player.state == Player.State.IDLE and not Flow.is_hitstopped():
+		if _game.player.state == Player.State.IDLE and _game.player.is_grounded() \
+				and not Flow.is_hitstopped():
 			break
 
 
@@ -332,7 +333,8 @@ func test_one_swing_still_takes_one_heart() -> void:
 	await wait_physics_frames(2)
 	await _until_settled()
 	for _wait: int in 30:
-		if _player().state == Player.State.IDLE and not Flow.is_hitstopped():
+		if _player().state == Player.State.IDLE and _player().is_grounded() \
+				and not Flow.is_hitstopped():
 			break
 		await wait_physics_frames(1)
 	assert_eq(guard.health, Patrol.MAX_HEALTH - 1, "the swing took a heart")

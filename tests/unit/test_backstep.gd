@@ -98,9 +98,15 @@ func _play(text: String) -> void:
 	_swings = 0
 	_game.player.backstepped.connect(func() -> void: _backsteps += 1)
 	_game.player.attacked.connect(func() -> void: _swings += 1)
+	# Grounded as well as IDLE: a prince is IDLE from his spawn frame, before
+	# his first slide has met a floor the tile layer builds a frame late. Run
+	# after a long suite (test_specials.gd) the frames fell so that this
+	# returned with him not yet on the floor, and the backstep read as a
+	# turn -- a test that failed by what ran before it.
 	for _frame: int in 30:
 		await wait_physics_frames(1)
-		if _game.player.state == Player.State.IDLE and not Flow.is_hitstopped():
+		if _game.player.state == Player.State.IDLE and _game.player.is_grounded() \
+				and not Flow.is_hitstopped():
 			break
 
 
@@ -432,9 +438,13 @@ func test_after_the_window_he_is_hit() -> void:
 func test_a_cut_from_behind_lands() -> void:
 	await _play(FACE_TO_FACE)
 	var guard := _guard()
-	# Looking away from the guard: the backstep goes back into him.
+	# Looking away from the guard: the backstep goes back into him. Four
+	# frames of raise left, not two: the tap takes two (GUT's
+	# wait_physics_frames(1)), and the wait above polls every other frame, so
+	# with two left the cut could land inside the tap and the test read HURT
+	# or BACKSTEP by the parity of the frame it began on.
 	_player().facing = -1
-	await _until_the_raise_has(0.03)
+	await _until_the_raise_has(4.0 * FRAME)
 	assert_eq(guard.state, Patrol.State.WINDUP, "the guard is raising at his back")
 	await _tap(_back() | PlayerInput.BIT_ATTACK)
 	assert_eq(_state_name(), "BACKSTEP", "the backstep is on")
