@@ -235,6 +235,13 @@ up (`MenuScene._row_pitch`): eight rows sat at eleven while the duel
 had three. Six or seven sit at twelve, so adding a row never moves a screen
 that had room for it.
 
+**Rows can be tapped**, as on every page: a tap selects, a tap on the selected
+row opens it. The list ignored every touch once, on the one screen a phone
+always shows first. Only the touch counts, not the mouse click Godot emulates
+from it, and a touch that is a thumb button's is the button's alone
+(`TouchControls.claims()`); `tests/unit/test_title_taps.gd` holds all three,
+and that no row lies under a thumb button.
+
 The hint line is cut into the rail (`UiLayout.rail(view)`, shared with the
 settings page). When the on-screen stick is up, a sword button covers the right
 end of that rail, so the hint moves to the left end and says less — the buttons
@@ -252,7 +259,7 @@ touch button, and the only place wide enough for the whole phrase at 320 units;
 too narrow. It is hung from the architecture rather than floated as a toast,
 so it reads as part of the place.
 
-It is the one thing on the title screen that is **touched** rather than chosen
+It is the one thing on the title screen that is **only touched**, never chosen
 with the stick: it is not a way into the game and does not belong in the list
 the stick walks. Its touch target reaches `PLAQUE_TOUCH` (24) units below the
 top of the safe area — about 9 mm on a phone held sideways — and overlaps the
@@ -386,7 +393,16 @@ reporting a bug needs it, and they will look for it where the settings are.
 
 Volume is a ten-cell gauge, and a step snaps to the grid. Driven by the same
 four actions as the menu: up/down to choose, left/right to set, jump to
-confirm, sword to go back.
+confirm, sword to go back. Rows can be tapped, as the title screen's can: a
+tap selects, a tap on the selected row does what JUMP does there, and a tap
+on a gauge's cells sets the volume to the cell tapped — the first cell,
+tapped when it is all that is lit, is silence.
+
+**HAPTICS** switches the buzz on landings and hits (`Flow.haptic()`), which
+is on by default on a phone and could not be switched off anywhere before it.
+It writes through `Flow.set_haptics_enabled()` to `user://feel.cfg` and buzzes
+once when switched on. Seven rows made the pitch 13 and the drop to the first
+row 30, or the build line landed on the rail.
 
 **LONGER WARNINGS** is the one assist (`scripts/core/assist.gd`): every foe's
 tell, and every timed window that guards a death, lasts half as long again.

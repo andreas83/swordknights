@@ -475,9 +475,9 @@ on dying — all scaled by the same weight the dust and the camera use.
 The setting lives in `user://feel.cfg` under `[feel] haptics`, and
 `Flow.set_haptics_enabled()` writes it. **It defaults to on where there is
 something to vibrate — `OS.has_feature("mobile")` — and off everywhere else**,
-so a desktop or web build never pays for it and a phone gets it without
-needing a settings screen that does not exist yet. Switching it off is one
-call whenever one does.
+so a desktop or web build never pays for it and a phone gets it without a
+trip to the settings page. The page's **HAPTICS** row switches it, and buzzes
+once when it is switched on, so the switch is felt as well as read.
 
 ---
 

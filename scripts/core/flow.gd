@@ -238,7 +238,8 @@ static func is_hitstopped() -> bool:
 
 ## Defaults to on where there is something to vibrate and off everywhere else,
 ## so a desktop or web build never pays for it and a phone gets it without a
-## trip through a settings screen that does not exist yet.
+## trip through the settings page -- whose HAPTICS row switches it
+## (SettingsPanel).
 static func haptics_enabled() -> bool:
 	if _haptics < 0:
 		var fallback := OS.has_feature("mobile")

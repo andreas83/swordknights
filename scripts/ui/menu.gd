@@ -9,7 +9,9 @@ extends Control
 ##
 ## Navigated with up/down and confirmed with jump, so the keyboard, a gamepad
 ## and the on-screen touch controls all work without any extra plumbing. Sword
-## backs out of a sub-screen.
+## backs out of a sub-screen. Rows can be tapped, as on every page: a tap
+## selects, a tap on the selected row opens it. On a phone the first thing
+## anyone does with a list is touch it, and this one ignored every touch.
 ##
 ## Only the selected mode shows its subtitle. Five modes each with a caption is
 ## a wall of small type; one caption that moves is a list with a voice. Every
@@ -21,7 +23,7 @@ extends Control
 ## superseded (UpdateCheck), and if so hangs a plaque from the lintel:
 ## UPDATE AVAILABLE · BUILD n. Tapping it hands the APK's URL to the browser,
 ## which downloads it and lets Android install it over this copy. The plaque is
-## the one thing on this screen that is touched rather than chosen with the
+## the one thing on this screen that is only touched, never chosen with the
 ## stick, because it is not a way into the game and should not sit in the list
 ## the stick walks. A release build never asks, so never shows it.
 
@@ -56,6 +58,9 @@ const PLAQUE_DROP := 7.0
 ## 7 mm floor for a thumb. It overlaps the top of the title, which is not
 ## touchable, rather than shrinking.
 const PLAQUE_TOUCH := 24.0
+## How long the stick is ignored after a tap on a row: the same thumb is now
+## on the floating stick, and a wobble in the tap is not a second move.
+const TAP_HOLD := 0.42
 
 var _index := 0
 var _time := 0.0
@@ -65,6 +70,9 @@ var _settings: SettingsPanel
 var _update: UpdateCheck
 var _offer: Dictionary = {}
 var _offer_rect := Rect2()
+var _hold := 0.0
+## Where each row can be tapped, as last drawn; empty before the first draw.
+var _row_rects: Array[Rect2] = []
 
 ## Test seam: what a tap on the plaque calls with the APK's URL. The browser,
 ## by default; Godot cannot install a package without an Android plugin, and
@@ -140,7 +148,7 @@ func _build_rows() -> Array[Dictionary]:
 	out.append({
 		"id": SETTINGS_ID,
 		"title": "SETTINGS",
-		"subtitle": "SOUND AND ASSISTS",
+		"subtitle": "SOUND, HAPTICS AND ASSISTS",
 		"scene": "",
 		"enabled": true,
 	})
@@ -206,22 +214,50 @@ func take_offer() -> void:
 	opener.call(String(_offer["apk_url"]))
 
 
-## Touch only: the plaque is not in the list the stick and keys walk. With
-## emulate_touch_from_mouse on, a mouse click arrives here as a touch too, and
-## a real touch also produces an emulated mouse click -- so listening to the
-## touch alone is what makes one tap open the browser once.
+## A tap at `at`, in this control's coordinates: selects a row, or opens the
+## one already selected, as the chapter select's does. True if it landed on
+## a row. A tap that is a thumb button's is the button's alone
+## (TouchControls.claims()). Public so a test can tap without a touch.
+func tap(at: Vector2) -> bool:
+	if _settings != null and _settings.visible:
+		return false
+	if TouchControls.claims(self, at):
+		return false
+	for row: int in _row_rects.size():
+		if not _row_rects[row].has_point(at):
+			continue
+		if row == _index:
+			confirm()
+		elif bool(_rows[row]["enabled"]):
+			_index = row
+			GameAudio.cue("ui_move")
+			queue_redraw()
+		_hold = TAP_HOLD
+		return true
+	return false
+
+
+## Where row `row` can be tapped; empty until the menu has been drawn once.
+func row_rect(row: int) -> Rect2:
+	return _row_rects[row] if row < _row_rects.size() else Rect2()
+
+
+## Touch only: the plaque and the rows. With emulate_touch_from_mouse on, a
+## mouse click arrives here as a touch too, and a real touch also produces an
+## emulated mouse click -- so listening to the touch alone is what makes one
+## tap open the browser, or a row, once.
 func _input(event: InputEvent) -> void:
-	if _offer.is_empty() or not _offer_rect.has_area():
-		return
 	if _settings != null and _settings.visible:
 		return
 	var touch := event as InputEventScreenTouch
 	if touch == null or not touch.pressed:
 		return
-	var local := make_input_local(touch) as InputEventScreenTouch
-	if _offer_rect.has_point(local.position):
+	var local := (make_input_local(touch) as InputEventScreenTouch).position
+	if not _offer.is_empty() and _offer_rect.has_point(local):
 		get_viewport().set_input_as_handled()
 		take_offer()
+	elif tap(local):
+		get_viewport().set_input_as_handled()
 
 
 ## Android's Back: closes the settings page, as SWORD does, or -- on the
@@ -252,6 +288,7 @@ func _close_settings() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_repeat = maxf(0.0, _repeat - delta)
+	_hold = maxf(0.0, _hold - delta)
 	queue_redraw()
 
 	if _settings != null and _settings.visible:
@@ -262,7 +299,9 @@ func _process(delta: float) -> void:
 	TouchControls.label(self, "OPEN", "OPEN")
 
 	var axis := Input.get_axis("move_up", "move_down")
-	if absf(axis) > 0.5 and is_zero_approx(_repeat):
+	if _hold > 0.0:
+		pass
+	elif absf(axis) > 0.5 and is_zero_approx(_repeat):
 		move(signi(int(signf(axis))))
 		_repeat = REPEAT_DELAY
 	elif absf(axis) <= 0.5:
@@ -310,8 +349,13 @@ func _draw() -> void:
 
 	var list_top := title_top + 29.0
 	var pitch := _row_pitch(list_top, rail)
+	_row_rects.clear()
 	for i: int in _rows.size():
-		_draw_row(_rows[i], column, list_top + i * pitch, i == _index)
+		var y := list_top + i * pitch
+		# The selection band's top to the next row's: the whole pitch, so
+		# there is no gap between rows a tap can fall through.
+		_row_rects.append(Rect2(column.position.x, y - 3.0, column.size.x, pitch))
+		_draw_row(_rows[i], column, y, i == _index)
 
 	# One caption slot, below the list, so choosing does not reflow anything.
 	var caption_y := list_top + _rows.size() * pitch + 5.0

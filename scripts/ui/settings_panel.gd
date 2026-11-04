@@ -1,6 +1,6 @@
 class_name SettingsPanel
 extends Control
-## Volume, the one switch that silences the game, and the one assist.
+## Volume, the one switch that silences the game, haptics, and the one assist.
 ##
 ## A sub-screen of the menu rather than a mode: it is not something you play,
 ## and ModeRegistry is the list of things you play.
@@ -8,7 +8,11 @@ extends Control
 ## LONGER WARNINGS is here because this is where a player looks for anything
 ## they can set, and a page of its own for one switch would be a page nobody
 ## opens. It writes through Assist.set_longer_warnings(), which saves for
-## itself (scripts/core/assist.gd).
+## itself (scripts/core/assist.gd). HAPTICS is here for the same reason: the
+## buzz on a landing or a hit (Flow.haptic()) was on by default on a phone and
+## could not be switched off anywhere. It writes through
+## Flow.set_haptics_enabled(), which saves for itself, and buzzes once when
+## switched on, so the switch is felt as well as read.
 ##
 ## Everything here already existed — AudioDirector persists master, music, SFX
 ## and mute to user://audio.cfg — and only a keyboard `M` could reach any of
@@ -20,7 +24,9 @@ extends Control
 ##
 ## Driven by the same four actions as the menu, so a keyboard, a gamepad and
 ## the on-screen stick all work: up/down to choose, left/right to set, jump to
-## confirm, sword to go back.
+## confirm, sword to go back. Rows can be tapped, as on every page: a tap
+## selects, a tap on the selected row does what JUMP would -- flips a switch,
+## goes BACK -- and a tap on a gauge's cells sets the volume there.
 ##
 ## Under the list, small and dim, the build that is running: its name, build
 ## number and commit. Here rather than on the title screen because only the
@@ -36,11 +42,21 @@ const REPEAT_DELAY := 0.22
 const REPEAT_FIRST := 0.42
 const STEP := 0.1
 const GAUGE_CELLS := 10
-## Fifteen, not sixteen, since LONGER WARNINGS made it six rows: at sixteen
-## the build line under the list landed on the rail's hint.
-const ROW_HEIGHT := 15.0
-## From the top of the title to the first row.
-const LIST_DROP := 34.0
+## Thirteen since HAPTICS made it seven rows: at fifteen (six rows) the build
+## line under a seventh landed on the rail. Thirteen is the selection band's
+## own height, so the bands meet and a tap has no gap between rows to fall in.
+const ROW_HEIGHT := 13.0
+## From the top of the title to the first row: four units tighter than six
+## rows had, for the same reason.
+const LIST_DROP := 30.0
+## The gauge's cells, as drawn and as tapped.
+const GAUGE_CELL := Vector2(4.0, 7.0)
+## How long the stick is ignored after a tap: the same thumb is now on the
+## floating stick, and a wobble in the tap is not a second move.
+const TAP_HOLD := 0.42
+## SWORD with its hit padding (scripts/ui/touch_controls.gd), measured from
+## the bottom right as the chapter select measures it.
+const SWORD_REACH := Vector2(110.0, 50.0)
 const COLUMN_WIDTH := 168.0
 
 enum Kind { GAUGE, TOGGLE, ACTION }
@@ -50,12 +66,17 @@ var audio: Node
 
 var _index := 0
 var _repeat := 0.0
+var _hold := 0.0
 var _settings: AudioSettings
+## Where each row, and each gauge's cells, can be tapped, as last drawn.
+var _row_rects: Array[Rect2] = []
+var _gauge_rects: Dictionary = {}
 var _rows: Array[Dictionary] = [
 	{"id": "master", "label": "MASTER", "kind": Kind.GAUGE, "bus": &"Master"},
 	{"id": "music", "label": "MUSIC", "kind": Kind.GAUGE, "bus": &"Music"},
 	{"id": "sfx", "label": "SWORDS", "kind": Kind.GAUGE, "bus": &"SFX"},
 	{"id": "mute", "label": "MUTE", "kind": Kind.TOGGLE, "bus": &""},
+	{"id": "haptics", "label": "HAPTICS", "kind": Kind.TOGGLE, "bus": &""},
 	{"id": "warnings", "label": "LONGER WARNINGS", "kind": Kind.TOGGLE, "bus": &""},
 	{"id": "back", "label": "BACK", "kind": Kind.ACTION, "bus": &""},
 ]
@@ -102,11 +123,15 @@ func value_of(row: Dictionary) -> float:
 
 
 ## Whether a toggle row is switched on: MUTE when the game is silent, LONGER
-## WARNINGS when the assist is on.
+## WARNINGS when the assist is on, HAPTICS when the phone buzzes.
 func is_on(row: Dictionary) -> bool:
-	if String(row["id"]) == "warnings":
-		return Assist.longer_warnings()
-	return _settings.muted
+	match String(row["id"]):
+		"warnings":
+			return Assist.longer_warnings()
+		"haptics":
+			return Flow.haptics_enabled()
+		_:
+			return _settings.muted
 
 
 func move(by: int) -> void:
@@ -157,6 +182,62 @@ func back() -> void:
 	closed.emit()
 
 
+## A tap at `at`, in this control's coordinates: selects a row, or on the
+## selected row does what JUMP does there -- except on a gauge's cells, where
+## it sets the volume to the cell tapped (the first cell, tapped when it is
+## all that is lit, is silence). True if it landed on a row; a tap that is a
+## thumb button's is the button's alone (TouchControls.claims()).
+func tap(at: Vector2) -> bool:
+	if not visible or TouchControls.claims(get_parent(), at):
+		return false
+	for row: int in _row_rects.size():
+		if not _row_rects[row].has_point(at):
+			continue
+		_hold = TAP_HOLD
+		if row != _index:
+			_index = row
+			_play("ui_move")
+		elif _gauge_rects.has(row) and (_gauge_rects[row] as Rect2).has_point(at):
+			_set_from_cell(_rows[row], _gauge_rects[row], at.x)
+		else:
+			confirm()
+		queue_redraw()
+		return true
+	return false
+
+
+## Where row `row` can be tapped; empty until the panel has been drawn.
+func row_rect(row: int) -> Rect2:
+	return _row_rects[row] if row < _row_rects.size() else Rect2()
+
+
+## Where row `row`'s gauge can be tapped; empty for a row with none.
+func gauge_rect(row: int) -> Rect2:
+	return _gauge_rects.get(row, Rect2())
+
+
+func _set_from_cell(row: Dictionary, gauge: Rect2, x: float) -> void:
+	var cell := clampi(int((x - gauge.position.x) / (GAUGE_CELL.x + 1.0)), 0, GAUGE_CELLS - 1)
+	var next := float(cell + 1) * STEP
+	if cell == 0 and is_equal_approx(value_of(row), next):
+		next = 0.0
+	if is_equal_approx(next, value_of(row)):
+		return
+	_set_volume(row["bus"], next)
+	_play("ui_move")
+
+
+## Touch only, as the title screen listens: the emulated mouse click a real
+## touch also makes would be a second tap.
+func _input(event: InputEvent) -> void:
+	var touch := event as InputEventScreenTouch
+	if touch == null or not touch.pressed or not visible:
+		return
+	var local := make_input_local(touch) as InputEventScreenTouch
+	if tap(local.position):
+		get_viewport().set_input_as_handled()
+
+
 ## What JUMP does on the selected row, for the thumb button's word: a gauge
 ## steps up, a switch flips, BACK goes back.
 func jump_word() -> String:
@@ -173,13 +254,16 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	_repeat = maxf(0.0, _repeat - delta)
+	_hold = maxf(0.0, _hold - delta)
 	# The page draws over the title screen, whose controls these are.
 	TouchControls.label(get_parent(), jump_word(), "BACK")
 
 	var vertical := Input.get_axis("move_up", "move_down")
 	var horizontal := Input.get_axis("move_left", "move_right")
 
-	if absf(vertical) > 0.5:
+	if _hold > 0.0:
+		pass
+	elif absf(vertical) > 0.5:
 		if is_zero_approx(_repeat):
 			move(signi(int(signf(vertical))))
 			_repeat = REPEAT_FIRST
@@ -210,12 +294,18 @@ func _set_volume(bus: StringName, value: float) -> void:
 
 
 func _flip(row: Dictionary) -> void:
-	if String(row["id"]) != "warnings":
-		_toggle_mute()
-		return
-	var err := Assist.set_longer_warnings(not Assist.longer_warnings())
-	if err != OK:
-		push_warning("assist: could not save: %s" % error_string(err))
+	match String(row["id"]):
+		"warnings":
+			var err := Assist.set_longer_warnings(not Assist.longer_warnings())
+			if err != OK:
+				push_warning("assist: could not save: %s" % error_string(err))
+		"haptics":
+			Flow.set_haptics_enabled(not Flow.haptics_enabled())
+			# Felt as well as read: what HAPTICS ON means, once.
+			Flow.haptic(0.6)
+		_:
+			_toggle_mute()
+			return
 	_play("ui_confirm")
 
 
@@ -254,21 +344,35 @@ func _draw() -> void:
 		minf(column.size.x * 0.5, 54.0), Palette.with_alpha(Palette.LIGHT_SOFT, 0.7))
 
 	var list_top := top + LIST_DROP
+	_row_rects.clear()
+	_gauge_rects.clear()
 	for i: int in _rows.size():
-		_draw_row(_rows[i], column, list_top + i * ROW_HEIGHT, i == _index)
+		var y := list_top + i * ROW_HEIGHT
+		_row_rects.append(Rect2(column.position.x, y - 3.0, column.size.x, ROW_HEIGHT))
+		var gauge := _draw_row(_rows[i], column, y, i == _index)
+		if gauge.has_area():
+			_gauge_rects[i] = gauge
 
+	var controls := TouchControls.of(get_parent())
+	var surface := controls.get_node_or_null(^"Surface") as Control if controls else null
+	var thumbs := surface != null and surface.visible
+
+	# The build line sits low enough to reach SWORD's ring at 320 units, so
+	# with the thumbs up it slides left, just clear of SWORD's reach, rather
+	# than shortening: the person reporting a bug needs all of it.
+	var right := view.x - SWORD_REACH.x if thumbs else content.end.x
 	var build := UiFont.fit(PackedStringArray([
 		build_line(), "BUILD %d" % BuildStamp.CODE,
-	]), content.size.x, UiFont.Cut.MICRO)
-	UiFont.draw_text(self, build, Vector2(cx, list_top + _rows.size() * ROW_HEIGHT + 4.0),
-		UiFont.Cut.MICRO, Palette.with_alpha(Palette.PAPER, 0.42), UiFont.Align.CENTER, 0.5)
+	]), right - content.position.x, UiFont.Cut.MICRO)
+	var half := UiFont.width(build, UiFont.Cut.MICRO) * 0.5
+	var build_x := maxf(content.position.x + half, minf(cx, right - half))
+	UiFont.draw_text(self, build, Vector2(roundf(build_x),
+		list_top + _rows.size() * ROW_HEIGHT + 4.0), UiFont.Cut.MICRO,
+		Palette.with_alpha(Palette.PAPER, 0.42), UiFont.Align.CENTER, 0.5)
 
 	# On the same course of stone the title screen cuts its hint into, and
 	# like its hint it moves to the rail's left end when the thumb buttons
 	# are up: SWORD covers the right end, and says BACK itself.
-	var controls := TouchControls.of(get_parent())
-	var surface := controls.get_node_or_null(^"Surface") as Control if controls else null
-	var thumbs := surface != null and surface.visible
 	var hint := UiFont.fit(PackedStringArray([
 		"LEFT / RIGHT TO SET   ·   SWORD TO GO BACK",
 		"LEFT / RIGHT  ·  SWORD TO GO BACK",
@@ -280,7 +384,9 @@ func _draw() -> void:
 		UiFont.Align.LEFT if thumbs else UiFont.Align.CENTER)
 
 
-func _draw_row(row: Dictionary, column: Rect2, y: float, selected: bool) -> void:
+## Draws one row; returns its gauge's cells, grown to the row's height so a
+## thumb need not land on a seven-unit cell, or an empty rect.
+func _draw_row(row: Dictionary, column: Rect2, y: float, selected: bool) -> Rect2:
 	var left := column.position.x + 12.0
 	var right := column.end.x
 	var band := Rect2(column.position.x + 4.0, y - 3.0, column.size.x - 8.0, 13.0)
@@ -295,10 +401,11 @@ func _draw_row(row: Dictionary, column: Rect2, y: float, selected: bool) -> void
 
 	match int(row["kind"]):
 		Kind.GAUGE:
-			var cell := Vector2(4.0, 7.0)
-			var wide := GAUGE_CELLS * (cell.x + 1.0) - 1.0
-			UiMarks.gauge(self, Vector2(right - wide - 2.0, y), GAUGE_CELLS, cell,
-				value_of(row), Palette.LIGHT_SOFT, selected)
+			var wide := GAUGE_CELLS * (GAUGE_CELL.x + 1.0) - 1.0
+			var at := Vector2(right - wide - 2.0, y)
+			UiMarks.gauge(self, at, GAUGE_CELLS, GAUGE_CELL, value_of(row),
+				Palette.LIGHT_SOFT, selected)
+			return Rect2(at.x, y - 3.0, wide, ROW_HEIGHT)
 		Kind.TOGGLE:
 			var on := is_on(row)
 			UiFont.draw_text(self, "ON" if on else "OFF", Vector2(right - 2.0, y + 1.0),
@@ -307,3 +414,4 @@ func _draw_row(row: Dictionary, column: Rect2, y: float, selected: bool) -> void
 				UiFont.Align.RIGHT, 0.5)
 		_:
 			pass
+	return Rect2()
