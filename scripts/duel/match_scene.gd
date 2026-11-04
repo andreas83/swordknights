@@ -242,7 +242,8 @@ func _to_menu() -> void:
 ## against an echo. The one reaction that is a record rather than a beat, the
 ## blood, has its own pair of signals, because a correction can take it back.
 
-func _on_fighter_died(victim: int, _killer: int, _at: Vector2) -> void:
+func _on_fighter_died(victim: int, _killer: int, at: Vector2) -> void:
+	camera.kill_beat(at)
 	camera.shake(3.6, 0.42)
 	hud.flash(_down(victim))
 

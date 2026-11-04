@@ -100,6 +100,32 @@ player actually needed: seeing further down a drop is a question of where the
 frame sits, not how wide it is. `tests/feel_camera_test.gd` reads the source
 and fails if anyone writes `zoom`.
 
+### The duel's camera breathes, and why that is not a contradiction
+
+The duel's camera (`scripts/duel/match_camera.gd`, `match_framing.gd`) does
+zoom, and is not covered by the rule above, because its problem is the other
+way round: two fighters who must both be on screen, at a scale the owner,
+playing on a phone, found too small. It comes in to the adventure's scale as
+they close and goes out to the old fixed framing as they part.
+
+What keeps it inside this page's rules:
+
+- **At rest it is never fractional.** Every level is a whole number of screen
+  pixels per texel, and the view is snapped to the pixel grid. Only the
+  frames of an ease between levels are fractional — smoothstepped, 0.6 s in,
+  0.3 s out — and a scale that is moving reads as a camera move, where one that
+  rests reads as a shimmer. That was judged on frames rendered mid-ease.
+- **It is not noticed.** It moves a level at a time, needs 48 px of
+  hysteresis, 0.6 s of dwell and 1.2 s since the last step out before it comes
+  in, so a fencing exchange at the edge of a threshold does not pump it.
+- **It never fights a beat.** On a kill it holds for 0.8 s at the scale the
+  kill happened, body in frame, and only then stands back.
+- **It is presentation.** It runs in `_process`, reads the match and writes
+  nothing; it is the same camera online and against the computer, and a match
+  framed every frame steps to the same bytes as one never framed.
+
+`docs/duel-match.md`, *The camera*, has the curve and its numbers.
+
 ---
 
 ## Hitstop
@@ -407,7 +433,8 @@ call whenever one does.
 Each of these was considered, and some were built and then taken out again.
 
 - **Camera zoom** on falls and ledge grabs. Argued above: it softens every
-  edge in the frame.
+  edge in the frame. (The duel's two-fighter framing does zoom, in whole
+  pixels per texel at rest; see *The duel's camera breathes*.)
 - **Hitstop on relic pickup, on landing, and on the exit door.** Hitstop is
   for things that resist you. A relic that stops time is a relic that feels
   like a mistake.

@@ -22,15 +22,26 @@ extends Camera2D
 ## camera follows a float. The seam is a thing in the level files and nowhere
 ## else.
 ##
-## FRAMED ON TWO FIGHTERS AT OPPOSITE ENDS OF A ZONE
-## Solved by construction rather than by zooming. The scale is fixed by the
-## fighter's height on screen (_apply_zoom), a zone is narrow enough to fit
-## across a phone at that scale (ZoneStrip.SCREEN_WIDTH), and the simulation
-## holds both fighters inside a window one zone wide -- so on a phone they are
-## both on screen at every moment without the zoom ever moving. On a screen
-## narrower than a zone at that scale the view follows the pair instead. A
-## breathing zoom would make "1.5 screen widths" ambiguous, and that number has
-## to mean the same thing on a phone and on a desktop.
+## FRAMED ON TWO FIGHTERS, AS CLOSE AS THEY ALLOW
+## The scale breathes: as close as the adventure's while the two are near each
+## other, out to the old fixed framing (a fighter FIGHTER_SHARE of the screen)
+## as they separate, a whole screen pixel per texel at rest. How far, when and
+## how fast is MatchFraming's, which argues each number; this file hands it the
+## fighters and draws what it answers. The far level is still the one the
+## strip was cut for -- a zone fits across a phone at it -- so a match that
+## never comes close looks exactly as it did.
+##
+## What it is handed is what must be on screen: the living fighters inside the
+## playable window, and for a moment after a kill the spot the body fell on.
+## Close framing is allowed only while both are alive and inside the window.
+## A fighter down, or respawned 1.5 screens ahead of the leader as the spec
+## places them, puts the frame at the far level and leans it that way, so the
+## respawn is on screen as soon as any readable framing can show it.
+##
+## It reads the match and writes nothing back. The online duel and DUEL VS CPU
+## use this same camera, and two peers may frame the same frame differently --
+## different screens, different moments of an ease -- without it mattering,
+## because nothing about the frame is in the snapshot.
 ##
 ## Nothing here runs in _physics_process. The match steps at a fixed 60 Hz and
 ## may step twice in one frame while a client reconciles; the camera glides at
@@ -42,10 +53,9 @@ extends Camera2D
 const FOLLOW := 14.0
 const VERTICAL_FOLLOW := 6.0
 
-## How tall a standing fighter is, as a share of the screen's height. The middle
-## of 8-9%: big enough that a blade's height reads on a phone, small enough
-## that a zone still fits across one. See _apply_zoom().
-const FIGHTER_SHARE := 0.085
+## How tall a standing fighter is at the widest framing, as a share of the
+## screen's height. MatchFraming owns it now; kept here under its old name.
+const FIGHTER_SHARE := MatchFraming.FIGHTER_SHARE
 
 ## The rumble at full tremor, in world pixels. Small on purpose: the fight has to
 ## stay readable, and a fighter is only 22 px tall.
@@ -62,6 +72,18 @@ var framing_width := 0.0
 ## MatchDusk. Also scales up every shake while it is on, so a kill in the
 ## final room lands harder than one in the middle.
 var tremor := 0.0
+
+## How close to stand. See MatchFraming.
+var framing := MatchFraming.new()
+
+## The screen the framing is worked out for, in pixels, and its pixels per
+## canvas unit. Zero measures the window. A seam for a test, which runs with no
+## window and has to stand in front of a phone's.
+var screen_pixels := Vector2.ZERO
+var pixels_per_unit := 0.0
+
+## The spot the last body fell on, kept in the frame while the kill holds.
+var _fallen := Vector2.ZERO
 
 ## The follow position before it is snapped to whole screen pixels. Snapping the
 ## smoothed value itself would stall the lerp a fraction of a pixel short.
@@ -84,10 +106,20 @@ func setup(match_node: DuelMatch) -> void:
 	limit_right = int(world.x)
 	limit_bottom = int(world.y)
 
-	_apply_zoom()
+	_measure()
+	framing.reset(_subjects(), _together())
+	_apply_zoom(0.0)
 	_smooth = _target()
 	global_position = _snapped(_smooth)
 	reset_smoothing()
+
+
+## A death: the frame holds where it is, with the body in it, before it stands
+## back to wait for the respawn. Rung by the scene on `fighter_died`, the beat,
+## which a replay never rings twice.
+func kill_beat(at: Vector2) -> void:
+	_fallen = at
+	framing.kill_beat()
 
 
 func shake(magnitude: float, duration: float = 0.25) -> void:
@@ -98,13 +130,16 @@ func shake(magnitude: float, duration: float = 0.25) -> void:
 func _process(delta: float) -> void:
 	if fight == null or fight.strip == null:
 		return
-	_apply_zoom()
+	_apply_zoom(delta)
 
 	var want := _target()
 	_smooth = Vector2(
 		lerpf(_smooth.x, want.x, 1.0 - exp(-FOLLOW * delta)),
 		lerpf(_smooth.y, want.y, 1.0 - exp(-VERTICAL_FOLLOW * delta))
 	)
+	# The glide is allowed to lag the target, but not to lose a fighter: two
+	# running apart at full speed are nine pixels ahead of a 14/s follow.
+	_smooth = _kept(_smooth, _subjects())
 	global_position = _snapped(_smooth)
 
 	var jolt := Vector2.ZERO
@@ -121,53 +156,125 @@ func _process(delta: float) -> void:
 	offset = _snapped(jolt + _rumble() * TREMOR_PX * tremor)
 
 
-## The centre of the authoritative window, and a vertical framing of whatever
-## the two fighters are doing inside it.
+## Where the view should be: between the subjects, leaning toward a fighter
+## who is down or away, and never so far that a subject leaves the frame.
 func _target() -> Vector2:
 	var width := fight.strip.zone_width()
-	var centre := fight.scroll + width * 0.5
-
 	var view := _view_size() / zoom
-	if view.x < width - 0.5:
-		# Framed narrower than the window: follow the fighters inside it rather
-		# than staring at its middle while they fight at one end.
-		var mid := (fight.fighter_position(0).x + fight.fighter_position(1).x) * 0.5
-		centre = clampf(mid, fight.scroll + view.x * 0.5,
-			fight.scroll + width - view.x * 0.5)
-	var high := fight.fighter_position(0).y
-	var low := high
-	for slot: int in 2:
-		var y := fight.fighter_position(slot).y
-		high = minf(high, y)
-		low = maxf(low, y)
+	var subjects := _subjects()
+
+	# The window's own range for the centre: inside it when the view is
+	# narrower, holding all of it when the view is wider.
+	var lo := fight.scroll + view.x * 0.5
+	var hi := fight.scroll + width - view.x * 0.5
+	if lo > hi:
+		var swap := lo
+		lo = hi
+		hi = swap
+	var leaning := _leaning(subjects)
+	var centre := clampf((leaning.x + leaning.y) * 0.5, lo, hi)
+
+	var high := INF
+	var low := -INF
+	for at: Vector2 in subjects:
+		high = minf(high, at.y)
+		low = maxf(low, at.y)
+	if subjects.is_empty():
+		high = fight.fighter_position(0).y
+		low = high
 	# Their feet, lifted by a body, so heads are not against the top edge.
 	var middle := (high + low) * 0.5 - 14.0
 	var height := fight.strip.world_size().y
 	var vertical := clampf(middle, view.y * 0.5, maxf(view.y * 0.5, height - view.y * 0.5))
 
-	return Vector2(centre, vertical)
+	# The rule the mode cannot lose outranks the window and the lean.
+	return _kept(Vector2(centre, vertical), subjects)
 
 
-## A fighter stands 8-9% of the screen's height, at a whole number of screen
-## pixels per world pixel.
+## `centre`, moved as little as it takes for every subject to be inside the
+## view with MatchFraming's hard margins: EDGE beside the feet, EDGE_UPRIGHT
+## above the head and below the feet.
+func _kept(centre: Vector2, subjects: PackedVector2Array) -> Vector2:
+	if subjects.is_empty():
+		return centre
+	var half := _view_size() / zoom * 0.5
+	var body := DuelTuning.default().body_height
+	var left := subjects[0].x
+	var right := left
+	var top := subjects[0].y
+	var bottom := top
+	for at: Vector2 in subjects:
+		left = minf(left, at.x)
+		right = maxf(right, at.x)
+		top = minf(top, at.y)
+		bottom = maxf(bottom, at.y)
+	var x_lo := right + MatchFraming.EDGE - half.x
+	var x_hi := left - MatchFraming.EDGE + half.x
+	var y_lo := bottom + MatchFraming.EDGE_UPRIGHT - half.y
+	var y_hi := top - body - MatchFraming.EDGE_UPRIGHT + half.y
+	return Vector2(
+		clampf(centre.x, minf(x_lo, x_hi), maxf(x_lo, x_hi)),
+		clampf(centre.y, minf(y_lo, y_hi), maxf(y_lo, y_hi))
+	)
+
+
+## What must be on screen: every living fighter inside the playable window,
+## and the spot the last body fell on while the kill holds.
+func _subjects() -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for slot: int in 2:
+		if fight.is_fighter_alive(slot) and _inside(fight.fighter_position(slot).x):
+			out.append(fight.fighter_position(slot))
+	if framing.holding():
+		out.append(_fallen)
+	return out
+
+
+## Both alive and both in the window: the only time the frame may come close.
+func _together() -> bool:
+	for slot: int in 2:
+		if not fight.is_fighter_alive(slot) or not _inside(fight.fighter_position(slot).x):
+			return false
+	return true
+
+
+func _inside(x: float) -> bool:
+	return x >= fight.scroll - MatchFraming.EDGE \
+		and x <= fight.scroll + fight.strip.zone_width() + MatchFraming.EDGE
+
+
+## The horizontal extent the view leans toward: the subjects, plus where a
+## fighter who is down will come back and where one outside the window stands.
+## Returned as (left, right).
+func _leaning(subjects: PackedVector2Array) -> Vector2:
+	var points := subjects.duplicate()
+	if framing.holding():
+		return _extent(points) # the kill first; the lean waits for it
+	for slot: int in 2:
+		if not fight.is_fighter_alive(slot):
+			points.append(fight.respawn_plan(slot)["position"] as Vector2)
+		elif not _inside(fight.fighter_position(slot).x):
+			points.append(fight.fighter_position(slot))
+	if points.is_empty():
+		var middle := fight.scroll + fight.strip.zone_width() * 0.5
+		return Vector2(middle, middle)
+	return _extent(points)
+
+
+static func _extent(points: PackedVector2Array) -> Vector2:
+	var left := points[0].x
+	var right := left
+	for at: Vector2 in points:
+		left = minf(left, at.x)
+		right = maxf(right, at.x)
+	return Vector2(left, right)
+
+
+## The scale MatchFraming answers, as a Camera2D zoom.
 ##
-## The scale is set by HEIGHT, because what the player has to read is a
-## fighter -- which of three heights its blade is at -- and that depends on how
-## tall the fighter is on the glass, not on the aspect. A first version fitted
-## one zone to the width instead: on a phone that was a 0.5 zoom and a fighter
-## at about 6% of the screen, and the stances were hard to tell apart.
-##
-## The exact target is a fractional scale on almost every screen, and a
-## fractional scale on nearest-filtered pixel art draws texels alternately n
-## and n+1 pixels wide, which shimmers as the view scrolls. So the scale is
-## rounded to the nearest whole number of screen pixels per texel: 8.1% at
-## 1080 px tall, 9.2-9.4% at 1170-1440. ZoneStrip.SCREEN_WIDTH is chosen so a
-## whole zone still fits across a phone at that scale; where it does not -- a
-## 16:9 tablet, a 4:3 iPad -- _target() follows the fighters instead.
-##
-## `framing_width` overrides all of this with a fixed world width, for
-## comparing framings side by side.
-func _apply_zoom() -> void:
+## `framing_width` overrides it with a fixed world width, for comparing
+## framings side by side, at a whole number of screen pixels per texel.
+func _apply_zoom(delta: float) -> void:
 	var view := _view_size()
 	var stretch := _stretch()
 	if framing_width > 0.0:
@@ -177,18 +284,27 @@ func _apply_zoom() -> void:
 		var fitted := maxf(1.0, floorf(view.x * stretch / framing_width))
 		zoom = Vector2.ONE * (fitted / stretch)
 		return
+	_measure()
+	if delta > 0.0:
+		framing.update(delta, _subjects(), _together())
+	zoom = Vector2.ONE * framing.zoom()
 
-	var body := DuelTuning.default().body_height
+
+## Tells the framing what screen it is framing for.
+func _measure() -> void:
+	var stretch := pixels_per_unit if pixels_per_unit > 0.0 else _stretch()
 	if stretch <= 0.0:
-		zoom = Vector2.ONE * (view.y * FIGHTER_SHARE / body)
-		return
-	var pixels := maxf(1.0, roundf(view.y * stretch * FIGHTER_SHARE / body))
-	zoom = Vector2.ONE * (pixels / stretch)
+		stretch = 1.0
+	framing.per_unit = stretch
+	framing.screen = screen_pixels if screen_pixels.x > 0.0 else _view_size() * stretch
+	framing.body = DuelTuning.default().body_height
 
 
 ## Screen pixels per virtual unit: the canvas_items stretch factor. Zero when
 ## there is no window to measure, as under a headless test.
 func _stretch() -> float:
+	if pixels_per_unit > 0.0:
+		return pixels_per_unit
 	var window := get_window()
 	var view := _view_size()
 	if window == null or view.y <= 0.0 or window.size.y <= 0:
@@ -218,6 +334,8 @@ func _snapped(at: Vector2) -> Vector2:
 
 
 func _view_size() -> Vector2:
+	if screen_pixels.x > 0.0 and pixels_per_unit > 0.0:
+		return screen_pixels / pixels_per_unit
 	var viewport := get_viewport()
 	if viewport == null:
 		return Vector2(320.0, 180.0)
@@ -225,11 +343,24 @@ func _view_size() -> Vector2:
 	return size if size.x > 1.0 and size.y > 1.0 else Vector2(320.0, 180.0)
 
 
+## The world the view shows now, in world pixels, before shake: worked out
+## from the camera's own position and limits, as the viewport will place it,
+## so it can be asked between frames and with no window.
+func view_rect() -> Rect2:
+	var seen := _view_size() / zoom
+	var centre := global_position
+	centre.x = clampf(centre.x, limit_left + seen.x * 0.5,
+		maxf(limit_left + seen.x * 0.5, limit_right - seen.x * 0.5))
+	centre.y = clampf(centre.y, limit_top + seen.y * 0.5,
+		maxf(limit_top + seen.y * 0.5, limit_bottom - seen.y * 0.5))
+	return Rect2(centre - seen * 0.5, seen)
+
+
 ## Which zones the view can see, for the gore layer's culling.
 func visible_zones() -> PackedInt32Array:
-	var width := fight.strip.zone_width()
-	var first := fight.strip.zone_of_x(global_position.x - width * 0.5)
-	var last := fight.strip.zone_of_x(global_position.x + width * 0.5)
+	var half := _view_size().x / zoom.x * 0.5
+	var first := fight.strip.zone_of_x(global_position.x - half)
+	var last := fight.strip.zone_of_x(global_position.x + half)
 	var out := PackedInt32Array()
 	for zone: int in range(first, last + 1):
 		out.append(zone)
