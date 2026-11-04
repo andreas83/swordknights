@@ -8,7 +8,7 @@ extends RefCounted
 ## stepping the same arithmetic scripts/player/player.gd steps — the two-phase
 ## gravity of `_apply_gravity`, the `move_toward` air control of
 ## `_free_movement`, the one-way platform layer, and the hand probe of
-## `_try_grab_ledge` with its hang-rect and stand-rect clearance checks. A
+## `PrinceHands.grab_ledge()` with its hang-rect and stand-rect clearance checks. A
 ## landing ten tiles or more below its apex kills the player
 ## (Tuning.FATAL_FALL_TILES), so the search prunes it like a spike.
 ##
@@ -375,7 +375,7 @@ const _PROBE_SURFACE := 10   ## Row of the probe's ground surface.
 
 
 ## A one-way platform `rise` tiles above the ground. A platform is not solid,
-## so `_try_grab_ledge` cannot catch it — this isolates the plain hop.
+## so `PrinceHands.grab_ledge()` cannot catch it — this isolates the plain hop.
 static func _probe_platform(rise: int) -> Dictionary:
 	var grid := _probe_canvas()
 	var row := _PROBE_SURFACE - rise
@@ -799,7 +799,7 @@ class Solver extends RefCounted:
 	func _expand_ladder(x: int, y: int, out: Array[int]) -> void:
 		_offer_ladder(x, y - 1, out)
 		_offer_ladder(x, y + 1, out)
-		# Stepping off: Player._update_ladder moves horizontally at half walk
+		# Stepping off: PrinceHands.ladder() moves horizontally at half walk
 		# speed and drops out of LADDER state as soon as the body leaves it.
 		_offer_stand(x, y, out)
 		_offer_stand(x - 1, y, out)
@@ -941,7 +941,7 @@ class Solver extends RefCounted:
 				return row
 		return -1
 
-	## Player._try_grab_ledge, step for step: the hand probe at hand height in
+	## PrinceHands.grab_ledge(), step for step: the hand probe at hand height in
 	## the facing direction, a solid cell with nothing solid on top of it, a
 	## hang position clear of walls, and room to stand up after the mantle.
 	func _probe_ledge(cx: float, feet: float, dir: int, out: Array[int]) -> void:
@@ -966,7 +966,7 @@ class Solver extends RefCounted:
 		if rect_flags(hang_x, hang_feet) & F_SOLID != 0:
 			return # Player bails out of the grab rather than clipping in
 
-		# Player._update_hang mantles half a tile across onto the ledge top.
+		# PrinceHands.hang() mantles half a tile across onto the ledge top.
 		var target_x := hang_x + _tile * 0.5 * float(dir)
 		if rect_flags(target_x, ledge_top) & F_SOLID != 0:
 			return # no room to stand up: the grab is a dead end

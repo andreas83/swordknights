@@ -54,6 +54,7 @@ var last_impact: float = 0.0
 ## can drive the character with the exact same code path as a local player.
 var input: PlayerInput = LocalInput.new()
 var moves := PrinceMoves.new(self) ## --- the duel's moves (prince_moves.gd) ---
+var hands := PrinceHands.new(self) ## --- ledges and ladders (prince_hands.gd) ---
 
 var _coyote: float = 0.0
 var _jump_buffer: float = 0.0
@@ -62,9 +63,6 @@ var _turn_timer: float = 0.0
 var _land_timer: float = 0.0
 var _hurt_timer: float = 0.0
 var _drop_through: float = 0.0
-var _climb_from := Vector2.ZERO
-var _climb_to := Vector2.ZERO
-var _climb_progress: float = 0.0
 var _crouched := false
 var _ladder_lockout: float = 0.0
 ## Seconds since the current rise began. The jump cut reads this rather than
@@ -268,11 +266,11 @@ func _physics_process(delta: float) -> void:
 			_apply_gravity(delta)
 			_move(delta)
 		State.HANG:
-			_update_hang()
+			hands.hang()
 		State.CLIMB_UP:
-			_update_climb_up(delta)
+			hands.climb_up(delta)
 		State.LADDER:
-			_update_ladder(delta)
+			hands.ladder(delta)
 		State.HURT:
 			_update_hurt(delta)
 		_:
@@ -693,7 +691,7 @@ func _on_touch_ground(impact: float) -> void:
 ## - **A ladder**, climbed down or caught in mid-air: the rungs hold him, so a
 ##   long fall caught on one is two short ones, and a long ladder is no fall.
 ##   This one has to be named: climbing down moves him at LADDER_SPEED.
-## - **A ledge grab**: hanging, the hands hold him at rest (_update_hang()
+## - **A ledge grab**: hanging, the hands hold him at rest (PrinceHands.hang()
 ##   zeroes the velocity every frame, which is what resets it), so a grab that
 ##   catches a fall ends it, and letting go starts another from the hang.
 ## - **Going up**: a stomp's or a plunge's bounce off a guard is a new arc,
@@ -748,128 +746,9 @@ func _resolve_air_state() -> void:
 	if velocity.y > 0.0:
 		if state != State.FALL:
 			_enter(State.FALL)
-		_try_grab_ledge()
+		hands.grab_ledge()
 	elif state != State.JUMP:
 		_enter(State.JUMP)
-
-
-## --- ledges ----------------------------------------------------------------
-
-## Looks for a corner at hand height in the facing direction. The player has to
-## be falling (not too fast) and not pushing down, which keeps grabs
-## intentional rather than sticky. Because it is a geometry probe and not a
-## trigger volume, every corner in every level is grabbable without authoring.
-func _try_grab_ledge() -> void:
-	if level == null or velocity.y > Tuning.MAX_GRAB_FALL_SPEED or input.down:
-		return
-
-	var direction := input.axis_x if input.axis_x != 0 else facing
-	var half := Tuning.BODY_WIDTH * 0.5
-	var hand_x := position.x + (half + Tuning.GRAB_REACH) * direction
-	var top_y := position.y - _height()
-	var cell := level.cell_of(Vector2(hand_x, top_y + Tuning.GRAB_PROBE_Y))
-
-	# A grabbable ledge is a solid tile with nothing solid directly on top.
-	if not level.is_solid_cell(cell) or level.is_solid_cell(cell + Vector2i.UP):
-		return
-
-	var ledge_top := float(cell.y) * TILE
-	var hang_feet_y := ledge_top - Tuning.GRAB_PROBE_Y + _height()
-	var hang_x := cell.x * TILE - half if direction > 0 else (cell.x + 1) * TILE + half
-
-	var hang_rect := Rect2(hang_x - half, hang_feet_y - _height(), Tuning.BODY_WIDTH, _height())
-	if level.rect_hits_solid(hang_rect):
-		return
-
-	position = Vector2(hang_x, hang_feet_y)
-	velocity = Vector2.ZERO
-	facing = direction
-	_enter(State.HANG)
-	grabbed_ledge.emit()
-
-
-func _update_hang() -> void:
-	velocity = Vector2.ZERO
-	if state_time < Tuning.HANG_HOLD_TIME:
-		return
-
-	if input.down:
-		velocity.y = 20.0
-		_enter(State.FALL)
-		return
-
-	if not (input.up or _jump_buffer > 0.0):
-		return
-	_jump_buffer = 0.0
-
-	var ledge_top := position.y - _height() + Tuning.GRAB_PROBE_Y
-	var target := Vector2(position.x + TILE * 0.5 * facing, ledge_top)
-
-	var stand_rect := Rect2(
-		target.x - Tuning.BODY_WIDTH * 0.5, target.y - _height(),
-		Tuning.BODY_WIDTH, _height()
-	)
-	if level != null and level.rect_hits_solid(stand_rect):
-		_enter(State.FALL) # no room to stand up — let go rather than clip in
-		return
-
-	_climb_from = position
-	_climb_to = target
-	_climb_progress = 0.0
-	_enter(State.CLIMB_UP)
-
-
-func _update_climb_up(delta: float) -> void:
-	_climb_progress = clampf(_climb_progress + delta / Tuning.CLIMB_UP_TIME, 0.0, 1.0)
-	# Up first, then across: the classic mantle arc.
-	var vertical := minf(1.0, _climb_progress * 1.6)
-	var horizontal := maxf(0.0, (_climb_progress - 0.45) / 0.55)
-	position = Vector2(
-		lerpf(_climb_from.x, _climb_to.x, horizontal),
-		lerpf(_climb_from.y, _climb_to.y, vertical)
-	)
-	if _climb_progress >= 1.0:
-		velocity = Vector2.ZERO
-		_enter(State.IDLE)
-
-
-## --- ladders ---------------------------------------------------------------
-
-func _update_ladder(delta: float) -> void:
-	if level == null or not level.rect_is_climbable(body_rect()):
-		_enter(State.FALL)
-		return
-
-	# Before moving, so the frame the thumb taps JUMP is a leap, not a rung.
-	if _jump_buffer > 0.0:
-		_leap_off_ladder()
-		return
-
-	velocity = Vector2(input.axis_x * Tuning.WALK_SPEED * 0.5, input.axis_y * Tuning.LADDER_SPEED)
-	if input.axis_x != 0:
-		facing = input.axis_x
-	_move(delta)
-
-
-## Leaves the rungs with a jump: sideways at full stride when a direction is
-## held, straight up off the rungs when none is. The sideways leap takes the
-## run's speed rather than the ladder's half-walk shuffle, because a jump that
-## drifts off a ladder at 20 px/s is still on the ladder when it lands.
-##
-## Either way the hands are kept off every ladder for LADDER_REGRAB_TIME. A
-## ladder jump existed before this, and on a phone it did nothing: the stick
-## was still pushed up when JUMP was tapped, and on the very next frame
-## _free_movement() saw a vertical input over a ladder and put the prince back
-## on it. The lockout is what makes the jump a jump.
-func _leap_off_ladder() -> void:
-	_jump_buffer = 0.0
-	_ladder_lockout = Tuning.LADDER_REGRAB_TIME
-	var stride := Tuning.WALK_SPEED if input.walk else Tuning.RUN_SPEED
-	velocity = Vector2(input.axis_x * stride, -Tuning.JUMP_SPEED * Tuning.LADDER_JUMP_SCALE)
-	if input.axis_x != 0:
-		facing = input.axis_x
-	_enter(State.JUMP)
-	jumped.emit()
 
 
 ## --- damage ----------------------------------------------------------------

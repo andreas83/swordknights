@@ -144,7 +144,7 @@ arithmetic `scripts/player/player.gd` steps, at the same fixed 60 Hz:
   `move_and_slide()` does;
 - the one-way platform layer — ignored going up, landed on coming down, and
   switched off entirely during the 0.25 s drop-through window;
-- `_try_grab_ledge()` step for step, including the hand probe position, the
+- `PrinceHands.grab_ledge()` step for step, including the hand probe position, the
   "solid tile with nothing solid on top" test, the hang-rect clearance check
   and the stand-rect check that decides whether the mantle has room to finish.
 
