@@ -39,6 +39,21 @@ const LIP := """; Cat At The Lip
 #     ##################
 """
 
+## The deck's twist in miniature: the cat on the stone east of a run of
+## slabs, the prince waiting west of it exactly as far short of the run as
+## he does on Chapter III's deck (76.5 px).
+const DECK := """; Cat On The Deck
+
+
+
+
+
+                j       D
+#########,,,#############
+#########   #############
+#########   #############
+"""
+
 ## The prince across a gap from the cat: it may stalk to the lip, never leap.
 const ACROSS := """; Cat Across
 
@@ -285,6 +300,45 @@ func test_it_never_pounces_over_a_hole() -> void:
 		assert_ne(cat.state, Caracal.State.POUNCE, "not across the gap")
 		if cat.state == Caracal.State.POUNCE:
 			break
+	assert_eq(_game.player.health, Tuning.MAX_HEALTH)
+
+
+func test_it_never_pounces_at_a_target_over_a_hole() -> void:
+	await _play(ACROSS)
+	var cat := Caracal.new()
+	autofree(cat)
+	cat.level = _game.level
+	cat.position = Vector2(11.0 * 16.0, 6.0 * 16.0)
+	cat.facing = -1
+	# A prince hanging off the lip in front of it: his feet are within a tile
+	# of its floor and in reach, but there is nothing under them.
+	var feet := Vector2(9.0 * 16.0 + 8.0, 7.0 * 16.0)
+	cat.target_rect = Rect2(feet - Vector2(4.5, 22.0), Vector2(9.0, 22.0))
+	var crouched := false
+	for _frame: int in 60:
+		cat.tick(1.0 / 60.0, true)
+		crouched = crouched or cat.state == Caracal.State.CROUCH
+	assert_false(crouched, "no crouch at a target over the pit")
+	var floor_feet := Vector2(10.0 * 16.0 + 4.0, 6.0 * 16.0)
+	cat.target_rect = Rect2(floor_feet - Vector2(4.5, 22.0), Vector2(9.0, 22.0))
+	cat.state = Caracal.State.PROWL
+	cat.facing = -1
+	for _frame: int in 3:
+		cat.tick(1.0 / 60.0, true)
+	assert_eq(cat.state, Caracal.State.CROUCH, "while one on the stone is fair game")
+
+
+func test_a_cat_drawn_onto_the_slabs_is_on_them_with_all_four_feet() -> void:
+	await _play(DECK)
+	_game.player.position = Vector2(9.0 * 16.0 - 76.5, 6.0 * 16.0)
+	var cat := _cat()
+	assert_true(await _until_state(cat, Caracal.State.CROUCH, 400), "it stalked him and crouched")
+	var body := cat.bounds()
+	assert_gte(body.position.x, 9.0 * 16.0, "every foot on the crumbling stone")
+	assert_true(await _until_state(cat, Caracal.State.FALL, 60), "so its push-off breaks them")
+	for _frame: int in 120:
+		await get_tree().physics_frame
+	assert_false(is_instance_valid(cat), "and it goes through, not onto the stone beside")
 	assert_eq(_game.player.health, Tuning.MAX_HEALTH)
 
 
