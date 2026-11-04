@@ -428,6 +428,43 @@ call whenever one does.
 
 ---
 
+## Blood
+
+A guard cut down used to make the wound's sound and fall over, which read as
+a stagger that did not get up. A kill now reads as a kill
+(`scripts/world/bloodshed.gd`):
+
+| Part | What | Why |
+| --- | --- | --- |
+| the sound | `kill`, on top of the wound: the blow, the death figure's first two notes, the body on stone | the same opening as the prince's own `die`, so a death sounds like a death in both directions (docs/audio.md) |
+| the burst | 24 drops from the middle of the body the blade reached, thrown away from the prince: the first quarter fast and flat (the spurt that says which way the blade went), the rest climbing and falling, one in five back over the shoulder | directed by the blow, and a burst rather than a jet |
+| the stains | a drop that meets stone stays: a two-row smear along a floor, a run down a wall; a pool under the body | the floor is a record of the fight, as in the duel |
+| the prince | four drops when he is cut, eight when he dies | smaller than a kill on purpose: the burst is the reward for a blow landed |
+
+**Art direction.** Two tones from the palette — the deep cloth crimson and the
+near-black crimson for the heart of a stain — opaque, one to three pixels,
+snapped to the grid every frame. No glow, no alpha, no fade: the crimson reads
+on a lit floor, the dark row on one in shade.
+
+**Phones.** At most 64 drops in the air and 240 stains in a level, in fixed
+arrays drawn as rects in one pass; past the cap the oldest stain goes.
+
+**The foe contract.** Nothing names a kind of foe. Bloodshed watches the
+level's entity node and hears `defeated` on every Foe that enters it — placed,
+put back at a respawn, summoned, or a kind added after this was written.
+`Game` has three additive lines: the field, `Bloodshed.install()` and a
+`blood.clear()` in `_restart()`.
+
+**What a death and a restart do.** A checkpoint respawn keeps every stain:
+the level remembers what you did, and a guard you cut down stays down beside
+his blood. A restart clears it. The node is a child of `Game`, so the next
+level — which is a new `Game` — starts clean.
+
+`tests/unit/test_bloodshed.gd` kills every foe kind in the entity registry
+(read at run time, so a new kind is covered the day it is registered) and a
+toy foe of its own, and checks the burst, the stains, the kill's sound, the
+direction, the caps, the respawn and the restart.
+
 ## What was deliberately left out
 
 Each of these was considered, and some were built and then taken out again.

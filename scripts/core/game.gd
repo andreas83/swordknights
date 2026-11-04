@@ -104,6 +104,9 @@ var _struck: Dictionary = {}
 # --- secrets --- the level's secret rooms: what opens them, what is in them,
 # how many are found. See scripts/world/secret_keeper.gd.
 var secrets := SecretKeeper.new()
+# --- blood --- every foe's death, and the prince's wounds, as blood that
+# stays for the life of the level. See scripts/world/bloodshed.gd.
+var blood: Bloodshed
 
 
 func _ready() -> void:
@@ -125,6 +128,7 @@ func _ready() -> void:
 	_entities = Node2D.new()
 	_entities.name = "Entities"
 	add_child(_entities)
+	blood = Bloodshed.install(self, _entities) # --- blood ---
 	_contact.exit_reached = func() -> void: _completing = true
 	_contact.checkpoint_offered = _offer_checkpoint
 	_contact.foe_met = _resolve_foe
@@ -592,6 +596,7 @@ func _restart() -> void:
 	_kept.clear()
 	_bus = ChannelBus.for_level(level.data)
 	secrets.reseal() # --- secrets --- behind the wipe, like the rest
+	blood.clear() # --- blood --- a restart is the level starting over
 	_spawn_entities(level.data)
 	secrets.furnish(_entities)
 	checkpoint = level.spawn_world_position()
