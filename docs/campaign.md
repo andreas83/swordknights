@@ -377,8 +377,10 @@ without a death inside par.
 
 ### III. The Aqueduct — sunset
 
-[`chapter_03.txt`](campaign/drafts/chapter_03.txt) · 128 × 28 ·
-[stand-in](campaign/drafts/chapter_03_static.txt)
+**Built:** [`levels/chapter_03.txt`](../levels/chapter_03.txt), from the
+[draft](campaign/drafts/chapter_03.txt) · 128 × 28 ·
+[stand-in](campaign/drafts/chapter_03_static.txt). What changed from the draft,
+and why, is under *As built*, below.
 
 **The place.** The masons' quarter, ruined, and the aqueduct that crosses the
 ravine on its piers toward the Mirror Tower — partly an open deck, partly a
@@ -402,7 +404,7 @@ and something is hunting you across it.
 | --- | --- | --- |
 | introduce | the walled yard under the walk (x 25) | from above, watch it crouch, pounce at the doves, miss, skid — it cannot reach you |
 | develop | the cat's yard (x 42) | backstep the pounce, cut it in the skid |
-| twist | the deck (x 74) | a cat cannot push off crumbling stone: wait back on the deck and it stalks you onto the slabs to crouch |
+| twist | the deck (x 74) | a cat cannot push off crumbling stone: wait by torch 1 at the deck's west end and it stalks you onto the slabs (x 65–67) to crouch |
 | master | the tower's foot (x 121) | the collapse is at your back, so the backstep costs ground you no longer have — cut it out of the air or jump it |
 
 **Beat sheet** (11 beats):
@@ -411,13 +413,13 @@ and something is hunting you across it.
 2. The first crumble; secret C in the cellar. *(crumbling: introduce)*
 3. The walk over the doves' yard; R1. *(Caracal: introduce)*
 4. The cat's yard. *(Caracal: develop)*
-5. Two roofs; secret A in the lane; torch 1. *(crumbling: develop)*
-6. The deck and the cat that should not cross it. *(twist, both)*
+5. Two roofs; secret A in the lane. *(crumbling: develop)*
+6. The deck, torch 1, and the cat that should not cross it. *(twist, both)*
 7. The way down is the floor; R2 up the ruined tower by one crumbling stone. *(crumbling: twist)*
 8. The channel — a sentinel in the low dark; secret B.
 9. Torch 2, at the channel's mouth.
 10. **The collapse.** *(crumbling: master; set piece)*
-11. The tower's foot — the last Caracal; the door in the tower's first course. *(Caracal: master)*
+11. The tower's foot — the last doves, the last Caracal; the door in the tower's first course. *(Caracal: master)*
 
 **The set piece.** The open channel over the ravine is crumbling stone in runs
 of three between the piers that hold. Once you are on it, each slab that falls
@@ -429,8 +431,9 @@ toward the next pier: the collapse is a scramble, not a trapdoor, and it says
 so honestly rather than pretending a three-wide gap is a hazard
 (`CLAUDE.md`).
 
-**Checkpoints.** Torch 1 on house B (about 40 s in), torch 2 at the channel's
-mouth (about 40 s later), so the set piece is retried from its start.
+**Checkpoints.** Torch 1 at the deck's west end (about 40 s in), torch 2 at
+the channel's mouth (about 40 s later), so the twist and the set piece are
+each retried from their start.
 
 **Relics.** Five: R1 on the walk, R2 on the ruined tower's top (the harder
 route: one crumbling stone to grab, stand on and leave at once), one in each
@@ -443,7 +446,34 @@ secret.
 | C | the first cellar's east wall | cracked wall | the first thing that gave way under you was a door |
 
 **Expert line, about 45 s:** run every slab; cut the cats out of the air;
-take the channel's floor the moment you reach it.
+take the channel's floor the moment you reach it. The clear run in
+`tests/unit/test_aqueduct_clear.gd` plays a line close to it -- runs past the
+sentinel instead of fighting him -- in 32.2 s, without a death or a scratch.
+
+**As built.** Four changes from the draft, each found by playing it, none of
+which moves a beat:
+
+- **The walk runs on three tiles as a lintel (x 35–37) over the cat's yard.**
+  In the draft the prince dropped in off the walk's end with the yard's wall
+  at his back, and the backstep -- the move the yard is there to teach --
+  had three pixels to slide. Now he lands with the lintel's floor behind him.
+- **The deck's slabs moved a tile west (x 65–67).** A cat crouches with its
+  nose five tiles from the prince, so a prince waiting where he climbs onto
+  the deck drew it to crouch on the last stone before the slabs, not on them:
+  the twist did not happen. With the run at 65–67, anywhere from the deck's
+  west end to two tiles in brings it onto them with all four feet.
+- **Torch 1 moved from house B onto the deck's west end.** Its glow marks the
+  place to wait for the twist, a respawn comes back to the twist rather than
+  before the bridge, and its mark keeps the dresser's foreground arch -- one
+  every 23 columns -- from standing between the waiting prince and the cat.
+- **Doves at the gate, in the walled yard and at the tower's foot.** The yard's
+  flock is the cat's demonstration; the last one, on the last lit terrace
+  before the door, also keeps a foreground arch off the final fight.
+
+What it does not yet do: the channel is not "the low dark". At sunset's
+four-tile reach, a floor four rows under its roof is lit again by the cut
+(*Time of day*), so the sentinel stands in light; a roof two rows lower would
+not leave the prince room, so darkening it is a grade question, left open.
 
 ### IV. The Mirror Tower — dusk
 
@@ -670,7 +700,12 @@ thump (`land_hard` 1.3, −6 dB); a wound (`guard_hit` 0.85).
 ### The Caracal — the backstep (Chapter III)
 
 The King's hunting cat. The only foe on four legs, so the only one whose
-silhouette shares nothing with a person.
+silhouette shares nothing with a person. **Built:**
+`scripts/entities/caracal.gd`, `caracal_art.gd`; its poses in
+[`docs/caracal-poses.png`](caracal-poses.png), with the prince and the
+sentinel beside it for scale (`tools/caracal_poses.gd`).
+
+![The Caracal's poses](caracal-poses.png)
 
 **Silhouette.** Horizontal and lean, 20 × 12 px: long legs, short tail, and
 two tall ink ear-tufts — the read — with a gold collar dot. Dark wine with a
@@ -703,9 +738,31 @@ once — it falls through. **With the sentinel:** a sentinel's raise and a
 cat's crouch together are answered by one backstep, which evades both.
 
 **Audio:** the crouch (`cloth` 1.6, −10 dB, and a hiss — a new `hiss` voice
-(to be built), filtered noise around 3 kHz, 0.25 s); the leap (`jump` 1.5);
+filtered noise around 3 kHz, 0.25 s); the leap (`jump` 1.5);
 the landing (`land_soft` 1.4); the skid (`step_run` 1.3, twice); death
-(`guard_hit` 1.4 and a short `yowl` (to be built)).
+(`guard_hit` 1.4 and a short `yowl`).
+
+**As built.** The numbers above hold, pinned by `tests/unit/test_caracal.gd`;
+building it settled five things the table left open.
+
+- **Where it lands.** Its nose comes down at the near edge of where the prince
+  stood, so its claws reach four pixels into that spot. Landing its middle
+  there instead let the flying body rake a standing prince seven frames
+  early, which shrank the backstep's window to 22 frames; nose-first, the
+  claws touch him only in the leap's last two frames, and the window is the
+  28 the table promises (thrown from the crouch's end through frame 27 of the
+  30-frame leap).
+- **Its reach is measured from its nose.** "Within 5 tiles in front" is from
+  the front of the cat, so a cat that stalked onto crumbling stone to get in
+  reach is on it with all four feet -- and its push-off breaks every slab
+  under them, so it goes through rather than standing on the stone beside.
+- **Only a stalking cat trusts crumbling stone.** Prowling, it turns at it
+  like any walker; it crosses only when it has the prince in its sights. That
+  keeps the last cat off the collapse until the prince is on it.
+- **It springs off a prince it rakes.** Flying on to land where he stood put
+  it under his knockback, and he came down on its back for a free stomp.
+- **It weighs nothing** (`Foe.has_weight()`), acts only while the camera shows
+  it, and a cat that falls out of the level is down, as if cut down.
 
 ### The Glassbearer — the parry (Chapter IV)
 
@@ -899,12 +956,20 @@ pilot clears it in 62.85 s.
 ### The doves — the city's life
 
 Not a foe. Small flocks — three to five birds, 3 × 2 px, `LIGHT_SOFT` —
-peck on lit terraces, placed by rule like the room moods (`docs/world.md`).
+peck on lit terraces. **Built** (`scripts/entities/dove_flock.gd`), placed by
+a mark, `v`, rather than by rule: the Caracal's demonstration needs a flock
+exactly where the cat is, and a rule could not promise it. A flock pecks
+along the floor it was put on (six tiles each way at most) and settles at the
+far end of that stretch from whatever put it up, or leaves for seven seconds
+when no end is far enough.
 When the prince runs within three tiles they burst up and settle elsewhere
 (`cloth` at 2.0, −14 dB, three times). They are a pure function of the clock
 and the prince's position, so they cost nothing to the simulation; they are
 the Caracal's demonstration target (it pounces at a flock and always misses);
-they go to roost at dusk; and at night the owls hunt where they were.
+they go to roost at dusk; and at night the owls hunt where they were. A
+flock is stepped in physics frames from what it has seen of the prince and
+the cats, so the cat that hunts it sees the same flock on every run; it has
+no body and the proof never hears of it (`tests/unit/test_doves.gd`).
 
 ---
 
@@ -1070,6 +1135,41 @@ most conservative reading of every slab without losing the route.
    longer be stood on.
 3. Fallen slabs re-form on respawn, so a torch's proof uses the whole level.
 
+**As built** (`scripts/mechanisms/crumbling_stone.gd`, `,` in
+`Tiles.MECHANISM_LEGEND`; `tests/unit/test_crumbling.gd`). The rules above
+hold to the frame: a slab lit on frame N holds a body through N + 26 and is
+gone on N + 27, its neighbours 15 frames later, both read through `warn()`
+so LONGER WARNINGS stretches them to 41 and 23. A slab is drawn from the atlas
+tile it would be as stone, through the world's shader, so it takes the light
+exactly as the floor around it does; it casts no shadow, as no mechanism does.
+
+- **A trap, not a deed.** A fallen slab is put back whole by a checkpoint
+  respawn, like every mechanism. Latching it instead -- holes kept for good
+  -- would make the collapse, retried from torch 2, a row of three-wide jumps
+  rather than the set piece. The proof is told so, and proves each torch
+  under the state a death actually comes back to, which is how "fallen slabs
+  re-form" (3, above) is made true rather than assumed.
+- **Who breaks it.** Feet light the fuse; hands never do, so a crumbling ledge
+  is grabbed and mantled. A foe with weight (`Foe.has_weight()`) on a slab
+  breaks it at once; sentinels -- and any foe that walks a beat -- treat it as
+  the end of the floor; a Caracal walks it, but its push-off and landing
+  break every slab under its feet.
+- **The proof** gives each run one wire (`crumble@x,y`): its cells are stone
+  until it is on and air after. Two verbs were added to `ReachModel`, used by
+  nothing without crumbling stone, so every other level is proved exactly as
+  before: `fuse_on_stand()` makes the stand above a run *transient* -- the
+  search expands it with the floor there and lands every move off it with the
+  floor gone, and the jump straight up, which comes down where the slab was,
+  is how it "waits" on one -- and `resets_on_respawn()` marks the wire a trap,
+  so a torch is proved under every mask with the traps put back (and, when
+  every wire is a trap, under the authored level alone, with no flood). One
+  wire per run rather than per slab is exact: once one slab of a run drops,
+  the chain takes the rest.
+- **The collapse audit** is `CrumbleAudit` (`scripts/levels/crumble_audit.gd`):
+  the design rule run by run, cell named; the masked flood with every slab
+  whole, which walks every order the prince can bring them down in; and the
+  fallen subsets above, for what a cat or an overhanging heel breaks.
+
 ### Sun mirrors and sun-seals (Chapter IV)
 
 The game's identity as a mechanic: you aim the low sun.
@@ -1178,6 +1278,7 @@ mechanism checks above. Every check passed:
 | --- | --- | --- | --- | --- | --- | --- |
 | II | yes | 3 — never required, never a trap | 2 of 2 | 5 of 5 | 7 gates: opener reachable with the gate shut, and the gate matters; the expert's grab across the lift shaft proved, and the lift proved necessary without the stall | 24 |
 | III | yes | 3 | 2 of 2 | 5 of 5 | with every slab fallen: exit reachable, nothing stranded, every earlier cell still reaches the door | 11 |
+| III, built | yes | 3 | 2 of 2 | 5 of 5 | on `levels/chapter_03.txt` with slabs and cats registered: R2 only by its crumbling stone; 8 runs within the rule; the whole flood and 9 fallen subsets strand nobody (`tests/unit/test_chapter_aqueduct.gd`) | 16 |
 | IV | yes | 3 | 4 of 4 | 5 of 5 | 5 doors' mirrors reachable with the door shut; 11 beam and bolt paths clear of stone; 7 sunlit mirrors and posts lit, 3 dark ones dark, with the horizon and the reach | 38 |
 | V | yes | 3 | 4 of 4 | 7 of 7 | dawn's door: the Vault reachable with it shut, and the door matters | 12 |
 
@@ -1332,18 +1433,19 @@ thing they guard broken (`CLAUDE.md`).
    in the real scene, proves Chapter II's races against their holds, and
    refuses a race with 10% slack.
 5. **Crumbling stone.** The fuse on feet, the chain, the foes' rules, the
-   respawn; the transient stand and the collapse audit. *Done when*
-   `tests/unit/test_crumbling.gd` (to be built) shows a walker falls and a
-   runner does not, and refuses a four-slab run between single stones.
+   respawn; the transient stand and the collapse audit. *Done:*
+   `tests/unit/test_crumbling.gd` shows a walker falls and a runner does not,
+   and refuses a four-slab run between single stones.
 6. **The Bastion.** *Done when* `tests/unit/test_bastion.gd` (to be built)
    pins, the way `tests/unit/test_patrol.gd` and `tests/unit/test_specials.gd`
    pin the sentinel: the shove's tell is `WINDUP_TIME`; front blows clang; two
    plunges kill; the turn exposes his back for longer than a swing's lead; the
    shove costs no heart; his weight holds a plate.
-7. **The Caracal and the doves.** *Done when* `tests/unit/test_caracal.gd` (to
-   be built) pins the 28-frame backstep window against the pounce, the skid
-   longer than the backstep's remainder plus a swing's lead, the parry failing,
-   and a cat falling through crumbling stone it pushes off.
+7. **The Caracal and the doves.** *Done:* `tests/unit/test_caracal.gd` pins
+   the 28-frame backstep window against the pounce, the skid longer than the
+   backstep's remainder plus a swing's lead, the parry failing, and a cat
+   falling through crumbling stone it pushes off; `tests/unit/test_doves.gd`
+   the cat on the doves.
 8. **Mirrors and seals.** Including `Q` in `SEAL_LEGEND` and the beam proof.
    *Done when* `tests/unit/test_mirrors.gd` (to be built) turns a mirror with
    each sword move, fills and drains a seal, proves Chapter IV's doors, and

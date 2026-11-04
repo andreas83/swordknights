@@ -313,10 +313,12 @@ Three rules:
    `latch_on_stand()` and `fixed_cells()`, and ask `model.channel_mode()`
    what a press means: a plate's press is a latch to the proof only on a
    `latch` wire. Say the conservative thing for anything with a clock in it:
-   a held gate the proof treats as shut, a crumbling floor as a latch that
-   drops it the moment it is stood on. A mechanism that says nothing is
-   treated as never changing anything. The only verb that sets a bit is a
-   latch, and the checkpoint proof leans on that; a mechanism that needs
+   a held gate the proof treats as shut; a crumbling floor, a transient stand
+   (`fuse_on_stand()`) on a wire that is a trap (`resets_on_respawn()`), as
+   `CrumblingStone` does. A mechanism that says nothing is
+   treated as never changing anything. A bit is set only by a latch or by a
+   fuse, and a fuse's wire is a trap, cleared before a torch is proved, so
+   every bit the checkpoint proof keeps is a latch -- it leans on that; a mechanism that needs
    another (a race against a hold) changes `ReachSearch` as well.
 
 The framework ships with no real mechanism, only the toys that prove it — a

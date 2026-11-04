@@ -713,8 +713,9 @@ func _update_hud(refill: bool = false) -> void:
 ##   wire is a puzzle solved, and solving it again after every death is replay
 ##   with nothing to learn. What keeps the first rule true is the proof: a
 ##   torch is proved from every channel mask the prince can be standing on it
-##   under (LevelReachability.prove_checkpoints()), and every bit in a mask is
-##   a latch, so whatever he respawns with is a state the proof has walked. A
+##   under (LevelReachability.prove_checkpoints()) with its traps -- a fallen
+##   slab -- put back, and every bit left is a latch, so whatever he respawns
+##   with is a state the proof has walked. A
 ##   latch that drops a floor between a torch and the door costs that torch
 ##   its checkpoint instead of making the respawn a soft lock. The rest that
 ##   persists is safe by construction: relics never touch passability, foes

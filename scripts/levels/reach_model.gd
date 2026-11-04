@@ -46,8 +46,9 @@ extends RefCounted
 ## him standing on air. A checkpoint respawn keeps the latches (Game's
 ## checkpoint notes), so a torch is proved from every mask he can stand on it
 ## under (ReachSearch.prove_checkpoints()); that is sound because these verbs
-## set bits only by latching. A mechanism that sets a bit any other way --
-## a hold, once the search has a clock -- has to change that proof too.
+## set bits only by latching, or by a fuse on a wire that resets_on_respawn()
+## says the respawn clears. A mechanism that sets a bit any other way -- a
+## hold, once the search has a clock -- has to change that proof too.
 ##
 ## ## What it does not model, and what to do instead
 ##

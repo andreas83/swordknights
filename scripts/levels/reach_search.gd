@@ -21,11 +21,11 @@ extends RefCounted
 ##
 ## A checkpoint respawn keeps what was latched (Game._respawn()), so a torch
 ## is proved from every mask the prince can be standing on it under, not just
-## from the authored state (prove_checkpoints()). That set is the same as the
-## set he can respawn under because every bit in a mask is a latch: ReachModel
-## has no other way to set one. A latch that drops the floor between a torch
-## and the door therefore costs the torch its checkpoint, rather than making
-## a respawn a soft lock.
+## from the authored state (prove_checkpoints()). That set, with the traps put
+## back, is the set he can respawn under, because every other bit in a mask is
+## a latch: ReachModel has no other way to set one. A latch that drops the floor
+## between a torch and the door therefore costs the torch its checkpoint,
+## rather than making a respawn a soft lock.
 ##
 ## ## Floors that give way
 ##

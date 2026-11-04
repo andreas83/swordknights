@@ -272,13 +272,25 @@ wiring*) changes in play, and a proof over its authored cells would be wrong
 both ways: a gate its plate opens would read as a wall, and a trapdoor its
 plate drops as floor. So each mechanism kind describes itself to a
 `ReachModel` (`scripts/levels/reach_model.gd`), from its own
-`static func reach(mark, model)`, in three verbs:
+`static func reach(mark, model)`, in these verbs:
 
 | Verb | Means | Example |
 | --- | --- | --- |
 | `switch_cells(cells, channel, off, on)` | these cells are `off` while the wire is off, `on` while it is on | a gate: SOLID, then EMPTY |
 | `latch_on_stand(cells, channel)` | standing in any of these sets the wire for good | a plate that stays down |
 | `fixed_cells(cells, kind)` | these cells are `kind` in every state | a lift treated as a ladder |
+| `fuse_on_stand(cells, channel)` | standing here is transient: any move may leave, nothing may wait, and the wire is on once it is left | crumbling stone |
+| `resets_on_respawn(channel)` | the wire is a trap: a checkpoint respawn puts it back off | a fallen slab, whole again |
+
+A transient stand is expanded under the mask it was reached with -- the floor
+still there -- and every move off it lands under the mask with its fuse burnt,
+re-checked where it arrives: a hop onto the next slab of the same run falls
+through it. Waiting needs no move of its own: the jump straight up comes down
+where the slab was. A torch is proved under each mask it is stood on with, as
+the respawn leaves it -- traps put back -- and a model whose every wire is a
+trap is proved under the authored level alone, without the flood
+(`ReachModel.only_traps()`), which is what keeps Chapter III's load-time
+proof at about a tenth of a second (`docs/campaign.md`, *Crumbling stone*).
 
 The search state becomes `(cell, mode, channel mask)`, packed into one integer
 — `(mask << 32) | cell key` — so a level without mechanisms has the very same
