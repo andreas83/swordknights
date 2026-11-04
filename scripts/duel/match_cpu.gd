@@ -22,8 +22,9 @@ extends "res://scripts/duel/match_scene.gd"
 ## frame for frame from exactly those. A rematch takes the next seed.
 ##
 ## THE PLAYER uses the shared actions, which the keyboard's single-player keys,
-## a gamepad and the touch controls all drive: the stick, JUMP, SWORD and the
-## THROW button Duel Online has. Pause and quit are the one-keyboard duel's.
+## a gamepad and the touch controls all drive: the stick, JUMP, SWORD and
+## THROW, laid out as the adventure lays them (scenes/duel_match_cpu.tscn).
+## Pause and quit are the one-keyboard duel's.
 ##
 ## THE LOOKS are the wardrobe's: player one's in the crimson seat, and the
 ## computer wears player two's, held to sea-green like any second seat.

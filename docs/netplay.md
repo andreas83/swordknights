@@ -152,7 +152,6 @@ scripts/duel/
   match_scene.gd     two seats, one keyboard
   match_online.gd    lobby, connection, and the same match with a session
   match_hud.gd       the rope, results, network status
-  duel_touch.gd      the THROW button the shared touch controls lack
 scripts/net/
   protocol.gd        versioned messages, encode and decode
   transport.gd       the interface

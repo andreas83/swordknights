@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/duel/match_online.gd" id="1_scene"]
 [ext_resource type="Script" path="res://scripts/render/parallax_sky.gd" id="2_sky"]
@@ -8,7 +8,6 @@
 [ext_resource type="Script" path="res://scripts/duel/match_camera.gd" id="6_camera"]
 [ext_resource type="Script" path="res://scripts/duel/match_hud.gd" id="7_hud"]
 [ext_resource type="PackedScene" path="res://scenes/touch_controls.tscn" id="8_touch"]
-[ext_resource type="Script" path="res://scripts/duel/duel_touch.gd" id="9_throw"]
 [ext_resource type="Script" path="res://scripts/net/lobby.gd" id="10_lobby"]
 
 [node name="DuelMatchOnline" type="Node2D"]
@@ -43,17 +42,7 @@ anchor_bottom = 1.0
 script = ExtResource("7_hud")
 
 [node name="TouchControls" parent="." instance=ExtResource("8_touch")]
-
-[node name="ThrowLayer" type="CanvasLayer" parent="."]
-layer = 49
-
-[node name="ThrowButton" type="Control" parent="ThrowLayer"]
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-script = ExtResource("9_throw")
-action = "throw"
-glyph = "throw"
+throw_button = true
 
 [node name="LobbyLayer" type="CanvasLayer" parent="."]
 layer = 60

@@ -73,11 +73,10 @@ func test_the_scene_seats_the_player_and_the_computer() -> void:
 	assert_eq(scene.call("_down", 0), "YOU ARE DOWN", "the band speaks to the player")
 	assert_eq(scene.call("_down", 1), "CPU DOWN")
 
-	assert_not_null(scene.get_node_or_null(^"TouchControls"), "the stick, JUMP and SWORD")
-	var throw := scene.get_node_or_null(^"ThrowLayer/ThrowButton")
-	assert_not_null(throw, "and THROW")
-	if throw != null:
-		assert_eq(String(throw.get("action")), "throw")
+	var controls := scene.get_node_or_null(^"TouchControls") as TouchControls
+	assert_not_null(controls, "the stick, JUMP and SWORD")
+	if controls != null:
+		assert_true(controls.throw_button, "and THROW, in the same hit test as the rest")
 
 
 ## Played by the scene's own physics frames: the computer closes on a player

@@ -39,10 +39,14 @@ const STICK_DEADZONE := 7.0
 const VERTICAL_DEADZONE := 14.0
 const HIT_PADDING := 8.0
 ## --- the duel's moves --- where THROW sits, from the safe area's bottom
-## right, and its size: exactly the duel's (scripts/duel/duel_touch.gd), up
-## and to the left of JUMP and clear of SWORD, so a thumb that has learned
-## one layout finds the button in the other.
-const THROW_AT := Vector2(52.0, 78.0)
+## right: straight above JUMP, in the column the right thumb already works.
+## It used to sit up and to the left of JUMP, over the stretch of floor the
+## camera leads the prince into -- where the next guard, gap or spike row is
+## -- and its padded circle overlapped JUMP's by ten units. Here it covers
+## the screen's edge rather than the way ahead, and its ring is eight units
+## clear of JUMP's. The adventure and the duel lay it out the same, from
+## this one place, so a thumb that has learned one finds it in the other.
+const THROW_AT := Vector2(34.0, 84.0)
 const THROW_RADIUS := 18.0
 const JUMP_RADIUS := 24.0
 const SWORD_RADIUS := 19.0
@@ -54,10 +58,12 @@ const LABEL_RING := 1.2
 ## The buttons that carry words, by id.
 const LABELLED: Array[String] = ["jump", "attack"]
 
-## --- the duel's moves --- whether this layout carries THROW. The adventure's
-## scene sets it (scenes/game.tscn); the menus have nothing to throw, and the
-## duel's scenes add their own THROW (DuelTouchGuard), so for them it stays
-## off and the button is never drawn twice.
+## --- the duel's moves --- whether this layout carries THROW: the scenes
+## that play set it (scenes/game.tscn, the computer's duel and the online
+## one); the menus have nothing to throw. The duel once drew its own THROW
+## in a node of its own with its own hit test, and one tap on the overlap
+## pressed JUMP and THROW together: every thumb button is in this one list
+## now, so one hit test decides every touch (button_at()).
 @export var throw_button := false
 
 var _buttons: Array[Dictionary] = []
@@ -196,7 +202,7 @@ func _on_touch(event: InputEventScreenTouch) -> void:
 	var point := _local(event)
 	if event.pressed:
 		_surface.visible = true
-		var button := _button_at(point)
+		var button := button_at(point)
 		if not button.is_empty():
 			if String(button["id"]) == "mute":
 				# Not an input action: the only touch-reachable way to silence
@@ -278,14 +284,37 @@ func _release(action: String) -> void:
 		Input.action_release(action)
 
 
-func _button_at(point: Vector2) -> Dictionary:
+## The one button a touch at `point` presses, or {} for none: of the buttons
+## whose padded circle holds it, the one whose ring it is nearest. The
+## padding reaches past a ring so a thumb that lands just outside still
+## counts, and neighbours' paddings overlap -- the mute button's and pause's
+## by a fifth of mute's area, JUMP's and SWORD's by ten units. The first in
+## the list used to take the whole overlap, so a tap on the edge of mute
+## paused the game. Nearest ring, not nearest centre, so a touch inside a
+## drawn ring is never given to a bigger neighbour; for rings of one size
+## it is the same thing.
+func button_at(point: Vector2) -> Dictionary:
+	var best := {}
+	var nearest := INF
 	for button: Dictionary in _buttons:
 		if not _shown(button):
 			continue
-		var r: float = button["r"] + HIT_PADDING
-		if point.distance_squared_to(button["at"]) <= r * r:
-			return button
-	return {}
+		var r: float = button["r"]
+		var from_ring := point.distance_to(button["at"]) - r
+		if from_ring <= HIT_PADDING and from_ring < nearest:
+			nearest = from_ring
+			best = button
+	return best
+
+
+## Whether a touch at `point`, in `screen`'s coordinates, is one of the
+## thumb buttons' -- for a page whose rows can be tapped, so that a tap
+## pressing a button is not also a tap on a row under it. False on a screen
+## with no thumb buttons. Asks whether a button is there, not whether the
+## buttons are up: the first touch is the one that puts them up.
+static func claims(screen: Node, point: Vector2) -> bool:
+	var controls := of(screen)
+	return controls != null and not controls.button_at(point).is_empty()
 
 
 ## Where a touch is, in the surface's own coordinates -- the ones the buttons
@@ -343,9 +372,8 @@ func draw_surface() -> void:
 		_surface.draw_circle(knob, 11.0, Palette.with_alpha(Palette.LIGHT_SOFT, 0.55))
 
 
-## A sword flying point-first with two speed lines behind it: the duel's
-## THROW glyph (DuelTouchGuard), drawn again here because the duel's file is
-## the duel's, and the same picture on both buttons is the point.
+## A sword flying point-first with two speed lines behind it: the throw,
+## readable without a label at thumb size.
 func _draw_throw_mark(at: Vector2, held: bool) -> void:
 	var steel := Palette.with_alpha(Palette.STEEL, 0.95 if held else 0.6)
 	var light := Palette.with_alpha(Palette.LIGHT_SOFT, 0.9 if held else 0.5)

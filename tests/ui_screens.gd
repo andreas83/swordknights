@@ -161,10 +161,6 @@ func _pose(shot: Dictionary) -> void:
 			var surface := _stage.get_node_or_null(^"TouchControls/Surface")
 			if surface != null:
 				surface.visible = true
-			# The duel's THROW button shows itself only on a phone.
-			var throw := _stage.get_node_or_null(^"ThrowLayer/ThrowButton")
-			if throw != null:
-				throw.visible = true
 		"update":
 			# A dev build that has been superseded, with the thumbs up so the
 			# plaque is seen next to the pause and mute buttons it must clear.

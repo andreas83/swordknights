@@ -381,8 +381,8 @@ func _menu_press_held() -> bool:
 	return false
 
 
-## What the thumb buttons say now, and whether the duel's THROW is up: only
-## in play, as TouchControls hides its own (TouchControls.is_play()).
+## What the thumb buttons say now. THROW is up only while they say play's
+## words (TouchControls.is_play()).
 func _label_thumbs() -> void:
 	var controls := TouchControls.of(self)
 	if controls == null:
@@ -393,9 +393,6 @@ func _label_thumbs() -> void:
 		controls.set_labels(over_jump_label(), "QUIT")
 	else:
 		controls.play_labels()
-	var throw := get_node_or_null(^"ThrowLayer/ThrowButton") as DuelTouchGuard
-	if throw != null:
-		throw.suppressed = not controls.is_play()
 
 
 ## JUMP's word once the match is over: a rematch, which REMATCH is too wide

@@ -192,12 +192,11 @@ func test_the_duel_letters_its_menu_and_its_end() -> void:
 	add_child_autofree(scene)
 	await wait_physics_frames(3)
 	var controls := TouchControls.of(scene)
-	var throw := scene.get_node(^"ThrowLayer/ThrowButton") as DuelTouchGuard
 	assert_true(controls.is_play(), "in the match: JUMP and SWORD")
-	assert_false(throw.suppressed, "and THROW")
+	assert_true(controls._shown(_throw(controls)), "and THROW")
 	await _press("pause")
 	_says(controls, "SELECT", "BACK", "the duel's menu")
-	assert_true(throw.suppressed, "THROW is no menu verb")
+	assert_false(controls._shown(_throw(controls)), "THROW is no menu verb")
 	await _press("pause")
 	var fight := scene.get("fight") as DuelMatch
 	fight.winner = 0
@@ -229,6 +228,14 @@ func test_a_ruin_that_would_not_generate_letters_its_way_back() -> void:
 
 
 ## --- helpers ----------------------------------------------------------------
+
+func _throw(controls: TouchControls) -> Dictionary:
+	for button: Dictionary in controls._buttons:
+		if String(button["id"]) == "throw":
+			return button
+	assert_true(false, "the layout has a THROW")
+	return {"id": "throw"}
+
 
 ## Both buttons' words as shown -- the first phrasing that fits -- and that
 ## a word is shown wherever one was asked for.

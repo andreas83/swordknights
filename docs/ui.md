@@ -568,11 +568,31 @@ are the same width at five pixels and nobody reads a label on a button they
 are hitting with a thumb. It is the only touch-reachable way to silence the
 game short of the settings screen.
 
-The duel's THROW button (`scripts/duel/duel_touch.gd`, online and against
-the computer) lays itself out against the same `UiLayout.safe()`, up and to the left
-of JUMP. It used to convert the safe area by hand, which put it off the right
-edge whenever the reported area was wider than the window — the bug the stick
-and the other buttons had before UiLayout.
+**One touch presses one button.** Each button's hit circle is its ring plus
+`HIT_PADDING`, so a thumb that lands just outside still counts — and
+neighbours' paddings overlap: mute's and pause's by about a fifth of mute's
+area, JUMP's and SWORD's by ten units. The first button in the list used to
+take every overlap, so the edge of the mute button paused the game.
+`TouchControls.button_at()` now gives a touch to the button whose ring it is
+nearest, among those whose padding holds it — nearest ring rather than
+nearest centre, so a touch inside a drawn ring is never handed to a bigger
+neighbour.
+
+**THROW is one of them.** The duel drew its own THROW in a node of its own
+(`DuelTouchGuard`) with its own hit test, and its circle overlapped JUMP's by
+ten units: one tap pressed JUMP and THROW together. Every scene that plays —
+the adventure, the computer's duel, the online one — now sets
+`throw_button` on its TouchControls, so every thumb button is in one list and
+one hit test. THROW sits straight above JUMP (`THROW_AT`), at the screen's
+edge in the column the right thumb already works, where it used to sit up and
+to the left of JUMP over the stretch of floor the camera leads the prince
+into. `tests/unit/test_touch_controls.gd` touches a grid over every button at
+320 and 440 units and fails a touch that presses two actions, or one that
+goes to anything but the nearest ring.
+
+A page whose rows can be tapped asks `TouchControls.claims(screen, point)`
+first: a tap that presses a thumb button is that button's, not also a tap on
+a row under it.
 
 ### What the buttons say
 
@@ -595,8 +615,8 @@ five — SWORD itself, with a unit to spare. CONTINUE (53 units) and REMATCH
 (48) are wider than JUMP's ring, which is why those buttons say NEXT and AGAIN
 where their hint lines say the long word. An empty label letters the button
 with nothing: on that screen it does nothing. THROW, which has no menu
-meaning, is hidden whenever the labels are not play's — TouchControls' own,
-and the duel's (`DuelTouchGuard.suppressed`).
+meaning, is hidden whenever the labels are not play's (`TouchControls.is_play()`), in
+a level and in a duel alike.
 
 | Screen | JUMP | SWORD |
 | --- | --- | --- |
