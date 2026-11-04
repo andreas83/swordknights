@@ -208,8 +208,42 @@ func test_drops_and_stains_are_capped() -> void:
 		blood.burst(Vector2(100.0, 100.0), 1.0, Bloodshed.KILL_DROPS)
 	assert_eq(blood.drops_in_flight(), Bloodshed.MAX_DROPS, "no more than MAX_DROPS in the air")
 	for i: int in Bloodshed.MAX_STAINS + 40:
-		blood.stain(Rect2(float(i), 0.0, 1.0, 1.0), Bloodshed.BLOOD)
+		blood.stain(Rect2(float(i), 0.0, 1.0, 1.0), Palette.BLOOD)
 	assert_eq(blood.stain_count(), Bloodshed.MAX_STAINS, "no more than MAX_STAINS on the floor")
+	for _i: int in Bloodshed.MAX_POOLS + 10:
+		blood.pool(Vector2(100.0, 100.0), Bloodshed.POOL_MAX)
+	assert_eq(blood.pool_count(), Bloodshed.MAX_POOLS, "no more than MAX_POOLS on the floor")
+
+
+func test_a_kill_leaves_a_pool_and_so_does_the_princes_death() -> void:
+	await _play("patrol")
+	_cut_down(_foe())
+	assert_eq(_game.blood.pool_count(), 1, "the guard's pool")
+	DeathWatch.expect_deaths(1)
+	_game.player.kill()
+	assert_eq(_game.blood.pool_count(), 2, "and the prince's own where he fell")
+	assert_eq(_game.blood.drops_in_flight(), Bloodshed.KILL_DROPS + Bloodshed.DEATH_DROPS,
+		"his death throws more than a wound and fewer than a kill")
+
+
+## The tiles take no hour (their shader is unshaded), so the blood on them must
+## not either: the hour's multiply, times the blood's own modulate, is white.
+## Seen to fail: with _grade_like_the_stone() not called, this is the night.
+func test_the_blood_takes_the_stones_light_at_night() -> void:
+	var data := AsciiLevel.new()
+	data.parse(FLOOR + "\n;! time night\n")
+	_game = (load(GAME_SCENE) as PackedScene).instantiate() as Game
+	_game.level_source = data
+	add_child_autofree(_game)
+	await wait_process_frames(3)
+	var grade := get_tree().get_first_node_in_group(WorldGrade.GROUP) as WorldGrade
+	assert_not_null(grade, "a night level is graded")
+	if grade == null:
+		return
+	var seen := _game.blood.modulate * grade.color
+	assert_almost_eq(seen.r, 1.0, 0.001, "red as the stone")
+	assert_almost_eq(seen.g, 1.0, 0.001, "green as the stone")
+	assert_almost_eq(seen.b, 1.0, 0.001, "blue as the stone")
 
 
 func test_a_checkpoint_respawn_keeps_the_blood_and_a_restart_clears_it() -> void:

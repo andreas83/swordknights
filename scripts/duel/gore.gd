@@ -1,6 +1,6 @@
 class_name GoreField
 extends Node2D
-## Where everybody died, in their own colour, for the rest of the match.
+## Where everybody died, for the rest of the match.
 ##
 ## A BOUNDED LIST, NOT A RENDER TARGET
 ## The specification asks for stains baked into the wall and floor textures.
@@ -38,17 +38,27 @@ extends Node2D
 ##   water is gone.
 ## - A STREAK along the floor in the direction of the blow, from under the
 ##   body, as far as the floor runs flat.
-## - A POOL under the body that spreads for a second and a half, wet -- a
-##   fresh-coloured sheen on its sunward side -- for four seconds, then dark
-##   for the rest of the match.
+## - A POOL under the body that spreads for a second and a half, wet -- the
+##   glint on its sunward side -- for four seconds, then dries from the rim
+##   inward over the next six, and stays dark for the rest of the match. The
+##   streak dries with it.
 ##
-## Everything is in the seat's two tones (scripts/duel/fighter_art.gd), hard
-## edged, and drawn on the texel grid: droplets and their stains are whole-
-## pixel rects, because a 22 px fighter's blood is a pixel or two, and a
+## Everything is in the blood ramp (Palette.BLOOD, BLOOD_DRIED, BLOOD_WET),
+## hard edged, and drawn on the texel grid: droplets and their stains are
+## whole-pixel rects, because a 22 px fighter's blood is a pixel or two, and a
 ## smooth droplet at that size would be the one soft thing on the screen. No
 ## gradient, no glow, nothing additive: docs/art-direction.md keeps its
 ## restraint everywhere but here, and here the excess is in quantity, not in
-## technique.
+## technique. Drying is a hard-edged shape shrinking, not a fade, for the same
+## reason.
+##
+## TWO TONES IN EVERY MARK
+## The ramp is set apart from the stone by chroma, but each of its tones sits
+## near one of the stone's in lightness: fresh blood near the mid crimson,
+## dried blood near the deep shade. So no mark is one tone. A wall hit is a
+## fresh blob over a dried run, a wet pool has its glint, a floor's spray is
+## both tones, and a drop in the air has the glint on its leading pixel.
+## Whatever a kill lands on, part of it reads.
 ##
 ## THE CLOCK IS THE MATCH'S, SO A CORRECTION NEVER RE-SPILLS
 ## The spurt is not a particle system with state of its own. Every droplet is
@@ -76,12 +86,23 @@ extends Node2D
 ## are bounded apart so a busy zone sheds its oldest droplets and keeps its
 ## pools: the record lasts, the spray around it thins. Only zones in view are
 ## drawn; the field redraws every frame only while a death is younger than its
-## spurt and its pool, and otherwise when something changes.
+## spurt and its pool's drying, and otherwise when something changes.
 ##
-## CRIMSON AND TEAL
-## Seat one bleeds crimson and seat two bleeds teal, the same two colours
-## scripts/duel/fighter_art.gd dresses them in. After a few exchanges the floor is
-## a record of who died where -- which is the point of keeping it.
+## BLOOD IS BLOOD, FOR BOTH SEATS
+## Seat two used to bleed teal. It no longer does, for three reasons. Teal is
+## water's (docs/art-direction.md), and a teal pool beside a gate zone's water
+## read as a puddle, not a death. Who died is already said twice, by the body
+## on the floor and by the HUD's flash in the seat's colour. And the blood ramp
+## is the one accent that means only "someone died here": a hint of seat in it
+## would make it mean two things, and the rule it is rationed by would have an
+## exception on its first day. The HUD's seat colours are its own
+## (MatchHud.SEAT).
+##
+## LIT LIKE THE STONE IT LIES ON
+## The tiles are drawn by an unshaded shader, so MatchDusk's multiply never
+## lands on them; blood drawn without it would be darkened by the dusk while
+## the wall under it is not, and go out exactly where a match is decided. The
+## field joins MatchDusk.LIT, which lifts it back to the stone's light.
 
 ## Per zone. A kill is two marks and DROPS_PER_KILL droplets, so the bounds hold
 ## twenty-four kills' worth of pools and seventeen kills' worth of spray in
@@ -107,21 +128,19 @@ const FLIGHT_FRAMES := 90
 ## Where on the body the wound is: above the feet, in pixels.
 const WOUND := 12.0
 
-## The pool: how wide, how long it spreads, how long it stays wet.
+## The pool: how wide, how long it spreads, how long it stays wet, and how
+## long it then takes to dry from the rim in.
 const POOL_MIN := 13.0
 const POOL_MAX := 19.0
 const POOL_FRAMES := 90
 const WET_FRAMES := 240
+const DRY_FRAMES := 360
 ## The streak along the floor, from under the body, in the blow's direction.
 const STREAK_MIN := 14.0
 const STREAK_MAX := 28.0
 
 ## How far a mark is walked down to a floor.
 const FALL := 72.0
-
-## Seat colours. The deep one is the stain, the bright one the fresh edge.
-const BLOOD: Array[Color] = [Palette.CLOTH_DARK, Palette.WATER_DEEP]
-const BLOOD_FRESH: Array[Color] = [Palette.CLOTH, Palette.WATER]
 
 var strip: ZoneStrip
 
@@ -138,6 +157,10 @@ var _drawn_for := PackedInt32Array()
 var _now := -1
 ## While the clock is before this frame, something is still moving.
 var _moving_until := -1
+
+
+func _ready() -> void:
+	add_to_group(MatchDusk.LIT)
 
 
 func setup(zones: ZoneStrip) -> void:
@@ -164,7 +187,7 @@ func tick(frame: int) -> void:
 		queue_redraw()
 
 
-## One kill's worth of blood, in the dead fighter's colour.
+## One kill's worth of blood.
 ##
 ## `at` is where they died and `slot` is who they were. `seed_from` is the
 ## simulation frame, which is what makes two peers draw the same stains without
@@ -181,9 +204,9 @@ func spill(at: Vector2, slot: int, seed_from: int, blow: int = 0) -> void:
 
 	var floor_at := _settle(at + Vector2(0.0, -2.0))
 	floor_at.y = roundf(floor_at.y)
-	_add_mark(_pool(rng, floor_at, slot, death))
+	_add_mark(_pool(rng, floor_at, death))
 	if side != 0:
-		var streak := _streak(rng, floor_at, side, slot, death)
+		var streak := _streak(rng, floor_at, side, death)
 		if not streak.is_empty():
 			_add_mark(streak)
 
@@ -192,10 +215,10 @@ func spill(at: Vector2, slot: int, seed_from: int, blow: int = 0) -> void:
 		for i: int in PULSES[pulse]:
 			var back := i < BACKSPRAY and side != 0
 			var velocity := _throw(rng, side, back) * PULSE_STRENGTH[pulse]
-			var drop := _droplet(rng, wound, velocity, PULSE_FRAMES[pulse], slot, death)
+			var drop := _droplet(rng, wound, velocity, PULSE_FRAMES[pulse], death)
 			_add_drop(drop)
-	_moving_until = maxi(_moving_until, seed_from + maxi(POOL_FRAMES,
-		PULSE_FRAMES[PULSE_FRAMES.size() - 1] + FLIGHT_FRAMES) + 1)
+	var settles := maxi(POOL_FRAMES, PULSE_FRAMES[PULSE_FRAMES.size() - 1] + FLIGHT_FRAMES)
+	_moving_until = maxi(_moving_until, seed_from + maxi(settles, WET_FRAMES + DRY_FRAMES) + 1)
 	queue_redraw()
 
 
@@ -237,7 +260,7 @@ func _throw(rng: RandomNumberGenerator, side: int, back: bool) -> Vector2:
 ## Flies one droplet against the tiles, once, and keeps where and when it came
 ## down. The arc is what tick() draws it along; the landing is its stain.
 func _droplet(rng: RandomNumberGenerator, from: Vector2, velocity: Vector2, leaves: int,
-		slot: int, death: Vector2i) -> Dictionary:
+		death: Vector2i) -> Dictionary:
 	var dt := 1.0 / 60.0
 	var at := from
 	var speed := velocity
@@ -261,16 +284,21 @@ func _droplet(rng: RandomNumberGenerator, from: Vector2, velocity: Vector2, leav
 			frames = step
 			break
 		at = next
-	var fresh := rng.randf() < 0.4
+	var rects := _stain(rng, at, velocity, landed)
+	# A wall hit is a fresh blob over a dried run. A floor splat is one or the
+	# other, mostly fresh, so a floor's spray is never all of one tone.
+	var fresh := rng.randf() < 0.6
+	var tones := PackedColorArray([Palette.BLOOD, Palette.BLOOD_DRIED])
+	if rects.size() == 1 and not fresh:
+		tones = PackedColorArray([Palette.BLOOD_DRIED])
 	return {
 		"at": at,
 		"from": from,
 		"velocity": velocity,
 		"leaves": leaves,
 		"flight": frames,
-		"rects": _stain(rng, at, velocity, landed),
-		"colour": BLOOD_FRESH[slot] if fresh else BLOOD[slot],
-		"flying": BLOOD_FRESH[slot],
+		"rects": rects,
+		"tones": tones,
 		"death": death,
 	}
 
@@ -300,13 +328,14 @@ func _stain(rng: RandomNumberGenerator, at: Vector2, velocity: Vector2,
 			return []
 
 
-func _pool(rng: RandomNumberGenerator, at: Vector2, slot: int, death: Vector2i) -> Dictionary:
+func _pool(rng: RandomNumberGenerator, at: Vector2, death: Vector2i) -> Dictionary:
 	var width := rng.randf_range(POOL_MIN, POOL_MAX)
 	return {
 		"kind": "pool",
 		"at": at,
-		"colour": BLOOD[slot],
-		"sheen": BLOOD_FRESH[slot],
+		"colour": Palette.BLOOD,
+		"dried": Palette.BLOOD_DRIED,
+		"sheen": Palette.BLOOD_WET,
 		"points": PackedVector2Array([
 			Vector2(-width, 0.0),
 			Vector2(-width * 0.6, -1.6),
@@ -328,7 +357,7 @@ func _pool(rng: RandomNumberGenerator, at: Vector2, slot: int, death: Vector2i) 
 
 ## A smear along the floor from under the body, in the blow's direction, cut
 ## short where the floor steps up or drops away.
-func _streak(rng: RandomNumberGenerator, at: Vector2, side: int, slot: int,
+func _streak(rng: RandomNumberGenerator, at: Vector2, side: int,
 		death: Vector2i) -> Dictionary:
 	var want := rng.randf_range(STREAK_MIN, STREAK_MAX)
 	var reach := 0.0
@@ -345,7 +374,8 @@ func _streak(rng: RandomNumberGenerator, at: Vector2, side: int, slot: int,
 	return {
 		"kind": "streak",
 		"at": at,
-		"colour": BLOOD[slot],
+		"colour": Palette.BLOOD,
+		"dried": Palette.BLOOD_DRIED,
 		"points": PackedVector2Array([
 			Vector2(dir * 3.0, -1.4),
 			Vector2(dir * reach, -0.2),
@@ -463,9 +493,20 @@ func _draw_mark(decal: Dictionary) -> void:
 		# Spreads fast and then slowly, as a pool does.
 		grown = lerpf(0.3, 1.0, 1.0 - pow(1.0 - clampf(float(age) / POOL_FRAMES, 0.0, 1.0), 2.0))
 	var scale := Vector2(grown, 1.0)
-	draw_colored_polygon(_placed(decal["points"], at, scale), decal["colour"])
-	if decal.has("sheen") and _now >= 0 and age < WET_FRAMES:
-		draw_colored_polygon(_placed(decal["sheen_points"], at, scale), decal["sheen"])
+	var points: PackedVector2Array = decal["points"]
+	if _now < 0 or age >= WET_FRAMES + DRY_FRAMES:
+		draw_colored_polygon(_placed(points, at, scale), decal["dried"])
+		return
+	if age < WET_FRAMES:
+		draw_colored_polygon(_placed(points, at, scale), decal["colour"])
+		if decal.has("sheen"):
+			draw_colored_polygon(_placed(decal["sheen_points"], at, scale), decal["sheen"])
+		return
+	# Drying from the rim in: the dried shape, and the wet one inside it
+	# shrinking to nothing. A hard edge moving, not a fade.
+	var wet := 1.0 - float(age - WET_FRAMES) / DRY_FRAMES
+	draw_colored_polygon(_placed(points, at, scale), decal["dried"])
+	draw_colored_polygon(_placed(points, at, scale * wet), decal["colour"])
 
 
 func _draw_drop(drop: Dictionary) -> void:
@@ -476,16 +517,24 @@ func _draw_drop(drop: Dictionary) -> void:
 	if not is_nan(air.x):
 		# Two pixels long along its flight, so it reads as thrown, not as a
 		# speck; the later, weaker pulses one.
-		var size := Vector2.ONE
-		if int(drop["leaves"]) == 0:
-			var velocity: Vector2 = drop["velocity"]
-			size = Vector2(2.0, 1.0) if absf(velocity.x) > absf(velocity.y) else Vector2(1.0, 2.0)
-		draw_rect(Rect2(air.round(), size), drop["flying"])
+		var corner := air.round()
+		if int(drop["leaves"]) != 0:
+			draw_rect(Rect2(corner, Vector2.ONE), Palette.BLOOD)
+			return
+		# The first pulse's drops are two pixels along their flight, so they
+		# read as thrown, and the sunward one -- left, or top: the sun is low
+		# on the left -- is the glint.
+		var velocity: Vector2 = drop["velocity"]
+		var along := Vector2(1.0, 0.0) if absf(velocity.x) > absf(velocity.y) else Vector2(0.0, 1.0)
+		draw_rect(Rect2(corner, Vector2.ONE + along), Palette.BLOOD)
+		draw_rect(Rect2(corner, Vector2.ONE), Palette.BLOOD_WET)
 		return
 	if _now >= 0 and age - int(drop["leaves"]) < int(drop["flight"]):
 		return # not out of the wound yet
-	for rect: Rect2 in drop["rects"]:
-		draw_rect(rect, drop["colour"])
+	var rects: Array[Rect2] = drop["rects"]
+	var tones: PackedColorArray = drop["tones"]
+	for i: int in rects.size():
+		draw_rect(rects[i], tones[mini(i, tones.size() - 1)])
 
 
 ## Frames since the death a decal belongs to, or a large number with no clock.

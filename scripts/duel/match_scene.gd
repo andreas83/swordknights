@@ -255,7 +255,7 @@ func _on_fighter_died(victim: int, _killer: int, at: Vector2) -> void:
 	hud.flash(_down(victim))
 
 
-## The dead fighter's colour, and it stays for the match -- unless the host
+## The blood, and it stays for the match -- unless the host
 ## says the death did not happen, or happened elsewhere.
 func _on_death_recorded(victim: int, at: Vector2, frame: int, blow: int) -> void:
 	gore.spill(at, victim, frame, blow)

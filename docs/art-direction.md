@@ -62,6 +62,74 @@ The duotone is the rule; accents are the exception and they are rationed:
   sword reads instantly.
 - **Paper white** — reserved for the brightest specular and for text. If
   white appears anywhere else it steals the eye.
+- **Blood red** — blood, and nothing else. See below.
+
+### The fifth accent: blood
+
+Blood was the cloth crimson, which is the architecture's crimson: it read on
+a gold floor and went out against every wall, arcade and shaded floor it was
+spilled on. The owner approved a dedicated blood colour as a deliberate
+exception to the two-tone rule, and it is rationed like the other four:
+**the blood ramp is drawn by `scripts/duel/gore.gd` and
+`scripts/world/bloodshed.gd` and by nothing else.** A banner, a sky or a HUD
+mark that borrowed it would make a death harder to read everywhere it hung.
+`tests/unit/test_blood_ramp.gd` scans the project for the names and the hex
+values and fails on any other file.
+
+| Tone | Hex | OKLab L | Chroma | Hue | Used for |
+| --- | --- | --- | --- | --- | --- |
+| `Palette.BLOOD` | `c80810` | 0.526 | 0.212 | 28.1° | a drop in the air, a fresh splat, a wet pool, the blob where a drop hits a wall |
+| `Palette.BLOOD_DRIED` | `3a0406` | 0.226 | 0.083 | 25.0° | a dried pool, a pool's heart, a smear's lower row, a wall run |
+| `Palette.BLOOD_WET` | `ff6a55` | 0.707 | 0.186 | 30.4° | the glint: the sunward pixel of a drop, the sunward end of a wet pool. Never a fill |
+
+**What sets it apart is chroma.** The world spends the whole red ramp, from
+`INK` to `SHADOW_WARM`, so any red sits near some stone tone in lightness.
+What no stone tone has is `BLOOD`'s saturation (0.212, against 0.188 for the
+most saturated stone) at the hue of red rather than crimson's pink (13 to 19°
+of hue from `SHADOW`, `SHADOW_DEEP` and `SHADOW_PIT`; the cloth crimson it
+replaces was 1.5 to 4°). That is why it reads as blood and not as more wall.
+
+**Two tones in every mark.** `BLOOD` alone is weakest on the mid crimson
+`SHADOW` (OKLab distance 6.0), and `BLOOD_DRIED` alone on the darkest stone
+(`INK` 4.2, `SHADOW_PIT` 5.6). Each is far from what the other is near, so no
+mark is one tone: a drop has its glint, a smear is fresh over dried, a wall
+hit is a fresh blob over a dried run, a wet pool has a dried heart and a
+glint. Measured in OKLab distance × 100 (about 2 is just noticeable, 10
+plainly different, 20 a glance) and WCAG luminance contrast ratio:
+
+| Surface | Hex | `BLOOD` ΔE | `BLOOD` CR | `BLOOD_DRIED` ΔE | `BLOOD_DRIED` CR | `BLOOD_WET` ΔE | better of the two |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `INK` | `2b0a14` | 35.9 | 3.03 | 4.2 | 1.04 | 52.0 | 35.9 |
+| `SHADOW_PIT` | `4a0d1e` | 28.1 | 2.56 | 5.6 | 1.14 | 44.4 | 28.1 |
+| `SHADOW_DEEP` | `7a1230` | 17.1 | 1.79 | 16.6 | 1.63 | 33.4 | 17.1 |
+| `SHADOW` | `b32142` | 6.0 | 1.09 | 29.4 | 2.68 | 21.0 | 29.4 |
+| `SHADOW_WARM` | `d8452c` | 7.6 | 1.37 | 38.6 | 4.01 | 11.0 | 38.6 |
+| `MID` | `e8702a` | 16.9 | 1.94 | 46.2 | 5.65 | 6.1 | 46.2 |
+| `LIGHT_WARM` | `f2a829` | 30.1 | 2.98 | 57.1 | 8.67 | 15.3 | 57.1 |
+| `LIGHT` | `f7ce2e` | 39.5 | 3.95 | 65.6 | 11.52 | 24.1 | 65.6 |
+| `LIGHT_SOFT` | `ffe873` | 45.3 | 4.87 | 71.5 | 14.20 | 28.8 | 71.5 |
+
+Over the stone and every stone tone under every hour's multiply (the duel's
+dusk, golden, sunset, night) the worst case for the better of the two tones
+is 17.0, against `SHADOW` under the dusk. The old pair, cloth crimson over
+`SHADOW_PIT`, was 9.0 at its worst. The test holds these floors: the better
+tone at least 15 from every surface, `BLOOD`'s chroma 0.02 above the stone's
+most, 12° of hue from the crimson stone, and the glint 15 from `SHADOW` and
+`SHADOW_DEEP`, which is where `BLOOD` is weakest.
+
+**The hour does not dim it.** The stone is drawn by an unshaded shader, so
+neither the duel's dusk nor a chapter's hour reaches it. Blood drawn on the
+canvas did get the multiply, so it went dark exactly where the light was
+going: on the last rooms of the duel and in the night chapters. It is now lit
+like the stone it lies on: the duel's field joins `MatchDusk.LIT`, and the
+adventure's takes its hour's multiply back off each frame (but not the
+Eclipse's dimming, which reaches the stone too, so blood does not glow in
+the dark).
+
+**Not cartoonish.** The rest of the art direction still holds: opaque, hard
+edged, one to three pixels, on the grid. The glint is a single pixel and is
+never a fill. A pool dries from the rim inward as a hard edge moving, not a
+fade, and ends a near-black red, which is what old blood is.
 
 Everything is drawn from `scripts/core/palette.gd`. There are no image assets
 in this project and there will not be: the tile atlas is generated from the

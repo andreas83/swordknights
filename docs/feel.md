@@ -460,16 +460,23 @@ a stagger that did not get up. A kill now reads as a kill
 | --- | --- | --- |
 | the sound | `kill`, on top of the wound: the blow, the death figure's first two notes, the body on stone | the same opening as the prince's own `die`, so a death sounds like a death in both directions (docs/audio.md) |
 | the burst | 24 drops from the middle of the body the blade reached, thrown away from the prince: the first quarter fast and flat (the spurt that says which way the blade went), the rest climbing and falling, one in five back over the shoulder | directed by the blow, and a burst rather than a jet |
-| the stains | a drop that meets stone stays: a two-row smear along a floor, a run down a wall; a pool under the body | the floor is a record of the fight, as in the duel |
-| the prince | four drops when he is cut, eight when he dies | smaller than a kill on purpose: the burst is the reward for a blow landed |
+| the stains | a drop that meets stone stays: a smear along a floor (fresh over dried), a blob and a run down a wall | the floor is a record of the fight, as in the duel |
+| the pool | 16 to 24 pixels wide under the body: it spreads for 1.5 s, is wet for 4 s (the glint on its sunward end, a dried heart), dries from the rim in over 6 s, and stays | a kill leaves a mark you can find again from across the room |
+| the prince | four drops when he is cut; when he dies, fourteen and a pool of his own, 10 to 14 wide, that the respawn leaves on the floor | still smaller than a kill: the burst is the reward for a blow landed, and his own blood should not compete with it |
 
-**Art direction.** Two tones from the palette — the deep cloth crimson and the
-near-black crimson for the heart of a stain — opaque, one to three pixels,
-snapped to the grid every frame. No glow, no alpha, no fade: the crimson reads
-on a lit floor, the dark row on one in shade.
+**Art direction.** The blood ramp — `Palette.BLOOD`, `BLOOD_DRIED` and the
+`BLOOD_WET` glint, the fifth rationed accent (docs/art-direction.md, "The
+fifth accent: blood") — opaque, one to three pixels, snapped to the grid every
+frame. No glow, no alpha, no fade. Every mark is two tones, because the fresh
+red is weakest on the mid crimson and the dried tone on the darkest stone,
+and each is strong where the other is weak. It is graded like the stone: a
+chapter's hour, which the stone's shader never takes, is taken back off the
+blood, so a kill at sunset or at night is as red as one in the afternoon.
 
-**Phones.** At most 64 drops in the air and 240 stains in a level, in fixed
-arrays drawn as rects in one pass; past the cap the oldest stain goes.
+**Phones.** At most 64 drops in the air, 240 stains and 48 pools in a level,
+in fixed arrays drawn as rects in one pass; past a cap the oldest goes. The
+field redraws every frame only while a drop is in the air or a pool is
+drying.
 
 **The foe contract.** Nothing names a kind of foe. Bloodshed watches the
 level's entity node and hears `defeated` on every Foe that enters it — placed,

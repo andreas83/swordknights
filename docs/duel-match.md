@@ -230,13 +230,30 @@ pool, and on a phone it read as a smudge. A kill is now:
   reaches water is gone. A hazard has no blow and throws up and to both sides;
 - **a streak** along the floor from under the body in the blow's direction,
   as far as the floor runs flat;
-- **a pool** that spreads for a second and a half, wet — a fresh-coloured sheen
-  on its sunward side — for four seconds, then dark for the rest of the match.
+- **a pool** that spreads for a second and a half, wet — the glint on its
+  sunward side — for four seconds, then dries from the rim inward over six,
+  and stays dark for the rest of the match. The streak dries with it.
 
-All in the seat's two tones, hard-edged, droplets and their stains as whole-
-pixel rects on the texel grid; no gradient, no glow. The blow's direction is
-read in the step from where the killer stood and carried only in the event
-(`death_recorded`'s fourth argument); no step reads it back.
+All in the blood ramp (`Palette.BLOOD`, `BLOOD_DRIED`, `BLOOD_WET`; see
+docs/art-direction.md, "The fifth accent: blood"), hard-edged, droplets and
+their stains as whole-pixel rects on the texel grid; no gradient, no glow.
+Every mark is two tones: a first-pulse drop has the glint on its sunward
+pixel, a wall hit is a fresh blob over a dried run, a floor's spray is both.
+The blow's direction is read in the step from where the killer stood and
+carried only in the event (`death_recorded`'s fourth argument); no step reads
+it back.
+
+**Blood is blood, for both seats.** Seat two used to bleed teal. Teal is
+water's, and a teal pool beside a gate zone's water read as a puddle, not a
+death; who died is already said by the body and by the HUD's flash in the
+seat's colour; and an accent that means "someone died here" should not also
+mean "which seat". The HUD's seat colours are now its own (`MatchHud.SEAT`)
+rather than borrowed from the blood.
+
+**Lit like the stone.** The zones' stone is drawn by an unshaded shader and
+never takes the dusk's multiply; the field joins `MatchDusk.LIT`, so a kill in
+the last room is as red as one at noon instead of going out against walls the
+dusk never touched.
 
 **On the match's clock.** The spurt is not a particle system. Every droplet's
 arc and landing are worked out once, at `spill()`, and drawn at "frames since
@@ -244,7 +261,7 @@ the death" against the match frame the scene passes to `tick()`. A death a
 correction moves carries on at the host's age instead of spurting again; a
 kill found late is shown mid-flight; `wipe()` takes a retracted kill's
 droplets out of the air as well as off the floor. The field redraws every
-frame only while a death is younger than its spurt and pool.
+frame only while a death is younger than its spurt and its pool's drying.
 
 The blood is fed by `death_recorded` and `death_retracted`, not by the beat
 (`fighter_died`): a reconciling client paints each death once, takes back the

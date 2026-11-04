@@ -37,6 +37,24 @@ const CLOTH_DARK := Color("8e1f38")
 const STEEL := Color("8c8fa3")
 const STEEL_DARK := Color("5a5d70")
 
+## Blood, and nothing else: the fifth rationed accent (docs/art-direction.md,
+## "Colour discipline"). The architecture is crimson, so a crimson death
+## vanished into it. This ramp is set apart by chroma, the one axis nothing
+## else in the palette spends: a scarlet past the most saturated stone, at the
+## hue of red rather than crimson's pink. Its tones still sit close in
+## lightness to one of the stone's, so every mark carries two: the body reads
+## on gold, dark stone and the night, and the dried tone reads where the body
+## is weakest, on mid crimson. The numbers are in docs/art-direction.md and
+## tests/unit/test_blood_ramp.gd holds them, and holds that only
+## scripts/duel/gore.gd and scripts/world/bloodshed.gd ever draw with it.
+const BLOOD := Color("c80810")
+## Old blood: a pool after it has dried, the heart of a stain. Darker than
+## SHADOW_PIT and turned toward brown, away from the stone's pink.
+const BLOOD_DRIED := Color("3a0406")
+## The wet glint: a pixel on a flying drop and the sunward edge of a fresh
+## pool. A highlight only -- never a fill.
+const BLOOD_WET := Color("ff6a55")
+
 ## Surfaces, named by how they face the sun.
 const SURFACE_LIT := LIGHT
 const SURFACE_LIT_SOFT := LIGHT_SOFT

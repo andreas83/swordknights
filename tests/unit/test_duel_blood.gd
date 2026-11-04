@@ -64,6 +64,9 @@ func test_the_blood_is_drawn_over_the_stone_and_under_the_actors() -> void:
 			assert_gte(gore.z_index, z, "over the stone of %s" % layer.get_path())
 	for art: Node in scene.find_children("FighterArt", "", true, false):
 		assert_lt(gore.z_index, (art as CanvasItem).z_index, "under the fighters")
+	# The stone takes no dusk (its shader is unshaded), so the blood on it must
+	# not: lifted with the lit group, or the last rooms' kills go out.
+	assert_true(gore.is_in_group(MatchDusk.LIT), "lit like the stone through the dusk")
 
 
 func test_a_kill_is_a_spurt_a_streak_and_a_pool() -> void:
@@ -114,7 +117,9 @@ func test_the_spurt_runs_on_the_matchs_clock() -> void:
 	assert_gt(field.flying().size(), 0, "the last pulse is out after the first")
 	field.tick(300 + GoreField.PULSE_FRAMES[2] + GoreField.FLIGHT_FRAMES + 1)
 	assert_eq(field.flying().size(), 0, "and all of it is down by the end")
-	field.tick(300 + GoreField.POOL_FRAMES + GoreField.FLIGHT_FRAMES + 30)
+	field.tick(300 + GoreField.WET_FRAMES + GoreField.DRY_FRAMES - 10)
+	assert_true(field.moving(), "the pool is still drying")
+	field.tick(300 + GoreField.WET_FRAMES + GoreField.DRY_FRAMES + 1)
 	assert_false(field.moving(), "after which nothing moves, and nothing redraws")
 
 

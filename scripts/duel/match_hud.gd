@@ -35,6 +35,11 @@ extends Control
 ## rope and the result. The one-keyboard duel sets no tags: ONE and TWO are
 ## the arrow's colours, and the arrow says it.
 
+## Each seat's mark on the rope, the arrow, the tags and the rings: the bright
+## step of the colour it is dressed in (FighterArt.SEAT_CLOTH). These were the
+## blood's colours until blood became red for both seats; the HUD keeps them,
+## because the HUD is where a seat is told apart and blood is not.
+const SEAT: Array[Color] = [Palette.CLOTH, Palette.WATER]
 const PIP := 4.0
 const PIP_GAP := 13.0
 const ARROW := 13.0
@@ -136,7 +141,7 @@ func _draw_rope(content: Rect2) -> float:
 			# The two ends are gates, not stops: a thicker ring says so.
 			var seat := 0 if zone == 0 else 1
 			draw_arc(at, PIP + 2.4, 0.0, TAU, 20,
-				Palette.with_alpha(GoreField.BLOOD_FRESH[seat], 0.75), 1.2)
+				Palette.with_alpha(SEAT[seat], 0.75), 1.2)
 
 	var below := origin.y + PIP + 4.0
 	_draw_tags(origin, span, below)
@@ -150,7 +155,7 @@ func _draw_rope(content: Rect2) -> float:
 	var tip := origin + Vector2(
 		roundf(span * 0.5 + direction * (span * 0.5 + ARROW + 8.0)), 0.0
 	)
-	var colour := GoreField.BLOOD_FRESH[leader]
+	var colour := SEAT[leader]
 	var arrow := PackedVector2Array([
 		tip,
 		tip - Vector2(direction * ARROW, -ARROW * 0.52),
@@ -203,7 +208,7 @@ func _draw_tags(origin: Vector2, span: float, below: float) -> void:
 		# A rim of light under the seat's colour: crimson on a crimson sky is
 		# otherwise a mark nobody can find.
 		UiMarks.lozenge(self, mark, 4.4, Palette.with_alpha(Palette.LIGHT_SOFT, 0.85), 0.8)
-		UiMarks.lozenge(self, mark, 3.0, GoreField.BLOOD_FRESH[slot])
+		UiMarks.lozenge(self, mark, 3.0, SEAT[slot])
 		var at := Vector2(mark.x + side * 6.0, name_y)
 		var align := UiFont.Align.RIGHT if slot == 0 else UiFont.Align.LEFT
 		UiFont.draw_text(self, tag[0], at, cut, Palette.PAPER, align, 0.8)
@@ -250,7 +255,7 @@ func _draw_respawns(content: Rect2) -> void:
 			content.position.x + 8.0 if slot == 0 else content.end.x - 8.0,
 			content.end.y - 8.0
 		)
-		var colour := GoreField.BLOOD_FRESH[slot]
+		var colour := SEAT[slot]
 		draw_arc(at, 8.0, 0.0, TAU, 24, Palette.with_alpha(colour, 0.25), 1.0)
 		draw_arc(at, 8.0, -PI * 0.5, -PI * 0.5 + TAU * done, 24, colour, 2.0)
 		if slot == your_slot:
@@ -291,7 +296,7 @@ func _draw_result(band: Rect2) -> void:
 	UiFont.draw_text(self, title, Vector2(cx, band.position.y + 4.0),
 		UiFont.Cut.DISPLAY, Palette.PAPER, UiFont.Align.CENTER, 0.8)
 	UiMarks.rule(self, Vector2(cx, band.position.y + 22.0),
-		minf(band.size.x * 0.3, 48.0), Palette.with_alpha(GoreField.BLOOD_FRESH[winner], 0.9))
+		minf(band.size.x * 0.3, 48.0), Palette.with_alpha(SEAT[winner], 0.9))
 	var gate := "WEST" if ZoneStrip.goal_direction(winner) < 0 else "EAST"
 	var how := UiFont.fit(PackedStringArray([
 		"TAKEN THROUGH THE %s GATE" % gate, "THROUGH THE %s GATE" % gate,

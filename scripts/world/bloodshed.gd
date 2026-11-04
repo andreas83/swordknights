@@ -22,21 +22,46 @@ extends Node2D
 ## and not a jet. A drop that meets stone becomes a stain on it: a short smear
 ## along a floor, a run down a wall. One pool goes on the floor under the body.
 ##
-## ## Two tones, hard pixels, no glow
+## ## Its own red, two tones to every mark, hard pixels, no glow
 ##
-## docs/art-direction.md: every surface is lit gold or crimson shadow and the
-## line between them is hard. Blood is the deep cloth crimson, with a near-
-## black crimson for the heart of a stain and the old edge of a pool -- both
-## palette steps, so it reads on gold floors and on shaded stone alike, and
-## both opaque: nothing is blended, faded or blurred. A drop is one pixel or
-## two, snapped to the grid, every frame.
+## Blood used to be the cloth crimson, which is the architecture's crimson: it
+## read on a gold floor and went out against every wall. It is now the blood
+## ramp (Palette.BLOOD, BLOOD_DRIED, BLOOD_WET), the one accent rationed to
+## blood alone (docs/art-direction.md). The ramp is set apart from the stone by
+## chroma, and each tone of it is still near one stone tone in lightness, so
+## every mark is two: a drop in the air is fresh red with the wet glint on its
+## sunward corner, a floor smear is fresh over dried, a wall run is a fresh
+## blob over a dried run, and a pool is wet with a dried heart and the glint
+## on its sunward edge. Whatever it lands on, part of it reads. All of it is
+## opaque and on the pixel grid: nothing is blended, faded or blurred.
+##
+## ## A pool spreads, glistens, and dries
+##
+## A pool is not a stain: it spreads for POOL_TIME, stays wet -- the glint on
+## its sunward edge -- for WET_TIME, then dries from the rim inward over
+## DRY_TIME and stays dark. Drying is a hard edge moving in, not a fade. The
+## clock is this node's own and stops with the hitstop and the pause, like the
+## drops. A foe's pool is wider than it was, and the prince's death leaves one
+## too: the two moments the blood exists for.
+##
+## ## Lit like the stone it lies on
+##
+## The tiles are drawn by an unshaded shader, so a level's hour (WorldGrade)
+## never lands on the stone -- but it lands on everything else on the canvas,
+## and blood under the sunset or night multiply went out against the stone it
+## was spilled on. Each frame the hour's multiply is taken back off this node,
+## so blood is graded exactly as the stone is: not at all by the hour, and by
+## the same factor as the stone when the world is put out (WorldGrade.dim). It
+## does not join MatchDusk.LIT, because the lit group is lifted out of that
+## dim too, and blood glowing in the Eclipse's dark would be a light source.
 ##
 ## ## Capped for phones
 ##
 ## Drops live in one fixed PackedFloat32Array, like PlayerFx's dust: nothing
 ## is allocated while playing and a kill can never cost more than MAX_DROPS.
-## Stains are a ring of MAX_STAINS rects; past it the oldest goes. Both are
-## drawn in one pass of rects.
+## Stains are a ring of MAX_STAINS rects and pools a ring of MAX_POOLS; past
+## either the oldest goes. All of it is drawn in one pass of rects, redrawn
+## every frame only while a drop is in the air or a pool is still drying.
 ##
 ## ## What a death and a restart do to it
 ##
@@ -53,17 +78,32 @@ const MAX_DROPS := 64
 ## Stains a level keeps. Far more than a level's foes leave -- a kill leaves
 ## about a score -- so the oldest only go in a level fought over at length.
 const MAX_STAINS := 240
-## Drops in one kill's burst, and in the spatter when the prince is cut.
+## Pools a level keeps: one a kill and one a death of the prince's.
+const MAX_POOLS := 48
+## Drops in one kill's burst, in the spatter when the prince is cut, and when
+## he dies. His death is louder than a wound and still quieter than a kill:
+## the burst is the reward for a blow landed, and his own blood should not
+## compete with it.
 const KILL_DROPS := 24
 const HURT_DROPS := 4
+const DEATH_DROPS := 14
 
 const GRAVITY := 300.0
 ## A drop that has not landed by then is let go without a stain.
 const DROP_LIFE := 1.6
 
-## Fresh blood, and the dark heart of a stain.
-const BLOOD := Palette.CLOTH_DARK
-const BLOOD_DARK := Palette.SHADOW_PIT
+## A foe's pool, and the prince's, in pixels wide when spread.
+const POOL_MIN := 16
+const POOL_MAX := 24
+const PRINCE_POOL_MIN := 10
+const PRINCE_POOL_MAX := 14
+## Seconds a pool spreads, stays wet, and then takes to dry from the rim in.
+## The duel's pool keeps the same three beats (scripts/duel/gore.gd).
+const POOL_TIME := 1.5
+const WET_TIME := 4.0
+const DRY_TIME := 6.0
+## How far a pool spreads from: a share of its width at the instant of death.
+const POOL_START := 0.4
 
 const STRIDE := 6
 const D_X := 0
@@ -82,6 +122,13 @@ var _drops := PackedFloat32Array()
 var _next := 0
 ## [Rect2, Color] pairs, oldest first.
 var _stains: Array[Array] = []
+## { x, top, width, born } -- the centre, the floor's top, the spread width
+## and the clock at the death -- oldest first.
+var _pools: Array[Dictionary] = []
+## Seconds of unfrozen play since the last clear(): the pools' clock.
+var _clock := 0.0
+## While the clock is before this, a pool is still spreading or drying.
+var _drying_until := 0.0
 var _rng := RandomNumberGenerator.new()
 var _frozen := Callable()
 
@@ -97,7 +144,7 @@ static func install(game: Game, entities: Node) -> Bloodshed:
 	entities.child_entered_tree.connect(blood.watch)
 	if game.player != null:
 		game.player.hurt.connect(func(_left: int) -> void: blood.spatter(HURT_DROPS))
-		game.player.died.connect(func() -> void: blood.spatter(HURT_DROPS * 2))
+		game.player.died.connect(blood.prince_down)
 	return blood
 
 
@@ -128,12 +175,10 @@ func bleed_for(foe: Foe) -> void:
 		body = Rect2(foe.global_position - Vector2(4.0, 16.0), Vector2(8.0, 16.0))
 	var origin := to_local(body.get_center())
 	burst(origin, _away_from_prince(origin.x), KILL_DROPS)
-	pool(Vector2(origin.x, to_local(body.end).y))
+	pool(Vector2(origin.x, to_local(body.end).y), _rng.randi_range(POOL_MIN, POOL_MAX))
 
 
-## The prince cut, or killed: a few drops, thrown the way the blow knocked
-## him. A smaller thing than a kill on purpose -- the burst is the reward for
-## a blow landed, and his own blood should not compete with it.
+## The prince cut: a few drops, thrown the way the blow knocked him.
 func spatter(count: int = HURT_DROPS) -> void:
 	if player == null:
 		return
@@ -142,6 +187,17 @@ func spatter(count: int = HURT_DROPS) -> void:
 	if is_zero_approx(direction):
 		direction = -float(player.facing)
 	burst(to_local(body.get_center()), direction, count)
+
+
+## The prince killed: a spatter the size of a small burst, and a pool of his
+## own where he fell, which the respawn leaves on the floor.
+func prince_down() -> void:
+	if player == null:
+		return
+	spatter(DEATH_DROPS)
+	var body := player.body_rect()
+	pool(Vector2(to_local(body.get_center()).x, to_local(body.end).y),
+		_rng.randi_range(PRINCE_POOL_MIN, PRINCE_POOL_MAX))
 
 
 ## `count` drops from `origin`, thrown toward `direction` (-1 or 1) and up.
@@ -165,19 +221,24 @@ func burst(origin: Vector2, direction: float, count: int) -> void:
 	queue_redraw()
 
 
-## A pool on the floor under `at`, if there is one within a couple of tiles.
-func pool(at: Vector2) -> void:
+## A pool `width` pixels wide when spread, on the floor under `at`, if there
+## is one within a few tiles. The oldest goes once there are MAX_POOLS.
+func pool(at: Vector2, width: int = POOL_MIN) -> void:
 	if level == null:
 		return
 	var probe := at
 	for _step: int in 3 * Level.TILE:
 		if level.is_solid_at(to_global(probe)):
-			var top := floorf(probe.y / Level.TILE) * Level.TILE
-			var width := float(_rng.randi_range(12, 18))
-			var left := floorf(at.x - width * 0.5)
-			stain(Rect2(left, top, width, 2.0), BLOOD)
-			stain(Rect2(left + 3.0, top, width - 6.0, 2.0), BLOOD_DARK)
-			stain(Rect2(left + 2.0, top + 2.0, width - 4.0, 1.0), BLOOD)
+			if _pools.size() >= MAX_POOLS:
+				_pools.pop_front()
+			_pools.append({
+				"x": roundf(at.x),
+				"top": floorf(probe.y / Level.TILE) * Level.TILE,
+				"width": float(width),
+				"born": _clock,
+			})
+			_drying_until = _clock + WET_TIME + DRY_TIME
+			queue_redraw()
 			return
 		probe.y += 1.0
 
@@ -194,6 +255,9 @@ func stain(rect: Rect2, colour: Color) -> void:
 func clear() -> void:
 	_drops.fill(0.0)
 	_stains.clear()
+	_pools.clear()
+	_clock = 0.0
+	_drying_until = 0.0
 	kills = 0
 	queue_redraw()
 
@@ -220,12 +284,31 @@ func stain_count() -> int:
 	return _stains.size()
 
 
+func pool_count() -> int:
+	return _pools.size()
+
+
+## Every colour a stain on the floor is in, for a test to hold to the ramp.
+func stain_colours() -> Array[Color]:
+	var out: Array[Color] = []
+	for entry: Array in _stains:
+		if not out.has(entry[1] as Color):
+			out.append(entry[1] as Color)
+	return out
+
+
 ## --- per-frame ----------------------------------------------------------------
+
+func _process(_delta: float) -> void:
+	_grade_like_the_stone()
+
 
 func _physics_process(delta: float) -> void:
 	if Flow.is_hitstopped() or (_frozen.is_valid() and bool(_frozen.call())):
 		return
-	var moved := false
+	var was := _clock
+	_clock += delta
+	var moved := was < _drying_until
 	for i: int in MAX_DROPS:
 		var at := i * STRIDE
 		if _drops[at + D_AGE] <= 0.0:
@@ -234,6 +317,15 @@ func _physics_process(delta: float) -> void:
 		_step_drop(at, delta)
 	if moved:
 		queue_redraw()
+
+
+## The hour's multiply taken back off: the canvas multiply is the hour times
+## the dim, and this leaves only the dim, which is what the stone gets
+## through the world shader's tint. See "Lit like the stone it lies on".
+func _grade_like_the_stone() -> void:
+	var grade := get_tree().get_first_node_in_group(WorldGrade.GROUP) as WorldGrade
+	var hour: Color = Color.WHITE if grade == null else grade.grade.get("world", Color.WHITE)
+	modulate = Color.WHITE / hour
 
 
 func _step_drop(at: int, delta: float) -> void:
@@ -254,16 +346,18 @@ func _step_drop(at: int, delta: float) -> void:
 		# Came down onto it, or up into it: a floor takes a smear along it.
 		if now.y > was.y:
 			var top := floorf(now.y / Level.TILE) * Level.TILE
-			# Two rows, crimson over near-black: the crimson reads on a lit
-			# floor, the dark row on one in shade.
-			stain(Rect2(floorf(now.x) - 1.0, top, size + 2.0, 1.0), BLOOD)
-			stain(Rect2(floorf(now.x), top + 1.0, size, 1.0), BLOOD_DARK)
+			# Two rows, fresh over dried: the fresh row reads on dark stone
+			# and gold, the dried one on mid crimson.
+			stain(Rect2(floorf(now.x) - 1.0, top, size + 2.0, 1.0), Palette.BLOOD)
+			stain(Rect2(floorf(now.x), top + 1.0, size, 1.0), Palette.BLOOD_DRIED)
 		return
-	# Came in from the side: a wall takes a run down its face.
-	var face := floorf(now.x / Level.TILE) * Level.TILE
-	if now.x < was.x:
-		face += Level.TILE - 1.0
-	stain(Rect2(face - (1.0 if now.x < was.x else 0.0), floorf(now.y), 2.0, size + 3.0), BLOOD)
+	# Came in from the side: a wall takes a blob where it struck and a run
+	# down the face from it, fresh over dried.
+	var leftward := now.x < was.x
+	var face := floorf(now.x / Level.TILE) * Level.TILE + (Level.TILE - 1.0 if leftward else 0.0)
+	var y := floorf(now.y)
+	stain(Rect2(face - (1.0 if leftward else 0.0), y, 2.0, 2.0), Palette.BLOOD)
+	stain(Rect2(face, y + 2.0, 1.0, size + 1.0), Palette.BLOOD_DRIED)
 
 
 func _away_from_prince(x: float) -> float:
@@ -276,12 +370,48 @@ func _away_from_prince(x: float) -> float:
 func _draw() -> void:
 	for entry: Array in _stains:
 		draw_rect(entry[0] as Rect2, entry[1] as Color)
+	for each: Dictionary in _pools:
+		_draw_pool(each)
 	for i: int in MAX_DROPS:
 		var at := i * STRIDE
 		if _drops[at + D_AGE] <= 0.0:
 			continue
 		var size := _drops[at + D_SIZE]
 		var corner := Vector2(floorf(_drops[at + D_X]), floorf(_drops[at + D_Y]))
-		draw_rect(Rect2(corner, Vector2(size, size)), BLOOD)
+		draw_rect(Rect2(corner, Vector2(size, size)), Palette.BLOOD)
 		if size > 1.0:
-			draw_rect(Rect2(corner, Vector2.ONE), BLOOD_DARK)
+			# The glint on the sunward corner: the sun is low on the left.
+			draw_rect(Rect2(corner, Vector2.ONE), Palette.BLOOD_WET)
+
+
+## Three rows into the floor's top, narrowing: the lip, the body, the
+## underside. Wet, it is fresh with a dried heart and the glint along the
+## sunward end of the lip; drying, the dried tone takes it from the rim in;
+## dry, it is the dried tone alone.
+func _draw_pool(each: Dictionary) -> void:
+	var age := _clock - float(each["born"])
+	var spread := 1.0 - pow(1.0 - clampf(age / POOL_TIME, 0.0, 1.0), 2.0)
+	var width := maxf(4.0, 2.0 * roundf(float(each["width"]) * lerpf(POOL_START, 1.0, spread) * 0.5))
+	var left := float(each["x"]) - width * 0.5
+	var top := float(each["top"])
+	var rows: Array[Rect2] = [
+		Rect2(left, top, width, 1.0),
+		Rect2(left + 1.0, top + 1.0, width - 2.0, 1.0),
+		Rect2(left + 3.0, top + 2.0, maxf(0.0, width - 6.0), 1.0),
+	]
+	if age >= WET_TIME + DRY_TIME:
+		for row: Rect2 in rows:
+			draw_rect(row, Palette.BLOOD_DRIED)
+		return
+	if age < WET_TIME:
+		for row: Rect2 in rows:
+			draw_rect(row, Palette.BLOOD)
+		draw_rect(Rect2(left + 3.0, top + 1.0, maxf(0.0, width - 6.0), 1.0), Palette.BLOOD_DRIED)
+		draw_rect(Rect2(left + 1.0, top, ceilf(width * 0.3), 1.0), Palette.BLOOD_WET)
+		return
+	var wet := 1.0 - (age - WET_TIME) / DRY_TIME
+	for row: Rect2 in rows:
+		draw_rect(row, Palette.BLOOD_DRIED)
+	var inner := 2.0 * roundf((width - 2.0) * wet * 0.5)
+	if inner > 0.0:
+		draw_rect(Rect2(float(each["x"]) - inner * 0.5, top, inner, 2.0), Palette.BLOOD)
