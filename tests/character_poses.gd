@@ -89,6 +89,13 @@ func _pin(pose: Dictionary) -> void:
 	_player.velocity = pose.get("velocity", Vector2.ZERO)
 	_player.health = pose.get("health", Tuning.MAX_HEALTH)
 	_player.position = FEET + pose.get("offset", Vector2.ZERO)
+	# An empty hand is the blade out of it: thrown, and lying out of frame.
+	if pose.get("unarmed", false):
+		if _player.moves.armed():
+			_player.moves.blade.launch(Vector2(-200.0, -200.0), 1)
+		_player.moves.blade.mode = PrinceBlade.Mode.LOOSE
+	else:
+		_player.moves.rearm()
 	# A death from a fall is DEAD with the fall's flag up, which nothing
 	# public sets but the landing itself. Read back: Object.set() on a name
 	# the script does not have drops the value in silence (CLAUDE.md).
@@ -163,6 +170,18 @@ func _pose_table() -> Array[Dictionary]:
 			"velocity": Vector2(-Tuning.backstep_speed(0.08), 0.0),
 			"emit": [["backstepped"]]},
 		{"name": "backstep-recover", "state": Player.State.BACKSTEP, "t": 0.3},
+		{"name": "roll-tuck", "state": Player.State.ROLL, "t": 0.16,
+			"velocity": Vector2(Tuning.ROLL_SPEED, 0.0), "emit": [["rolled"]]},
+		{"name": "roll-rise", "state": Player.State.ROLL, "t": Tuning.ROLL_TUCK + 0.08},
+		{"name": "dive-kick", "state": Player.State.DIVE_KICK, "t": 0.1,
+			"velocity": Vector2(Tuning.DIVE_KICK_DRIFT, Tuning.DIVE_KICK_DROP),
+			"offset": Vector2(0.0, -12.0)},
+		{"name": "kick-land", "state": Player.State.KICK_LAND, "t": 0.06},
+		{"name": "throw-draw", "state": Player.State.THROW, "t": 0.02},
+		{"name": "throw-release", "state": Player.State.THROW, "t": 0.12, "unarmed": true},
+		{"name": "unarmed", "state": Player.State.IDLE, "t": 0.45, "unarmed": true},
+		{"name": "sweep", "state": Player.State.SWEEP, "t": 0.09, "unarmed": true},
+		{"name": "pickup", "state": Player.State.PICKUP, "t": 0.075},
 		{"name": "hurt", "state": Player.State.HURT, "t": 0.10,
 			"velocity": Vector2(-80.0, -40.0), "health": 2,
 			"emit": [["hurt", 2]]},

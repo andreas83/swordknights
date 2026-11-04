@@ -26,7 +26,7 @@ func before_each() -> void:
 
 
 func after_each() -> void:
-	for action: String in ["jump", "attack", "pause", "move_left", "move_right"]:
+	for action: String in ["jump", "attack", "pause", "move_left", "move_right", "throw"]:
 		Input.action_release(action)
 
 
@@ -77,3 +77,45 @@ func _drag(at: Vector2, index: int) -> InputEventScreenDrag:
 	event.position = at
 	event.index = index
 	return event
+
+
+## --- THROW, the adventure's third button -------------------------------------
+
+func _button(id: String) -> Dictionary:
+	for button: Dictionary in _controls._buttons:
+		if String(button["id"]) == id:
+			return button
+	return {}
+
+
+func test_the_menus_and_the_duel_have_no_throw_of_this_layouts() -> void:
+	assert_true(_button("throw").is_empty(),
+		"off by default: the menus have nothing to throw, the duel draws its own")
+
+
+func test_the_adventure_scene_asks_for_throw() -> void:
+	var game := (load("res://scenes/game.tscn") as PackedScene).instantiate()
+	var touch := game.get_node(^"TouchControls") as TouchControls
+	assert_true(touch.throw_button, "scenes/game.tscn lays THROW out")
+	game.free()
+
+
+func test_throw_sits_where_the_duels_does_and_is_pressed_where_drawn() -> void:
+	_controls.throw_button = true
+	_controls._layout()
+	var throw := _button("throw")
+	assert_false(throw.is_empty(), "laid out")
+	var view := _controls.get_viewport().get_visible_rect().size
+	var safe := UiLayout.safe(view)
+	assert_eq(throw["at"], Vector2(safe.end.x - 52.0, safe.end.y - 78.0),
+		"at the duel's place: up and to the left of JUMP (scripts/duel/duel_touch.gd)")
+	assert_eq(float(throw["r"]), DuelTouchGuard.RADIUS, "and the duel's size")
+	for other: String in ["jump", "attack"]:
+		var button := _button(other)
+		var apart: float = (throw["at"] as Vector2).distance_to(button["at"])
+		assert_gt(apart, float(throw["r"]) + float(button["r"]),
+			"clear of %s: a thumb on one never lands on the other" % other)
+	_controls._input(_touch(throw["at"], true, 4))
+	assert_true(Input.is_action_pressed("throw"), "a touch on it presses throw")
+	_controls._input(_touch(throw["at"], false, 4))
+	assert_false(Input.is_action_pressed("throw"), "and letting go releases it")

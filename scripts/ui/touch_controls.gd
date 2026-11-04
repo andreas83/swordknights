@@ -15,6 +15,18 @@ const STICK_RADIUS := 30.0
 const STICK_DEADZONE := 7.0
 const VERTICAL_DEADZONE := 14.0
 const HIT_PADDING := 8.0
+## --- the duel's moves --- where THROW sits, from the safe area's bottom
+## right, and its size: exactly the duel's (scripts/duel/duel_touch.gd), up
+## and to the left of JUMP and clear of SWORD, so a thumb that has learned
+## one layout finds the button in the other.
+const THROW_AT := Vector2(52.0, 78.0)
+const THROW_RADIUS := 18.0
+
+## --- the duel's moves --- whether this layout carries THROW. The adventure's
+## scene sets it (scenes/game.tscn); the menus have nothing to throw, and the
+## duel's scenes add their own THROW (DuelTouchGuard), so for them it stays
+## off and the button is never drawn twice.
+@export var throw_button := false
 
 var _buttons: Array[Dictionary] = []
 var _held: Dictionary = {} # touch index -> action name
@@ -54,6 +66,9 @@ func _layout() -> void:
 		{"id": "mute", "action": "", "label": "", "mark": "sound",
 			"at": Vector2(right - 34.0, safe.position.y + 12.0), "r": 10.0},
 	]
+	if throw_button:
+		_buttons.append({"id": "throw", "action": "throw", "label": "", "mark": "throw",
+			"at": Vector2(right, bottom) - THROW_AT, "r": THROW_RADIUS})
 	_surface.queue_redraw()
 
 
@@ -201,6 +216,8 @@ func draw_surface() -> void:
 				_surface.draw_rect(Rect2(at.x + 1.0, at.y - 4.0, 2.0, 8.0), ink)
 			"sound":
 				_draw_sound_mark(at, ink)
+			"throw":
+				_draw_throw_mark(at, held)
 			_:
 				pass
 
@@ -209,6 +226,25 @@ func draw_surface() -> void:
 		var knob := _stick_origin + delta.limit_length(STICK_RADIUS)
 		_surface.draw_circle(_stick_origin, STICK_RADIUS, Palette.with_alpha(Palette.INK, 0.18))
 		_surface.draw_circle(knob, 11.0, Palette.with_alpha(Palette.LIGHT_SOFT, 0.55))
+
+
+## A sword flying point-first with two speed lines behind it: the duel's
+## THROW glyph (DuelTouchGuard), drawn again here because the duel's file is
+## the duel's, and the same picture on both buttons is the point.
+func _draw_throw_mark(at: Vector2, held: bool) -> void:
+	var steel := Palette.with_alpha(Palette.STEEL, 0.95 if held else 0.6)
+	var light := Palette.with_alpha(Palette.LIGHT_SOFT, 0.9 if held else 0.5)
+	var dir := Vector2(1.0, -0.55).normalized()
+	var side := Vector2(-dir.y, dir.x)
+	var tip := at + dir * 8.0
+	var hilt := at - dir * 4.0
+	_surface.draw_colored_polygon(PackedVector2Array([
+		hilt + side * 1.1, tip, hilt - side * 1.1,
+	]), steel)
+	_surface.draw_line(hilt + side * 3.0, hilt - side * 3.0, light, 1.4)
+	for k: int in 2:
+		var back := hilt - dir * (3.0 + 2.5 * float(k)) + side * (2.5 - 5.0 * float(k))
+		_surface.draw_line(back, back - dir * 4.0, light, 1.0)
 
 
 ## A horn, and a bar struck through it when the game is silent. Drawn rather

@@ -160,6 +160,7 @@ func _bind() -> bool:
 	_player.hurt.connect(_on_hurt)
 	_player.died.connect(_on_died)
 	PlayerFx.attach(_player)
+	LooseSwordArt.attach(_player) # --- the duel's moves --- the blade out of hand
 	idle_art = IdleArt.attach(self, _player)
 	return true
 
@@ -194,7 +195,8 @@ func _skip_frame() -> bool:
 ## Whether the blade is drawn in front of the robe rather than behind it.
 func _blade_in_front() -> bool:
 	match _player.state:
-		Player.State.PLUNGE_LAND, Player.State.PARRY, Player.State.BACKSTEP:
+		Player.State.PLUNGE_LAND, Player.State.PARRY, Player.State.BACKSTEP, \
+		Player.State.THROW:
 			return true
 		_:
 			return _player.is_striking()
@@ -578,7 +580,8 @@ func _grounded() -> bool:
 	match _player.state:
 		Player.State.IDLE, Player.State.WALK, Player.State.RUN, Player.State.TURN, \
 		Player.State.CROUCH, Player.State.LAND, Player.State.ATTACK, \
-		Player.State.PLUNGE_LAND, Player.State.PARRY, Player.State.BACKSTEP:
+		Player.State.PLUNGE_LAND, Player.State.PARRY, Player.State.BACKSTEP, \
+		Player.State.ROLL, Player.State.KICK_LAND, Player.State.SWEEP, Player.State.PICKUP:
 			return true
 		_:
 			return _player.is_grounded()
@@ -625,6 +628,12 @@ func _pose(over: Dictionary) -> Dictionary:
 
 
 func _posture() -> Dictionary:
+	var pose := _state_pose()
+	# --- the duel's moves --- an empty hand: no blade, the hand open.
+	return pose if _player.moves.armed() else MovePoses.unarmed(pose)
+
+
+func _state_pose() -> Dictionary:
 	var t := _player.state_time
 	match _player.state:
 		Player.State.WALK:
@@ -659,6 +668,9 @@ func _posture() -> Dictionary:
 			return _pose(SwordPoses.parry(t))
 		Player.State.BACKSTEP:
 			return _pose(SwordPoses.backstep(t))
+		Player.State.ROLL, Player.State.DIVE_KICK, Player.State.KICK_LAND, \
+		Player.State.THROW, Player.State.SWEEP, Player.State.PICKUP:
+			return _pose(MovePoses.for_state(_player.state, t))
 		Player.State.HURT:
 			return _hurt(t)
 		Player.State.DEAD:
