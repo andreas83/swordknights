@@ -70,6 +70,17 @@ extends RefCounted
 ## likewise left out: the prince cannot hold a plate and walk through the
 ## gate it holds, so a momentary plate is modelled as nothing, which is right
 ## until something else can hold it down.
+##
+## ## Facts for other proofs
+##
+## Some mechanisms change nothing the search sees and still owe a proof: a
+## blade on a beat is air to the search, as a sentinel's cut is, but every
+## crossing of it must leave a window to set off in (BeatProof). Such a hook
+## files what it is with `note(topic, fact)`, and that proof reads
+## `notes(topic)` -- so it finds the level's blades through the same hooks,
+## from the same marks, as the search finds its gates. Notes are not
+## passability: a level whose mechanisms only file notes keeps an empty model
+## (is_empty()), and its proof stays exactly the plain search.
 
 ## The bits a mask has. Thirty would fit beside a cell key; sixteen wires is
 ## already more than a hand-made level should ever want.
@@ -105,6 +116,8 @@ var level: AsciiLevel
 var extras: Dictionary = {}
 ## cell -> the channels whose race standing there starts (race_on_stand()).
 var _races: Dictionary = {}
+## topic -> Array[Dictionary]: what hooks filed with note().
+var _notes: Dictionary = {}
 
 
 ## The model of `level`: every mark whose registered kind has a reach hook
@@ -232,6 +245,20 @@ func resets_on_respawn(channel: StringName) -> void:
 	var index := bit(channel)
 	if index >= 0:
 		_resets |= 1 << index
+
+
+## Files `fact` under `topic` for a proof the search does not run (above).
+func note(topic: StringName, fact: Dictionary) -> void:
+	if not _notes.has(topic):
+		_notes[topic] = [] as Array[Dictionary]
+	(_notes[topic] as Array[Dictionary]).append(fact)
+
+
+## Everything filed under `topic`, in the level's order.
+func notes(topic: StringName) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	out.assign(_notes.get(topic, []))
+	return out
 
 
 ## --- what the search asks ------------------------------------------------------
