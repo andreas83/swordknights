@@ -63,6 +63,7 @@ const ENTITY_LEGEND := {
 	"L": "inscription", ## words cut into a wall; spawned by SecretKeeper
 	"j": "caracal", ## the King's hunting cat (scripts/entities/caracal.gd)
 	"v": "doves", ## a flock on a lit terrace (scripts/entities/dove_flock.gd)
+	"g": "glassbearer", ## fires sunbolts while his glass is lit (Chapter IV)
 }
 
 ## Masonry that seals a secret room. The cell parses to the Kind it has in

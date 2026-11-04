@@ -676,8 +676,9 @@ phone:
   roll passes those only by being lower than them (the tuck is 9 px).
 
 What each foe does with the duel's moves (`docs/character.md`, "The duel's
-moves in the adventure"). The Glassbearer and the owl are not built; their
-rows are what their chapters should build to:
+moves in the adventure"). The owl is not built; its row is what its chapter
+should build to. The Glassbearer's row is built and pinned by
+`tests/unit/test_glassbearer.gd`:
 
 | Foe | Roll | Dive kick | Sweep | Thrown sword |
 | --- | --- | --- | --- | --- |

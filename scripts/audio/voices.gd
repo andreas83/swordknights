@@ -160,6 +160,17 @@ static func specs() -> Dictionary:
 			"peak": 0.62, "seed": 1702, "pitch_jitter": 0.05, "gain_jitter": 1.0,
 			"min_gap": 0.3,
 		},
+		# The Glassbearer (docs/campaign.md): the aim's rising whine, which is
+		# his telegraph and so is never jittered off its pitch, and his glass
+		# breaking when he dies.
+		"glass_charge": {
+			"peak": 0.4, "seed": 1401, "pitch_jitter": 0.0, "gain_jitter": 0.0,
+			"min_gap": 0.3,
+		},
+		"shatter": {
+			"peak": 0.6, "seed": 1402, "pitch_jitter": 0.05, "gain_jitter": 1.0,
+			"min_gap": 0.2,
+		},
 
 		# --- interface ---
 		"ui_move": {
@@ -334,6 +345,8 @@ static func _render(name: String, rate: int, seed_value: int) -> PackedFloat32Ar
 		"chain": return _chain(rate, seed_value)
 		"hiss": return _hiss(rate, seed_value)
 		"yowl": return _yowl(rate, seed_value)
+		"glass_charge": return _glass_charge(rate, seed_value)
+		"shatter": return _shatter(rate, seed_value)
 		"ui_move": return _ui_move(rate, seed_value)
 		"ui_confirm": return _ui_arpeggio(rate, seed_value, true)
 		"ui_back": return _ui_arpeggio(rate, seed_value, false)
@@ -806,6 +819,48 @@ static func _yowl(rate: int, seed_value: int) -> PackedFloat32Array:
 		"attack": 0.02, "decay": 0.32, "curve": 1.6, "amp": 0.2, "seed": seed_value,
 	})
 	Synth.one_pole(buf, 3400.0, false, rate)
+	return buf
+
+
+## A burning glass gathering the sun: a sine swept 900 to 1800 Hz over the
+## 27 frames of the aim -- an octave, rising, so it is heard as "now" the way
+## the sentinel's raise is seen -- with a fifth above it a little behind, for
+## the edge of glass rather than a whistle. The pitch climbs while the level
+## falls away, so the rise is what is heard and the shot lands on its end.
+## The cue stretches it for LONGER WARNINGS by pitching it down, so it still
+## ends on the shot.
+static func _glass_charge(rate: int, _seed_value: int) -> PackedFloat32Array:
+	var buf := Synth.buffer(0.47, rate)
+	Synth.add_tone(buf, {
+		"rate": rate, "len": 0.45, "freq": 900.0, "freq_end": 1800.0, "sweep_curve": 1.0,
+		"amp": 0.32, "attack": 0.03, "decay": 0.44, "curve": 1.1,
+		"vibrato_hz": 11.0, "vibrato_cents": 12.0,
+	})
+	Synth.add_tone(buf, {
+		"rate": rate, "start": 0.08, "len": 0.37, "freq": 1350.0, "freq_end": 2700.0,
+		"amp": 0.12, "attack": 0.06, "decay": 0.36, "curve": 1.1,
+	})
+	return buf
+
+
+## His glass breaking: a high crack of noise, then a scatter of bright
+## plucks -- shards ringing off stone -- at uneven times, each a little lower
+## than the last. The ladder's pluck again, very high and very short, so it
+## belongs with the iron and the bronze rather than being a new kind of
+## sound.
+static func _shatter(rate: int, seed_value: int) -> PackedFloat32Array:
+	var buf := Synth.buffer(0.55, rate)
+	Synth.add_noise(buf, {
+		"rate": rate, "len": 0.06, "cutoff": 5200.0, "cutoff_end": 2600.0, "q": 1.4,
+		"decay": 0.05, "curve": 2.2, "amp": 0.6, "seed": seed_value,
+	})
+	var times := [0.02, 0.07, 0.13, 0.2, 0.29, 0.38]
+	for i: int in times.size():
+		Synth.add_pluck(buf, {
+			"rate": rate, "start": times[i], "len": 0.12, "freq": 3400.0 - 260.0 * i,
+			"decay": 0.06, "brightness": 0.98, "amp": 0.34 - 0.04 * i,
+			"seed": seed_value + 3 + i, "release": 0.02,
+		})
 	return buf
 
 
