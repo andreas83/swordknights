@@ -17,8 +17,13 @@ extends RefCounted
 ##   the channel is off and `on` while it is on. A gate: SOLID, then EMPTY. A
 ##   trapdoor: SOLID, then EMPTY, under the floor. A bridge that slides out:
 ##   EMPTY, then SOLID. A spike trap that is armed: SPIKES, then EMPTY.
-## - `latch_on_stand(cells, channel)` -- standing in any of these cells turns
-##   the channel on for good. A plate that clicks down and stays down.
+## - `latch_on_stand(cells, channel, needs)` -- standing in any of these cells
+##   turns the channel on for good. A plate that clicks down and stays down.
+##   With `needs`, only while every channel named there is already on: a sun
+##   seal is opened from where its mirror is struck, but only once the doors
+##   its beam has to pass are open (scripts/mechanisms/sun_seal.gd). Still a
+##   latch -- a guard on when the bit may be set, never a way to clear one --
+##   so everything below about masks and checkpoints holds unchanged.
 ## - `fixed_cells(cells, kind)` -- these cells are `kind` in every state:
 ##   for something the proof should treat as always there, or never.
 ##
@@ -82,13 +87,18 @@ var _latches: Dictionary = {}
 var _fuses: Dictionary = {}
 ## The bits a checkpoint respawn clears: traps, not deeds.
 var _resets := 0
+## cell -> Array of [needs mask, sets mask]: latches that wait for other bits.
+var _guarded: Dictionary = {}
 ## Wiring the model could not take: too many channels.
 var problems := PackedStringArray()
 ## channel -> `{mode, seconds, phase, period}`, the level's `;! channel` lines,
 ## for a reach hook to ask what its wire does (channel_mode()).
 var channels: Dictionary = {}
 ## The level the model describes, for an extension that searches it on its
-## own terms (ReachRace builds a timed solver over it).
+## own terms (ReachRace builds a timed solver over it) and for a hook whose
+## effect is a question about the whole level -- where a beam goes depends on
+## every wall in it (scripts/levels/sun_proof.gd). Null for a model built by
+## hand.
 var level: AsciiLevel
 ## Per-level scratch for search extensions, so what they cache lives and dies
 ## with the model.
@@ -128,7 +138,7 @@ static func _has_hook(script: Script) -> bool:
 
 func is_empty() -> bool:
 	return _switched.is_empty() and _fixed.is_empty() and _latches.is_empty() \
-		and _fuses.is_empty()
+		and _fuses.is_empty() and _guarded.is_empty()
 
 
 ## The bit for `channel`, allocated on first use; -1 past MAX_CHANNELS.
@@ -165,13 +175,29 @@ func switch_cells(cells: Array[Vector2i], channel: StringName, off: Tiles.Kind,
 	_switched.append({"cells": cells.duplicate(), "bit": index, "off": off, "on": on})
 
 
-## Standing in any of `cells` turns `channel` on for good.
-func latch_on_stand(cells: Array[Vector2i], channel: StringName) -> void:
+## Standing in any of `cells` turns `channel` on for good -- with `needs`,
+## only while every channel in it is already on. A guard naming a channel the
+## model cannot hold is dropped whole: a latch that might fire too early is
+## not one the proof may lean on.
+func latch_on_stand(cells: Array[Vector2i], channel: StringName,
+		needs: Array[StringName] = []) -> void:
 	var index := bit(channel)
 	if index < 0:
 		return
+	if needs.is_empty():
+		for cell: Vector2i in cells:
+			_latches[cell] = int(_latches.get(cell, 0)) | (1 << index)
+		return
+	var guard := 0
+	for need: StringName in needs:
+		var at := bit(need)
+		if at < 0:
+			return
+		guard |= 1 << at
 	for cell: Vector2i in cells:
-		_latches[cell] = int(_latches.get(cell, 0)) | (1 << index)
+		if not _guarded.has(cell):
+			_guarded[cell] = []
+		(_guarded[cell] as Array).append([guard, 1 << index])
 
 
 ## `cells` are `kind` in every state.
@@ -210,9 +236,22 @@ func resets_on_respawn(channel: StringName) -> void:
 
 ## --- what the search asks ------------------------------------------------------
 
-## The mask after standing in `cell` with `mask`.
+## The mask after standing in `cell` with `mask`. A guarded latch whose
+## guard another latch at the same cell has just met fires too, so this runs
+## to a fixed point; bits are only ever set, so it ends.
 func after_standing(mask: int, cell: Vector2i) -> int:
-	return mask | int(_latches.get(cell, 0))
+	var out := mask | int(_latches.get(cell, 0))
+	var rules: Array = _guarded.get(cell, [])
+	var grew := not rules.is_empty()
+	while grew:
+		grew = false
+		for rule: Array in rules:
+			var guard := int(rule[0])
+			var sets := int(rule[1])
+			if out & guard == guard and out & sets != sets:
+				out |= sets
+				grew = true
+	return out
 
 
 ## The mask once a stand in `cell` under `mask` is left: its fuses burnt.

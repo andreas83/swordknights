@@ -20,7 +20,9 @@ extends RefCounted
 ## ## The vocabulary
 ##
 ## `harm(hearts, from_x)` is a mechanism's way to hurt him without being a
-## foe. `reach_exit()` and `offer_checkpoint(at)` are the level's two goals. A
+## foe. `reach_exit()` and `offer_checkpoint(at)` are the level's two goals.
+## `reveal_secret(cell, at)` finds a secret for him, for a seal his body and
+## blade cannot open -- the sun seal, which light opens. A
 ## relic's tally and heal ride on its own `collected` signal, which its
 ## `place()` wires to the site (scripts/entities/entity_site.gd) because a
 ## relic can be taken by more than the prince's body.
@@ -56,6 +58,8 @@ var foe_met := Callable()
 var shot_met := Callable()
 ## `(hearts: int, from_x: float) -> bool`: true when the hurt was dealt.
 var harmed := Callable()
+## `(cell: Vector2i, at: Vector2) -> bool`: true when a secret was found.
+var secret_revealed := Callable()
 
 
 ## The blade is out and live this frame.
@@ -82,6 +86,15 @@ func offer_checkpoint(at: Vector2) -> bool:
 ## should kill outright is a hazard instead: Mechanism.set_kind(SPIKES).
 func harm(hearts: int, from_x: float) -> bool:
 	return harmed.is_valid() and bool(harmed.call(hearts, from_x))
+
+
+## Finds the secret whose seal or room holds `cell`, as if the prince had
+## found it at `at`: the count, the banner, the chime and the reveal, through
+## the secret keeper. For a seal that something other than his body or his
+## blade opens -- light, for a sun seal (scripts/mechanisms/sun_seal.gd). True
+## when a secret was found now.
+func reveal_secret(cell: Vector2i, at: Vector2) -> bool:
+	return secret_revealed.is_valid() and bool(secret_revealed.call(cell, at))
 
 
 func meet_foe(foe: Foe) -> void:

@@ -297,6 +297,7 @@ drawn and cannot be forgotten. `AsciiLevel._find_secrets()` does the flood.
 | --- | --- | --- | --- |
 | `%` false | `BACKDROP`: there is no wall | the body walking into it | a bricked-up doorway, air drifting out of its joints |
 | `&` cracked | `SOLID`: a wall, a ledge, a floor | the sword: a swing, an air slash, or a plunge onto a cracked floor | the same doorway with a crack, shedding grit; on a floor, a hairline across the cap |
+| `Q` sun | `SOLID`, as cracked | light: a beam resting on it, or a sunbolt -- its seal mechanism fills and calls `Contact.reveal_secret()` (`scripts/mechanisms/sun_seal.gd`) | a sun carved in the doorway, its eight rays lighting as it fills |
 
 A fall does not open a cracked floor, however hard: luck is not looking.
 

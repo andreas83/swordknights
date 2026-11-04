@@ -134,6 +134,8 @@ func _ready() -> void:
 	_contact.foe_met = _resolve_foe
 	_contact.shot_met = _resolve_shot
 	_contact.harmed = _harm
+	_contact.secret_revealed = func(cell: Vector2i, at: Vector2) -> bool:
+		return secrets.open_at(cell, at)
 	_bus = ChannelBus.for_level(data)
 	_spawn_entities(data)
 

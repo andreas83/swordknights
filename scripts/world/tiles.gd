@@ -78,15 +78,22 @@ const ENTITY_LEGEND := {
 ##
 ## Behind a seal, the room is the BACKDROP (and the entity marks) a flood from
 ## the seal reaches; AsciiLevel finds it. It is drawn as stone until found.
+##   Q  sun      a doorway with a sun carved in it: SOLID, and blind to the
+##               body and the blade alike. Light opens it -- a beam resting on
+##               it, or a sunbolt -- through the sun-seal mechanism that the
+##               same glyph places (MECHANISM_LEGEND, scripts/mechanisms/
+##               sun_seal.gd). The carved sun is its tell.
 const SEAL_LEGEND := {
 	"%": "false",
 	"&": "cracked",
+	"Q": "sun",
 }
 
 ## What a seal of each kind is, in play, until its secret is found.
 const SEAL_KIND := {
 	"false": Kind.BACKDROP,
 	"cracked": Kind.SOLID,
+	"sun": Kind.SOLID,
 }
 
 ## Mechanisms: plates, gates, lifts, crumbling stone (docs/world.md,
@@ -104,15 +111,24 @@ const MECHANISM_LEGEND := {
 	"!": "gate", ## a portcullis, hung from a lintel (scripts/mechanisms/gate.gd)
 	",": "crumbling", ## scripts/mechanisms/crumbling_stone.gd
 	"h": "hatch", ## an iron grate in a floor: a one-way floor, drawn as iron (hatch.gd)
+	"x": "sun_mirror", ## turned a quarter by the sword; starts facing up
+	"O": "sun_seal", ## a door with a sun carved in it: opens when lit
+	"Q": "sun_secret", ## the same seal guarding a secret room (SEAL_LEGEND)
 }
 ## The terrain a mechanism glyph's cell is in the grid. Only for something
 ## that IS terrain and stays it, like a plate, which is a floor stone: the
 ## tilemap draws and collides what is listed, so anything that stops being
 ## stone in play (crumbling stone, a seal) must be EMPTY here and bring its
 ## own collision (Mechanism.set_kind()).
+##
+## `Q` is the one exception, and it is the secrets' rule rather than this
+## one's: a secret's seal is terrain that the secret keeper un-makes when the
+## room is found (SEAL_KIND, scripts/world/secret_keeper.gd), exactly as it
+## un-makes a cracked wall, so it is SOLID here like `&` is.
 const MECHANISM_TERRAIN := {
 	"o": Kind.SOLID, ## a plate is the floor's own stone, and stays it
 	"h": Kind.PLATFORM, ## a hatch is a one-way floor, and stays one
+	"Q": Kind.SOLID,
 }
 ## Mason's marks: stone carved with a channel number. A mark wires the one
 ## mechanism it touches, up, down, left or right -- same mark, same channel --

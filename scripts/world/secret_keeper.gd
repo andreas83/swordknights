@@ -3,8 +3,11 @@ extends RefCounted
 ## The rules of a level's secret rooms, in play: what opens one, what is in
 ## it, and how many have been found.
 ##
-## Two ways in, one per seal (Tiles.SEAL_LEGEND), and both are things the
-## player does on purpose once they have read the tell:
+## Three ways in, one per seal (Tiles.SEAL_LEGEND), and each is something the
+## player does on purpose once they have read the tell. The third -- a
+## doorway with a sun carved in it, which only light opens -- is not checked
+## here at all: its seal mechanism counts the light and calls open_at() when
+## it is full (scripts/mechanisms/sun_seal.gd). The other two:
 ##
 ## - **A false wall opens to the body.** The seal was never stone, so the
 ##   first frame the character's body overlaps any cell of the secret, it is
@@ -105,6 +108,10 @@ func resolve(player: Player) -> int:
 		if data.opened.has(index):
 			continue
 		var secret: Dictionary = data.secrets[index]
+		# A sun seal opens to light and to nothing the prince does with his
+		# body: its seal mechanism asks for it through open_at().
+		if String(secret["kind"]) == "sun":
+			continue
 		if String(secret["kind"]) == "false":
 			var met := _overlap(body, secret["cells"])
 			if met.has_area():
@@ -123,6 +130,19 @@ func resolve(player: Player) -> int:
 			if bite.has_area():
 				return _find(index, bite.get_center())
 	return -1
+
+
+## Finds the unfound secret whose seal or room holds `cell`, from `at`: the
+## way in for what is not the prince's body or blade -- a sun seal that light
+## has filled (scripts/mechanisms/sun_seal.gd). True when one was found now.
+func open_at(cell: Vector2i, at: Vector2) -> bool:
+	if level == null:
+		return false
+	var index := level.data.secret_at(cell)
+	if index < 0 or level.data.opened.has(index):
+		return false
+	_find(index, at)
+	return true
 
 
 func _find(index: int, at: Vector2) -> int:

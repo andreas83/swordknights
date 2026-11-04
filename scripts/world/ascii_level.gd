@@ -78,7 +78,8 @@ var problems: PackedStringArray = PackedStringArray()
 ## a level can be decorated, left alone, or anything in between.
 var decorations: Array[Dictionary] = []
 var name: String = "Untitled"
-## Cell -> "false" | "cracked": the seals of secret rooms (Tiles.SEAL_LEGEND).
+## Cell -> "false" | "cracked" | "sun": the seals of secret rooms
+## (Tiles.SEAL_LEGEND).
 ## The grid holds what each seal is in play; this remembers that it is one.
 var seals: Dictionary = {}
 ## The secret rooms, left to right. Each is
@@ -189,6 +190,11 @@ func parse(text: String) -> void:
 				(mechanisms[mechanism] as Array).append(Vector2i(x, y))
 				mechanism_glyphs[Vector2i(x, y)] = glyph
 				_grid[y * cols + x] = Tiles.mechanism_terrain(glyph)
+				# A mechanism that is also a seal -- the sun-sealed secret, `Q`
+				# -- guards a room like any seal: remembered here, so the room
+				# is found, hidden, counted and audited as every secret is.
+				if Tiles.SEAL_LEGEND.has(glyph):
+					seals[Vector2i(x, y)] = String(Tiles.SEAL_LEGEND[glyph])
 				continue
 
 			if Tiles.is_masons_mark(glyph):
@@ -495,9 +501,14 @@ func _find_secrets() -> void:
 					continue
 				_secret_of[next] = index
 				queue.append(next)
+		# One seal of a kind makes the secret that kind. A sun seal outranks a
+		# crack: light is the only thing that opens it, so a doorway with a
+		# carved sun in it is never mistaken for one a sword opens.
 		var kind := "false"
 		for cell: Vector2i in seal:
-			if String(seals[cell]) == "cracked":
+			if String(seals[cell]) == "sun":
+				kind = "sun"
+			elif String(seals[cell]) == "cracked" and kind != "sun":
 				kind = "cracked"
 		var cells: Array[Vector2i] = seal.duplicate()
 		cells.append_array(room)

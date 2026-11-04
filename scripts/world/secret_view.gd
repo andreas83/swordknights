@@ -183,6 +183,12 @@ func _paint_cover(index: int) -> void:
 ## a floor and gets the crack across its cap.
 func _paint_tells(index: int) -> void:
 	var secret: Dictionary = data.secrets[index]
+	# A sun seal's tell is the sun carved in it, which its own mechanism
+	# draws and fills (scripts/mechanisms/sun_seal.gd). A false wall's
+	# breathing doorway on it would say "walk through", and it does not open
+	# to a body.
+	if String(secret["kind"]) == "sun":
+		return
 	var cracked := String(secret["kind"]) == "cracked"
 	var seal_cells := {}
 	for cell: Vector2i in secret["seal"]:

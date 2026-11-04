@@ -289,6 +289,7 @@ What the base gives a mechanism, and what it overrides:
 | `static func wired() -> bool` | override to return true if it is nothing without a wire (a gate): placed without a mark, it is a level problem |
 | `set_kind(kind)` | make its cells stone, a one-way platform, spikes, a ladder or air — its own `StaticBody2D` on `Tiles.MASK_SOLID` / `MASK_ONE_WAY` for the prince's physics *and* the level's overlay for his probes; never the tilemap |
 | `contact.harm(hearts, from_x)` | hurt the prince without being a foe (a crusher); something that kills outright is `set_kind(SPIKES)` |
+| `contact.reveal_secret(cell, at)` | find the secret whose seal or room holds `cell`, through the secret keeper (count, chime, reveal): for a seal the prince's body and blade cannot open, as light opens a sun-seal |
 | `cue` / `impact` | presentation, through `GameAudio.cue` and Game's impact budget |
 | `static func reach(mark, model)` | override: how it changes passability, for the proof |
 
@@ -310,7 +311,8 @@ Three rules:
    can grab, or grab one he walks through.
 3. **Tell the proof.** In `reach()`, describe the mechanism to the
    `ReachModel` (`scripts/levels/reach_model.gd`) with `switch_cells()`,
-   `latch_on_stand()` and `fixed_cells()`, and ask `model.channel_mode()`
+   `latch_on_stand()` (with `needs`, a latch that waits for other wires: a
+   sun-seal behind another door) and `fixed_cells()`, and ask `model.channel_mode()`
    what a press means: a plate's press is a latch to the proof only on a
    `latch` wire. Say the conservative thing for anything with a clock in it:
    a held gate the proof treats as shut; a crumbling floor, a transient stand

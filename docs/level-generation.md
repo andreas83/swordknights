@@ -278,6 +278,7 @@ plate drops as floor. So each mechanism kind describes itself to a
 | --- | --- | --- |
 | `switch_cells(cells, channel, off, on)` | these cells are `off` while the wire is off, `on` while it is on | a gate: SOLID, then EMPTY |
 | `latch_on_stand(cells, channel)` | standing in any of these sets the wire for good | a plate that stays down |
+| `latch_on_stand(cells, channel, needs)` | the same, but only while every wire in `needs` is already on | a sun-seal, opened from where its mirror is struck once the doors its beam passes are open (`scripts/levels/sun_proof.gd`) |
 | `fixed_cells(cells, kind)` | these cells are `kind` in every state | a lift treated as a ladder |
 | `fuse_on_stand(cells, channel)` | standing here is transient: any move may leave, nothing may wait, and the wire is on once it is left | crumbling stone |
 | `resets_on_respawn(channel)` | the wire is a trap: a checkpoint respawn puts it back off | a fallen slab, whole again |
