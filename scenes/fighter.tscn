@@ -1,7 +1,8 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/duel/fighter.gd" id="1_fighter"]
 [ext_resource type="Script" path="res://scripts/duel/fighter_art.gd" id="2_art"]
+[ext_resource type="Script" path="res://scripts/audio/fighter_audio.gd" id="3_audio"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 ; Per-instance: the fighter resizes this shape when it ducks or rolls, so a
@@ -20,3 +21,6 @@ shape = SubResource("RectangleShape2D_body")
 
 [node name="FighterArt" type="Node2D" parent="."]
 script = ExtResource("2_art")
+
+[node name="FighterAudio" type="Node" parent="."]
+script = ExtResource("3_audio")

@@ -176,8 +176,17 @@ func _wanted_intensity() -> float:
 	if is_inside_tree() and get_tree().get_first_node_in_group(HUSH) != null:
 		return 0.0
 	var wounded := float(Tuning.MAX_HEALTH - _player.health) / float(maxi(1, Tuning.MAX_HEALTH))
-	var moving := 0.12 if _player.state == Player.State.RUN else 0.0
-	return clampf(0.28 + wounded * 0.4 + _heat * 0.3 + moving, 0.0, 1.0)
+	return combat_intensity(wounded, _heat)
+
+
+## The drive stem for a prince `wounded` (0..1 of his hearts gone) with the
+## fight's `heat` (0..1). It used to rest at 0.28 and rise to nearly full in a
+## fight, so the drum was always ticking and loudest exactly when the swords
+## had to be heard. Now it is silent at rest -- running is not tension -- and a
+## fight raises it to half at most: the drum says "a fight" and then gets out
+## of the way. MixRender's guard fight is scored at combat_intensity(1/3, 1).
+static func combat_intensity(wounded: float, heat: float) -> float:
+	return clampf(wounded * 0.3 + heat * 0.25, 0.0, 0.5)
 
 
 ## --- events ----------------------------------------------------------------

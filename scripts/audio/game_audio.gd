@@ -29,6 +29,14 @@ static func cue(voice: StringName, options: Dictionary = {}) -> void:
 		director.play(voice, options)
 
 
+## Put the music in a Mix mood while `claimant` is in the tree (a duel's
+## fighters claim Mix.MOOD_DUEL). Nothing without a director.
+static func set_mood(mood: StringName, claimant: Node = null) -> void:
+	var director := _resolve()
+	if director != null and director.has_method(&"set_mood"):
+		director.set_mood(mood, claimant)
+
+
 ## Flip the persisted mute. The director saves its own settings.
 static func toggle_mute() -> void:
 	var director := _resolve()

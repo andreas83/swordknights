@@ -10,9 +10,13 @@ anywhere in the build, no importer settings for audio, and no
 scripts/audio/
   synth.gd ............ oscillators, filtered noise, plucked strings, envelopes
   voices.gd ........... the catalogue: one entry per sound the game can make
+  steel_voices.gd ..... the catalogue's fight recipes: clash, disarm, kill, the blow
   music.gd ............ the procedural loop, in two stems
   audio_director.gd ... autoload: buses, player pool, variation, ducking
   player_audio.gd ..... the character's body — footsteps, cloth, sword, damage
+  fighter_audio.gd .... a duellist's body — the thrust, the clash, the disarm, the kill
+  mix.gd .............. the gain law: music trim, mood, duck, drive (read by both below)
+  mix_render.gd ....... the mix rendered offline and measured as a phone plays it
   audio_settings.gd ... volumes and mute, persisted to user://
   render_previews.gd .. writes and measures docs/audio/*.wav (a tool, not a build input)
 ```
@@ -97,25 +101,43 @@ gold light, hard edges, nothing soft or gradient. In audio terms:
 B flat, A — under a melody in **Hijaz on D** (D Eb F# G A Bb C), the
 Phrygian-dominant colour with the augmented second between Eb and F#. The last
 two bars switch to Hijaz on A so the C sharp pulls the cadence back to the top.
-Eight bars at 72 BPM is a **26.7 second loop**, written as about twenty lines
-of note data: short in code, long in loop.
+Eight bars at 72 BPM is a **26.7 second loop**, written as fourteen lines of
+note data: short in code, long in loop.
 
 The ensemble is a tonic drone that never moves (two saws four cents apart), a
-moving root and fifth per section, a plucked oud with grace notes a semitone
-below the long notes, a frame drum (`dum` on 1 and the second half of 3, `tek`
-on 2, 4 and the second half of 4), a shaker on the eighths, and a reed that
-doubles the melody an octave up in four of the eight bars.
+moving root and fifth per section — both lowpassed at 420 Hz before they are
+mixed — a plucked oud with grace notes a semitone below the long notes, a
+frame drum (`dum` on 1 and the second half of 3, `tek` on 4), and a reed that
+doubles the melody, at pitch, over the last two bars.
 
 It is baked as **two stems of identical length**, not two mixes:
 
 * `bed` — drone and oud, always playing;
-* `drive` — frame drum, shaker and reed.
+* `drive` — frame drum and reed.
 
-`AudioDirector.set_intensity(0..1)` cross-fades the drive over 2.5 seconds.
+**Why it is this sparse.** The first score was played on a phone and called
+annoying. Measured (below, "The mix"), it was also simply loud: within a
+decibel of the sound effects' RMS over a fight. What changed, and why:
+
+| Was | Is | Why |
+| --- | --- | --- |
+| 27 melody notes, eighth-note ornaments in every bar, top note D5 | 15 notes, mostly long, nothing above the C sharp | a busy phrase every 27 s is learned by the third pass and heard as a nag from then on; the gaps are where the swords are heard |
+| raw saw drone and root | the same saws lowpassed at 420 Hz (`Music.DRONE_LOWPASS`) | a saw's harmonics run through the band a phone plays: on the device the drone was a buzz, not a floor |
+| shaker on every eighth, 4–5 kHz | gone | the loudest, most tiring thing in the loop on a phone speaker, and it ticked whenever the prince moved |
+| `tek` on 2, 4 and 4& | `tek` on 4 | the drum says "a fight" without competing with the exchange's own rhythm |
+| reed an octave up in four bars | at pitch, two bars | the octave put it at 600–1200 Hz, exactly where a phone is loudest and where the sword lives |
+| drive resting at 0.28 and rising to ~0.9 in a fight | silent at rest, at most 0.5 in a fight (`PlayerAudio.combat_intensity`); still zero while anything in `PlayerAudio.HUSH` is in the tree (the Eclipse) | the old law made the drum loudest exactly when the swords had to be heard |
+| music fader default 0.65 (−3.7 dB) | 0.5 under a fixed −4 dB trim (`Mix.MUSIC_TRIM_DB`) | the trim is under the fader, so a settings file saved at the old default still gets the quieter bed |
+| one level everywhere | a duel is 5 dB quieter and has no drum (`Mix.MOODS`) | a duel is two people listening for steel |
+
+`AudioDirector.set_intensity(0..1)` cross-fades the drive over 2.5 seconds,
+capped by the mood's ceiling.
 Raising the tension costs a volume ramp, not a re-bake, and because both stems
 are one loop long and start in the same frame they stay sample-locked.
-`PlayerAudio` drives the intensity from the character's state — wounded, in
-combat, running — so the game gets this for free.
+`PlayerAudio` drives the intensity from the character's state — wounded and in
+combat — so the game gets this for free. `FighterAudio` claims the duel's mood
+(`GameAudio.set_mood(Mix.MOOD_DUEL, self)`); the claim lasts while the fighter
+is in the tree, so leaving a duel can never leave the menu in its mood.
 
 The loop joins seamlessly: notes are rendered into a buffer three seconds
 longer than the loop and the tail is then **folded back onto the head**
@@ -136,8 +158,8 @@ resource to keep in sync:
 
 | Bus | Index | Sends to | Carries |
 | --- | --- | --- | --- |
-| `Master` | 0 | — | the mute, master volume |
-| `Music` | 1 | Master | the two music stems; the duck is applied here |
+| `Master` | 0 | — | the mute, master volume, a hard limiter at −0.3 dB |
+| `Music` | 1 | Master | the two music stems; the trim, the mood and the duck are applied here |
 | `SFX` | 2 | Master | the one-shot pool and the ambience bed |
 
 Adding a bus is idempotent by name, so reloading a scene or instantiating a
@@ -149,8 +171,88 @@ relic pickup — so a single player would cut them off; the pool hands out the
 longest-idle player and only steals a busy one when all twelve are in use.
 
 **Ducking.** A voice with a `duck` value in its spec pulls the music bus down
-by that many dB when it plays; the bus climbs back at 11 dB/s after a 100 ms
-hold. A hard landing takes 4.5 dB, death takes 9.
+by that many dB when it plays; the bus climbs back at 11 dB/s after a 180 ms
+hold (`Mix.DUCK_HOLD`, long enough to cover the body of a blow). Every combat
+voice ducks: a swing 2.5 dB, a wound or a steel-on-steel hit 4, a clash 5, a
+disarm or a hurt 6, a kill 10, the prince's death 12. A hard landing takes 4.5.
+
+**The limiter.** A killing blow is the wound and the kill on the same frame;
+offline that sums to +4.5 dBFS before the master fader. A hard limiter on
+Master rounds it instead of letting a phone's DAC square it off.
+
+## The mix
+
+The owner played on a phone and said the music was too annoying, the sword
+fighting could not be heard and nor could a death. That is a claim about one
+sound against another through a small speaker, which no per-voice number can
+check, so `MixRender` (`scripts/audio/mix_render.gd`) mixes a scene offline
+with the game's own stems, voices, spec trims, faders, mood and duck (all read
+from `Mix`, as the director reads them), and measures it **as a phone plays
+it**: through a second-order highpass at 400 Hz, below which a phone speaker
+reproduces next to nothing. A cue's level is its loudest 50 ms window at the
+gain it was played at; the music under it is the 300 ms after it starts.
+
+Two scenes: a duel exchange (thrusts, two clashes, a disarm, a kill) and an
+adventure guard fight (swing, wound, the guard's cut parried, a hit taken, the
+killing blow, the prince's death). Rendered at the default faders, from 3 s
+into the loop.
+
+**Before** (main at d2db068). The duel cued nothing but the catch, so its
+exchange was the music alone; the duel rows below are what the existing
+voices *would* have measured had anything cued them.
+
+| Scene | Music RMS (full) | Music RMS (phone) | SFX RMS (phone) | Bed, whole loop (phone) |
+| --- | --- | --- | --- | --- |
+| duel exchange | −17.9 dBFS | −27.4 | silent | −28.5 |
+| guard fight (drive 0.71) | −18.1 dBFS | −27.1 | −23.1 | −26.8 |
+
+| Cue | Level (phone) | Music under | Margin |
+| --- | --- | --- | --- |
+| `sword` (swing) | −13.4 | −26.9 | +13.5 |
+| `guard_hit` (wound on a guard) | −25.6 | −26.9 | **+1.3** |
+| `sword_hit` (parry) | −11.0 | −29.1 | +18.1 |
+| `hurt` | −15.6 | −30.8 | +15.2 |
+| `die` | −14.1 | −32.4 | +18.3 |
+| a foe's death | — | — | no voice: only the wound |
+| duel clash / disarm / kill | — | — | no voice at all |
+
+The wound on a guard — the sound of the prince's blow landing — was all body
+(165 Hz and a low band of noise), which on a phone is nothing: it stood 1.3 dB
+over the music. Octave bands said the same: `guard_hit` peaked at 125 Hz and
+was at the music's level from 1 kHz up.
+
+**After.**
+
+| Scene | Music RMS (full) | Music RMS (phone) | SFX RMS (phone) | Bed, whole loop (phone) |
+| --- | --- | --- | --- | --- |
+| duel exchange (mood `duel`) | −31.4 dBFS | −45.8 | −22.9 | −45.3 |
+| guard fight (drive 0.35) | −26.9 dBFS | −41.2 | −22.9 | −39.9 |
+
+| Cue | Level (phone) | Margin, duck included | Margin, no duck |
+| --- | --- | --- | --- |
+| `sword` (duel / adventure) | −13.4 | +33 / +29 | +30 / +25 |
+| `clash` | −11.6 | +37 | +33 |
+| `disarm` | −10.6 | +39 | +33 |
+| `kill` (duel / adventure) | −14.9 | +39 / +33 | +29 / +24 |
+| `guard_hit` | −20.6 | +22 | +19 |
+| `sword_hit` (parry) | −11.0 | +32 | +28 |
+| `hurt` | −15.6 | +29 | +24 |
+| `die` | −14.6 | +37 | +27 |
+
+`tests/unit/test_mix_margins.gd` holds this: every combat voice at least
+15 dB over the loudest bed a fight plays over (the adventure's drum at the
+most a fight raises it), every cue of both scenes 15 dB over the music under
+it, the duel's bed a mood's trim under the adventure's, the music at rest
+under −24 dBFS RMS, and a kill's duck dipping by its spec and recovering. The
+line is 15 because the swing — the quietest thing a fight has to be heard
+through — was 13 over the old bed and is 25 over the new one. The suite also
+fails if a scene cues a voice that does not exist: the render drops an event
+it cannot resolve, and a scene of missing voices would otherwise measure the
+music alone and pass.
+
+The two scenes as wav (mix, music and SFX separately) come from a scratch tool
+that calls `MixRender.render()` and `Synth.to_wav()`; nothing in the build
+needs them.
 
 ## Adding a voice
 
@@ -256,9 +358,12 @@ the game loads anything from there.
 | ladder | 0.100 | 22050 | 0.380 | 0.0453 | -0.00006 | 4 |
 | sword | 0.300 | 22050 | 0.780 | 0.1128 | -0.00002 | 12 |
 | sword_hit | 0.400 | 22050 | 0.860 | 0.1604 | +0.00012 | 17 |
-| guard_hit | 0.260 | 22050 | 0.680 | 0.1544 | +0.00003 | 11 |
+| guard_hit | 0.260 | 22050 | 0.800 | 0.1515 | +0.00065 | 11 |
 | hurt | 0.340 | 22050 | 0.840 | 0.2013 | -0.00071 | 14 |
-| die | 1.500 | 22050 | 0.920 | 0.2157 | +0.00031 | 64 |
+| die | 1.500 | 22050 | 0.950 | 0.1851 | +0.00046 | 64 |
+| clash | 0.300 | 22050 | 0.920 | 0.1397 | +0.00008 | 12 |
+| disarm | 0.620 | 22050 | 0.900 | 0.1251 | -0.00006 | 26 |
+| kill | 0.720 | 22050 | 0.950 | 0.1472 | +0.00001 | 31 |
 | relic | 0.600 | 22050 | 0.700 | 0.0594 | -0.00003 | 25 |
 | exit | 1.100 | 22050 | 0.720 | 0.1160 | +0.00033 | 47 |
 | level_complete | 1.900 | 22050 | 0.860 | 0.1104 | +0.00014 | 81 |
@@ -270,10 +375,12 @@ the game loads anything from there.
 | ui_back | 0.360 | 22050 | 0.500 | 0.0423 | -0.00002 | 15 |
 | pause_in | 0.340 | 22050 | 0.580 | 0.0789 | -0.00000 | 14 |
 | pause_out | 0.340 | 22050 | 0.540 | 0.0571 | -0.00001 | 14 |
+| sun_gather | 0.900 | 22050 | 0.620 | 0.1856 | -0.00002 | 38 |
+| sunrise | 2.800 | 22050 | 0.800 | 0.1930 | +0.00011 | 120 |
 | wind | 3.500 | 11025 | 0.300 | 0.0595 | -0.00001 | 75 |
-| music_excerpt | 42.000 | 16000 | 0.920 | 0.1231 | -0.00001 | 1312 |
-| music_bed | 26.667 | 16000 | 0.800 | 0.1805 | +0.00000 | 833 |
-| music_drive | 26.667 | 16000 | 0.780 | 0.0995 | -0.00002 | 833 |
+| music_excerpt | 42.000 | 16000 | 0.920 | 0.1139 | -0.00005 | 1312 |
+| music_bed | 26.667 | 16000 | 0.800 | 0.1745 | -0.00007 | 833 |
+| music_drive | 26.667 | 16000 | 0.780 | 0.0933 | -0.00003 | 833 |
 ```
 
 ## The character
@@ -302,8 +409,34 @@ landing a step mid-stride. Step volume also scales with the actual
 | entering `CLIMB_UP` | `climb` |
 | `attacked` | `sword` |
 | `hurt(remaining)` | `hurt`, pitched down as health drops |
-| `died` | `die` |
+| `died` | `die`, which now opens on the same blow as `kill` |
 | entering JUMP/FALL/TURN/CROUCH/LAND/HANG/CLIMB_UP/ATTACK | `cloth`, at a per-state trim |
+
+A foe's death is not the character's to sound: `Bloodshed`
+(`scripts/world/bloodshed.gd`) hears every foe's `defeated` and plays `kill`
+with the blood, on top of the wound `Game` already plays for the blow.
+
+## The duel
+
+`FighterAudio` is the duel's `PlayerAudio`: a child of `Fighter` in
+`scenes/fighter.tscn`, reading the fighter and writing nothing. Before it the
+only cue anywhere in `scripts/duel/` was the catch.
+
+| Event | Sound |
+| --- | --- |
+| entering `THRUSTING` | `sword` |
+| entering `DIVEKICK` / `SWEEP` / `POUND` / `ROLLING` / `SNATCH` | `jump` low, `sword` low and soft, `cloth` |
+| `clashed` | `clash` (both fighters emit it; the voice's min gap plays it once) |
+| `disarmed` | `disarm`: the clash, a lower ring, the blade landing on stone |
+| `knocked_down` | `guard_hit` at 0.85 |
+| `blade_thrown` | `sword` at 0.7 |
+| `died`, unless `replaying` | `kill` |
+
+Seat two is pitched a whole tone under seat one, so two thrusts in the air are
+still two people. The presentation signals are already silent while the match
+replays a mispredicted frame; `died` is not, so it is heard only when the
+fighter is not `replaying`, exactly as `FighterArt`'s flash is.
+`tests/unit/test_fighter_audio.gd`.
 
 A landing below 40 px/s is silent — stepping off a kerb should not thud — and
 the soft and hard voices are the same instrument at two scales, so a landing
@@ -317,7 +450,16 @@ character scene still works in a test or a tool with no autoloads registered.
 `AudioSettings` keeps master / music / SFX volume as linear 0–1 values and a
 mute flag in `user://audio.cfg`, and converts to the bus faders itself
 (`linear_to_db`, with anything at or below 0.001 going to −60 dB). A settings
-screen can read and write it without touching the mixer.
+screen can read and write it without touching the mixer. The music defaults to
+0.5.
+
+The file is read **field by field**: a key that is missing, not a number, or
+not finite falls back to its own default and takes nothing else with it.
+Before, `music = "quiet"` read as 0.0 through `float()` — the music silenced
+with no way to tell why. `tests/unit/test_audio_settings_fallback.gd`.
+
+A music fader at zero is music off: the director stops the stems rather than
+playing them at −60 dB, and starts them from the top when it comes back up.
 
 ```gdscript
 AudioDirector.set_volume(&"Music", 0.4)   # saves immediately
@@ -329,9 +471,9 @@ AudioDirector.settings.music              # 0..1, for a slider
 of its own (`_apply_audio()`), along with the autoload registration. The
 director handles the action itself, so mute works from anywhere.
 
-There is no UI for any of this yet: the menu is owned elsewhere. What it needs
-is three sliders bound to `AudioDirector.settings.master / .music / .sfx` and a
-mute toggle, with `ui_move` on cursor movement and `ui_confirm` on selection.
+The settings page (`scripts/ui/settings_panel.gd`) has a gauge each for
+MASTER, MUSIC and SWORDS (the SFX bus) and a MUTE switch; the MUSIC gauge is
+the separate music volume, and run down to empty it is music off.
 
 ## Startup cost
 
@@ -374,6 +516,11 @@ Honest list, from code that nobody here has been able to hear:
   `set_ambience(false)`; nothing else depends on it.
 * **`climb` is a sequence of five scrapes and may read as a stutter** rather
   than as one continuous movement over the lip.
+* **The music was measured, not heard, after its rewrite.** The margins above
+  say combat now cuts through on a phone; whether the sparser loop is *less
+  annoying* is a judgement only a listener can make. If it still is, the next
+  lever is length: a sixteen-bar loop with a second, emptier half costs one
+  more stem's worth of memory (about 0.85 MB per stem).
 * **`hurt` and `die` use saturated squares,** which is the most chiptune-ish
   corner of the whole set and sits slightly apart from the noise-and-pluck
   palette everywhere else.

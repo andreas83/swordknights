@@ -21,9 +21,15 @@ extends Node
 ## minimum gap. Without the jitter, a run cycle machine-guns the identical
 ## sample five times a second and the ear hears a buzz instead of footsteps.
 ##
-## **Ducking.** Loud events (a hard landing, death, a pause) pull the music bus
-## down by the amount in their spec and let it climb back at a fixed rate, so
-## the hit reads over the loop without the music disappearing.
+## **Ducking.** Loud events (a hard landing, every blow of a fight, a death, a
+## pause) pull the music bus down by the amount in their spec and let it climb
+## back at a fixed rate, so the hit reads over the loop without the music
+## disappearing. The law -- trim, duck, drive, mood -- is Mix's, which the
+## offline MixRender reads too, so what the tests measure is this mixer.
+##
+## **Mood.** A scene may claim a mood (`set_mood()`): the duel's is quieter and
+## has no drum. The claim lasts while the node that made it is in the tree,
+## so a scene change cannot leave the menu in a duel's mood.
 ##
 ## Baking happens off the main thread. Synthesising every voice plus the two
 ## music stems is around two seconds of GDScript on a desktop — a freeze, if it
@@ -41,10 +47,6 @@ const BUS_SFX := &"SFX"
 ## Enough for every overlapping one-shot the character can produce (footstep,
 ## cloth, sword, landing) plus world and UI events on top.
 const POOL_SIZE := 12
-
-## How fast the music climbs back after a duck, in dB per second.
-const DUCK_RECOVERY := 11.0
-const DUCK_HOLD := 0.1
 
 ## Seconds for the intensity cross-fade to travel the full 0..1 range.
 const INTENSITY_RAMP := 2.5
@@ -83,6 +85,10 @@ var _duck_db := 0.0
 var _duck_hold := 0.0
 var _intensity := 0.0
 var _intensity_target := 0.0
+var _mood: StringName = Mix.MOOD_DEFAULT
+var _mood_owner: WeakRef = null
+## The mood's trim as it stands, moving toward Mix.mood_db(_mood).
+var _mood_db := 0.0
 var _music_wanted := false
 var _ambience_wanted := false
 var _gesture_needed := false
@@ -149,6 +155,21 @@ func _ensure_buses() -> void:
 		AudioServer.add_bus(index)
 		AudioServer.set_bus_name(index, String(bus))
 		AudioServer.set_bus_send(index, BUS_MASTER)
+	_ensure_limiter()
+
+
+## A hard limiter on Master. The combat voices are now loud on purpose and
+## stack: a killing blow is the wound and the kill on the same frame, which
+## MixRender measures at +4.5 dB over full scale before the master fader. A
+## phone's DAC would square that off; the limiter rounds it instead, and it
+## touches nothing that is not about to clip.
+func _ensure_limiter() -> void:
+	for i: int in AudioServer.get_bus_effect_count(0):
+		if AudioServer.get_bus_effect(0, i) is AudioEffectHardLimiter:
+			return
+	var limiter := AudioEffectHardLimiter.new()
+	limiter.ceiling_db = -0.3
+	AudioServer.add_bus_effect(0, limiter)
 
 
 ## What the director claims the mixer looks like: bus name -> {index, send}.
@@ -176,7 +197,8 @@ func _apply_music_volume() -> void:
 	var music := AudioServer.get_bus_index(BUS_MUSIC)
 	if music == -1:
 		return
-	AudioServer.set_bus_volume_db(music, settings.db_for(BUS_MUSIC) - _duck_db)
+	AudioServer.set_bus_volume_db(music,
+		Mix.music_db(settings.db_for(BUS_MUSIC), _mood_db, _duck_db))
 
 
 ## --- players ---------------------------------------------------------------
@@ -337,8 +359,19 @@ func has_voice(event: String) -> bool:
 ## Pulls the music bus down by `amount` dB; it recovers by itself.
 func duck(amount: float) -> void:
 	_duck_db = maxf(_duck_db, absf(amount))
-	_duck_hold = DUCK_HOLD
+	_duck_hold = Mix.DUCK_HOLD
 	_apply_music_volume()
+
+
+## Puts the music in `which` (a Mix mood) for as long as `claimant` is in the
+## tree. The last claim wins; when its claimant leaves, the default comes back.
+func set_mood(which: StringName, claimant: Node = null) -> void:
+	_mood = which if Mix.MOODS.has(which) else Mix.MOOD_DEFAULT
+	_mood_owner = weakref(claimant) if claimant != null else null
+
+
+func mood() -> StringName:
+	return _mood
 
 
 func play_music(intensity: float = -1.0) -> void:
@@ -401,13 +434,16 @@ func _process(delta: float) -> void:
 		_bake_next_on_main_thread()
 
 	if _duck_db > 0.0:
-		_duck_hold = maxf(0.0, _duck_hold - delta)
-		if is_zero_approx(_duck_hold):
-			_duck_db = maxf(0.0, _duck_db - DUCK_RECOVERY * delta)
-			_apply_music_volume()
+		var next := Mix.duck_step(_duck_db, _duck_hold, delta)
+		_duck_db = next.x
+		_duck_hold = next.y
+		_apply_music_volume()
 
-	if not is_equal_approx(_intensity, _intensity_target):
-		_intensity = move_toward(_intensity, _intensity_target, delta / INTENSITY_RAMP)
+	_follow_mood(delta)
+
+	var wanted := minf(_intensity_target, Mix.mood_intensity_cap(_mood))
+	if not is_equal_approx(_intensity, wanted):
+		_intensity = move_toward(_intensity, wanted, delta / INTENSITY_RAMP)
 		_apply_intensity()
 
 	if _gesture_needed and not _pending.is_empty():
@@ -416,6 +452,20 @@ func _process(delta: float) -> void:
 			_pending.clear()
 
 	_sync_music()
+
+
+## A claim whose owner has left the tree is over. The trim then moves at
+## MOOD_RAMP rather than jumping, so a scene change is not a step in volume.
+func _follow_mood(delta: float) -> void:
+	if _mood_owner != null:
+		var claimant := _mood_owner.get_ref() as Node
+		if claimant == null or not claimant.is_inside_tree():
+			_mood = Mix.MOOD_DEFAULT
+			_mood_owner = null
+	var target := Mix.mood_db(_mood)
+	if not is_equal_approx(_mood_db, target):
+		_mood_db = move_toward(_mood_db, target, Mix.MOOD_RAMP * delta)
+		_apply_music_volume()
 
 
 func _bake_next_on_main_thread() -> void:
@@ -440,7 +490,12 @@ func _sync_music() -> void:
 				.get("db", -13.0))
 			_ambience.play()
 
-	if not _music_wanted:
+	# A music fader at zero is music off: the stems stop rather than play at
+	# -60 dB, and come back from the top when the fader is raised again.
+	if not _music_wanted or settings.music <= 0.001:
+		if _bed.playing:
+			_bed.stop()
+			_drive.stop()
 		return
 	_mutex.lock()
 	var stems := _music_streams
@@ -460,8 +515,7 @@ func _sync_music() -> void:
 
 func _apply_intensity() -> void:
 	_bed.volume_db = 0.0
-	_drive.volume_db = -60.0 if _intensity <= 0.02 else maxf(-60.0,
-		linear_to_db(_intensity))
+	_drive.volume_db = Mix.drive_db(_intensity)
 
 
 func _take_player() -> AudioStreamPlayer:

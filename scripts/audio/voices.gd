@@ -21,7 +21,10 @@ extends RefCounted
 ## * anything metal or precious (sword, relic, exit) is a small stack of
 ##   inharmonic partials that rings and stops — gold, not shimmer;
 ## * damage and death are low and crimson: saturated square waves and a drone,
-##   not a cartoon splat.
+##   not a cartoon splat -- but never *only* low. A phone speaker plays almost
+##   nothing below 400 Hz, so every blow also carries a transient and a band
+##   at 0.5-2 kHz; MixRender measures each against the music as a phone
+##   plays it (tests/unit/test_mix_margins.gd).
 ##
 ## `peak` is a normalisation target, not a limiter: the mix balance between a
 ## footstep (0.4) and a hard landing (0.95) is baked into the samples, so the
@@ -79,25 +82,43 @@ static func specs() -> Dictionary:
 		},
 
 		# --- sword and damage ---
+		# Every voice here ducks the music: a fight is the one time the player
+		# has to hear what happened, and the duck is how the mix says so. The
+		# depths rise with the stakes -- a swing, a wound, a clash, a death.
 		"sword": {
 			"peak": 0.78, "seed": 1201, "pitch_jitter": 0.08, "gain_jitter": 1.5,
-			"min_gap": 0.07,
+			"min_gap": 0.07, "duck": 2.5,
 		},
 		"sword_hit": {
 			"peak": 0.86, "seed": 1202, "pitch_jitter": 0.07, "gain_jitter": 1.5,
-			"min_gap": 0.05, "duck": 3.0,
+			"min_gap": 0.05, "duck": 4.0,
 		},
 		"guard_hit": {
-			"peak": 0.68, "seed": 1203, "pitch_jitter": 0.08, "gain_jitter": 2.0,
-			"min_gap": 0.05,
+			"peak": 0.80, "seed": 1203, "pitch_jitter": 0.08, "gain_jitter": 2.0,
+			"min_gap": 0.05, "duck": 4.0,
 		},
 		"hurt": {
 			"peak": 0.84, "seed": 1204, "pitch_jitter": 0.05, "gain_jitter": 1.0,
-			"min_gap": 0.1, "duck": 5.0,
+			"min_gap": 0.1, "duck": 6.0,
 		},
 		"die": {
-			"peak": 0.92, "seed": 1205, "pitch_jitter": 0.02, "gain_jitter": 0.0,
-			"min_gap": 0.5, "duck": 9.0,
+			"peak": 0.95, "seed": 1205, "pitch_jitter": 0.02, "gain_jitter": 0.0,
+			"min_gap": 0.5, "duck": 12.0,
+		},
+		# The duel's steel, and the kill in both modes (docs/audio.md, "The
+		# mix"). A clash is two blades meeting and neither giving; a disarm is
+		# one of them leaving a hand; a kill is the blow that ends someone.
+		"clash": {
+			"peak": 0.92, "seed": 1206, "pitch_jitter": 0.05, "gain_jitter": 1.0,
+			"min_gap": 0.05, "duck": 5.0,
+		},
+		"disarm": {
+			"peak": 0.90, "seed": 1207, "pitch_jitter": 0.04, "gain_jitter": 1.0,
+			"min_gap": 0.2, "duck": 6.0,
+		},
+		"kill": {
+			"peak": 0.95, "seed": 1208, "pitch_jitter": 0.04, "gain_jitter": 0.5,
+			"min_gap": 0.15, "duck": 10.0,
 		},
 
 		# --- world ---
@@ -291,6 +312,9 @@ static func _render(name: String, rate: int, seed_value: int) -> PackedFloat32Ar
 		"guard_hit": return _guard_hit(rate, seed_value)
 		"hurt": return _hurt(rate, seed_value)
 		"die": return _die(rate, seed_value)
+		"clash": return SteelVoices.clash(rate, seed_value)
+		"disarm": return SteelVoices.disarm(rate, seed_value)
+		"kill": return SteelVoices.kill(rate, seed_value)
 		"relic": return _relic(rate, seed_value)
 		"exit": return _exit(rate, seed_value)
 		"level_complete": return _level_complete(rate, seed_value)
@@ -496,6 +520,13 @@ static func _sword_hit(rate: int, seed_value: int) -> PackedFloat32Array:
 
 ## Sword into a guard: cloth and body, no ring. Deliberately duller than
 ## sword_hit so the two read as different materials.
+##
+## It used to be all body -- a 165 Hz thump over a low band of noise -- and on
+## a phone that is nothing: measured through MixRender's phone filter it stood
+## 1.3 dB above the music, which is to say it was not there. The body is kept
+## for headphones; the part a phone plays is the cut through cloth on the
+## front, a band at 1.4-2 kHz, and a knock at 330 Hz that is the thump's
+## second harmonic, so the wound still sounds dull rather than bright.
 static func _guard_hit(rate: int, seed_value: int) -> PackedFloat32Array:
 	var buf := Synth.buffer(0.26, rate)
 	Synth.add_tone(buf, {
@@ -507,8 +538,13 @@ static func _guard_hit(rate: int, seed_value: int) -> PackedFloat32Array:
 		"q": 1.0, "decay": 0.1, "curve": 2.6, "amp": 0.4, "seed": seed_value,
 	})
 	Synth.add_noise(buf, {
-		"rate": rate, "len": 0.05, "cutoff": 2400.0, "q": 0.7, "decay": 0.04,
-		"curve": 2.2, "amp": 0.14, "seed": seed_value + 5,
+		"rate": rate, "len": 0.06, "cutoff": 2000.0, "cutoff_end": 1300.0,
+		"q": 1.6, "decay": 0.05, "curve": 2.2, "amp": 0.55, "seed": seed_value + 5,
+	})
+	Synth.add_tone(buf, {
+		"rate": rate, "len": 0.11, "freq": 330.0, "freq_end": 210.0,
+		"shape": Synth.SHAPE_TRIANGLE, "attack": 0.002, "decay": 0.09,
+		"curve": 2.4, "amp": 0.4,
 	})
 	return buf
 
@@ -535,8 +571,14 @@ static func _hurt(rate: int, seed_value: int) -> PackedFloat32Array:
 
 ## Death: the Hijaz tetrachord walked downwards on a saturated reed, under a
 ## tonic drone that outlives it. 1.5 s, which fits inside Game.DEATH_HOLD.
+##
+## It opens on the blow: a crack and a knock in the 1-2 kHz band a phone
+## speaker actually plays, so the death is heard on the frame it happens and
+## not only as a figure that follows it. The figure is doubled an octave up
+## for the same reason -- D4 to A3 sits where a phone has almost nothing.
 static func _die(rate: int, seed_value: int) -> PackedFloat32Array:
 	var buf := Synth.buffer(1.5, rate)
+	SteelVoices.blow(buf, rate, seed_value + 11, 1.0)
 	# D4, Db4, Bb3, A3 — the descent that ends an Andalusian phrase.
 	var steps := [293.66, 277.18, 233.08, 220.0]
 	for i: int in steps.size():
@@ -545,6 +587,12 @@ static func _die(rate: int, seed_value: int) -> PackedFloat32Array:
 			"freq": float(steps[i]), "shape": Synth.SHAPE_SQUARE, "duty": 0.3,
 			"attack": 0.01, "decay": 0.42, "curve": 2.6,
 			"amp": 0.3 - 0.03 * float(i), "vibrato_hz": 5.5, "vibrato_cents": 22.0,
+		})
+		Synth.add_tone(buf, {
+			"rate": rate, "start": 0.03 + float(i) * 0.17, "len": 0.4,
+			"freq": float(steps[i]) * 2.0, "shape": Synth.SHAPE_TRIANGLE,
+			"attack": 0.01, "decay": 0.34, "curve": 2.6,
+			"amp": 0.16 - 0.02 * float(i), "vibrato_hz": 5.5, "vibrato_cents": 22.0,
 		})
 	Synth.add_tone(buf, {
 		"rate": rate, "len": 1.45, "freq": 73.42, "freq_end": 69.3,
