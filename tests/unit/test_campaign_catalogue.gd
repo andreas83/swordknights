@@ -69,7 +69,7 @@ func test_a_built_entry_is_a_clean_level_at_the_catalogues_hour() -> void:
 
 func test_an_entry_still_being_built_is_never_playable() -> void:
 	var progress := CampaignProgress.new()
-	progress.path = "user://test_catalogue_progress.cfg"
+	progress.path = UserData.at("user://test_catalogue_progress.cfg")
 	for index: int in Campaign.count():
 		progress.record_clear(index, 60.0, 0, 0, 0, 0)
 	for index: int in Campaign.count():
@@ -91,6 +91,6 @@ func test_adventure_opens_the_chapter_select() -> void:
 	assert_not_null(scene, "which loads")
 	var page := scene.instantiate() as ChapterSelect
 	assert_not_null(page, "and is the chapter select")
-	page.store_path = "user://test_catalogue_progress.cfg"
+	page.store_path = UserData.at("user://test_catalogue_progress.cfg")
 	add_child_autofree(page)
 	assert_eq(page.row_title(0), "CONTINUE", "CONTINUE first")

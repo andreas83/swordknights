@@ -222,10 +222,11 @@ func test_the_clear_run_reaches_the_vault_door_with_no_death_inside_par() -> voi
 
 
 func test_with_longer_warnings_nothing_breaks() -> void:
-	Assist.load_saved("user://test_sun_well_assist.cfg")
+	Assist.load_saved(UserData.at("user://test_sun_well_assist.cfg"))
 	Assist.set_longer_warnings(true)
 	var game := await _clear_run()
-	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://test_sun_well_assist.cfg"))
+	var assist_file := UserData.at("user://test_sun_well_assist.cfg")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(assist_file))
 	assert_eq(game.phase, Game.Phase.COMPLETE, "the same run clears it")
 	assert_eq(game.deaths, 0, "with no death")
 	assert_eq(game.player.health, Tuning.MAX_HEALTH, "and not a heart lost")

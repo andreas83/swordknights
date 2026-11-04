@@ -12,19 +12,19 @@ extends GutTest
 
 const EclipseSupport := preload("res://tests/eclipse_support.gd")
 const GAME_SCENE := "res://scenes/game.tscn"
-const PATH := "user://test_eclipse_assist_run.cfg"
+var _path := UserData.at("user://test_eclipse_assist_run.cfg")
 const FRAME := 1.0 / 60.0
 
 
 func before_each() -> void:
-	Assist.load_saved(PATH)
+	Assist.load_saved(_path)
 	Assist.set_longer_warnings(true)
 
 
 func after_each() -> void:
 	Assist.reset()
-	if FileAccess.file_exists(PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
+	if FileAccess.file_exists(_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_path))
 
 
 func test_the_fight_plays_to_its_end_with_every_tell_longer() -> void:

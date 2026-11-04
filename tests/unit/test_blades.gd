@@ -188,7 +188,7 @@ func test_the_tell_is_the_sentinels_and_the_assist_widens_only_it() -> void:
 	scythe.cue.connect(ear.hear)
 	var plain := _run(bus, [scythe] as Array[BeatBlade], 110)
 
-	Assist.load_saved("user://test_blades_assist.cfg")
+	Assist.load_saved(UserData.at("user://test_blades_assist.cfg"))
 	Assist.set_longer_warnings(true)
 	var wide_bus := _bus()
 	var wide := _scythe(wide_bus)
@@ -197,7 +197,8 @@ func test_the_tell_is_the_sentinels_and_the_assist_widens_only_it() -> void:
 	wide_ear.bus = wide_bus
 	wide.cue.connect(wide_ear.hear)
 	var assisted := _run(wide_bus, [wide] as Array[BeatBlade], 110)
-	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://test_blades_assist.cfg"))
+	var assist_file := UserData.at("user://test_blades_assist.cfg")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(assist_file))
 
 	assert_eq(assisted, plain, "the cut is still on the beat")
 	assert_eq(wide.live(), scythe.live(), "and as long")

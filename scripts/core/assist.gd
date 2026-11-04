@@ -33,7 +33,7 @@ const SECTION := "assist"
 const LONGER := 1.5
 
 static var _longer_warnings := false
-static var _path := PATH
+static var _path := ""
 
 
 ## The factor every warning is multiplied by: 1.0 unless the player asked for
@@ -52,16 +52,17 @@ static func set_longer_warnings(on: bool) -> Error:
 	_longer_warnings = on
 	var file := ConfigFile.new()
 	file.set_value(SECTION, "longer_warnings", on)
-	return file.save(_path)
+	return file.save(_path if _path != "" else UserData.at(PATH))
 
 
-## Reads the saved assists from `at` (and saves there from now on). False
-## when there was nothing usable, which leaves every assist off.
-static func load_saved(at: String = PATH) -> bool:
-	_path = at
+## Reads the saved assists from `at` -- by default PATH, through UserData --
+## and saves there from now on. False when there was nothing usable, which
+## leaves every assist off.
+static func load_saved(at: String = "") -> bool:
+	_path = at if at != "" else UserData.at(PATH)
 	_longer_warnings = false
 	var file := ConfigFile.new()
-	if file.load(at) != OK:
+	if file.load(_path) != OK:
 		return false
 	var value: Variant = file.get_value(SECTION, "longer_warnings", false)
 	if typeof(value) != TYPE_BOOL:
@@ -70,7 +71,8 @@ static func load_saved(at: String = PATH) -> bool:
 	return true
 
 
-## Test seam: every assist off, saving to the real path again.
+## Test seam: every assist off, saving to the default path again (the real
+## one in the game, the run's sandbox in a test run -- UserData).
 static func reset() -> void:
 	_longer_warnings = false
-	_path = PATH
+	_path = ""

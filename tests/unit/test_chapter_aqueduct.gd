@@ -15,7 +15,7 @@ extends GutTest
 
 const LEVEL := "res://levels/chapter_03.txt"
 const TORCHES: Array[Vector2i] = [Vector2i(60, 11), Vector2i(101, 15)]
-const ASSIST_PATH := "user://test_chapter_aqueduct_assist.cfg"
+var _assist_path := UserData.at("user://test_chapter_aqueduct_assist.cfg")
 
 var _level: AsciiLevel
 
@@ -26,8 +26,8 @@ func before_all() -> void:
 
 func after_each() -> void:
 	Assist.reset()
-	if FileAccess.file_exists(ASSIST_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(ASSIST_PATH))
+	if FileAccess.file_exists(_assist_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_assist_path))
 
 
 func test_it_is_the_catalogues_chapter_three() -> void:
@@ -92,7 +92,7 @@ func test_nothing_that_falls_strands_anyone() -> void:
 
 
 func test_longer_warnings_stretch_every_tell_and_change_no_proof() -> void:
-	Assist.load_saved(ASSIST_PATH)
+	Assist.load_saved(_assist_path)
 	assert_eq(Assist.set_longer_warnings(true), OK)
 	var game := (load("res://scenes/game.tscn") as PackedScene).instantiate() as Game
 	game.level_path = LEVEL

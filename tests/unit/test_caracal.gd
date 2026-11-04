@@ -12,7 +12,7 @@ extends GutTest
 ## stone falls through it.
 
 const GAME_SCENE := "res://scenes/game.tscn"
-const ASSIST_PATH := "user://test_caracal_assist.cfg"
+var _assist_path := UserData.at("user://test_caracal_assist.cfg")
 
 ## The prince facing east, the cat eight tiles off, facing him.
 const ARENA := """; Cat Arena
@@ -94,13 +94,13 @@ var _input: ScriptedInput
 
 func before_each() -> void:
 	Assist.reset()
-	Assist.load_saved(ASSIST_PATH)
+	Assist.load_saved(_assist_path)
 
 
 func after_each() -> void:
 	Assist.reset()
-	if FileAccess.file_exists(ASSIST_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(ASSIST_PATH))
+	if FileAccess.file_exists(_assist_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_assist_path))
 
 
 func _play(text: String) -> void:

@@ -10,7 +10,7 @@ extends GutTest
 
 const FRAME := 1.0 / 60.0
 const LEVEL := "res://levels/chapter_06_eclipse.txt"
-const ASSIST_PATH := "user://test_eclipse_assist.cfg"
+var _assist_path := UserData.at("user://test_eclipse_assist.cfg")
 const ARENA := {
 	"floor_y": 240.0, "west_x": 96.0, "east_x": 512.0,
 	"west_lip": 176.0, "east_lip": 432.0, "gallery_y": 176.0,
@@ -30,8 +30,8 @@ func after_each() -> void:
 		if is_instance_valid(shot):
 			shot.free()
 	_shots.clear()
-	if FileAccess.file_exists(ASSIST_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(ASSIST_PATH))
+	if FileAccess.file_exists(_assist_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_assist_path))
 
 
 ## A King in `phase`, standing under the sun of a hand-set arena, and woken by
@@ -101,7 +101,7 @@ func test_every_tell_is_the_standard_one_and_the_last_twice_it() -> void:
 
 
 func test_the_assist_stretches_every_tell_and_nothing_else() -> void:
-	Assist.load_saved(ASSIST_PATH)
+	Assist.load_saved(_assist_path)
 	Assist.set_longer_warnings(true)
 	var longer := roundi(Patrol.WINDUP_TIME * Assist.LONGER / FRAME)
 	assert_almost_eq(_frames_in(_king(Eclipse.Phase.SHIELD, 4.0), Eclipse.State.DRAW),
@@ -124,7 +124,7 @@ func test_bolts_come_a_fresh_parry_apart() -> void:
 	assert_eq(roundi(Eclipse.BOLT_SPACING / FRAME), cycle, "42 frames, by the bible's sum")
 	for assisted: bool in [false, true]:
 		if assisted:
-			Assist.load_saved(ASSIST_PATH)
+			Assist.load_saved(_assist_path)
 			Assist.set_longer_warnings(true)
 		var king := _king(Eclipse.Phase.BURNING, 100.0)
 		var at: Array[int] = []

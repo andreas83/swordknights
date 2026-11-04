@@ -13,20 +13,20 @@ extends GutTest
 
 const EclipseSupport := preload("res://tests/eclipse_support.gd")
 const SCENE := "res://scenes/campaign_game.tscn"
-const PROGRESS := "user://test_eclipse_finale.cfg"
+var _progress := UserData.at("user://test_eclipse_finale.cfg")
 
 var _left := 0
 
 
 func before_each() -> void:
 	Campaign.reset()
-	_remove(PROGRESS)
+	_remove(_progress)
 	_left = 0
 
 
 func after_each() -> void:
 	Campaign.reset()
-	_remove(PROGRESS)
+	_remove(_progress)
 
 
 func _remove(path: String) -> void:
@@ -47,7 +47,7 @@ func test_his_fall_records_the_clear_and_jump_goes_to_dawn() -> void:
 	var last := Campaign.count() - 1
 	Campaign.selected = last
 	var campaign := (load(SCENE) as PackedScene).instantiate() as CampaignGame
-	campaign.progress_path = PROGRESS
+	campaign.progress_path = _progress
 	campaign.leave = func() -> void: _left += 1
 	add_child_autofree(campaign)
 	await wait_physics_frames(2)
@@ -69,7 +69,7 @@ func test_his_fall_records_the_clear_and_jump_goes_to_dawn() -> void:
 
 	assert_eq(king.state, Eclipse.State.FALL, "he fell to the parry")
 	assert_eq(game.phase, Game.Phase.COMPLETE, "and the prince walked out of dawn's door")
-	var saved := CampaignProgress.open(PROGRESS)
+	var saved := CampaignProgress.open(_progress)
 	assert_true(saved.is_cleared("eclipse"), "the finale's clear is recorded")
 
 	campaign._advance()

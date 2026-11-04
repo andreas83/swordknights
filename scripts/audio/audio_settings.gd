@@ -24,7 +24,7 @@ const SILENCE_DB := -60.0
 
 ## Where the settings live. A test seam: a test reads and writes its own file,
 ## never the player's.
-var path := PATH
+var path := UserData.at(PATH)
 
 var master: float = 0.9:
 	set(value):

@@ -10,23 +10,23 @@ extends GutTest
 ## Seen to fail: with load_from_disk() back on float(file.get_value(...)),
 ## the first test reads the music as 0.
 
-const PATH := "user://test_audio_settings_fallback.cfg"
+var _path := UserData.at("user://test_audio_settings_fallback.cfg")
 
 
 func after_each() -> void:
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(_path))
 
 
 func _write(values: Dictionary) -> void:
 	var file := ConfigFile.new()
 	for key: String in values:
 		file.set_value(AudioSettings.SECTION, key, values[key])
-	assert_eq(file.save(PATH), OK, "wrote the test file")
+	assert_eq(file.save(_path), OK, "wrote the test file")
 
 
 func _load() -> AudioSettings:
 	var settings := AudioSettings.new()
-	settings.path = PATH
+	settings.path = _path
 	assert_true(settings.load_from_disk(), "the file loads")
 	return settings
 
@@ -59,7 +59,7 @@ func test_a_whole_number_is_a_volume() -> void:
 
 func test_the_music_round_trips_through_its_own_file() -> void:
 	var settings := AudioSettings.new()
-	settings.path = PATH
+	settings.path = _path
 	settings.music = 0.3
 	assert_eq(settings.save(), OK, "saved")
 	assert_almost_eq(_load().music, 0.3, 0.0001, "and read back")

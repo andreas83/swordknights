@@ -49,10 +49,10 @@ var strip: ZoneStrip
 var demo := false
 ## Where the seats' looks are read from. A seam for a test, which must never
 ## read or write the real save.
-var wardrobe_path := Wardrobe.PATH
+var wardrobe_path := UserData.at(Wardrobe.PATH)
 ## Where the duel page's choices are read from: the strip here, and the
 ## computer's level in match_cpu.gd. A seam for a test, likewise.
-var choice_path := DuelChoice.PATH
+var choice_path := UserData.at(DuelChoice.PATH)
 ## The blades, the water and the crumbling stone, drawn (HazardView).
 var hazards: HazardView
 

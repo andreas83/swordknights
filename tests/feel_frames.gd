@@ -35,7 +35,7 @@ const ARM_TIMEOUT := 240
 ## combined half-widths, inside ATTACK_REACH.
 const GUARD_REACH := 18.0
 
-var _out_dir := "user://feel"
+var _out_dir := UserData.at("user://feel")
 var _game: Game
 var _guard: Patrol
 var _frame := 0

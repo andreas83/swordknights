@@ -29,6 +29,16 @@ extends GutHookScript
 ##     const DeathWatch := preload("res://tests/death_watch.gd")
 ##     DeathWatch.expect_deaths(1)
 ##
+## ## The run's one hook, so it also sandboxes the run's saves
+##
+## GUT takes a single pre-run script, and this is it, so the other thing every
+## test must have from before its first line lives here too: the run's own
+## user data (UserData.sandbox_for_tests()). A run started by
+## .github/scripts/run_tests.sh is sandboxed already; one started from the
+## editor or by hand is sandboxed here, so no GUT run writes the player's real
+## progress, settings, assist or wardrobe, and no two runs share a file.
+## tests/unit/test_user_data_sandbox.gd fails a run that is not sandboxed.
+##
 ## Not a `class_name`, for the reason tests/duel_support.gd gives: test support
 ## has no business in the project's class registry. tests/unit/test_death_watch.gd
 ## proves the hook is installed and that its verdicts go red.
@@ -45,6 +55,7 @@ var _deaths: Array[String] = []
 
 ## GUT's entry point: watch the run's tree and report into the running test.
 func run() -> void:
+	UserData.sandbox_for_tests()
 	attach(gut.get_tree() as SceneTree, _fail_current_test)
 	gut.end_test.connect(close_test)
 	_installed = self

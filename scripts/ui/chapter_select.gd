@@ -49,7 +49,7 @@ const REPEAT_FIRST := 0.42
 ## Test seams, set before _ready: where progress is kept, what playing an
 ## entry does (`play.call(index)`; the campaign scene by default), and what
 ## going back does (the title screen).
-var store_path := CampaignProgress.PATH
+var store_path := UserData.at(CampaignProgress.PATH)
 var play := Callable()
 var leave := Callable()
 

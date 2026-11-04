@@ -12,7 +12,7 @@ extends GutTest
 
 const GAME_SCENE := "res://scenes/game.tscn"
 const DeathWatch := preload("res://tests/death_watch.gd")
-const ASSIST_PATH := "user://test_chapter04_glassbearer_assist.cfg"
+var _assist_path := UserData.at("user://test_chapter04_glassbearer_assist.cfg")
 
 ## A long lit floor: the prince at one end, a Glassbearer facing him. Dressed
 ## by hand, with nothing: left to the dresser, the floor grows a colonnade
@@ -74,8 +74,8 @@ var _input: ScriptedInput
 
 func after_each() -> void:
 	Assist.reset()
-	if FileAccess.file_exists(ASSIST_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(ASSIST_PATH))
+	if FileAccess.file_exists(_assist_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_assist_path))
 
 
 func _play(text: String, prince_at: int = -1) -> void:
@@ -152,7 +152,7 @@ func test_in_the_sun_he_aims_and_the_aim_is_the_telegraph() -> void:
 
 
 func test_longer_warnings_stretch_the_aim() -> void:
-	Assist.load_saved(ASSIST_PATH)
+	Assist.load_saved(_assist_path)
 	assert_eq(Assist.set_longer_warnings(true), OK)
 	await _play(RANGE, 11)
 	var bearer := _bearer()

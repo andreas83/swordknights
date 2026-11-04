@@ -27,6 +27,15 @@ fi
 mkdir -p "$(dirname "$JUNIT")"
 rm -f "$JUNIT"
 
+# Every save the game makes goes through UserData.at() (scripts/core/
+# user_data.gd), which, with this set, keeps it in a directory of this run's
+# own: no test writes the player's real progress, settings, assist or
+# wardrobe, and two runs side by side never read each other's files. Both
+# phases below inherit it; it is removed when the run ends.
+SWORDKNIGHTS_USER_DATA="$(mktemp -d -t swordknights-user-data.XXXXXX)"
+export SWORDKNIGHTS_USER_DATA
+trap 'rm -rf "$SWORDKNIGHTS_USER_DATA"' EXIT
+
 # Test selection (directories, prefix, suffix) lives in .gutconfig.json so that
 # this script, the editor panel and a bare `godot -s .../gut_cmdln.gd` all agree.
 "$GODOT" --headless --path . \

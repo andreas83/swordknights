@@ -34,15 +34,15 @@ const PLAYER_ONE := 0
 const PLAYER_TWO := 1
 const SECTIONS: Array[String] = ["player_one", "player_two"]
 
-var path := PATH
+var path := UserData.at(PATH)
 var _looks: Array[CharacterLook] = [CharacterLook.new(), CharacterLook.new()]
 
 
 ## The saved wardrobe at `at`, or the defaults if there is nothing usable
 ## there.
-static func open(at: String = PATH) -> Wardrobe:
+static func open(at: String = "") -> Wardrobe:
 	var wardrobe := Wardrobe.new()
-	wardrobe.path = at
+	wardrobe.path = at if at != "" else UserData.at(PATH)
 	wardrobe.load_from_disk()
 	return wardrobe
 

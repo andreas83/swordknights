@@ -34,16 +34,16 @@ const META := "campaign"
 ## A best time no run has set.
 const NO_TIME := -1.0
 
-var path := PATH
+var path := UserData.at(PATH)
 var _unlocked := 1
 ## id -> {cleared, best_time, relics, relics_total, secrets, secrets_total}
 var _records: Dictionary = {}
 
 
 ## The saved progress at `at`, or a fresh campaign if nothing there is usable.
-static func open(at: String = PATH) -> CampaignProgress:
+static func open(at: String = "") -> CampaignProgress:
 	var progress := CampaignProgress.new()
-	progress.path = at
+	progress.path = at if at != "" else UserData.at(PATH)
 	progress.load_from_disk()
 	return progress
 

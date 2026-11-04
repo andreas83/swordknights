@@ -62,7 +62,7 @@ const PLAYER_NAMES: Array[String] = ["PLAYER ONE", "PLAYER TWO"]
 
 ## Test seams: set before _ready. Where the wardrobe is kept, and what going
 ## back does -- the title screen, by default.
-var store_path := Wardrobe.PATH
+var store_path := UserData.at(Wardrobe.PATH)
 var leave := Callable()
 
 var _wardrobe: Wardrobe

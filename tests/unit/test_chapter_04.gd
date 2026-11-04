@@ -40,7 +40,7 @@ extends GutTest
 
 const GAME_SCENE := "res://scenes/game.tscn"
 const LEVEL := "res://levels/chapter_04.txt"
-const ASSIST_PATH := "user://test_chapter04_clear_assist.cfg"
+var _assist_path := UserData.at("user://test_chapter04_clear_assist.cfg")
 ## Par for a good first clear (docs/campaign.md, "The arc").
 const PAR := 180.0
 ## How much faster than the wall clock the run is played.
@@ -118,8 +118,8 @@ func after_each() -> void:
 	Engine.time_scale = _scale
 	Engine.max_physics_steps_per_frame = _steps
 	Assist.reset()
-	if FileAccess.file_exists(ASSIST_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(ASSIST_PATH))
+	if FileAccess.file_exists(_assist_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_assist_path))
 
 
 func _level() -> AsciiLevel:
@@ -204,7 +204,7 @@ func test_every_beam_and_seal_holds_to_the_bible() -> void:
 
 func _play(assisted: bool = false) -> Game:
 	if assisted:
-		Assist.load_saved(ASSIST_PATH)
+		Assist.load_saved(_assist_path)
 		Assist.set_longer_warnings(true)
 	var game := (load(GAME_SCENE) as PackedScene).instantiate() as Game
 	game.level_path = LEVEL

@@ -8,7 +8,7 @@ extends GutTest
 ## its best time, and its caption the bests in full; a tap selects and a tap
 ## on the selected row plays; sword goes back.
 
-const PATH := "user://test_chapter_select.cfg"
+var _path := UserData.at("user://test_chapter_select.cfg")
 const SCENE := "res://scenes/chapter_select.tscn"
 
 var _entries: Array[Dictionary] = [
@@ -39,13 +39,13 @@ func after_each() -> void:
 
 
 func _remove() -> void:
-	if FileAccess.file_exists(PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
+	if FileAccess.file_exists(_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_path))
 
 
 func _page() -> ChapterSelect:
 	var page := (load(SCENE) as PackedScene).instantiate() as ChapterSelect
-	page.store_path = PATH
+	page.store_path = _path
 	page.play = func(index: int) -> void: _played.append(index)
 	page.leave = func() -> void: _left += 1
 	add_child_autofree(page)
@@ -53,7 +53,7 @@ func _page() -> ChapterSelect:
 
 
 func _clear_alpha(seconds: float) -> void:
-	var progress := CampaignProgress.open(PATH)
+	var progress := CampaignProgress.open(_path)
 	progress.record_clear(0, seconds, 4, 6, 1, 3)
 	progress.save()
 

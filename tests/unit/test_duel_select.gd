@@ -9,7 +9,7 @@ extends GutTest
 ## next time; the file falls back field by field; a tap selects, plays, or
 ## steps the level; the rows keep clear of the thumb buttons; sword goes back.
 
-const PATH := "user://test_duel_select.cfg"
+var _path := UserData.at("user://test_duel_select.cfg")
 const SCENE := "res://scenes/duel_select.tscn"
 const MENU := "res://scenes/menu.tscn"
 
@@ -28,13 +28,13 @@ func after_each() -> void:
 
 
 func _remove() -> void:
-	if FileAccess.file_exists(PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
+	if FileAccess.file_exists(_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_path))
 
 
 func _page() -> DuelSelect:
 	var page := (load(SCENE) as PackedScene).instantiate() as DuelSelect
-	page.store_path = PATH
+	page.store_path = _path
 	page.play = func(scene: String) -> void: _played.append(scene)
 	page.leave = func() -> void: _left += 1
 	add_child_autofree(page)
@@ -42,7 +42,7 @@ func _page() -> DuelSelect:
 
 
 func _write(lines: String) -> void:
-	var file := FileAccess.open(PATH, FileAccess.WRITE)
+	var file := FileAccess.open(_path, FileAccess.WRITE)
 	file.store_string(lines)
 	file.close()
 
@@ -93,7 +93,7 @@ func test_left_and_right_set_the_level_on_its_row_only() -> void:
 	assert_eq(page.row_value(DuelSelect.CPU_ROW), "HARD", "and HARD, and no further")
 	page.shift_level(-1)
 	assert_eq(page.row_value(DuelSelect.CPU_ROW), "MEDIUM", "left: back")
-	assert_false(FileAccess.file_exists(PATH), "browsing saves nothing")
+	assert_false(FileAccess.file_exists(_path), "browsing saves nothing")
 
 
 func test_starting_a_duel_remembers_the_way_and_the_level() -> void:
@@ -101,7 +101,7 @@ func test_starting_a_duel_remembers_the_way_and_the_level() -> void:
 	page.move(1)
 	page.shift_level(2)
 	page.confirm()
-	var saved := DuelChoice.open(PATH)
+	var saved := DuelChoice.open(_path)
 	assert_eq(saved.way, 1, "VS CPU was saved")
 	assert_eq(saved.level, DuelBrain.Difficulty.HARD, "at HARD")
 
@@ -110,27 +110,27 @@ func test_starting_a_duel_remembers_the_way_and_the_level() -> void:
 	assert_eq(again.row_value(DuelSelect.CPU_ROW), "HARD", "at HARD")
 	again.move(1)
 	again.confirm()
-	assert_eq(DuelChoice.open(PATH).way, 2, "then ONLINE")
-	assert_eq(DuelChoice.open(PATH).level, DuelBrain.Difficulty.HARD,
+	assert_eq(DuelChoice.open(_path).way, 2, "then ONLINE")
+	assert_eq(DuelChoice.open(_path).level, DuelBrain.Difficulty.HARD,
 		"without forgetting the level")
 
 
 func test_the_file_falls_back_field_by_field() -> void:
 	assert_false(DuelChoice.new().load_from_disk(), "no file: the defaults")
 	_write("[duel]\nway=\"sideways\"\nlevel=\"hard\"\n")
-	var choice := DuelChoice.open(PATH)
+	var choice := DuelChoice.open(_path)
 	assert_eq(choice.way, 0, "a way that names nothing is ONE KEYBOARD")
 	assert_eq(choice.level, DuelBrain.Difficulty.HARD, "and costs the level nothing")
 	_write("[duel]\nway=\"online\"\nlevel=7\n")
-	choice = DuelChoice.open(PATH)
+	choice = DuelChoice.open(_path)
 	assert_eq(choice.way, 2, "a good way survives")
 	assert_eq(choice.level, DuelBrain.Difficulty.EASY, "a level of the wrong type is EASY")
 	_write("[duel]\nlevel=\"medium\"\n")
-	choice = DuelChoice.open(PATH)
+	choice = DuelChoice.open(_path)
 	assert_eq([choice.way, choice.level], [0, DuelBrain.Difficulty.MEDIUM],
 		"a missing way is ONE KEYBOARD, the level kept")
 	_write("this is not [ a config file\n")
-	choice = DuelChoice.open(PATH)
+	choice = DuelChoice.open(_path)
 	assert_eq([choice.way, choice.level], [0, DuelBrain.Difficulty.EASY],
 		"a file that does not parse is the defaults")
 

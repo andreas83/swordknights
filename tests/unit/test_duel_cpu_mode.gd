@@ -11,21 +11,21 @@ extends GutTest
 
 const SCENE := preload("res://scenes/duel_match_cpu.tscn")
 ## Never the real saves: the scene reads the looks and the level from here.
-const WARDROBE := "user://test_duel_cpu_mode_wardrobe.cfg"
-const CHOICE := "user://test_duel_cpu_mode_choice.cfg"
+var _wardrobe := UserData.at("user://test_duel_cpu_mode_wardrobe.cfg")
+var _choice := UserData.at("user://test_duel_cpu_mode_choice.cfg")
 
 
 func after_each() -> void:
 	for action: String in ["move_left", "move_right"]:
 		Input.action_release(action)
-	for path: String in [WARDROBE, CHOICE]:
+	for path: String in [_wardrobe, _choice]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 ## What the duel page saves when VS CPU is started at `level`.
 func _choose(level: DuelBrain.Difficulty) -> void:
 	var choice := DuelChoice.new()
-	choice.path = CHOICE
+	choice.path = _choice
 	choice.way = 1
 	choice.level = level
 	assert_eq(choice.save(), OK, "the test's choice was written")
@@ -33,9 +33,9 @@ func _choose(level: DuelBrain.Difficulty) -> void:
 
 func _open() -> Node:
 	var scene := SCENE.instantiate()
-	scene.set("wardrobe_path", WARDROBE)
-	scene.set("choice_path", CHOICE)
-	assert_eq(scene.get("choice_path"), CHOICE, "the scene took the test's choice file")
+	scene.set("wardrobe_path", _wardrobe)
+	scene.set("choice_path", _choice)
+	assert_eq(scene.get("choice_path"), _choice, "the scene took the test's choice file")
 	add_child_autofree(scene)
 	return scene
 
@@ -48,7 +48,7 @@ func test_with_nothing_saved_the_computer_is_easy() -> void:
 func test_the_scene_seats_the_player_and_the_computer() -> void:
 	var two := CharacterLook.new()
 	two.take_ids({"figure": "heroine", "accent": "pale", "hair": "henna", "skin": "copper"})
-	var wardrobe := Wardrobe.open(WARDROBE)
+	var wardrobe := Wardrobe.open(_wardrobe)
 	wardrobe.set_look(Wardrobe.PLAYER_TWO, two)
 	assert_eq(wardrobe.save(), OK, "the test wardrobe was written")
 

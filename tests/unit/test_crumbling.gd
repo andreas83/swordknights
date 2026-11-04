@@ -143,18 +143,18 @@ var _input: ScriptedInput
 ## Unassisted unless a test says otherwise, whatever ran before it -- and a
 ## test that turns the assist on saves it here, never over the player's own
 ## user://assist.cfg, which the next game to boot would read.
-const ASSIST_PATH := "user://test_crumbling_assist.cfg"
+var _assist_path := UserData.at("user://test_crumbling_assist.cfg")
 
 
 func before_each() -> void:
 	Assist.reset()
-	Assist.load_saved(ASSIST_PATH)
+	Assist.load_saved(_assist_path)
 
 
 func after_each() -> void:
 	Assist.reset()
-	if FileAccess.file_exists(ASSIST_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(ASSIST_PATH))
+	if FileAccess.file_exists(_assist_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_assist_path))
 
 
 func _play(text: String) -> void:

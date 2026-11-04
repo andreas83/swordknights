@@ -32,7 +32,7 @@ const TOUCH_CONTROLS := preload("res://scenes/touch_controls.tscn")
 
 ## Test seams, set before _ready: where progress is kept, and what returning
 ## to the chapter select does (the scene change, by default).
-var progress_path := CampaignProgress.PATH
+var progress_path := UserData.at(CampaignProgress.PATH)
 var leave := Callable()
 
 ## The entry being played.

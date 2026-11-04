@@ -39,7 +39,7 @@ const SCENES: Array[String] = [
 	"res://scenes/duel_match_online.tscn",
 ]
 
-var path := PATH
+var path := UserData.at(PATH)
 ## Index into WAYS.
 var way := 0
 ## A DuelBrain.Difficulty.
@@ -49,9 +49,9 @@ var strip: String = DuelStrips.TUG
 
 
 ## The saved choice at `at`, or the defaults if there is nothing usable there.
-static func open(at: String = PATH) -> DuelChoice:
+static func open(at: String = "") -> DuelChoice:
 	var choice := DuelChoice.new()
-	choice.path = at
+	choice.path = at if at != "" else UserData.at(PATH)
 	choice.load_from_disk()
 	return choice
 

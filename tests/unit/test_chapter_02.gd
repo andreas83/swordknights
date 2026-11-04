@@ -204,7 +204,7 @@ func test_the_clear_run_reaches_the_door_inside_par_without_a_death() -> void:
 
 
 func test_with_longer_warnings_the_tells_stretch_and_the_run_still_clears() -> void:
-	Assist.load_saved("user://test_chapter_02_assist.cfg")
+	Assist.load_saved(UserData.at("user://test_chapter_02_assist.cfg"))
 	Assist.set_longer_warnings(true)
 	var level := _level()
 	var bastions := level.entities.filter(func(m: Dictionary) -> bool:
@@ -218,4 +218,5 @@ func test_with_longer_warnings_the_tells_stretch_and_the_run_still_clears() -> v
 	await _replay()
 	assert_eq(_game.phase, Game.Phase.COMPLETE, "and the same run still reaches the door")
 	assert_eq(_game.deaths, 0, "without dying")
-	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://test_chapter_02_assist.cfg"))
+	var assist_file := UserData.at("user://test_chapter_02_assist.cfg")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(assist_file))

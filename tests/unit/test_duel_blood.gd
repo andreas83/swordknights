@@ -9,7 +9,7 @@ extends GutTest
 ## wipes -- once per death, never again on a replay.
 
 const SCENE := "res://scenes/duel_match.tscn"
-const WARDROBE := "user://test_duel_blood_wardrobe.cfg"
+var _wardrobe := UserData.at("user://test_duel_blood_wardrobe.cfg")
 
 var _strip: ZoneStrip
 
@@ -19,7 +19,7 @@ func before_all() -> void:
 
 
 func after_all() -> void:
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(WARDROBE))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(_wardrobe))
 
 
 func _field() -> GoreField:
@@ -49,7 +49,7 @@ func _landed_offsets(field: GoreField, at: Vector2) -> PackedFloat32Array:
 ## drawn and hidden. This holds it over the stone and under the actors.
 func test_the_blood_is_drawn_over_the_stone_and_under_the_actors() -> void:
 	var scene := (load(SCENE) as PackedScene).instantiate()
-	scene.set("wardrobe_path", WARDROBE)
+	scene.set("wardrobe_path", _wardrobe)
 	add_child_autofree(scene)
 	var gore := scene.get_node(^"World/Gore") as GoreField
 	var view := scene.get_node(^"World/ZoneView")

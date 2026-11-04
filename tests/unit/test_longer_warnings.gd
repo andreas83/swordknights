@@ -10,7 +10,7 @@ extends GutTest
 ## is where it is switched.
 
 const FRAME := 1.0 / 60.0
-const PATH := "user://test_assist.cfg"
+var _path := UserData.at("user://test_assist.cfg")
 
 
 func before_each() -> void:
@@ -19,8 +19,8 @@ func before_each() -> void:
 
 func after_each() -> void:
 	Assist.reset()
-	if FileAccess.file_exists(PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
+	if FileAccess.file_exists(_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_path))
 
 
 ## A guard with a prince just inside its reach, so it raises on the first
@@ -57,7 +57,7 @@ func test_off_the_factor_is_one_and_the_raise_is_as_it_was() -> void:
 
 func test_on_the_sentinels_raise_lasts_the_factor_longer() -> void:
 	var off := _attack()
-	Assist.load_saved(PATH)
+	Assist.load_saved(_path)
 	assert_eq(Assist.set_longer_warnings(true), OK, "saved")
 	assert_eq(Assist.warning_scale(), Assist.LONGER)
 	var guard: Patrol = autofree(Patrol.new())
@@ -72,31 +72,31 @@ func test_on_the_sentinels_raise_lasts_the_factor_longer() -> void:
 
 
 func test_the_choice_is_kept_and_a_bad_file_is_off() -> void:
-	Assist.load_saved(PATH)
+	Assist.load_saved(_path)
 	Assist.set_longer_warnings(true)
 	Assist.reset()
-	assert_true(Assist.load_saved(PATH), "the file is read back")
+	assert_true(Assist.load_saved(_path), "the file is read back")
 	assert_true(Assist.longer_warnings(), "with the assist on")
 
-	var file := FileAccess.open(PATH, FileAccess.WRITE)
+	var file := FileAccess.open(_path, FileAccess.WRITE)
 	file.store_string("[assist]\nlonger_warnings=\"very\"\n")
 	file.close()
-	assert_false(Assist.load_saved(PATH), "a value of the wrong type is not believed")
+	assert_false(Assist.load_saved(_path), "a value of the wrong type is not believed")
 	assert_false(Assist.longer_warnings(), "and is off")
 
-	file = FileAccess.open(PATH, FileAccess.WRITE)
+	file = FileAccess.open(_path, FileAccess.WRITE)
 	file.store_string("not a config file [[[")
 	file.close()
-	Assist.load_saved(PATH)
+	Assist.load_saved(_path)
 	assert_false(Assist.longer_warnings(), "a broken file is off")
 
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
-	assert_false(Assist.load_saved(PATH), "and so is no file at all")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(_path))
+	assert_false(Assist.load_saved(_path), "and so is no file at all")
 	assert_false(Assist.longer_warnings())
 
 
 func test_the_settings_page_switches_it() -> void:
-	Assist.load_saved(PATH)
+	Assist.load_saved(_path)
 	var panel := SettingsPanel.new()
 	add_child_autofree(panel)
 	var rows := panel.rows()
@@ -113,7 +113,7 @@ func test_the_settings_page_switches_it() -> void:
 	assert_false(panel.is_on(rows[at]), "off to start")
 	panel.confirm()
 	assert_true(Assist.longer_warnings(), "jump on the row turns it on")
-	assert_true(FileAccess.file_exists(PATH), "and saves it")
+	assert_true(FileAccess.file_exists(_path), "and saves it")
 	panel.adjust(-1)
 	assert_false(Assist.longer_warnings(), "left turns it off")
 	panel.adjust(-1)

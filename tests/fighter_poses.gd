@@ -26,7 +26,7 @@ const FEET_Y := 34.0
 const SETTLE_FRAMES := 20
 const FIGHTER_SCENE: PackedScene = preload("res://scenes/fighter.tscn")
 
-var _out := "user://fighter-poses.png"
+var _out := UserData.at("user://fighter-poses.png")
 var _look := CharacterLook.new()
 var _frames := 0
 var _labels: Array[Dictionary] = []

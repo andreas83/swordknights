@@ -8,7 +8,7 @@ extends GutTest
 ## entry; CONTINUE goes to the first playable entry not yet cleared, and
 ## never to one still being built; and all of it survives a round trip.
 
-const PATH := "user://test_campaign_progress.cfg"
+var _path := UserData.at("user://test_campaign_progress.cfg")
 
 ## Three chapters, the last not built.
 var _entries: Array[Dictionary] = [
@@ -32,18 +32,18 @@ func after_each() -> void:
 
 
 func _remove() -> void:
-	if FileAccess.file_exists(PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
+	if FileAccess.file_exists(_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_path))
 
 
 func _write(text: String) -> void:
-	var file := FileAccess.open(PATH, FileAccess.WRITE)
+	var file := FileAccess.open(_path, FileAccess.WRITE)
 	file.store_string(text)
 	file.close()
 
 
 func test_no_file_is_a_fresh_campaign() -> void:
-	var progress := CampaignProgress.open(PATH)
+	var progress := CampaignProgress.open(_path)
 	assert_eq(progress.unlocked(), 1, "chapter I is open")
 	assert_false(progress.is_unlocked(1), "and nothing after it")
 	assert_false(progress.is_cleared("alpha"))
@@ -54,7 +54,7 @@ func test_no_file_is_a_fresh_campaign() -> void:
 func test_a_broken_file_is_a_fresh_campaign() -> void:
 	_write("this is [not a config file\n=== at all")
 	var progress := CampaignProgress.new()
-	progress.path = PATH
+	progress.path = _path
 	assert_false(progress.load_from_disk(), "not believed")
 	# ConfigFile logs the parse error itself; the progress adds none of its own.
 	assert_engine_error("ConfigFile parse error", "the engine noticed the corruption")
@@ -80,7 +80,7 @@ best_time=-20.0
 relics=-2
 relics_total=5
 """)
-	var progress := CampaignProgress.open(PATH)
+	var progress := CampaignProgress.open(_path)
 	var alpha := progress.record_of("alpha")
 	assert_true(bool(alpha["cleared"]), "alpha's clear is kept")
 	assert_eq(alpha["best_time"], CampaignProgress.NO_TIME, "its unreadable time is lost")
@@ -95,7 +95,7 @@ relics_total=5
 
 
 func test_a_clear_keeps_the_best_of_each_and_opens_the_next() -> void:
-	var progress := CampaignProgress.open(PATH)
+	var progress := CampaignProgress.open(_path)
 	var first := progress.record_clear(0, 75.0, 2, 6, 0, 3)
 	assert_eq(first, {"first": true, "time": true, "relics": true, "secrets": false})
 	assert_true(progress.is_unlocked(1), "the next chapter opens")
@@ -110,7 +110,7 @@ func test_a_clear_keeps_the_best_of_each_and_opens_the_next() -> void:
 
 
 func test_continue_goes_to_the_first_playable_uncleared_entry() -> void:
-	var progress := CampaignProgress.open(PATH)
+	var progress := CampaignProgress.open(_path)
 	assert_eq(progress.continue_index(), 0)
 	progress.record_clear(0, 70.0, 0, 0, 0, 0)
 	assert_eq(progress.continue_index(), 1, "on to chapter II")
@@ -122,10 +122,10 @@ func test_continue_goes_to_the_first_playable_uncleared_entry() -> void:
 
 
 func test_progress_survives_a_round_trip() -> void:
-	var progress := CampaignProgress.open(PATH)
+	var progress := CampaignProgress.open(_path)
 	progress.record_clear(0, 61.25, 3, 6, 2, 3)
 	assert_eq(progress.save(), OK)
-	var again := CampaignProgress.open(PATH)
+	var again := CampaignProgress.open(_path)
 	assert_eq(again.record_of("alpha"), progress.record_of("alpha"))
 	assert_eq(again.unlocked(), 2)
 	assert_eq(again.continue_index(), 1)

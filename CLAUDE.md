@@ -94,13 +94,14 @@ matching neither is silently skipped, which loses the coverage *and* leaves the
 build green. These match neither on purpose — support libraries
 (`duel_support.gd`, `fighter_support.gd`, `level_asserts.gd`, `cpu_support.gd`,
 `eclipse_support.gd`), GUT's pre-run
-hook (`death_watch.gd`), a live network harness (`net_live.gd`), and renderers
+hook (`death_watch.gd`, which also sandboxes the run's `user://` files), a live network harness (`net_live.gd`), and renderers
 for documentation images (`character_poses.gd`, `fighter_poses.gd`,
 `feel_frames.gd`, `ui_screens.gd`). A new file that is none of those and
 matches neither convention is a test nobody runs.
 
-A green suite is not evidence on its own. This repository has produced seven
-distinct ways of being green while testing nothing, and each is now a guard:
+A green suite is not evidence on its own. This repository has produced eight
+distinct ways of being green, or red, for a reason that is not the code under
+test, and each is now a guard:
 
 | Failure | Guard |
 | --- | --- |
@@ -111,8 +112,9 @@ distinct ways of being green while testing nothing, and each is now a guard:
 | A comment names a test or doc that does not exist | `test_references_resolve.gd` |
 | A death is hidden by the checkpoint respawn | `death_watch.gd` fails any GUT test whose prince dies unannounced (`DeathWatch.expect_deaths(n)`); `test_death_watch.gd` |
 | Two scripts share a `class_name`, so one silently loses and parse-check passes | `test_class_names_unique.gd` |
+| A test writes the player's real `user://` progress or settings, or two runs read each other's files | every save resolves through `UserData.at()`, sandboxed per run (`run_tests.sh`, GUT's hook); `test_user_data_sandbox.gd` fails a bare `user://` in a test or a save that skips the seam |
 
-**When you find an eighth, add a guard — do not just fix the symptom.** A test
+**When you find a ninth, add a guard — do not just fix the symptom.** A test
 that measures nothing must fail, and a guard is only trusted once it has been
 seen to fail: break the thing on purpose and watch it go red.
 

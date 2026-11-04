@@ -96,14 +96,15 @@ func test_the_shove_is_told_for_the_sentinels_27_frames() -> void:
 
 func test_longer_warnings_stretch_the_windup_and_nothing_else() -> void:
 	var off := _shove_frames()
-	Assist.load_saved("user://test_bastion_assist.cfg")
+	Assist.load_saved(UserData.at("user://test_bastion_assist.cfg"))
 	Assist.set_longer_warnings(true)
 	var on := _shove_frames()
 	assert_almost_eq(int(on.get("WINDUP", 0)), roundi(27 * Assist.LONGER), 1,
 		"the windup, frame for frame")
 	assert_eq(on.get("SHOVE"), off.get("SHOVE"), "the shove itself is not slowed")
 	assert_eq(on.get("RECOVER"), off.get("RECOVER"), "nor the recovery")
-	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://test_bastion_assist.cfg"))
+	var assist_file := UserData.at("user://test_bastion_assist.cfg")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(assist_file))
 
 
 func test_the_front_turns_every_blow_but_the_plunge() -> void:

@@ -5,7 +5,7 @@ extends GutTest
 ## back. Against its own file, never the real save.
 
 const SCENE := preload("res://scenes/wardrobe.tscn")
-const STORE := "user://test_wardrobe_screen.cfg"
+var _store := UserData.at("user://test_wardrobe_screen.cfg")
 
 var _screen: WardrobeScreen
 var _left := 0
@@ -15,7 +15,7 @@ func before_each() -> void:
 	_remove()
 	_left = 0
 	_screen = SCENE.instantiate() as WardrobeScreen
-	_screen.store_path = STORE
+	_screen.store_path = _store
 	_screen.leave = func() -> void: _left += 1
 	add_child_autofree(_screen)
 
@@ -25,8 +25,8 @@ func after_each() -> void:
 
 
 func _remove() -> void:
-	if FileAccess.file_exists(STORE):
-		DirAccess.remove_absolute(STORE)
+	if FileAccess.file_exists(_store):
+		DirAccess.remove_absolute(_store)
 
 
 func _row(id: String) -> int:
@@ -37,7 +37,7 @@ func _row(id: String) -> int:
 
 
 func _saved(player: int) -> CharacterLook:
-	return Wardrobe.open(STORE).look(player)
+	return Wardrobe.open(_store).look(player)
 
 
 func test_it_opens_on_player_one_and_the_saved_look() -> void:

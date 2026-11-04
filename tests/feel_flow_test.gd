@@ -134,7 +134,7 @@ func _check_wipe_geometry() -> void:
 
 
 func _check_haptics_setting() -> void:
-	var had_file := FileAccess.file_exists(Flow.SETTINGS_PATH)
+	var had_file := FileAccess.file_exists(UserData.at(Flow.SETTINGS_PATH))
 	var was := Flow.haptics_enabled()
 
 	Flow.set_haptics_enabled(false)
@@ -149,7 +149,7 @@ func _check_haptics_setting() -> void:
 
 	Flow.set_haptics_enabled(was)
 	if not had_file:
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(Flow.SETTINGS_PATH))
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(UserData.at(Flow.SETTINGS_PATH)))
 
 
 ## The rule from docs/feel.md, enforced where it can be enforced: a duel never

@@ -25,7 +25,7 @@ const SETTLE_FRAMES := 14
 ## in the air when the frame is taken.
 const EFFECT_LEAD := 3
 
-var _out_dir := "user://poses"
+var _out_dir := UserData.at("user://poses")
 var _figure := "prince"
 var _poses: Array[Dictionary] = []
 var _index := 0

@@ -119,10 +119,11 @@ func test_it_folds_for_a_prince_back_on_the_stone() -> void:
 
 func test_the_spread_is_the_tell_and_the_assist_widens_it() -> void:
 	assert_eq(_spread_frames(), 27, "the sentinel's 27 frames")
-	Assist.load_saved("user://test_owl_assist.cfg")
+	Assist.load_saved(UserData.at("user://test_owl_assist.cfg"))
 	Assist.set_longer_warnings(true)
 	assert_eq(_spread_frames(), roundi(27.0 * Assist.LONGER), "41 with the assist on")
-	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://test_owl_assist.cfg"))
+	var assist_file := UserData.at("user://test_owl_assist.cfg")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(assist_file))
 
 
 ## Frames from the spread to the stoop, for a prince who stays in the air.

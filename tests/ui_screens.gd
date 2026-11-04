@@ -19,13 +19,13 @@ extends SceneTree
 const SETTLE_FRAMES := 6
 ## Where the wardrobe shots keep their looks: never the real save, so a shot
 ## does not change what someone plays as, nor depend on it.
-const WARDROBE_STORE := "user://ui_screens_wardrobe.cfg"
+var _wardrobe_store := UserData.at("user://ui_screens_wardrobe.cfg")
 ## Where the chapter select shots keep their progress, for the same reason.
-const PROGRESS_STORE := "user://ui_screens_progress.cfg"
+var _progress_store := UserData.at("user://ui_screens_progress.cfg")
 ## Where the duel page and DUEL VS CPU shots keep the duel choice.
-const DUEL_STORE := "user://ui_screens_duel.cfg"
+var _duel_store := UserData.at("user://ui_screens_duel.cfg")
 
-var _out_dir := "user://ui"
+var _out_dir := UserData.at("user://ui")
 var _only := ""
 
 var _shots: Array[Dictionary] = []
@@ -127,25 +127,25 @@ func _build(shot: Dictionary) -> void:
 		# What the duel page saves when VS CPU is started at that level, read
 		# by the scene, or opened on by the page, as it readies.
 		var choice := DuelChoice.new()
-		choice.path = DUEL_STORE
+		choice.path = _duel_store
 		choice.way = 1
 		choice.level = int(shot["cpu"]) as DuelBrain.Difficulty
 		choice.save()
 	else:
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(DUEL_STORE))
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_duel_store))
 	_stage = packed.instantiate()
 	if "choice_path" in _stage:
-		_stage.set("choice_path", DUEL_STORE)
+		_stage.set("choice_path", _duel_store)
 	if _stage is DuelSelect:
-		(_stage as DuelSelect).store_path = DUEL_STORE
+		(_stage as DuelSelect).store_path = _duel_store
 	if shot.has("cpu") and "wardrobe_path" in _stage:
-		_stage.set("wardrobe_path", WARDROBE_STORE)
+		_stage.set("wardrobe_path", _wardrobe_store)
 	if _stage is WardrobeScreen:
 		_stock_wardrobe(String(shot["pose"]))
-		(_stage as WardrobeScreen).store_path = WARDROBE_STORE
+		(_stage as WardrobeScreen).store_path = _wardrobe_store
 	if _stage is ChapterSelect:
 		_stock_progress(bool(shot.get("cleared", false)))
-		(_stage as ChapterSelect).store_path = PROGRESS_STORE
+		(_stage as ChapterSelect).store_path = _progress_store
 	root.add_child(_stage)
 
 
@@ -239,7 +239,7 @@ func _pose(shot: Dictionary) -> void:
 ## Writes the looks a wardrobe shot opens on: the heroine in a non-default dress
 ## for player one, and the heroine for player two in the sea-green seat.
 func _stock_wardrobe(pose: String) -> void:
-	var wardrobe := Wardrobe.open(WARDROBE_STORE)
+	var wardrobe := Wardrobe.open(_wardrobe_store)
 	var one := CharacterLook.new()
 	if pose != "prince":
 		one.take_ids({"figure": "heroine", "accent": "gold", "hair": "raven", "skin": "amber"})
@@ -253,7 +253,7 @@ func _stock_wardrobe(pose: String) -> void:
 ## A first launch, or chapter I cleared with something left to find in it.
 func _stock_progress(cleared: bool) -> void:
 	var progress := CampaignProgress.new()
-	progress.path = PROGRESS_STORE
+	progress.path = _progress_store
 	if cleared:
 		progress.record_clear(0, 74.6, 5, 6, 2, 3)
 	progress.save()

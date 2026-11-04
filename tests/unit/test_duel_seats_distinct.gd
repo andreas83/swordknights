@@ -17,12 +17,12 @@ extends GutTest
 
 const FIGHTER_SCENE := preload("res://scenes/fighter.tscn")
 const ONLINE_SCENE := preload("res://scenes/duel_match_online.tscn")
-const STORE := "user://test_duel_seats_distinct.cfg"
+var _store := UserData.at("user://test_duel_seats_distinct.cfg")
 
 
 func after_each() -> void:
-	if FileAccess.file_exists(STORE):
-		DirAccess.remove_absolute(STORE)
+	if FileAccess.file_exists(_store):
+		DirAccess.remove_absolute(_store)
 
 
 func _team(seat: int) -> Array[Color]:
@@ -121,7 +121,7 @@ func test_every_received_look_keeps_each_seat_in_its_colour() -> void:
 
 
 func test_online_shows_my_look_on_my_seat_and_theirs_on_theirs() -> void:
-	var wardrobe := Wardrobe.open(STORE)
+	var wardrobe := Wardrobe.open(_store)
 	var mine := CharacterLook.new()
 	mine.take_ids({"figure": "heroine", "accent": "fire", "hair": "gold"})
 	wardrobe.set_look(Wardrobe.PLAYER_ONE, mine)
@@ -131,8 +131,8 @@ func test_online_shows_my_look_on_my_seat_and_theirs_on_theirs() -> void:
 	wardrobe.save()
 
 	var scene := ONLINE_SCENE.instantiate()
-	scene.set("wardrobe_path", STORE)
-	assert_eq(scene.get("wardrobe_path"), STORE, "the seam took")
+	scene.set("wardrobe_path", _store)
+	assert_eq(scene.get("wardrobe_path"), _store, "the seam took")
 	add_child_autofree(scene)
 	await wait_process_frames(1)
 

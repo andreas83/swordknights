@@ -101,7 +101,7 @@ func _check(far: float, dusk: float, night: float, view: Vector2, cam: Vector2,
 
 
 func test_each_chapter_has_its_own_distance_in_its_sky() -> void:
-	var dir := "user://test_mirror_tower"
+	var dir := UserData.at("user://test_mirror_tower")
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
 	var path := dir.path_join("alpha.txt")
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -111,7 +111,7 @@ func test_each_chapter_has_its_own_distance_in_its_sky() -> void:
 		"epigraph": "", "time": "afternoon", "file": path, "finale": false, "tower": 0.6}])
 	var campaign := (load("res://scenes/campaign_game.tscn") as PackedScene).instantiate() \
 		as CampaignGame
-	campaign.progress_path = "user://test_mirror_tower.cfg"
+	campaign.progress_path = UserData.at("user://test_mirror_tower.cfg")
 	campaign.leave = func() -> void: pass
 	add_child_autofree(campaign)
 	await wait_physics_frames(2)

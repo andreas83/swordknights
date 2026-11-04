@@ -13,8 +13,8 @@ extends GutTest
 ## been read (Hud.CARD_READ), when a verb still held is play.
 
 const SCENE := "res://scenes/campaign_game.tscn"
-const PROGRESS := "user://test_title_cards.cfg"
-const DIR := "user://test_title_cards"
+var _progress := UserData.at("user://test_title_cards.cfg")
+var _dir := UserData.at("user://test_title_cards")
 const LEVEL := """; Alpha
 
 
@@ -25,8 +25,8 @@ const LEVEL := """; Alpha
 
 
 func before_each() -> void:
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(DIR))
-	var file := FileAccess.open(DIR.path_join("alpha.txt"), FileAccess.WRITE)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_dir))
+	var file := FileAccess.open(_dir.path_join("alpha.txt"), FileAccess.WRITE)
 	file.store_string(LEVEL)
 	file.close()
 
@@ -35,7 +35,7 @@ func after_each() -> void:
 	for action: StringName in Hud.PLAY_ACTIONS:
 		Input.action_release(action)
 	Campaign.reset()
-	for path: String in [PROGRESS, DIR.path_join("alpha.txt")]:
+	for path: String in [_progress, _dir.path_join("alpha.txt")]:
 		if FileAccess.file_exists(path):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
@@ -84,9 +84,9 @@ func test_every_card_fits_the_narrowest_screen() -> void:
 func _start() -> CampaignGame:
 	Campaign.use_for_test([{"id": "alpha", "numeral": "IV", "title": "Alpha",
 		"epigraph": "Catch the last light", "time": "afternoon",
-		"file": DIR.path_join("alpha.txt"), "finale": false}])
+		"file": _dir.path_join("alpha.txt"), "finale": false}])
 	var campaign := (load(SCENE) as PackedScene).instantiate() as CampaignGame
-	campaign.progress_path = PROGRESS
+	campaign.progress_path = _progress
 	campaign.leave = func() -> void: pass
 	add_child_autofree(campaign)
 	await wait_physics_frames(2)

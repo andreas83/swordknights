@@ -235,7 +235,7 @@ static func haptics_enabled() -> bool:
 	if _haptics < 0:
 		var fallback := OS.has_feature("mobile")
 		var file := ConfigFile.new()
-		if file.load(SETTINGS_PATH) == OK:
+		if file.load(UserData.at(SETTINGS_PATH)) == OK:
 			fallback = bool(file.get_value(SETTINGS_SECTION, "haptics", fallback))
 		_haptics = 1 if fallback else 0
 	return _haptics == 1
@@ -245,9 +245,9 @@ static func set_haptics_enabled(on: bool) -> void:
 	_haptics = 1 if on else 0
 	var file := ConfigFile.new()
 	# Keep whatever else lives in the file; this is the shared settings path.
-	file.load(SETTINGS_PATH)
+	file.load(UserData.at(SETTINGS_PATH))
 	file.set_value(SETTINGS_SECTION, "haptics", on)
-	file.save(SETTINGS_PATH)
+	file.save(UserData.at(SETTINGS_PATH))
 
 
 ## A buzz scaled 0..1 by how hard the thing hit. `vibrate_handheld()` does

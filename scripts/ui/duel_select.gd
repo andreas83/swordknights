@@ -99,7 +99,7 @@ const STRIP_SLOT := 104.0
 ## Test seams, set before _ready: where the choice is kept, what playing does
 ## (`play.call(scene_path)`; a scene change by default), and what going back
 ## does (the title screen).
-var store_path := DuelChoice.PATH
+var store_path := UserData.at(DuelChoice.PATH)
 var play := Callable()
 var leave := Callable()
 
