@@ -97,6 +97,9 @@ func _catalogue() -> Array[Dictionary]:
 		{"name": "duel_select", "scene": "res://scenes/duel_select.tscn", "pose": ""},
 		{"name": "duel_select_cpu", "scene": "res://scenes/duel_select.tscn", "pose": "touch",
 			"cpu": DuelBrain.Difficulty.HARD},
+		# On a phone: no ONE KEYBOARD, and a first launch opens on VS CPU.
+		{"name": "duel_select_phone", "scene": "res://scenes/duel_select.tscn",
+			"pose": "touch", "handheld": true},
 		{"name": "match_cpu", "scene": "res://scenes/duel_match_cpu.tscn", "pose": "touch",
 			"cpu": DuelBrain.Difficulty.HARD},
 		{"name": "wardrobe", "scene": "res://scenes/wardrobe.tscn", "pose": "prince"},
@@ -138,6 +141,7 @@ func _build(shot: Dictionary) -> void:
 		_stage.set("choice_path", _duel_store)
 	if _stage is DuelSelect:
 		(_stage as DuelSelect).store_path = _duel_store
+		(_stage as DuelSelect).handheld = bool(shot.get("handheld", false))
 	if shot.has("cpu") and "wardrobe_path" in _stage:
 		_stage.set("wardrobe_path", _wardrobe_store)
 	if _stage is WardrobeScreen:

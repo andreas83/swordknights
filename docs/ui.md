@@ -507,6 +507,19 @@ an injected `store_path` (and the VS CPU scene through `choice_path`).
 Back is sword or pause, to the title screen; quitting a match from any of the
 three ways comes back here, as quitting a chapter goes to the chapter select.
 
+**On a phone there is no ONE KEYBOARD.** Its scene reads the two keyboard
+seats and carries no thumb buttons, so a phone that opened the page on it —
+the first-launch default — started a match nobody could move in on its first
+JUMP. Where `UiLayout.handheld()` says there is no keyboard to count on (an
+Android or iOS export, or the web export opened on one), the page offers VS
+CPU, ONLINE and STRIP, opens on VS CPU, and a saved ONE KEYBOARD opens on VS
+CPU too. The online lobby leaves out LOCAL TWO-PLAYER, the same scene, for
+the same reason; its wait no longer says SWORD plays locally, which it never
+did — SWORD gives up and puts the list back. `handheld()` asks the export's
+feature tags rather than `DisplayServer.is_touchscreen_available()`, which is
+true on every touch laptop; the page and the lobby take its answer through a
+`handheld` seam, which `tests/unit/test_duel_handheld.gd` sets both ways.
+
 ### Wardrobe
 
 `scripts/ui/wardrobe_screen.gd`, `scenes/wardrobe.tscn`: choose the figure each
@@ -648,7 +661,7 @@ a level and in a duel alike.
 | Chapter select | PLAY (— on a locked row) | BACK |
 | Duel page | PLAY | BACK |
 | Wardrobe | NEXT | BACK |
-| Duel lobby | SELECT | BACK; LOCAL while waiting |
+| Duel lobby | SELECT | BACK, and BACK while waiting |
 | The dawn | RETURN, once it can be left | BACK |
 | A ruin that would not generate | BACK | BACK |
 
@@ -775,8 +788,9 @@ different typeface.
 # One frame per interface state, including the ones you cannot reach by
 # playing: pause, settings, a finished match, the wardrobe as the heroine
 # and as player two (wardrobe_heroine, wardrobe_two, wardrobe_touch), and
-# the duel page on a first launch and opened on VS CPU at HARD with the
-# thumbs up (duel_select, duel_select_cpu), and that match (match_cpu).
+# the duel page on a first launch, opened on VS CPU at HARD with the
+# thumbs up, and on a phone (duel_select, duel_select_cpu,
+# duel_select_phone), and that match (match_cpu).
 xvfb-run -a godot --path . --rendering-driver opengl3 \
   --script tests/ui_screens.gd -- --out /tmp/ui/after --window 1280x720
 

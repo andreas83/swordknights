@@ -216,7 +216,7 @@ func test_the_lobby_letters_its_pages() -> void:
 	var lobby := scene.get_node(^"LobbyLayer/Lobby") as DuelLobby
 	lobby.show_busy("WAITING")
 	await wait_physics_frames(2)
-	_says(controls, "", "LOCAL", "waiting: SWORD gives up and plays on this phone")
+	_says(controls, "", "BACK", "waiting: SWORD gives up, back to the list")
 
 
 func test_a_ruin_that_would_not_generate_letters_its_way_back() -> void:

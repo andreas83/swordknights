@@ -33,6 +33,21 @@ const BANNER_BIAS := -6.0
 const MAX_INSET := 0.22
 
 
+## Whether this is a phone or a tablet: a device with no keyboard to count on,
+## native or in a browser. Asked by the screens that offer something only a
+## keyboard can play -- the duel's ONE KEYBOARD, the lobby's LOCAL
+## TWO-PLAYER -- so a phone is never offered a match it cannot control.
+##
+## The export's feature tags, not `DisplayServer.is_touchscreen_available()`:
+## that is true on every touch laptop, which has a keyboard, and its answer in
+## a browser is the browser's guess. `mobile` is every Android and iOS
+## export; `web_android` and `web_ios` are the web export opened on one. Each
+## screen that asks takes the answer through a seam, so a test can be a phone.
+static func handheld() -> bool:
+	return OS.has_feature("mobile") or OS.has_feature("web_android") \
+		or OS.has_feature("web_ios")
+
+
 ## The usable rectangle in canvas units, notches and rounded corners removed.
 static func safe(view: Vector2) -> Rect2:
 	if view.x <= 0.0 or view.y <= 0.0:

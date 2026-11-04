@@ -31,7 +31,9 @@ static func modes() -> Array[Dictionary]:
 			# One row; how to duel is the page's second step (DuelSelect).
 			"id": "duel",
 			"title": "Duel",
-			"subtitle": "One keyboard, the computer, or online",
+			# A phone has no keyboard to share (DuelSelect, "On a phone").
+			"subtitle": "The computer, or online" if UiLayout.handheld()
+				else "One keyboard, the computer, or online",
 			"scene": "res://scenes/duel_select.tscn",
 			"available": true,
 		},

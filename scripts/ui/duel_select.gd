@@ -42,6 +42,14 @@ extends Control
 ##
 ## ## Driven like every other page
 ##
+## ## On a phone
+##
+## ONE KEYBOARD is not offered where there is no keyboard (UiLayout.handheld()):
+## its scene reads the two keyboard seats and carries no thumb buttons, so on a
+## phone its first JUMP started a match nobody could move in. The page opens on
+## VS CPU there, and a saved ONE KEYBOARD -- from the same file on another
+## device, or from before this -- opens on VS CPU too.
+##
 ## Up/down choose, left/right set the level, jump plays, sword or pause go back
 ## to the title screen. Rows can be tapped: a tap selects, a tap on the selected
 ## row plays it, and a tap on VS CPU's level steps it toward the side tapped.
@@ -90,6 +98,7 @@ const ROWS: Array[Dictionary] = [
 		"caption": [],
 	},
 ]
+const LOCAL_ROW := 0
 const CPU_ROW := 1
 ## The row that says where, and the width of its value between the carets: the
 ## longest strip name at the MICRO cut, and a caret's room either side.
@@ -102,6 +111,8 @@ const STRIP_SLOT := 104.0
 var store_path := UserData.at(DuelChoice.PATH)
 var play := Callable()
 var leave := Callable()
+## Test seam: whether this is a phone, where ONE KEYBOARD is not offered.
+var handheld := UiLayout.handheld()
 
 var _choice: DuelChoice
 var _index := 0
@@ -109,6 +120,9 @@ var _time := 0.0
 var _repeat := 0.0
 var _repeat_across := 0.0
 var _hold := 0.0
+## The rows offered, as indices into ROWS, in order.
+var _shown: Array[int] = []
+## By ROWS index; empty for a row not offered or not yet drawn.
 var _row_rects: Array[Rect2] = []
 var _level_rect := Rect2()
 var _strip_rect := Rect2()
@@ -117,7 +131,13 @@ var _strip_rect := Rect2()
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_choice = DuelChoice.open(store_path)
+	for row: int in ROWS.size():
+		if not (handheld and row == LOCAL_ROW):
+			_shown.append(row)
+	if handheld and _choice.way == LOCAL_ROW:
+		_choice.way = CPU_ROW
 	_index = clampi(_choice.way, 0, ROWS.size() - 1)
+	_row_rects.resize(ROWS.size())
 	var sky := get_node_or_null(^"Sky/ParallaxSky") as ParallaxSky
 	if sky != null:
 		sky.seed_value = 0xa17e5
@@ -132,6 +152,12 @@ func index() -> int:
 
 func choice() -> DuelChoice:
 	return _choice
+
+
+## The rows this page offers, as indices into ROWS: all four, or on a phone
+## the three a thumb can play.
+func shown() -> Array[int]:
+	return _shown.duplicate()
 
 
 func row_title(row: int) -> String:
@@ -150,7 +176,8 @@ func row_value(row: int) -> String:
 ## --- what the player does ---------------------------------------------------
 
 func move(by: int) -> void:
-	_index = wrapi(_index + by, 0, ROWS.size())
+	var at := maxi(0, _shown.find(_index))
+	_index = _shown[wrapi(at + by, 0, _shown.size())]
 	GameAudio.cue("ui_move")
 	queue_redraw()
 
@@ -334,13 +361,12 @@ func _draw() -> void:
 		minf(column.size.x * 0.3, 64.0), Palette.with_alpha(Palette.LIGHT_SOFT, 0.8))
 
 	var list_top := title_top + 30.0
-	_row_rects.clear()
-	for row: int in ROWS.size():
-		_draw_row(row, Rect2(column.position.x, list_top + row * ROW_HEIGHT - 4.0,
+	for at: int in _shown.size():
+		_draw_row(_shown[at], Rect2(column.position.x, list_top + at * ROW_HEIGHT - 4.0,
 			column.size.x, ROW_HEIGHT))
 
 	# The caption keeps to the stone left of SWORD when the thumbs are up.
-	var caption_y := list_top + ROWS.size() * ROW_HEIGHT + 3.0
+	var caption_y := list_top + _shown.size() * ROW_HEIGHT + 3.0
 	var caption_right := column.end.x
 	if _thumbs_up():
 		caption_right = minf(caption_right, view.x - SWORD_REACH.x)
@@ -357,7 +383,7 @@ func _draw() -> void:
 
 
 func _draw_row(row: int, rect: Rect2) -> void:
-	_row_rects.append(rect)
+	_row_rects[row] = rect
 	var selected := row == _index
 	var y := rect.position.y + 4.0
 

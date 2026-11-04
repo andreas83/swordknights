@@ -15,6 +15,8 @@ extends Control
 ##   JOIN ON THIS WI-FI   dials that code, or any address.
 ##   LOCAL TWO-PLAYER no network at all. Also where you end up when a
 ##                    connection fails, which is why it is on this screen.
+##                    Not on a phone (UiLayout.handheld()): it is the two
+##                    keyboard seats, and a phone has no keyboard to share.
 ##
 ## A NOTE ON THE WIDGETS
 ## The rest of this game draws its interface by hand, and so does the frame and
@@ -40,6 +42,9 @@ const DEFAULT_RELAY := "ws://127.0.0.1:45678"
 
 var relay_url := DEFAULT_RELAY
 var page: Page = Page.MENU
+## Seam, set before _ready: whether this is a phone, where LOCAL TWO-PLAYER
+## is not offered.
+var handheld := UiLayout.handheld()
 
 var _font: Font
 var _time := 0.0
@@ -82,6 +87,8 @@ func show_menu() -> void:
 	if not WsTransport.new().supports_hosting():
 		# A web build cannot accept a connection. Saying so beats offering it.
 		rows[0] = ["HOST ON THIS WI-FI  —  NOT ON WEB", Callable()]
+	if handheld:
+		rows.assign(rows.filter(func(row: Array) -> bool: return row[1] != _on_local))
 	_set_rows(rows)
 	_field_row.visible = false
 
@@ -110,10 +117,13 @@ func set_status(text: String) -> void:
 
 
 ## Shown while a connection is being made, with nothing to press but escape.
+## SWORD gives up and puts the list back (DuelMatchOnline._offer_fallback());
+## it once said it played locally, which it never did, and on a phone could
+## not have.
 func show_busy(text: String) -> void:
 	page = Page.BUSY
 	_status = text
-	_hint = "SWORD TO GIVE UP AND PLAY LOCALLY"
+	_hint = "SWORD TO GIVE UP WAITING"
 	_set_rows([])
 	_field_row.visible = false
 
@@ -154,8 +164,8 @@ func thumb_labels() -> PackedStringArray:
 		Page.MENU:
 			return PackedStringArray(["SELECT", "BACK"])
 		Page.BUSY:
-			# Sword gives up waiting and plays on this device instead.
-			return PackedStringArray(["", "LOCAL"])
+			# Sword gives up waiting, back to the list.
+			return PackedStringArray(["", "BACK"])
 		_:
 			return PackedStringArray(["", "BACK"])
 

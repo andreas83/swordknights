@@ -226,6 +226,9 @@ and THROW are as online; on a desktop it is the single-player keys.
 How it plays and why is in
 [`docs/duel-match.md`](docs/duel-match.md#the-computer-opponent).
 
+On a phone the duel page offers the computer and online only: one keyboard
+needs a keyboard.
+
 Two players do not fit on one phone, so on phones each plays on their own:
 **Duel** → **Online** → *Host on this Wi-Fi* on one phone shows a short code, and the
 other phone picks *Join on this Wi-Fi* and types it. On a phone the left half
