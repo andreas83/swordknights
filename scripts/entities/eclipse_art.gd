@@ -17,6 +17,21 @@ extends Node2D
 ## Held up between himself and the light, the disc is the one silhouette in
 ## the game that is a ring of fire (docs/campaign.md).
 ##
+## ## Drawn a quarter larger than he is refereed
+##
+## Posed at his body's 32 px he read, in play, as about the prince's size:
+## the camera holds a 320-unit frame, the crown was a smudge on top of a
+## column as narrow as a cowl, and nothing said boss. So the whole figure is
+## drawn at SCALE about his feet -- 40 px to the crown band, a 30 px disc, a
+## mantle wider than two princes -- while his hitbox stays Eclipse.BODY, and
+## with it every number his fight and its frozen clear run are tied to. The
+## one place a drawing larger than the body could lie is the plunge, and it
+## errs the right way: the plunge's point reaches PLUNGE_REACH under the
+## prince's feet, so they meet the drawn crown just as the point meets the
+## refereed one. The scale is held under the galleries: at 1.25 the tallest
+## spike, flared, stops a pixel under a gallery's underside (48 px over the
+## floor), where he pauses to be plunged.
+##
 ## ## Two tones, lit by the kept sun
 ##
 ## The sentinel is near-black because on lit stone a threat is a hole in the
@@ -55,6 +70,9 @@ extends Node2D
 ## also lays the King's darkness over the world (WorldGrade.dim) and hushes
 ## the music to its bed while it lasts (PlayerAudio.HUSH), because
 ## presentation is where both belong.
+
+## How much larger than his body he is drawn (above).
+const SCALE := 1.25
 
 const ROBE := Palette.SHADOW
 const ROBE_SHADE := Palette.SHADOW_DEEP
@@ -108,6 +126,7 @@ var _tilt := 0.0
 
 
 func _ready() -> void:
+	scale = Vector2(SCALE, SCALE)
 	_king = get_parent() as Eclipse
 	if _king == null:
 		return

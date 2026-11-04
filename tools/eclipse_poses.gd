@@ -9,15 +9,17 @@ extends SceneTree
 ## drawn on a near-black ground, because that is the dark they are fought in:
 ## the sheet is how the silhouette is judged where it has to read.
 ##
-##     xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1440x540 \
+##     xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 2880x540 \
 ##       --script tools/eclipse_poses.gd -- --out docs/eclipse-phases.png [--silhouette]
 ##
 ## `--silhouette` paints every figure flat black, the two-tone check.
 
-const COLS := 8
-const ROWS := 3
-const CELL := Vector2(60.0, 60.0)
-const FEET_Y := 47.0
+## Two rows of twelve: the King is drawn at EclipseArt.SCALE, and a 60-unit
+## cell clipped his crown and his disc into the cells around him.
+const COLS := 12
+const ROWS := 2
+const CELL := Vector2(80.0, 90.0)
+const FEET_Y := 76.0
 const SETTLE_FRAMES := 20
 const PLAYER_SCENE: PackedScene = preload("res://scenes/player.tscn")
 
@@ -53,7 +55,7 @@ func _initialize() -> void:
 		if int(pose.get("phase", 0)) == Eclipse.Phase.ECLIPSE:
 			_darks.append(Rect2(cell, CELL))
 		_pins.append([figure, feet, pose])
-		_labels.append({"text": String(pose["label"]), "at": cell + Vector2(CELL.x * 0.5, 52.0)})
+		_labels.append({"text": String(pose["label"]), "at": cell + Vector2(CELL.x * 0.5, FEET_Y + 5.0)})
 
 
 func _process(_delta: float) -> bool:
