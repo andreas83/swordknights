@@ -12,7 +12,10 @@ extends RefCounted
 ## 2. **Evaded** -- a backstep's window is open and he faces `from_x`
 ##    (Player.evades), and the danger is `evadable`. Nothing happens to anyone;
 ##    the blow that did not land is the read.
-## 3. **Landed** -- `damage` hearts through Player.damage(), which refuses it
+## 3. **Rolled under** -- a roll is tucked (Player.rolls_under), from either
+##    side, and the danger is `rollable`. Nothing happens to anyone; he comes
+##    up on the far side of it.
+## 4. **Landed** -- `damage` hearts through Player.damage(), which refuses it
 ##    in his grace after a hit, and `landed` hears whether it was dealt.
 ##
 ## A danger that has no `parry` cannot be parried: a raised sword is simply
@@ -34,6 +37,14 @@ var from_x := 0.0
 var damage := 1
 ## Whether a backstep's window lets it by.
 var evadable := true
+## Whether a roll's tuck lets it by, from the front or from behind. True by
+## default, as `evadable` is, because the default danger is a blade or a
+## shield set against a standing man, and a body tucked at the floor goes
+## under either -- a sentinel's cut, a Bastion's face and his shove. False
+## for what is aimed at where he is rather than where a man stands: a body
+## coming down on him (a pounce, the King's slam) and anything in flight,
+## which a roll passes only by being lower than it (FoeProjectile.danger()).
+var rollable := true
 ## For a shove (`damage` 0): the velocity it throws him at, x away from
 ## `from_x`, and how long he reels.
 var push := Vector2.ZERO

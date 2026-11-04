@@ -18,11 +18,17 @@ extends CharacterBody2D
 ##   runs on each, so without that memory one swing would spend every heart
 ##   (tests/unit/test_one_swing.gd). A swing is `Blow.SWORD`, a plunge
 ##   `Blow.PLUNGE`, and the plunge springs the prince back off whatever it hit.
+## - **The feet.** The dive kick's heel or the unarmed sweep against
+##   `hurt_rect()`, once per kick per foe, as `Blow.KICK` or `Blow.SWEEP`.
+##   A dive kick springs him back off whatever it reached.
+## - **The thrown sword.** In flight, against `hurt_rect()`: `Blow.THROWN`
+##   from the side it flew in from, and the first foe it reaches stops it.
 ## - **The stomp.** Falling onto `bounds()` from above is `Blow.STOMP`, and
 ##   bounces him -- unless the foe answers `Outcome.NONE`, in which case it
 ##   was never a stomp and the foe's dangers are checked instead.
 ## - **The danger.** While `is_dangerous()`, each of `dangers()` against his
-##   body, first one that touches him wins: parried, evaded or landed
+##   body, first one that touches him wins: parried, evaded, rolled under or
+##   landed
 ##   (scripts/entities/foe_danger.gd). Touching a foe that is not dangerous
 ##   is free -- danger has one look, and the guard argues why at length
 ##   (scripts/entities/patrol.gd).
@@ -84,10 +90,15 @@ signal launched(projectile: FoeProjectile)
 signal summoned(foe: Foe)
 
 ## How the prince reached it. SHOT is one of a foe's own projectiles, sent back
-## by a parry.
-enum Blow { SWORD, PLUNGE, STOMP, SHOT }
+## by a parry. The last three are the duel's moves as the adventure has them
+## (docs/character.md): KICK the dive kick's heel, SWEEP the unarmed leg along
+## the floor, THROWN the sword in flight. New kinds go on the end, so a
+## blow's number never changes under a foe that has stored one.
+enum Blow { SWORD, PLUNGE, STOMP, SHOT, KICK, SWEEP, THROWN }
 ## What a blow did. NONE: it passed through, or there was nothing to hit.
-enum Outcome { NONE, BLOCKED, WOUNDED, KILLED }
+## STAGGERED: it rocked the foe and cost it nothing -- the answer a kick or a
+## sweep is built to get.
+enum Outcome { NONE, BLOCKED, WOUNDED, KILLED, STAGGERED }
 
 ## Every foe joins this group, so whatever needs to know whether one is about
 ## -- the prince's idle, for one -- asks the tree instead of being handed a
@@ -151,11 +162,24 @@ func hit(_from_x: float) -> bool:
 	return false
 
 
-## A blow from the prince landed on it. Every blow is a wound by default.
-func take_blow(_blow: Blow, from_x: float) -> Outcome:
+## A blow from the prince landed on it. Every blade is a wound by default,
+## the thrown one included. The feet -- KICK and SWEEP -- never wound: they
+## rock a foe that says it can be rocked (`knock()`) and ring off one that
+## does not, so a foe written before the kick existed is kicked as a wall,
+## never cut by it. tests/unit/test_foe_contract.gd holds every registered
+## kind to that.
+func take_blow(blow: Blow, from_x: float) -> Outcome:
 	if not is_alive():
 		return Outcome.NONE
+	if blow == Blow.KICK or blow == Blow.SWEEP:
+		return Outcome.STAGGERED if knock(from_x) else Outcome.BLOCKED
 	return Outcome.KILLED if hit(from_x) else Outcome.WOUNDED
+
+
+## Rocked by a kick or a sweep from `from_x`: no heart, an opening. True when
+## it took. The default stands firm, which the referee presents as a block.
+func knock(_from_x: float) -> bool:
+	return false
 
 
 ## The sound of a wound. Played through Game, pitched per blow.

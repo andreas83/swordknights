@@ -274,3 +274,27 @@ func test_the_guard_is_a_foe_and_answers_the_contract() -> void:
 	assert_true(dangers[0].evadable, "a backstep lets it by")
 	assert_true(dangers[0].parried(), "and a parry turns it, through Patrol.parried()")
 	assert_eq(guard.state, Patrol.State.STAGGER, "which reels him")
+
+
+## The feet never wound, whatever is kicked (Foe.take_blow()). Every kind in
+## the registry, each blow on a fresh one as it stands when placed: a foe
+## added later that overrides take_blow() and lets a kick fall through to
+## its wound is caught here, not in play.
+func test_no_registered_foe_is_wounded_by_the_feet() -> void:
+	var tried := 0
+	for kind: String in EntityRegistry.kinds():
+		var probe: Variant = EntityRegistry.make(kind)
+		if not probe is Foe:
+			if probe is Node:
+				(probe as Node).free()
+			continue
+		(probe as Node).free()
+		for blow: Foe.Blow in [Foe.Blow.KICK, Foe.Blow.SWEEP]:
+			var foe := EntityRegistry.make(kind) as Foe
+			add_child_autofree(foe)
+			foe.position = Vector2(100.0, 200.0)
+			var outcome := foe.take_blow(blow, 80.0)
+			assert_false(outcome in [Foe.Outcome.WOUNDED, Foe.Outcome.KILLED],
+				"%s takes a %s as no wound" % [kind, Foe.Blow.keys()[blow]])
+			tried += 1
+	assert_gte(tried, 8, "the sentinel, the Bastion, the cat and the King were all kicked")

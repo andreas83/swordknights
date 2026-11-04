@@ -74,6 +74,12 @@ const STAGGER_TIME := 0.4
 ## that met empty air, and the prince is already standing inside reach to take
 ## it. That gap is the parry's whole reward, so test_specials.gd pins it.
 const PARRIED_TIME := 0.9
+## How long a guard rocked by the prince's feet reels: a dive kick or an
+## unarmed sweep. No heart -- the feet do not wound -- but a raise is broken
+## and he is knocked back off his line for 42 frames, long enough for a
+## prince sprung back off him by the kick to land, step in and cut, and
+## for an unarmed one to reach his sword (docs/character.md).
+const KICKED_TIME := 0.7
 ## How long the body stays after the killing blow, collapsing and flickering
 ## out, before the node goes. Nothing about it is dangerous or hittable.
 const DEATH_TIME := 1.3
@@ -179,6 +185,20 @@ func hit(from_x: float) -> bool:
 	stagger_length = STAGGER_TIME
 	staggered.emit()
 	return false
+
+
+## Rocked by a kick or a sweep: knocked back off his line, out of whatever
+## he was doing -- a raise, a cut, a recovery -- and reeling for KICKED_TIME.
+## Nothing comes off his hearts.
+func knock(from_x: float) -> bool:
+	if not is_alive():
+		return false
+	var away := signf(global_position.x - from_x)
+	velocity = Vector2((away if away != 0.0 else 1.0) * 90.0, -60.0)
+	_enter(State.STAGGER)
+	stagger_length = KICKED_TIME
+	staggered.emit()
+	return true
 
 
 ## The cut was turned aside. No wound -- a parry is a defence -- but the sabre

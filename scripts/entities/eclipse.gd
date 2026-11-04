@@ -335,6 +335,9 @@ func dangers() -> Array[FoeDanger]:
 		# A body coming down, not a blade: the parry is simply hit, as a
 		# cat's pounce goes under a raised guard. The backstep lets it by.
 		var slam := FoeDanger.make(slam_rect(), position.x)
+		# A body landing on the floor lands on a body tucked against it:
+		# the roll is no answer to the pounce, which stays the backstep's.
+		slam.rollable = false
 		slam.on_landed = func(_dealt: bool) -> void: _slam_landed = true
 		out.append(slam)
 	return out

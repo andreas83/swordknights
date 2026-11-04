@@ -29,6 +29,7 @@ extends Foe
 ## | RECOVER | 33 | the shield stays up: the front never opens |
 ## | TURN | 30 | the prince got behind him: his back is open for the whole turn |
 ## | STAGGER | 24 | after a wound; not knocked back, so a plunge's rebound comes down on him again |
+## | OPENED | 54 | a dive kick knocked the shield wide: no wall, no shove; a front blade wounds |
 ##
 ## Two hearts. The plunge wounds him from any side, and its rebound puts the
 ## prince back in the air for the second: the double plunge kills. A swing
@@ -37,6 +38,23 @@ extends Foe
 ## nothing, but bounces, which is a second chance to plunge. There is nothing
 ## to parry -- a shove is not a blade -- and a backstep slides out of the
 ## shove and gains nothing.
+##
+## ## The duel's moves against him (docs/character.md)
+##
+## - **The roll** goes under the shield's face and under the shove: both are
+##   set against a standing man, and their dangers keep FoeDanger's default
+##   `rollable`. So a roll is the corridor's answer from the front: it comes
+##   up behind him, where his back is open while he shoves at nothing,
+##   recovers and turns.
+## - **The dive kick**, from either side, knocks the pavise wide: OPENED,
+##   54 frames (a parried reel's length), in which his front is no wall and a
+##   blade from the front wounds. It wounds nothing itself. It is a way in
+##   over the top, which is his lesson; the plunge is still the one that
+##   kills.
+## - **The sweep** clangs off the foot of the shield from the front and
+##   rocks him from behind, for a wound's stagger with no wound.
+## - **The thrown sword** clangs off the front and drops at his feet -- it
+##   has to be fetched from inside his shove -- and wounds his back.
 ##
 ## ## Weight
 ##
@@ -58,7 +76,7 @@ signal staggered()
 ## A blow turned by the shield.
 signal clanged()
 
-enum State { STAND, BRACE, WINDUP, SHOVE, RECOVER, TURN, STAGGER, DYING }
+enum State { STAND, BRACE, WINDUP, SHOVE, RECOVER, TURN, STAGGER, DYING, OPENED }
 
 const BODY := Vector2(14.0, 22.0)
 const MAX_HEALTH := 2
@@ -72,6 +90,9 @@ const RECOVER_TIME := Patrol.RECOVER_TIME
 const TURN_TIME := Patrol.LOOK_TIME
 const STAGGER_TIME := Patrol.STAGGER_TIME
 const DEATH_TIME := Patrol.DEATH_TIME
+## A dive kick's opening: the parried sentinel's reel, the game's word for
+## "a big opening".
+const OPENED_TIME := Patrol.PARRIED_TIME
 
 ## How close in front, body to body, before he sets the shield, and before he
 ## shoves.
@@ -146,11 +167,11 @@ func is_alive() -> bool:
 ## His front is a wall in every state but the turn, and the shove is live in
 ## its nine frames.
 func is_dangerous() -> bool:
-	return is_alive() and state != State.TURN
+	return is_alive() and state != State.TURN and state != State.OPENED
 
 
 func is_engaged() -> bool:
-	return state in [State.BRACE, State.WINDUP, State.SHOVE, State.RECOVER]
+	return state in [State.BRACE, State.WINDUP, State.SHOVE, State.RECOVER, State.OPENED]
 
 
 func dangers() -> Array[FoeDanger]:
@@ -189,10 +210,22 @@ func take_blow(blow: Blow, from_x: float) -> Outcome:
 		Blow.STOMP:
 			_clang()
 			return Outcome.BLOCKED
-	if _from_front(from_x):
+		Blow.KICK:
+			_enter(State.OPENED)
+			velocity.x = 0.0
+			cue.emit(&"sword_hit", {"pitch": 0.45, "volume_db": -6.0})
+			return Outcome.STAGGERED
+	if _from_front(from_x) and state != State.OPENED:
 		_clang()
-		_recoil = 2
+		# A blade off the face throws back the hand that held it; one that
+		# was thrown has no hand behind it, and simply drops.
+		if blow != Blow.THROWN:
+			_recoil = 2
 		return Outcome.BLOCKED
+	if blow == Blow.SWEEP:
+		_enter(State.STAGGER)
+		staggered.emit()
+		return Outcome.STAGGERED
 	return Outcome.KILLED if hit(from_x) else Outcome.WOUNDED
 
 
@@ -263,6 +296,10 @@ func tick(delta: float, grounded: bool) -> void:
 		State.STAGGER:
 			velocity.x = 0.0
 			if state_time >= STAGGER_TIME:
+				_enter(State.STAND)
+		State.OPENED:
+			velocity.x = 0.0
+			if state_time >= OPENED_TIME:
 				_enter(State.STAND)
 		State.DYING:
 			velocity.x *= 0.86

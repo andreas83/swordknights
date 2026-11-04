@@ -15,7 +15,8 @@ extends Node2D
 ##   hook a boss fight is built on.
 ## - **Evaded**, it flies on; by default it cannot be. A backstep is a step
 ##   out from under a blade coming down, and an arrow at chest height is
-##   still at chest height a step later.
+##   still at chest height a step later. A roll's window does not let it by
+##   either: a roll goes under a shot only by being lower than it.
 ## - **Landed**, it is spent, whether or not his grace refused the damage: it
 ##   struck him either way.
 ##
@@ -70,6 +71,9 @@ func danger() -> FoeDanger:
 		return null
 	var threat := FoeDanger.make(rect(), global_position.x - velocity.x, damage)
 	threat.evadable = false
+	# A roll passes a shot by its height or not at all: a sunbolt at chest
+	# height goes over the tuck, a shot at the shins does not.
+	threat.rollable = false
 	threat.parry = reflect
 	threat.on_landed = func(_dealt: bool) -> void: spend()
 	return threat

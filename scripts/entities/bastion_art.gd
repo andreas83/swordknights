@@ -134,6 +134,17 @@ func pose() -> Dictionary:
 			p["sink"] = lerpf(3.5, 0.0, smoothstep(0.2, 1.0, k))
 			p["tilt"] = lerpf(0.35, 0.0, k)
 			p["board_y"] = lerpf(2.0, 0.0, k)
+		Bastion.State.OPENED:
+			# The kick has thrown the board out wide and edge-on: his chest
+			# is bare from the front for the whole opening, and the board
+			# swings back in over its last third.
+			var shut := smoothstep(0.66, 1.0, clampf(t / Bastion.OPENED_TIME, 0.0, 1.0))
+			p["board"] = lerpf(-6.0, 5.0, shut)
+			p["board_w"] = lerpf(2.0, 7.0, shut)
+			p["back"] = shut < 0.5
+			p["lean"] = lerpf(-1.6, 0.0, shut)
+			p["sink"] = lerpf(1.6, 0.0, shut)
+			p["tilt"] = lerpf(-0.18, 0.0, shut)
 		Bastion.State.DYING:
 			var d := t / Bastion.DEATH_TIME
 			p["sink"] = lerpf(0.0, 7.0, smoothstep(KNEEL_AT, TOPPLE_AT, d))

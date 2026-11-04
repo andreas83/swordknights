@@ -167,8 +167,34 @@ func claw_rect() -> Rect2:
 func dangers() -> Array[FoeDanger]:
 	var claws := FoeDanger.make(claw_rect(), global_position.x)
 	claws.on_landed = _raked
+	# A body coming down lands on a body tucked against the floor: the roll
+	# goes under the leap only where the arc is higher than the tuck, never
+	# through the claws by its window. The backstep stays the answer.
+	claws.rollable = false
 	var out: Array[FoeDanger] = [claws]
 	return out
+
+
+## Rocked by the prince's feet -- a dive kick or a sweep -- and bowled over
+## into its opening, claws spent: out of the air into a fall that ends in a
+## skid, or straight into the skid off the floor. No wound: it has one heart,
+## and the feet never take one (Foe.take_blow()). True when it took.
+func knock(from_x: float) -> bool:
+	if not is_alive():
+		return false
+	var away := signf(global_position.x - from_x)
+	_claws = Rect2()
+	_face(global_position.x - (away if away != 0.0 else 1.0))
+	if state == State.POUNCE or state == State.FALL:
+		velocity = Vector2((away if away != 0.0 else 1.0) * 70.0, -60.0)
+		_enter(State.FALL)
+		return true
+	velocity = Vector2.ZERO
+	_enter(State.SKID)
+	# Skip the slide: bowled over where it stood, it only shakes its head.
+	state_time = 0.2
+	cue.emit(&"yowl", {"pitch": 1.4, "volume_db": -8.0})
+	return true
 
 
 ## The claws found him: it springs back off him and the claws are spent. Were
