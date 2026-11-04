@@ -14,6 +14,12 @@ extends RefCounted
 ## One flood from the spawn over the proof's own states -- channel masks
 ## included, so a mechanism's level works the same way -- recording where each
 ## state was reached from, then one walk back from the door, shortest first.
+## The flood takes the search's own moves (ReachSearch.moves_from()): the
+## races off a held plate and the fuse of a transient stand included. Built
+## first with the solver's moves alone, it could not follow a race, so in a
+## level whose way on is a race -- Chapter II's arcade -- nothing past the
+## first held gate had a distance, and a torch there could never be "further
+## on" under `;! checkpoints route`.
 ## Each of the proof's moves (a step, an arc, a rung) costs the tiles it
 ## crosses, across plus up or down: counting moves instead would make a torch
 ## at the far end of its ledge as far on as one at the near end, since a run
@@ -101,17 +107,17 @@ static func _flood(solver: LevelReachability.Solver, start: Vector2i) -> Diction
 		head += 1
 		if head > LevelReachability.MAX_STATES:
 			return {}
+		arrivals.clear()
 		if masked:
-			solver.use_mask(key >> ReachSearch.MASK_SHIFT)
-		solver.expand(key & ReachSearch.LOW_MASK, neighbours)
-		for next: int in neighbours:
-			arrivals.clear()
-			_arrive(solver, masked, next, key >> ReachSearch.MASK_SHIFT, arrivals)
-			for full: int in arrivals:
-				if not incoming.has(full):
-					incoming[full] = []
-					queue.append(full)
-				(incoming[full] as Array).append(key)
+			ReachSearch.moves_from(solver, key, arrivals)
+		else:
+			solver.expand(key, neighbours)
+			arrivals.append_array(neighbours)
+		for full: int in arrivals:
+			if not incoming.has(full):
+				incoming[full] = []
+				queue.append(full)
+			(incoming[full] as Array).append(key)
 	return incoming
 
 

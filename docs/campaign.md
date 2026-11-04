@@ -1709,6 +1709,13 @@ race. At most one beam puzzle on screen, three mirrors to a puzzle. Every new
 voice is justified against the existing catalogue first. When in doubt,
 remove something (`docs/art-direction.md`).
 
+**Built:** `;! checkpoints route` (`ReachRoute`, Chapter IV). The route walks
+the search's own moves (`ReachSearch.moves_from()`), so it follows a race off
+a held plate and a crumbling stand's fuse as the proof does. It was first
+built on the solver's moves alone, which could not cross a held gate: on
+Chapter II nothing reached the door, the spawn included, so no chapter with a
+race could have used it (`tests/unit/test_route_checkpoints.gd`).
+
 ---
 
 ## Build plan

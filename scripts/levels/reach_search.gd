@@ -322,6 +322,23 @@ static func arrive(solver: LevelReachability.Solver, low: int, mask: int,
 		arrive(solver, next, after, out, depth + 1)
 
 
+## Every full state the search moves to from full state `key`, as search()
+## and survey() take them: the solver's moves and the races off a held plate,
+## leaving a transient stand with its fuse burnt. For a reader that walks the
+## proof's graph itself (ReachRoute), so it walks the same graph.
+static func moves_from(solver: LevelReachability.Solver, key: int, out: Array[int]) -> void:
+	var neighbours: Array[int] = []
+	_expand(solver, key, neighbours)
+	var leaving := _leaving(solver, key)
+	var arrivals: Array[int] = []
+	for next: int in neighbours:
+		arrivals.clear()
+		arrive(solver, next, leaving, arrivals, 0, key >> MASK_SHIFT)
+		for full: int in arrivals:
+			if not out.has(full):
+				out.append(full)
+
+
 ## The neighbours of full state `key`, with its mask's flags in place.
 static func _expand(solver: LevelReachability.Solver, key: int, out: Array[int]) -> void:
 	solver.use_mask(key >> MASK_SHIFT)

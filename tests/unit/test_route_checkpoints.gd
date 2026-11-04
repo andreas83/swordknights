@@ -88,3 +88,26 @@ func test_by_the_doors_column_the_tower_is_read_wrong() -> void:
 	assert_true(game._offer_checkpoint(_at(LOW)), "the lower torch, under the door's column")
 	assert_false(game._offer_checkpoint(_at(HIGH)),
 		"refuses the higher one: what `;! checkpoints route` is for")
+
+
+## The route follows the proof's races. Chapter II's way on is a run of held
+## gates, each opened by a plate and crossed inside its hold -- a move only the
+## search's race takes (ReachRace). Walked with the solver's moves alone, the
+## route ended at the first held gate: nothing past it had a distance, so no
+## torch there could be further on under `;! checkpoints route`.
+func test_the_route_runs_through_the_races() -> void:
+	var level := AsciiLevel.from_file("res://levels/chapter_02.txt")
+	var route := ReachRoute.remaining(level)
+	var torches: Array[Vector2i] = []
+	for mark: Dictionary in level.entities:
+		if String(mark["kind"]) == "torch":
+			torches.append(mark["cell"])
+	assert_eq(torches.size(), 2, "the Long Arcade's two torches")
+	assert_true(route.has(level.spawn_point), "the spawn is on the route")
+	for torch: Vector2i in torches:
+		assert_true(route.has(torch), "torch %s, past a race, is on it" % torch)
+	if route.has(torches[0]) and route.has(torches[1]):
+		assert_lt(int(route[torches[1]]), int(route[torches[0]]),
+			"and the second is further on than the first")
+		assert_lt(int(route[torches[0]]), int(route[level.spawn_point]),
+			"and the first than the spawn")
