@@ -50,7 +50,7 @@ static func light_of(level: Level) -> Dictionary:
 			"face": mirror.face, "turning": mirror.is_turning(), "sun": mirror.sun_reaches(),
 		}
 	var blocks := func(cell: Vector2i) -> bool:
-		return SunField.stops_light(level.kind_at_cell(cell))
+		return SunField.stops_light_at(level.data, cell, level.kind_at_cell(cell))
 	var light := SunLight.network(mirrors, level.data.cols, level.data.rows, blocks)
 	_cache[key] = {"frame": frame, "version": _version, "light": light}
 	return light
@@ -72,6 +72,25 @@ static func sun_is_down(level: Level) -> bool:
 ## platforms do; ladders, spikes, water, backdrop and air do not.
 static func stops_light(kind: Tiles.Kind) -> bool:
 	return kind == Tiles.Kind.SOLID or kind == Tiles.Kind.PLATFORM
+
+
+## Whether `cell` of `level`, now of `kind`, stops a beam or a bolt: as
+## stops_light(), except that an iron grate (`h`, Hatch) lets light through.
+##
+## A grate's cell is a one-way floor in the grid, because that is how it is
+## walked, dropped and plunged through, and a floor stops light -- so asked by
+## kind alone, the one cell in the game drawn as bars the sun falls through
+## would be the one that stopped a beam, the way a portcullis's bars do not.
+## What it is made of is the level's glyph, not its kind, so every reader of
+## the light -- the field, a bolt in flight, a Glassbearer's line, the proof --
+## asks here and gets the same answer.
+static func stops_light_at(level: AsciiLevel, cell: Vector2i, kind: Tiles.Kind) -> bool:
+	return stops_light(kind) and not is_grate(level, cell)
+
+
+## Whether `cell` of `level` is an iron grate's (Hatch).
+static func is_grate(level: AsciiLevel, cell: Vector2i) -> bool:
+	return level != null and String(level.mechanism_glyphs.get(cell, "")) == "h"
 
 
 ## Whether light from a beam is resting on any of `cells` now.

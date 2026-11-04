@@ -16,7 +16,8 @@ extends FoeProjectile
 ## - **A sun-seal takes it as a full fill** (SunSeal.take_bolt()): the bolt
 ##   is spent on the seal's stone, and the seal opens.
 ## - **It stops where a beam stops** -- stone and one-way platforms -- by the
-##   same test (SunField.stops_light()), and passes everything a beam passes.
+##   same test (SunField.stops_light_at()), and passes everything a beam
+##   passes -- an iron grate's bars among them.
 ##
 ## ## Whose it is
 ##
@@ -117,7 +118,7 @@ func _physics_process(delta: float) -> void:
 	var cell := level.cell_of(next)
 	if cell != _turned_in and _meet_mirror(cell):
 		return
-	if SunField.stops_light(level.kind_at_cell(cell)):
+	if SunField.stops_light_at(level.data, cell, level.kind_at_cell(cell)):
 		_strike_stone(cell, next)
 		return
 	position = next

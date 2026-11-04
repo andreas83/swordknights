@@ -276,7 +276,8 @@ func _clear_line(to_x: float) -> bool:
 	var to := level.cell_of(Vector2(to_x, y))
 	var step := 1 if to.x >= from.x else -1
 	for x: int in range(from.x, to.x + step, step):
-		if SunField.stops_light(level.kind_at_cell(Vector2i(x, from.y))):
+		var cell := Vector2i(x, from.y)
+		if SunField.stops_light_at(level.data, cell, level.kind_at_cell(cell)):
 			return false
 	return true
 

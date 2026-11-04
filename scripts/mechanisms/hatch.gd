@@ -27,6 +27,9 @@ extends Mechanism
 ## above, down at what is under it. A level puts what the hatch is for where
 ## the shaft falls -- Chapter II's corridor Bastion stands under the grate's
 ## right half, where the light crosses his helm.
+##
+## What is true of the sun is true of all light: a mirror's beam and a bolt
+## pass the bars too (SunField.stops_light_at()), though the cell is a floor.
 
 const BAR := Palette.INK
 const BAR_LIT := Palette.SHADOW_WARM

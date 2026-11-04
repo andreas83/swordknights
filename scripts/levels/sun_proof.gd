@@ -168,7 +168,7 @@ static func _puzzles(level: AsciiLevel, mirrors: Array[Vector2i],
 	for seal: Dictionary in seals:
 		if not bool(seal["secret"]):
 			open[seal["wire"]] = true
-	var blocks := _blocks(level, seals, open)
+	var blocks := blocks(level, seals, open)
 	var at_mirror := {}
 	for cell: Vector2i in mirrors:
 		at_mirror[cell] = true
@@ -225,7 +225,7 @@ static func _solve_puzzle(level: AsciiLevel, light: Dictionary, index: int,
 			for cell: Vector2i in puzzle:
 				mirrors[cell] = {"face": faces[cell], "turning": false, "sun": sun[cell]}
 			var network := SunLight.network(mirrors, level.cols, level.rows,
-				_blocks(level, seals, open))
+				blocks(level, seals, open))
 			var struck: Dictionary = network["struck"]
 			for seal: Dictionary in seals:
 				var shut := bool(seal["secret"]) or not open.has(seal["wire"])
@@ -267,7 +267,7 @@ static func _wires_met(level: AsciiLevel, light: Dictionary, puzzle: Array[Vecto
 	for seal: Dictionary in seals:
 		if not bool(seal["secret"]):
 			open[seal["wire"]] = true
-	var blocks := _blocks(level, seals, open)
+	var blocks := blocks(level, seals, open)
 	var touched := {}
 	var at_mirror := {}
 	for cell: Vector2i in puzzle:
@@ -438,11 +438,11 @@ static func _door_kinds(seals: Array[Dictionary], open: Dictionary) -> Dictionar
 
 
 ## `(cell) -> bool` for what stops light with `open` doors open.
-static func _blocks(level: AsciiLevel, seals: Array[Dictionary], open: Dictionary) -> Callable:
+static func blocks(level: AsciiLevel, seals: Array[Dictionary], open: Dictionary) -> Callable:
 	var kinds := _door_kinds(seals, open)
 	return func(cell: Vector2i) -> bool:
 		var kind: Tiles.Kind = kinds.get(cell, level.kind_at(cell.x, cell.y))
-		return SunField.stops_light(kind)
+		return SunField.stops_light_at(level, cell, kind)
 
 
 ## --- the audit -----------------------------------------------------------------
@@ -679,7 +679,7 @@ static func _monotone(level: AsciiLevel, analysis: Dictionary, rule: Dictionary)
 			mirrors[cell] = {"face": rule["faces"][cell], "turning": false,
 				"sun": bare_sun_reaches(level, SunLight.pivot(cell), light, kinds)}
 		var network := SunLight.network(mirrors, level.cols, level.rows,
-			_blocks(level, seals, open))
+			blocks(level, seals, open))
 		if not _any(network["struck"], seal["cells"]):
 			return false
 	return true

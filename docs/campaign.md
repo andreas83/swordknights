@@ -1495,7 +1495,9 @@ beam is two tones exactly as written, broader by a pixel each for the great
 mirror's last ray, and its dust is drawn by the beam itself, motes that catch
 the light only beside the band. Beams stop at a gate's stone like any stone;
 a portcullis's bars and a Bastion's shield are not yet told apart from it,
-which no chapter with mirrors needs yet.
+which no chapter with mirrors needs yet. An iron grate (`h`) is: it is a
+one-way floor in the grid, but beams and bolts go through its bars as the sun
+does (`SunField.stops_light_at()`, `tests/unit/test_grate_light.gd`).
 
 ### Blades on the beat (Chapter V)
 
