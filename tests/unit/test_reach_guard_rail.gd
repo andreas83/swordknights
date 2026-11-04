@@ -47,10 +47,7 @@ func _sun_terrace() -> AsciiLevel:
 func test_no_level_without_a_mechanism_takes_the_masked_path() -> void:
 	var checked := 0
 	for name: String in DirAccess.get_files_at("res://levels"):
-		# The campaign's chapters are built on mechanisms on purpose, and
-		# each is proved by its own test (tests/unit/test_chapter_*.gd).
-		if name.get_extension() != "txt" or name == "duel_zones.txt" \
-				or name.begins_with("chapter_"):
+		if name.get_extension() != "txt" or name == "duel_zones.txt":
 			continue
 		var level := AsciiLevel.from_file("res://levels".path_join(name))
 		if _has_mechanism(level):
