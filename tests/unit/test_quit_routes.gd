@@ -15,7 +15,7 @@ extends GutTest
 ## by being forgotten.
 
 const DeathWatch := preload("res://tests/death_watch.gd")
-const STORE := "user://test_quit_routes.cfg"
+var _store := UserData.at("user://test_quit_routes.cfg")
 
 ## Scene -> the test that leaves it.
 const ROUTES := {
@@ -51,8 +51,8 @@ func after_each() -> void:
 	for action: String in ["jump", "attack", "pause", "move_down", "move_up"]:
 		Input.action_release(action)
 	Campaign.reset()
-	if FileAccess.file_exists(STORE):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(STORE))
+	if FileAccess.file_exists(_store):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_store))
 
 
 func test_every_scene_has_a_way_back_or_a_reason() -> void:
@@ -140,7 +140,7 @@ func test_the_feel_lab_is_left_as_a_level_is() -> void:
 func test_a_chapter_is_left_for_the_chapters() -> void:
 	Campaign.selected = 0
 	var campaign := (load("res://scenes/campaign_game.tscn") as PackedScene).instantiate()
-	campaign.progress_path = STORE
+	campaign.progress_path = _store
 	campaign.leave = func() -> void: _left += 1
 	add_child_autofree(campaign)
 	await _until(func() -> bool: return not Flow.busy())
@@ -173,7 +173,7 @@ func test_the_pages_go_back_on_sword() -> void:
 			"res://scenes/wardrobe.tscn"]:
 		_left = 0
 		var page := (load(path) as PackedScene).instantiate()
-		page.set("store_path", STORE)
+		page.set("store_path", _store)
 		page.set("leave", func() -> void: _left += 1)
 		add_child_autofree(page)
 		await wait_frames(2)
@@ -251,9 +251,9 @@ func _game(path: String) -> Game:
 
 func _duel(path: String) -> Node:
 	var scene := (load(path) as PackedScene).instantiate()
-	scene.set("wardrobe_path", STORE)
+	scene.set("wardrobe_path", _store)
 	if path.contains("cpu"):
-		scene.set("choice_path", STORE)
+		scene.set("choice_path", _store)
 	scene.set("leave", func() -> void: _left += 1)
 	add_child_autofree(scene)
 	await wait_physics_frames(3)

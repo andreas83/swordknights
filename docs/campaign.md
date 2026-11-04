@@ -75,7 +75,7 @@ and clear run to this table, and fails when a run moves without it):
 | V | The Sun Well | night | 2:15 | 34.82 s | 0 | 44 | the owl; scythes and spike slots |
 | — | The Eclipse | night | 1:45 | 79.07 s | 0 | 9 | the King; the kept sun |
 
-Four minutes ten seconds on the game's clocks, 4:20 from the first frame to
+Four minutes nine seconds on the game's clocks, 4:20 from the first frame to
 the last door with the cards and the complete screens between; the pars add
 to 12:00. *Threats on screen* counts each live window that opened where the
 camera showed it -- a foe's strike, a blade's cut -- and each shot loosed; by

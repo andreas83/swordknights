@@ -24,7 +24,7 @@ const ONLINE := "res://scenes/duel_match_online.tscn"
 const CAMPAIGN := "res://scenes/campaign_game.tscn"
 const GENERATED := "res://scenes/generated_game.tscn"
 const FEEL_LAB := "res://scenes/feel_lab.tscn"
-const STORE := "user://test_touch_labels.cfg"
+var _store := UserData.at("user://test_touch_labels.cfg")
 const THUMBS := preload("res://scenes/touch_controls.tscn")
 
 ## Every scene with a TouchControls in it, and the test below that letters
@@ -45,8 +45,8 @@ func after_each() -> void:
 	for action: String in ["jump", "attack", "pause", "move_down", "move_up"]:
 		Input.action_release(action)
 	Campaign.reset()
-	if FileAccess.file_exists(STORE):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(STORE))
+	if FileAccess.file_exists(_store):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_store))
 
 
 ## --- the rule ---------------------------------------------------------------
@@ -186,8 +186,8 @@ func test_the_dawn_letters_its_way_back() -> void:
 
 func test_the_duel_letters_its_menu_and_its_end() -> void:
 	var scene := (load(CPU) as PackedScene).instantiate()
-	scene.set("wardrobe_path", STORE)
-	scene.set("choice_path", STORE)
+	scene.set("wardrobe_path", _store)
+	scene.set("choice_path", _store)
 	scene.set("leave", func() -> void: pass)
 	add_child_autofree(scene)
 	await wait_physics_frames(3)
@@ -208,7 +208,7 @@ func test_the_duel_letters_its_menu_and_its_end() -> void:
 
 func test_the_lobby_letters_its_pages() -> void:
 	var scene := (load(ONLINE) as PackedScene).instantiate()
-	scene.set("wardrobe_path", STORE)
+	scene.set("wardrobe_path", _store)
 	scene.set("leave", func() -> void: pass)
 	add_child_autofree(scene)
 	await wait_physics_frames(3)
@@ -254,7 +254,7 @@ func _game(path: String) -> Game:
 
 func _page(path: String) -> Node:
 	var page := (load(path) as PackedScene).instantiate()
-	page.set("store_path", STORE)
+	page.set("store_path", _store)
 	page.set("leave", func() -> void: pass)
 	add_child_autofree(page)
 	await wait_frames(2)
