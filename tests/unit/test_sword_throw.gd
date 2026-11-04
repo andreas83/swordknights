@@ -189,7 +189,7 @@ func test_down_over_the_blade_takes_it_back() -> void:
 		return _p().body_rect().grow(2.0).intersects(_blade().rect()), 120)
 	_input.bits = 0
 	var back := [0]
-	_p().rearmed.connect(func() -> void: back[0] += 1)
+	_p().moves.rearmed.connect(func() -> void: back[0] += 1)
 	await _press(D)
 	assert_true(_p().moves.armed(), "down, over it, and it is in the hand")
 	assert_eq(back[0], 1, "and says so once")

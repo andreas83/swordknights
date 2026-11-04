@@ -124,7 +124,7 @@ func test_down_and_jump_on_stone_rolls_forward_along_the_floor() -> void:
 	await _play(STONE)
 	var start := _p().position
 	var rolls := [0]
-	_p().rolled.connect(func() -> void: rolls[0] += 1)
+	_p().moves.rolled.connect(func() -> void: rolls[0] += 1)
 	await _tap(D | J)
 	assert_eq(_state(), "ROLL", "down + JUMP on stone is a roll")
 	assert_eq(rolls[0], 1, "and says so")

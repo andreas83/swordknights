@@ -98,8 +98,8 @@ func _ready() -> void:
 	# --- the duel's moves --- the duel's own throw (FighterAudio's
 	# blade_thrown) and the catch's slap of steel into a palm, pitched up so
 	# it is not heard as a parry.
-	_player.threw.connect(func() -> void: _play("sword", {"pitch": 0.7, "volume_db": -2.0}))
-	_player.rearmed.connect(func() -> void: _play("catch", {"pitch": 1.3, "volume_db": -4.0}))
+	_player.moves.threw.connect(func() -> void: _play("sword", {"pitch": 0.7, "volume_db": -2.0}))
+	_player.moves.rearmed.connect(func() -> void: _play("catch", {"pitch": 1.3, "volume_db": -4.0}))
 
 
 ## --- cadence (pure, so the test can pin it without a scene) ----------------

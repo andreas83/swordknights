@@ -154,7 +154,7 @@ func _ready() -> void:
 	player.backstepped.connect(func() -> void: camera.settle(BACKSTEP_SETTLE))
 	# --- the duel's moves --- a kick or a sweep reaches each foe once, as a
 	# swing does.
-	player.kicked.connect(func() -> void: _struck.clear())
+	player.moves.kicked.connect(func() -> void: _struck.clear())
 	# --- secrets ---
 	secrets.setup(level, player)
 	secrets.furnish(_entities)

@@ -33,6 +33,26 @@ extends RefCounted
 ## None of them is reachable from a parry, a plunge, a backstep or a swing,
 ## which keep their inputs: tests/unit/test_moves_input.gd plays each pair.
 
+## --- signals, which the art, the sound and Game hang off rather than reading
+## the states. Here and not on Player, to keep player.gd's share of these
+## moves to a hook per seam.
+## Down + JUMP on stone came out as a roll.
+signal rolled()
+## A dive kick or a sweep began: Game clears the feet's memory of who they
+## reached, as a swing's `attacked` clears the blade's.
+signal kicked()
+## The sword left the hand.
+signal threw()
+## The sword is back in the hand: picked up, or flown home.
+signal rearmed()
+
+## The states this file runs. Player._free_movement() hands each of their
+## frames here (take_frame()).
+const STATES: Array[Player.State] = [
+	Player.State.ROLL, Player.State.DIVE_KICK, Player.State.KICK_LAND,
+	Player.State.THROW, Player.State.SWEEP, Player.State.PICKUP,
+]
+
 var blade := PrinceBlade.new()
 
 var _player: Player
@@ -59,7 +79,7 @@ func step(delta: float) -> void:
 	if blade.is_held():
 		return
 	if blade.step(delta, _player.level, hand()):
-		_player.rearmed.emit()
+		rearmed.emit()
 
 
 ## Where the blade leaves the hand and comes back to it.
@@ -69,8 +89,22 @@ func hand() -> Vector2:
 
 ## --- starting a move --------------------------------------------------------
 
-## Called first in Player._free_movement(): a press that starts one of these
-## moves takes the frame. True when one started.
+## Called first in Player._free_movement(), which is where every frame of a
+## free state -- and of these six -- arrives. A frame of one of these states
+## is run here; otherwise a press that starts one of them, or SWORD with an
+## empty hand, takes the frame. True when this file took it.
+func take_frame(delta: float, want_x: int, grounded: bool) -> bool:
+	if _player.state in STATES:
+		update(delta, want_x, grounded)
+		return true
+	if try_start(delta, want_x, grounded):
+		return true
+	if not blade.is_held() and _player._attack_buffer > 0.0:
+		return start_unarmed(delta, want_x, grounded)
+	return false
+
+
+## A press that starts one of these moves. True when one started.
 func try_start(delta: float, want_x: int, grounded: bool) -> bool:
 	var input := _player.input
 	if input.just_pressed_throw and blade.is_held():
@@ -87,19 +121,20 @@ func try_start(delta: float, want_x: int, grounded: bool) -> bool:
 		_player.velocity.x = 0.0
 		_player._enter(Player.State.PICKUP)
 		blade.hold()
-		_player.rearmed.emit()
+		rearmed.emit()
 		return true
 	return false
 
 
 ## SWORD with no sword. On the ground a sweep, or the backstep, which is
 ## footwork and keeps its stick; up + SWORD is spent on nothing, because a
-## thumb reaching for the parry must not throw a leg into a cut. In the air,
-## nothing, and the press keeps in the buffer as a swing's would.
+## thumb reaching for the parry must not throw a leg into a cut. In the air
+## the press is spent on nothing too: no plunge and no slash without a blade,
+## and a press kept for the landing would come out as a sweep nobody aimed.
 func start_unarmed(delta: float, want_x: int, grounded: bool) -> bool:
+	_player._attack_buffer = 0.0
 	if not grounded:
 		return false
-	_player._attack_buffer = 0.0
 	if _player.input.up:
 		return true
 	if _player._reads_backstep(want_x):
@@ -107,7 +142,7 @@ func start_unarmed(delta: float, want_x: int, grounded: bool) -> bool:
 		return true
 	_player.velocity.x = 0.0
 	_player._enter(Player.State.SWEEP)
-	_player.kicked.emit()
+	kicked.emit()
 	return true
 
 
@@ -117,26 +152,15 @@ func _can_dive() -> bool:
 
 
 ## Stone under the feet, not at a run, and room to stand: the roll keeps the
-## standing body's collision shape (below, Player.hurt_rect()).
+## standing body's collision shape (below, hurt_rect()). "Stone" is the
+## exact complement of Player._on_one_way_floor(), the floor the drop-through
+## and the plunge-through take, so the same press can never mean both: a
+## body with any stone under it would not drop anyway, and rolls.
 func _can_roll() -> bool:
-	if absf(_player.velocity.x) > Tuning.WALK_SPEED + 1.0 or not _stone_underfoot():
+	if absf(_player.velocity.x) > Tuning.WALK_SPEED + 1.0 or _player._on_one_way_floor():
 		return false
 	_player._set_crouched(false)
 	return not _player._crouched
-
-
-func _stone_underfoot() -> bool:
-	var level := _player.level
-	if level == null:
-		return true
-	var half := Tuning.BODY_WIDTH * 0.5
-	var x := _player.position.x
-	var row := floori((_player.position.y + 1.0) / Player.TILE)
-	for column: int in range(floori((x - half) / Player.TILE),
-			floori((x + half - 0.001) / Player.TILE) + 1):
-		if level.kind_at_cell(Vector2i(column, row)) == Tiles.Kind.SOLID:
-			return true
-	return false
 
 
 func _over_blade() -> bool:
@@ -153,14 +177,14 @@ func _start_roll(delta: float, want_x: int) -> void:
 	_player._coyote = 0.0
 	_player._enter(Player.State.ROLL)
 	_player.velocity.x = _player._careful(_player.facing * Tuning.ROLL_SPEED, delta)
-	_player.rolled.emit()
+	rolled.emit()
 
 
 func _start_dive_kick() -> void:
 	_player._jump_buffer = 0.0
 	_player._enter(Player.State.DIVE_KICK)
 	_player.velocity = _dive_velocity()
-	_player.kicked.emit()
+	kicked.emit()
 
 
 func _start_throw(delta: float, want_x: int, grounded: bool) -> void:
@@ -197,7 +221,7 @@ func update(delta: float, want_x: int, grounded: bool) -> void:
 				p._steer(delta, want_x, p.input.walk, false)
 			if blade.is_held() and t >= Tuning.THROW_RELEASE:
 				blade.launch(hand(), p.facing)
-				p.threw.emit()
+				threw.emit()
 			if t >= Tuning.THROW_TIME:
 				_end(grounded)
 		Player.State.KICK_LAND:

@@ -262,7 +262,10 @@ duel's moves". The duel's own files are untouched.
 
 **The roll is down + JUMP wherever stone is under the feet, and not at a
 run.** Down + JUMP is already the drop-through, and that is kept to the
-frame: on a floor of one-way tiles the press drops, exactly as it did. On
+frame: on a floor of one-way tiles -- a platform, a hatch -- the press drops,
+exactly as it did. "Stone under the feet" is the exact complement of
+`Player._on_one_way_floor()`, the test the drop-through and the hatch's
+plunge-through use, so the same press can never mean two things. On
 stone the press used to do nothing -- the crouch it came from cannot jump --
 so the roll takes only a press that meant nothing. At a run, down + JUMP stays
 the jump it always was: at a run a JUMP is nearly always a gap, and a thumb's
@@ -287,8 +290,9 @@ draws two.
 
 **Pick up is down, standing over the blade**, as in the duel.
 
-Nothing that was there moved: down + SWORD still plunges, up + SWORD still
-parries, back + SWORD still steps back, and the frozen clear runs of Chapter
+Nothing that was there moved: down + SWORD still plunges, and on a one-way
+floor -- a hatch -- still plunges through it, up + SWORD still parries, back +
+SWORD still steps back, and the frozen clear runs of Chapter
 II, the Aqueduct and the Eclipse play exactly as recorded
 (`tests/unit/test_moves_input.gd` plays every pairing from both sides).
 
@@ -375,9 +379,11 @@ route a proof has not walked. It passes sun mirrors and seals, which turn
 light, not steel.
 
 Then the prince is unarmed: no swing, no parry, no plunge, no air slash.
-SWORD on the ground is the duel's sweep, and the backstep -- footwork -- is
-still back + SWORD. Up + SWORD is spent on nothing: a thumb reaching for the
-parry must not throw a leg into a cut.
+SWORD on the ground is the duel's sweep -- on a hatch too, which only a blade
+can plunge through -- and the backstep, footwork, is still back + SWORD. Up +
+SWORD is spent on nothing: a thumb reaching for the parry must not throw a
+leg into a cut. In the air the press is spent on nothing as well, rather
+than kept for a sweep on landing nobody aimed.
 
 **It never soft-locks.** A blade left lying for four seconds flies back to the
 hand by itself, through anything; one that is plainly lost -- in water, on

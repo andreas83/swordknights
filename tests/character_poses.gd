@@ -171,7 +171,7 @@ func _pose_table() -> Array[Dictionary]:
 			"emit": [["backstepped"]]},
 		{"name": "backstep-recover", "state": Player.State.BACKSTEP, "t": 0.3},
 		{"name": "roll-tuck", "state": Player.State.ROLL, "t": 0.16,
-			"velocity": Vector2(Tuning.ROLL_SPEED, 0.0), "emit": [["rolled"]]},
+			"velocity": Vector2(Tuning.ROLL_SPEED, 0.0)},
 		{"name": "roll-rise", "state": Player.State.ROLL, "t": Tuning.ROLL_TUCK + 0.08},
 		{"name": "dive-kick", "state": Player.State.DIVE_KICK, "t": 0.1,
 			"velocity": Vector2(Tuning.DIVE_KICK_DRIFT, Tuning.DIVE_KICK_DROP),

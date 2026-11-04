@@ -25,14 +25,6 @@ signal plunge_landed()
 ## Back + SWORD came out as a backstep: the feet push off. The dust, the cloth
 ## and the camera's dip hang off this, so none of them reads the state machine.
 signal backstepped()
-## --- the duel's moves (scripts/player/prince_moves.gd) --- down + JUMP on
-## stone came out as a roll; a dive kick or a sweep began (Game clears the
-## feet's memory of who they reached on it); the sword left the hand; and it
-## is back in the hand, picked up or flown home.
-signal rolled()
-signal kicked()
-signal threw()
-signal rearmed()
 
 ## New states go on the end, so a state's number never changes under anything
 ## that has stored one.
@@ -60,9 +52,7 @@ var last_impact: float = 0.0
 ## Input is read through this indirection so a replay, an AI or a network peer
 ## can drive the character with the exact same code path as a local player.
 var input: PlayerInput = LocalInput.new()
-## --- the duel's moves --- the roll, the dive kick, the throw and the sword
-## itself, wherever it is. See scripts/player/prince_moves.gd.
-var moves := PrinceMoves.new(self)
+var moves := PrinceMoves.new(self) ## --- the duel's moves (prince_moves.gd) ---
 
 var _coyote: float = 0.0
 var _jump_buffer: float = 0.0
@@ -324,9 +314,6 @@ func _update_free(delta: float) -> void:
 			_slide_back(delta)
 			if state_time >= Tuning.BACKSTEP_TIME:
 				_enter(State.IDLE)
-		State.ROLL, State.DIVE_KICK, State.KICK_LAND, State.THROW, State.SWEEP, \
-		State.PICKUP:
-			moves.update(delta, want_x, grounded) # --- the duel's moves ---
 		State.LAND:
 			_land_timer -= delta
 			velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * delta)
@@ -391,8 +378,7 @@ func _update_free(delta: float) -> void:
 
 
 func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) -> void:
-	if moves.try_start(delta, want_x, grounded): # --- the duel's moves ---
-		return
+	if moves.take_frame(delta, want_x, grounded): return # --- the duel's moves ---
 	# Buffered, like jump: a press from the end of a fall, a turn, a landing or
 	# the tail of the last swing comes out here, on the first frame it can.
 	if _attack_buffer > 0.0 and _start_sword(delta, want_x, walking, grounded):
@@ -447,8 +433,6 @@ func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) ->
 ## past a stick that has drifted. False when the sword cannot come out from
 ## this state, so the press stays buffered.
 func _start_sword(delta: float, want_x: int, walking: bool, grounded: bool) -> bool:
-	if not moves.armed(): # --- the duel's moves --- no blade: the sweep
-		return moves.start_unarmed(delta, want_x, grounded)
 	if grounded:
 		_attack_buffer = 0.0
 		if input.up:
@@ -668,8 +652,7 @@ func _on_touch_ground(impact: float) -> void:
 		_enter(State.PLUNGE_LAND)
 		plunge_landed.emit()
 		return
-	if moves.on_touch_ground(): # --- the duel's moves --- the heel meets stone
-		return
+	if moves.on_touch_ground(): return # --- the duel's moves --- the heel on stone
 	if state == State.AIR_SLASH and impact < Tuning.SOFT_LAND_SPEED:
 		# A slash that lands finishes on the feet: the same swing at the same
 		# phase, now planted. Not re-entered, so the clock carries on and Game
