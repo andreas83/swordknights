@@ -3,7 +3,7 @@
 How the prince and the heroine are drawn, how they are posed, and what the
 tuning numbers behind them are for.
 
-![every state, before and after](character-states.png)
+![every state](character-states.png)
 
 ## The constraint
 
@@ -77,6 +77,13 @@ does not care:
 | `PLUNGE_LAND` | down on one knee over a blade bitten into the stone, drawn short because the buried part is not there to see, then dragged free |
 | `PARRY` | the high guard: weight on the back foot, both hands over the hood and the blade across above it, where the sentinel's cut comes down; the edge gleams only while the parry can still turn a cut |
 | `BACKSTEP` | the parry's opposite: leaning *away*, the blade upright in front of the face rather than level over the hood, the free arm flung back for balance, feet off the floor for the middle of the slide, then the knees taking the weight; the edge gleams only while a cut from the front would miss |
+| `ROLL` | pitched forward over the knees, hood tucked, cloak over the back, inside the 9 px the tuck is to a foe; then up off a crouch with the hood last. Pitched, not folded: the hood keeps its size, so folding sinks the hips through the floor (the duel's roll found that first) |
+| `DIVE_KICK` | heel first and leading, the body laid back behind the line, the sword held back out of it: the one attack the blade takes no part in |
+| `KICK_LAND` | a wide crouch on both feet, hands to the floor: planted |
+| `THROW` | drawn back over the shoulder, flung forward; the blade leaves the drawing on the release frame, as it leaves the hand |
+| `SWEEP` | the duel's sweep: half down, one leg scything along the floor exactly in its live window |
+| `PICKUP` | a stoop onto the front knee, hand to the floor, up with the blade |
+| *unarmed* | any pose with an empty hand: no blade, the sword hand opened a little forward -- reaching, not holding (`MovePoses.unarmed()`) |
 | `HURT` | thrown back and tilted, hood knocked away, whole figure burned white for 0.14 s |
 | `DEAD` | toppled: the robe keeps its shape, the figure does not. Over *backwards* off a wound's knockback, head and blade behind; from a fatal fall (`Player.is_fallen()`), folded at the knees on the frame it lands and then *face down* in a fifth of a second, arms flung ahead and the blade knocked flat beyond them, with no hop — so a fall never shares a silhouette with a cut |
 
@@ -230,6 +237,174 @@ does open a false wall it slides into, exactly as walking into one does.
 
 **Not idle.** `IdleArt.is_calm()` is true only in `IDLE`, so a backstep and
 its recovery never start a fidget.
+
+## The duel's moves in the adventure
+
+The owner, after a phone session: "In adventure mode, rolls and other attacks
+from the duel are missing." They were, and they are not copied over: the duel
+is a fencing game between two equals who die to one touch, and the adventure
+is a prince against foes that are not fencers. Each move is what the duel's
+move becomes when it meets this bestiary. They run in
+`scripts/player/prince_moves.gd`, the prince's sword as a thing in the world
+is `scripts/player/prince_blade.gd`, their poses are
+`scripts/player/move_poses.gd`, and every number is in `Tuning` under "The
+duel's moves". The duel's own files are untouched.
+
+| Move | Input | Numbers | It costs |
+| --- | --- | --- | --- |
+| Roll | down + JUMP, on stone, not at a run | 21-frame tuck at 115 px/s (40 px), 9 px tall to a foe; 12-frame rise | nothing comes out of the rise; 33 frames committed |
+| Dive kick | down + JUMP in a jump or a fall | a straight line at (80, 360) px/s; heel 8 px past the body and below the feet | 24 frames planted if it meets stone |
+| Throw | THROW, armed, standing or in the air | 12-frame throw, released at frame 4; 300 px/s level for 6 tiles, 14 px up | the sword, until it is picked up or flies home |
+| Pick up | down, standing over the blade | 9-frame stoop | standing still over it |
+| Sweep | SWORD with no sword | 16 frames, live 3 to 8, reach 15 px, 8 px band at the feet | it wounds nothing |
+
+### Where each sits on the controls, and why
+
+**The roll is down + JUMP wherever stone is under the feet, and not at a
+run.** Down + JUMP is already the drop-through, and that is kept to the
+frame: on a floor of one-way tiles the press drops, exactly as it did. On
+stone the press used to do nothing -- the crouch it came from cannot jump --
+so the roll takes only a press that meant nothing. At a run, down + JUMP stays
+the jump it always was: at a run a JUMP is nearly always a gap, and a thumb's
+stick drifts down, so a roll there would stop at the lip and lose the jump.
+From a stand, a walk or a crouch it rolls toward the stick, or the facing.
+
+The alternative, down + JUMP *while moving*, was weighed and turned down: it
+puts the roll exactly where the drifting stick is, at a run, and leaves the
+standing press -- the one that does nothing -- still doing nothing.
+
+**The dive kick is down + JUMP in the air**, the duel's pairing. A JUMP in
+the air waited in the buffer and did nothing, so nothing is taken from it,
+except in coyote time: a press just after running off a lip is still the late
+jump, because that is what a thumb meant.
+
+**THROW is the eighth input bit**, which the duel already carries and every
+device already reads (`Q` / `L`, R1). On a phone it is a third button, placed
+exactly as the duel's is -- up and to the left of JUMP, through the shared
+safe-area helper -- and only the adventure's scene asks for it
+(`TouchControls.throw_button`), so the menus have none and the duel never
+draws two.
+
+**Pick up is down, standing over the blade**, as in the duel.
+
+Nothing that was there moved: down + SWORD still plunges, up + SWORD still
+parries, back + SWORD still steps back, and the frozen clear runs of Chapter
+II, the Aqueduct and the Eclipse play exactly as recorded
+(`tests/unit/test_moves_input.gd` plays every pairing from both sides).
+
+### The roll: through, where the backstep is back
+
+The backstep survives in place, backwards, facing the blade, and a cut from
+behind is the one it steps into. The roll goes **through**: while tucked, a
+danger from either side that is `rollable` goes over him
+(`FoeDanger.rollable`, true by default, as `evadable` is). What is rollable is
+whatever is set against a standing man -- a sentinel's cut, a Bastion's
+shield face and his shove. What is not: a body coming down on him (the
+Caracal's claws, the King's slam -- the backstep stays their answer), and
+anything in flight, which a roll passes only by being lower than it. A
+sunbolt at chest height goes over the 9-px tuck as it goes over a crouch, so
+the roll is how a prince closes on a Glassbearer under fire; the King's beam
+is 16 px tall and reaches the tuck, so the finale is still the parry's.
+
+So a sentinel rolled at on sight of his raise is passed: the prince comes up
+behind him before the cut, and the cut goes into the air. Thrown late, into
+the live cut, the window carries him through. Either way the guard's back is
+there for his recovery. And the Bastion, whose front shut the two-tile
+corridor in Chapter II on the owner's playtest: a roll goes under the face
+and the shove and comes up behind him, and his back is open through the
+whole 30-frame turn (`tests/unit/test_roll_foes.gd`). The 40 px are chosen for
+both: through a guard from the gap he raises at, and up again with his back
+inside a swing.
+
+The rise is the price, and the stick may turn him in it, so a roll that came
+up behind a foe can cut his back at once; without that, stick-back-and-SWORD
+together read as a backstep.
+
+**No new traversal.** The roll stops at every lip, as the backstep does
+(`Player._careful()`), so it crosses no gap. It keeps the standing body's
+collision shape: only the body a *foe* aims at is tucked
+(`PrinceMoves.hurt_rect()`, which Game hands the foes); floors, ceilings,
+spikes and water see the standing body, so a roll enters no space and passes
+no hazard the proof's body does not. A one-tile slot stops it at the mouth.
+That was a choice: a roll under a one-tile gap would have had to be taught to
+`LevelReachability`, re-proving every level built on the current proof while
+chapters are being drafted against it, and a roll under a closing gate would
+shorten every race the gates are timed against. And it covers less floor a
+second than a run (40 px in 33 frames), so chaining rolls shortens no race.
+
+### The dive kick: the feet, not the blade
+
+Where the plunge is a sword blow straight down that wounds, the kick is the
+heel on a steep line forward that **never wounds**: it rocks what it reaches
+and springs the prince back off it, up as a stomp springs and back the way
+he came. That makes it the move that opens what a blade cannot:
+
+| Foe | A dive kick | An unarmed sweep |
+| --- | --- | --- |
+| Sentinel | knocked back, reeling 42 frames (`Patrol.KICKED_TIME`): a raise is broken | the same |
+| Bastion | the pavise knocked wide, from either side: `OPENED`, 54 frames, no wall and no shove, a blade from the front wounds | clangs off the shield from the front; rocks him from behind |
+| Caracal | bowled into its skid, claws spent; knocked out of a pounce into a fall that ends in one | the same |
+| Eclipse | blocked: only each phase's lesson wounds him | blocked |
+
+Never faster across than a run and as fast down as anything falls, it lands
+nearer than the same jump left alone from any height, so it adds no reach.
+A kick that meets stone plants him for 24 frames -- the plunge's price: with
+the swing's lead it is longer than a guard's raise, so a kick that misses in
+front of a guard cannot be swung out of. It holds no ledge, and it counts
+toward a fatal fall as the plunge does. On crumbling stone its landing lights
+the slab like any foot, and its 24 frames planted leave three to step off: a
+kick that misses onto a slab is a fall.
+
+Every registered foe is held to "the feet never wound"
+(`tests/unit/test_foe_contract.gd`): the default `Foe.take_blow()` answers a
+kick or a sweep with `knock()` and rings it off a foe that does not override
+that, so a foe added later is kicked as a wall, never cut.
+
+### The throw: a mirror blade, and the rule that it always comes back
+
+THROW flings the blade level at chest height for six tiles -- half a
+Glassbearer's aim, so a throw at one is a throw from inside his range -- and
+the first foe it meets takes it as `Foe.Blow.THROWN` from the side it flew
+in from. A sentinel is wounded; a Bastion's shield turns it and it drops at
+his feet, inside his shove, and his back is wounded; a prowling Caracal is
+lower than a man's chest and the blade goes over it, though a cat in the air
+of a pounce is hit; the King blocks it, as he blocks everything but the
+lesson. Its point going into a cracked wall opens the secret, as a swing
+would: secrets are proved never-a-trap in every combination, so it opens no
+route a proof has not walked. It passes sun mirrors and seals, which turn
+light, not steel.
+
+Then the prince is unarmed: no swing, no parry, no plunge, no air slash.
+SWORD on the ground is the duel's sweep, and the backstep -- footwork -- is
+still back + SWORD. Up + SWORD is spent on nothing: a thumb reaching for the
+parry must not throw a leg into a cut.
+
+**It never soft-locks.** A blade left lying for four seconds flies back to the
+hand by itself, through anything; one that is plainly lost -- in water, on
+spikes, under or outside the level -- after half a second. Back at the last
+checkpoint was the other remedy, and was turned down: the proof says a torch
+reaches the door, not that the prince can reach the torch from where he is
+now, so a drop already taken could strand him from it. Flying home needs no
+proof of anything. A respawn always gives the sword back.
+
+### Stance heights: not here
+
+The duel's three heights are its whole game because blade meets blade at a
+height: a matrix of high, mid and low. No foe in the adventure fences. Each
+has one attack in one band, and the prince's answers are already read on the
+stick: up for the parry, down in the air for the plunge, back for the
+backstep. The one slot left, down + SWORD on the ground, would buy a low cut
+with no target the swing does not already reach -- even the Caracal's 9-px
+body is inside the swing's band. So there are no heights here.
+
+### The assist
+
+LONGER WARNINGS stretches foes' tells and the windows that stand between the
+prince and a death, and never the prince. Nothing here adds a tell: the
+roll's window and the kick's recovery are the prince's, the Bastion's
+opening, the sentinel's reel and the cat's bowled skid are openings, and the
+recall is not a death's window. So none of it reads `warn()`, by the rule in
+`scripts/core/assist.gd`.
 
 ## Adding a state
 
@@ -685,3 +860,14 @@ cannot be jumped, mantle a ledge — and asserts every station is cleared. It
 runs in real time (the engine steps physics at wall-clock 60 Hz), so give it
 about a minute. If a station needs more cleverness than that bot has, the
 station is too fiddly to be canonical.
+
+The duel's moves have five GUT suites of their own, each seen to go red when
+the rule it holds was broken on purpose: `tests/unit/test_moves_input.gd`
+(where each press lands, and that the drop-through, the late jump, the plunge,
+the parry and the backstep did not move), `tests/unit/test_roll.gd` (its
+numbers, the lip, the slot, the window), `tests/unit/test_roll_foes.gd` (the
+sentinel and the corridor Bastion, played), `tests/unit/test_dive_kick.gd`
+(its reach, its price, each foe's answer to the feet) and
+`tests/unit/test_sword_throw.gd` (the throw, the pickup, the recall, the
+respawn, and the bestiary). `tests/unit/test_touch_controls.gd` holds the
+THROW button to the duel's place.

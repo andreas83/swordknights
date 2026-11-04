@@ -179,6 +179,14 @@ held frames, camera, sparks through `PlayerFx.sword_hit()`, and sound through
 
 | backstep pushes off | 0 | no shake; settle 0.3 (one pixel); the lead is held | none: five motes of grit thrown forward from the front foot | `cloth` at −2 dB with `sword` at 0.7, −10 dB under it: a whoosh, not a swing |
 | backstep lets a cut by | 0 | nothing | none | nothing beyond the guard's own `sword` |
+| roll | 0 | nothing: the lead follows it, since it faces the way it goes | none | `cloth` at −2 dB, the duel's roll |
+| roll goes under a blow | 0 | nothing | none | nothing beyond the foe's own |
+| dive kick leaves | 0 | nothing | none | `jump` at 0.85, −2 dB, the duel's dive kick |
+| dive kick or sweep rocks a foe | 3 | shake 1.4, settle 0.25 | at his head, 0.5 | `guard_hit` at 0.85, −2 dB: the duel's knock-down, a body hit and not a blade in it |
+| dive kick off a shield or the King | 3 | the block's beat | the block's | the block's clang |
+| sword leaves the hand | 0 | nothing | none | `sword` at 0.7, −2 dB, the duel's throw |
+| thrown sword finds a foe | the swing's | the swing's | the swing's | the swing's: it is the same blade |
+| sword back in the hand | 0 | nothing | none | `catch` (the duel's palm slap) at 1.3, −4 dB |
 
 The plunge into stone holds no frames on purpose. Hitstop is for something
 that resists you, and the floor was simply there — the same reason a landing
@@ -200,6 +208,20 @@ guard and drifted it back over a second — a lurch on every dodge. While
 `Player.is_backstepping()`, `GameCamera` holds the lead where it was, and the
 dead zone takes the 23 px step. `tests/unit/test_backstep_costs.gd` fails if
 the lead moves.
+
+### The duel's moves' beats
+
+The duel's moves (`docs/character.md`, "The duel's moves in the adventure")
+borrow the duel's voices so a player who has heard them there hears the same
+move here, and their beats from the table above. A kick that rocks a foe is
+the stagger's beat -- held frames, because the foe resisted, but the lightest
+held beat in the game, three frames, since nothing was cut -- and a kick off
+a shield is the block's. The thrown sword finding a foe is a swing's beat
+exactly, because it is the swing's blade. The roll, like the backstep, is felt
+in its going and not in what it avoids: a blow it goes under has no beat,
+and the missing hit is the read. The blade lying on the floor flashes every
+half second, so a sword that has to be found is found by the eye before it is
+looked for, and it is lifted out of the grade like the prince.
 
 ### Hitstop and the duel — read this before changing anything
 

@@ -68,13 +68,19 @@ repository owner should set up (the `DEBUG_KEYSTORE_B64` secret), is in
 | Plunge      | Down + sword in the air | Down + X / B | Stick down + **SWORD** in the air |
 | Parry       | Up + sword          | Up + X / B    | Stick up + **SWORD**       |
 | Backstep    | Back + sword        | Back + X / B  | Stick back + **SWORD**     |
+| Roll        | Down + jump, standing or walking on stone | Down + A | Stick down + **JUMP** |
+| Dive kick   | Down + jump in the air | Down + A in the air | Stick down + **JUMP** in the air |
+| Throw       | `Q` / `L`           | R1            | **THROW** (the flying sword) |
+| Pick up     | Down over the sword | Down          | Stick down over it         |
+| Sweep       | Sword with no sword | X / B         | **SWORD** with no sword    |
 | Walk (slow) | `Shift`             | L1            | Small stick deflection     |
 | Pause       | `Esc` / `P`         | Start         | **II**                     |
 | Mute        | `M`                 | —             | —                          |
 
 Ledge grabs happen automatically when you fall past a grabbable corner while
 moving into it; press up (or jump) to mantle, down to let go. Hold down and
-press jump to drop through a one-way platform.
+press jump to drop through a one-way platform; on stone the same press is a
+**roll**.
 
 The sword swings in the air too, without touching the jump's arc. Down and
 sword in the air is the **plunge**: straight down, point first, onto a guard's
@@ -86,6 +92,21 @@ face) and sword on the ground is the **backstep**: a skip of about a tile and
 a half back, still facing him, and his cut from the front misses you for the
 first quarter-second. It gives up the ground and the riposte, cannot be thrown
 twice in a row, and stops at the edge of a drop rather than going over it.
+
+The duel's moves are the prince's too. Down and jump on stone, from a stand
+or a walk, is the **roll**: two and a half tiles low along the floor, under a
+blade or a shield set against a standing man from either side -- through a
+sentinel's cut, under a Bastion's shield to his back -- and then a moment
+getting up in which nothing comes out. At a run, down and jump is still the
+jump. Down and jump in the air is the **dive kick**: a steep straight line,
+heel first, that knocks a foe back or a shield wide without wounding, and
+springs you off. **Throw** sends the sword six tiles level into the first foe
+it meets; then it lies where it falls until you stand over it and press down,
+and with no sword the sword button is a **sweep** of the leg. Left lying, a
+thrown sword flies back to your hand by itself after four seconds, and at
+once if it fell somewhere it cannot be fetched; a respawn always gives it
+back.
+
 Jump on a ladder to leap off it,
 sideways if you hold a direction. A relic gives back a heart.
 

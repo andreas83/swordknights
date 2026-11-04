@@ -663,6 +663,30 @@ phone:
 - **One swing, one wound.** The `_struck` rule in `Game._resolve_guard()`
   applies to every foe.
 - **Lifted out of the grade.** Every foe is in the grade's lit group.
+- **The feet never wound.** The dive kick and the unarmed sweep
+  (`Foe.Blow.KICK`, `Foe.Blow.SWEEP`) rock a foe that can be rocked
+  (`Foe.knock()`) and ring off one that cannot; the default `take_blow()`
+  does that, and `tests/unit/test_foe_contract.gd` holds every registered
+  kind to it, so a foe that overrides `take_blow()` must not let a kick fall
+  through to its wound. The thrown sword (`Foe.Blow.THROWN`) is a blade, and
+  wounds by default.
+- **A roll goes under what is set against a standing man.** A danger is
+  `rollable` by default -- a blade, a shield, a shove -- and a body coming
+  down on the prince or anything in flight must say `rollable = false`: a
+  roll passes those only by being lower than them (the tuck is 9 px).
+
+What each foe does with the duel's moves (`docs/character.md`, "The duel's
+moves in the adventure"). The Glassbearer and the owl are not built; their
+rows are what their chapters should build to:
+
+| Foe | Roll | Dive kick | Sweep | Thrown sword |
+| --- | --- | --- | --- | --- |
+| Sentinel | under the cut, from either side; comes up at his back | reels 42 frames, no wound; a raise is broken | the same | wounds |
+| Bastion | under the face and the shove: the corridor's answer from the front, to his back and his 30-frame turn | the pavise knocked wide, 54 frames: no wall, no shove, a front blade wounds | clangs off the front, rocks his back | clangs off the front and drops in his shove's reach; wounds his back |
+| Caracal | the claws are not rollable; the roll passes under the leap only where the arc is higher than the tuck | bowled into its skid, claws spent; knocked out of a pounce | the same | over a cat on the floor (it is lower than a chest); kills a cat in the air |
+| Glassbearer | the bolt is over the tuck by height: the roll closes on him under fire | knocked out of his aim into SPENT, no wound | the same | kills -- from six tiles, inside his aim, and leaves the prince with nothing to parry the next bolt with |
+| Owl | no meeting: it never stoops at the stone | a perched owl knocked into its pull-up, no wound | -- | kills it in its stoop or pull-up |
+| Eclipse | under his shove, which gains nothing; not under his slam (not rollable) or the beam (16 px reaches the tuck) | blocked | blocked | blocked: only each phase's lesson wounds |
 
 The numbers the bestiary is tied to, all from `scripts/core/tuning.gd` and
 `scripts/entities/patrol.gd`:
@@ -678,6 +702,10 @@ The numbers the bestiary is tied to, all from `scripts/core/tuning.gd` and
 | `Tuning.BACKSTEP_ACTIVE` / `BACKSTEP_SLIDE` / `BACKSTEP_TIME` | 15 / 12 / 27 | the backstep's window / slide (22.75 px) / whole move |
 | `Tuning.ATTACK_TIME` | 14.4 | a swing; live from phase 0.25 to 0.8 |
 | `Tuning.PLUNGE_RECOVER` | 25 | a plunge that met stone |
+| `Tuning.ROLL_TUCK` / `ROLL_TIME` | 21 / 33 | the roll's tuck, its window from either side (40 px) / the whole roll |
+| `Tuning.DIVE_KICK_RECOVER` | 24 | a dive kick that met stone |
+| `Patrol.KICKED_TIME` | 42 | a sentinel's reel from the feet |
+| `Bastion.OPENED_TIME` | 54 | a Bastion's shield knocked wide |
 | `Tuning.INVULNERABLE_TIME` | 54 | grace after a hit |
 | `Tuning.RUN_SPEED` | 10.9 per tile | 88 px/s, 5.5 tiles a second |
 | a jump | 37 | 0.62 s in the air; 33 px of rise in the engine, 54 px of reach at a run |
