@@ -78,6 +78,9 @@ var _row_rects: Array[Rect2] = []
 ## by default; Godot cannot install a package without an Android plugin, and
 ## the browser's download-then-install is the path Android already trusts.
 var opener := Callable(OS, "shell_open")
+## Test seam, set before _ready: whether the benches -- the feel lab -- are
+## listed (ModeRegistry.shows_benches(): never in an exported build).
+var benches := ModeRegistry.shows_benches()
 ## Test seam: what Android's Back does on this screen, which is the root and
 ## has nothing behind it: the app closes. A test must never quit its runner.
 var quit_app := Callable()
@@ -130,7 +133,7 @@ func offer_rect() -> Rect2:
 ## of this menu, not something ModeRegistry should have to know about.
 func _build_rows() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	for mode: Dictionary in ModeRegistry.modes():
+	for mode: Dictionary in ModeRegistry.modes(benches):
 		out.append({
 			"id": String(mode["id"]),
 			"title": String(mode["title"]).to_upper(),

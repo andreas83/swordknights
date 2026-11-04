@@ -677,7 +677,9 @@ canonical obstacle side by side, in the order the grammar introduces them —
 open run-up, 2-tile hop, 3-tile platform step, 4-tile grab wall, 3-tile gap,
 a four-tile drop, a ladder onto a terrace with a seven-tile drop off it, and a
 one-way platform to hop through and fall back down through. It is registered
-in `mode_registry.gd`, so it is one entry in the menu.
+in `mode_registry.gd` as a bench, so it is one entry in the menu wherever the
+game is being worked on — the editor, `godot --path .` — and none in an
+exported build, the phone's APK included (`ModeRegistry.shows_benches()`).
 
 Change a number in `tuning.gd`, play the lab, and you can see in one screen
 which distances still work.

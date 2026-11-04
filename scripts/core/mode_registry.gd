@@ -9,9 +9,31 @@ extends RefCounted
 ##
 ## `scene` is loaded when the mode is chosen, so a mode that generates a level
 ## or opens a network connection does no work until the player picks it.
+##
+## `bench` marks a tool rather than a mode -- the feel lab, a tuning bench --
+## which is listed only where the game is being worked on (shows_benches()).
 
 
-static func modes() -> Array[Dictionary]:
+## The modes, benches included only when `benches` is true.
+static func modes(benches: bool = shows_benches()) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for mode: Dictionary in _catalogue():
+		if benches or not bool(mode.get("bench", false)):
+			out.append(mode)
+	return out
+
+
+## Whether the benches are listed: only in a run of the editor's own binary --
+## from the editor, `godot --path .`, the tests -- and never in an exported
+## build. Not `OS.is_debug_build()`: the APK the owner plays on a phone is
+## CI's debug export, which is a debug build, and a tuning bench on its title
+## screen is a door into a room with no game in it. The export templates lack
+## the `editor` feature whatever they are stamped with.
+static func shows_benches() -> bool:
+	return OS.has_feature("editor")
+
+
+static func _catalogue() -> Array[Dictionary]:
 	return [
 		{
 			"id": "adventure",
@@ -43,6 +65,7 @@ static func modes() -> Array[Dictionary]:
 			"subtitle": "Tuning bench",
 			"scene": "res://scenes/feel_lab.tscn",
 			"available": true,
+			"bench": true,
 		},
 	]
 

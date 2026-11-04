@@ -242,6 +242,14 @@ from it, and a touch that is a thumb button's is the button's alone
 (`TouchControls.claims()`); `tests/unit/test_title_taps.gd` holds all three,
 and that no row lies under a thumb button.
 
+**FEEL LAB is not on it in an exported build.** It is a tuning bench
+(`docs/character.md`, *The feel lab*), and it sat between DUEL and WARDROBE
+on the phone. `ModeRegistry` marks it `bench` and lists benches only on the
+editor's own binary (`OS.has_feature("editor")`), not on a debug build: the
+APK the owner plays is CI's debug export. So the title screen has six rows on
+a phone and seven where the game is being worked on, and screenshots taken
+with the editor binary show seven.
+
 The hint line is cut into the rail (`UiLayout.rail(view)`, shared with the
 settings page). When the on-screen stick is up, a sword button covers the right
 end of that rail, so the hint moves to the left end and says less — the buttons
