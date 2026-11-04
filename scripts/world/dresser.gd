@@ -373,11 +373,25 @@ static func _rule_niches(level: AsciiLevel, mid: Dictionary, taken: Dictionary,
 			continue
 		var row := _niche_row(level, x)
 		var cell := Vector2i(x, row)
-		if _is_face(level, x, row - 1) and not taken.has(cell) and not reserved.has(cell):
+		if _is_face(level, x, row - 1) and not taken.has(cell) and not reserved.has(cell) \
+				and not _beside_a_floor(level, cell):
 			_put(mid, taken, cell, "niche")
 			x += NICHE_PITCH
 		else:
 			x += 1
+
+
+## Whether `cell` is at foot level beside open floor: an empty cell next to it
+## with stone under. A niche there is a dark hole a tile high at the prince's
+## feet, which since the crawl is exactly what a way through looks like, so
+## none is cut there (docs/world.md, "Lit caps are a promise").
+static func _beside_a_floor(level: AsciiLevel, cell: Vector2i) -> bool:
+	for dx: int in [-1, 1]:
+		var x := cell.x + dx
+		if level.kind_at(x, cell.y) != Tiles.Kind.SOLID \
+				and level.kind_at(x, cell.y + 1) == Tiles.Kind.SOLID:
+			return true
+	return false
 
 
 ## The course a niche would be carved into: one up from the bottom of the
@@ -467,27 +481,33 @@ static func _drop_at(level: AsciiLevel, x: int, y: int) -> int:
 	return level.rows if neighbour < 0 else neighbour - y
 
 
+## The railing and the kerb share the row the prince's feet are in, the cell
+## above the lip. The railing stands ON the terrace there, waist high and
+## dark (tools/generate_tiles_png.py, balustrade()): it used to hang a cell
+## higher with a gold rail across its top, over nothing, and a player jumped
+## at it -- a lit cap is a promise of footing (docs/world.md, "Lit caps are a
+## promise"). Railing first, so it has the cells it wants; the kerb fills
+## the rest of the lip.
 static func _dress_lip(level: AsciiLevel, mid: Dictionary, taken: Dictionary,
 		reserved: Dictionary, from_x: int, to_x: int, y: int) -> void:
+	# Railing only where the ground actually falls away, and only a few cells
+	# in from that edge: a balustrade down the whole terrace is a fence.
+	var spans: Array[Vector2i] = []
+	if to_x - from_x + 1 >= BALUSTRADE_MIN_RUN:
+		if _drop_at(level, from_x - 1, y) >= LIP_DROP:
+			spans.append(Vector2i(from_x, mini(to_x, from_x + BALUSTRADE_SPAN - 1)))
+		if _drop_at(level, to_x + 1, y) >= LIP_DROP:
+			spans.append(Vector2i(maxi(from_x, to_x - BALUSTRADE_SPAN + 1), to_x))
+	for span: Vector2i in spans:
+		for x: int in range(span.x, span.y + 1):
+			var cell := Vector2i(x, y - 1)
+			if _free(level, cell, taken, reserved):
+				_put(mid, taken, cell, "balustrade")
+
 	for x: int in range(from_x, to_x + 1):
 		var cell := Vector2i(x, y - 1)
 		if _free(level, cell, taken, reserved):
 			_put(mid, taken, cell, "cornice")
-
-	if to_x - from_x + 1 < BALUSTRADE_MIN_RUN:
-		return
-	# Railing only where the ground actually falls away, and only a few cells
-	# in from that edge: a balustrade down the whole terrace is a fence.
-	var spans: Array[Vector2i] = []
-	if _drop_at(level, from_x - 1, y) >= LIP_DROP:
-		spans.append(Vector2i(from_x, mini(to_x, from_x + BALUSTRADE_SPAN - 1)))
-	if _drop_at(level, to_x + 1, y) >= LIP_DROP:
-		spans.append(Vector2i(maxi(from_x, to_x - BALUSTRADE_SPAN + 1), to_x))
-	for span: Vector2i in spans:
-		for x: int in range(span.x, span.y + 1):
-			var cell := Vector2i(x, y - 2)
-			if _free(level, cell, taken, reserved):
-				_put(mid, taken, cell, "balustrade")
 
 
 ## --- rule: the foreground plane ---------------------------------------------

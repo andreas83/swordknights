@@ -224,6 +224,63 @@ glyphs are documented in the header of `levels/level_01.txt` and defined in
 `Tiles.DECOR_LEGEND`. Most of level 1 is deliberately *not* marked up: a level
 that needed hand marking would mean generated levels could never look like it.
 
+## Lit caps are a promise
+
+A band of gold across the top of something says one thing in this art: *you
+can stand here*. Terrain caps carry it (`solid` with its three rows of
+`LIGHT`), and so do platforms, lifts and plates, and since the lit path is
+the path (`art-direction.md`, *Lead the eye with light*), nothing else may.
+
+The dresser broke that twice. A player on a phone tried to jump onto the Sun
+Terrace's balustrade: it hung a cell above the terrace, floating nine pixels
+over the cornice it was meant to stand on, with a two-pixel gold rail across
+its top -- drawn exactly as a ledge is drawn. And the friezes under every
+long lip were three ink slots a cell between two gold rails, which the same
+player called "horizontal ladders" and tried to climb.
+
+There were two ways to fix it: make every free-standing balustrade solid, or
+make decoration stop promising. The first changes collision under every
+level's proof, and the shipping chapters, their races, crumble and beat
+proofs and checkpoint routes were all built on the proof as it is. The
+second changes pixels only. So the rule is the art's:
+
+**No decoration is lit across its top.** No decor tile has light
+(`LIGHT_WARM` or brighter) across 12 or more of its 16 columns in any row. It
+may be lit on an edge, a post, a jamb -- the sun still rakes in from the
+left and finds the west face of everything -- but never across, because
+across is a floor. `tests/unit/test_false_platforms.gd` reads the atlas and
+holds every decor tile to it, and holds the terrain caps to staying gold, so
+the rule cannot be met by drawing nothing.
+
+What it changed:
+
+| Decor | Was | Is |
+| --- | --- | --- |
+| balustrade | a cell above the lip, floating, gold top rail | standing on the floor in the lip's own row, waist high to the prince, dark posts and an unlit rail: a railing behind him, shorter than he is |
+| frieze | three slots between two gold rails | two round-headed blind arches in the wall's own shade, lit on the right jamb and sill like any carved recess |
+| cornice | a gold band four pixels over the floor | a low kerb in warm shade; the floor's own cap under it is the gold |
+| column capital | a 14-px gold abacus at the top of a four-tile column -- grab height | the abacus in shade, lit only on its west end |
+| column base, planter, fountain | gold rims and plinths | warm (`MID`), not gold |
+
+Mechanism art is held to the same rule by eye rather than by the test, which
+reads the atlas: a lift's slab is lit because it is stood on; a gate's or a
+lift's counterweight carries one warm pixel row across six, a stone on a
+chain, not a ledge.
+
+The cornice and the balustrade share the lip's row now, the railing in from
+each edge that falls away and the kerb along the rest (`_dress_lip()`). A
+railing's shadow still combs the terrace it stands on, which is what a
+balustrade is for in the composition.
+
+**Nothing reads as a passage that is not one.** The other half of the same
+complaint, from the Mirror Tower. A niche cut at foot level beside floor the
+prince walks on is a dark hole a tile high: since the crawl
+(`docs/character.md`, *The crawl*), that is exactly the shape of a way
+through. The niche rule no longer cuts one beside open floor at the
+walking level (`_rule_niches()`); there were two, in the Aqueduct and in
+the Mirror Tower's cellar. The one real one-tile wall in the tower, R5's
+slot, is now crawled through.
+
 ## Room moods: wear, growth and the things people leave about
 
 Architecture alone made every room the same room. The end of `dresser.gd`
@@ -636,6 +693,10 @@ no mechanism is proved exactly as it always was.
   casts, the two sparing rules, that shipping levels are neither blank nor
   black, and that the mask fits a texture. The shade-twin lookup itself has no
   dedicated test; it is checked by eye in screenshots.
+- `tests/unit/test_false_platforms.gd` — no decoration is lit across its top
+  (12 of 16 columns of `LIGHT_WARM` or brighter in a row), the caps that hold
+  the prince up still are, and every balustrade in every shipping level
+  stands on the floor rather than over it.
 - `tests/world_dressing_test.gd` — decoration cannot collide, marks leave
   their cell empty, every shipping and generated level gets architecture, and a
   symmetric level is dressed symmetrically.

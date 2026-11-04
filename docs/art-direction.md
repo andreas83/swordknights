@@ -141,7 +141,18 @@ world for night or interior must stay a palette edit plus a re-run.
 - **Negative space is not empty space.** A wide lit floor with one figure and
   one long shadow is the reference's strongest frame. Resist filling it.
 - **Lead the eye with light.** The lit path should be the path. Where the
-  player is meant to go, put the gold.
+  player is meant to go, put the gold. The converse is the rule that bites:
+  **a band of gold across the top of something is a promise that it holds
+  you up.** Terrain caps, platforms, lifts and plates make it; decoration
+  never does. A balustrade with a lit rail hanging over a terrace is a ledge
+  to anyone holding a phone, and a frieze of slots between two gold rails is
+  a ladder lying on its side -- both were jumped at by a player. So a
+  railing is dark and stands on the floor behind the prince, shorter than
+  he is; a frieze is blind arches in the wall's own shade; a capital, a rim
+  or a kerb is lit on its west edge and never across its top. And the same
+  holds for shape: nothing at the prince's feet may read as a hole a tile
+  high unless it is one he can crawl through. `docs/world.md`, *Lit caps are
+  a promise*, has the table and the test.
 - **Silhouette first.** At 22 px the character is a shape before it is
   anything else; the same goes for every hazard and every ledge. If a frame
   does not read in two tones, no amount of detail will save it.

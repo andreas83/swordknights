@@ -382,32 +382,49 @@ def _recess_lip(p: Patch, cx: float, cy: float, r: float, half: float) -> None:
                 p.set(x, y, LIGHT_WARM)
 
 
+# --- what a lit cap promises ------------------------------------------------
+#
+# In this art a band of gold across the top of a thing says one thing: you can
+# stand here. Terrain caps and platforms carry it, and nothing else may. A
+# player on a phone jumped at a balustrade's lit rail hanging over the Sun
+# Terrace because it was drawn exactly like a ledge, and called the carved
+# friezes "horizontal ladders" -- two gold rails with slots between. So no
+# decoration has light (LIGHT_WARM or brighter) across 12 or more of its 16
+# columns in any row: it may be lit on an edge, a post, a jamb, never across
+# its top. tests/unit/test_false_platforms.gd reads the atlas and holds it.
+# docs/world.md, "Lit caps are a promise", argues the rule.
+
 def cornice(_unused=None) -> Patch:
-    """A projecting moulding. Lives in the empty cell ABOVE a terrace lip, so
-    its underside is what you see from below and its top is the lit edge."""
+    """A low moulding along a terrace lip, in the empty cell above it: a kerb
+    on the floor, not a second floor over it. Its top catches only the warm
+    shade; the floor's own cap below it is the gold."""
     p = Patch(TILE, TILE)
-    p.hline(9, 0, TILE - 1, SHADOW_WARM)
-    p.rect(0, 10, TILE - 1, 11, LIGHT)
-    p.hline(12, 0, TILE - 1, LIGHT_WARM)
-    p.rect(0, 13, TILE - 1, TILE - 1, SHADOW)
+    p.hline(11, 0, TILE - 1, SHADOW_WARM)
+    p.rect(0, 12, TILE - 1, 13, SHADOW)
+    p.rect(0, 14, TILE - 1, TILE - 1, SHADOW_DEEP)
     for x in range(1, TILE, 4):          # dentils
         p.rect(x, 14, x + 1, TILE - 1, INK)
     return p
 
 
 def balustrade(_unused=None) -> Patch:
-    """Posts and a rail, one cell tall, tiling horizontally. Posts are two
-    pixels wide on purpose -- see docs/world.md: a one-pixel caster lands on
-    only half the shadow lanes and casts a dotted shadow."""
+    """A railing standing on the terrace, waist high to the prince, behind
+    him: the plinth sits on the floor at the bottom of the cell, the rail
+    twelve pixels up. It used to hang a cell higher with a gold rail, which
+    read as a ledge over the floor; now it is dark, unlit across its top, and
+    shorter than the man passing in front of it, so it cannot be mistaken
+    for anything to stand on. Posts are two pixels wide on purpose -- see
+    docs/world.md: a one-pixel caster lands on only half the shadow lanes and
+    casts a dotted shadow."""
     p = Patch(TILE, TILE)
-    p.rect(0, 2, TILE - 1, 3, LIGHT)
-    p.hline(4, 0, TILE - 1, LIGHT_WARM)
-    p.hline(5, 0, TILE - 1, SHADOW_WARM)
+    p.hline(3, 0, TILE - 1, SHADOW)
+    p.hline(4, 0, TILE - 1, SHADOW_DEEP)
+    p.hline(5, 0, TILE - 1, INK)
     for px0 in (1, 6, 11):
-        p.rect(px0, 6, px0 + 3, 12, SHADOW)
-        p.vline(px0, 6, 12, LIGHT_WARM)
-        p.vline(px0 + 3, 6, 12, INK)
-    p.rect(0, 13, TILE - 1, 13, LIGHT_WARM)
+        p.rect(px0, 6, px0 + 2, 12, SHADOW_DEEP)
+        p.vline(px0, 6, 12, SHADOW)
+        p.vline(px0 + 2, 6, 12, INK)
+    p.hline(13, 0, TILE - 1, SHADOW)
     p.rect(0, 14, TILE - 1, TILE - 1, SHADOW_DEEP)
     return p
 
@@ -429,8 +446,12 @@ def column_shaft(_unused=None) -> Patch:
 def column_cap(_unused=None) -> Patch:
     p = Patch(TILE, TILE)
     _shaft(p, 7, TILE - 1)
-    p.rect(1, 0, TILE - 2, 1, LIGHT)              # abacus
-    p.hline(2, 1, TILE - 2, LIGHT_WARM)
+    # The abacus is lit on its west end, the face square to the sun, and not
+    # across its top: a column ends four tiles up, exactly at grab height,
+    # and a gold slab there reads as a ledge to grab.
+    p.rect(1, 0, TILE - 2, 1, SHADOW_WARM)
+    p.vline(1, 0, 1, LIGHT_WARM)
+    p.hline(2, 1, TILE - 2, SHADOW)
     for i in range(4):                            # flaring echinus
         inset = 2 + i
         p.rect(inset, 3 + i, TILE - 1 - inset, 3 + i, SHADOW)
@@ -447,7 +468,7 @@ def column_base(_unused=None) -> Patch:
         p.rect(inset, 9 + i, TILE - 1 - inset, 9 + i, SHADOW)
         p.set(inset, 9 + i, LIGHT_WARM)
         p.set(TILE - 1 - inset, 9 + i, INK)
-    p.hline(12, 0, TILE - 1, LIGHT)               # plinth, lit top
+    p.hline(12, 0, TILE - 1, MID)                 # plinth, warm, not a cap
     p.rect(0, 13, TILE - 1, TILE - 1, SHADOW_DEEP)
     p.vline(0, 13, TILE - 1, MID)
     return p
@@ -462,8 +483,9 @@ def planter(_unused=None) -> Patch:
             x = fx + round(lean * (k * k) / 24.0)
             p.set(x, 8 - k, FOLIAGE)
             p.set(x + 1, 8 - k, FOLIAGE_DARK)
-    p.hline(9, 2, TILE - 3, LIGHT)
-    p.hline(10, 2, TILE - 3, LIGHT_WARM)
+    p.hline(9, 2, TILE - 3, MID)                  # the rim: warm, not a cap
+    p.set(2, 9, LIGHT_WARM)
+    p.hline(10, 2, TILE - 3, SHADOW_WARM)
     p.rect(2, 11, TILE - 3, TILE - 1, SHADOW)
     p.vline(2, 11, TILE - 1, LIGHT_WARM)
     p.vline(TILE - 3, 11, TILE - 1, INK)
@@ -491,23 +513,27 @@ def niche(_unused=None) -> Patch:
 
 
 def frieze(_unused=None) -> Patch:
-    """A carved band: a row of tiny arches, the cheapest way to make a long
-    wall face read as built rather than poured."""
+    """A carved band: blind arches cut into the course under a lip, the
+    cheapest way to make a long wall face read as built rather than poured.
+    Two to a cell, round-headed, in the wall's own shade and with no rails:
+    three slots a cell between two gold lines was a ladder lying on its side,
+    and was called one by a player who tried to climb it. Lit along the lower
+    and right inner edges, as every carved recess is (docs/ui.md, "The
+    light")."""
     p = Patch(TILE, TILE)
-    p.fill(SHADOW_DEEP)
-    p.hline(0, 0, TILE - 1, LIGHT_WARM)
-    p.hline(1, 0, TILE - 1, MID)
-    for sx in (1, 6, 11):
+    p.fill(SHADOW)
+    p.hline(0, 0, TILE - 1, SHADOW_WARM)
+    p.hline(1, 0, TILE - 1, SHADOW_DEEP)
+    for sx in (2, 10):
+        cx = sx + 2.0
         for y in range(4, 12):
             for x in range(sx, sx + 4):
                 fx, fy = x + 0.5, y + 0.5
-                cx = sx + 2.0
                 inside = abs(fx - cx) <= 1.8 if fy > 6.5 else (fx - cx) ** 2 + (fy - 6.5) ** 2 <= 3.6
                 if inside:
                     p.set(x, y, INK)
-        p.vline(sx, 4, 11, MID)
-    p.hline(12, 0, TILE - 1, SHADOW)
-    p.hline(13, 0, TILE - 1, LIGHT_WARM)
+        p.vline(sx + 4, 6, 11, MID)              # the right jamb, in the sun
+        p.hline(12, sx, sx + 3, MID)             # the sill
     p.rect(0, 14, TILE - 1, TILE - 1, SHADOW_DEEP)
     return p
 
@@ -527,8 +553,11 @@ def banner(_unused=None) -> Patch:
 def fountain_sheet() -> Patch:
     """Two cells wide. Teal is water and player two and nothing else."""
     p = Patch(TILE * 2, TILE)
-    p.rect(0, 5, TILE * 2 - 1, 6, LIGHT)          # lit rim
-    p.hline(7, 0, TILE * 2 - 1, LIGHT_WARM)
+    # The rim is waist high and nobody stands on it, so it is warm, not
+    # gold; the water and its one specular are what the eye goes to.
+    p.hline(5, 0, TILE * 2 - 1, MID)
+    p.hline(6, 0, TILE * 2 - 1, SHADOW_WARM)
+    p.hline(7, 0, TILE * 2 - 1, SHADOW)
     p.rect(0, 8, TILE * 2 - 1, TILE - 1, SHADOW)
     p.rect(2, 8, TILE * 2 - 3, 10, WATER)
     p.rect(2, 11, TILE * 2 - 3, TILE - 1, WATER_DEEP)
@@ -843,9 +872,9 @@ def lantern(_unused=None) -> Patch:
 def balustrade_rug(_unused=None) -> Patch:
     """A rug hung over the railing to air. Somebody lives here."""
     p = balustrade()
-    p.rect(3, 2, 12, 13, CLOTH)
-    p.hline(2, 3, 12, CLOTH_DARK)                 # the fold over the rail
-    p.hline(5, 3, 12, LIGHT_WARM)
+    p.rect(3, 3, 12, 13, CLOTH)
+    p.hline(3, 3, 12, CLOTH_DARK)                 # the fold over the rail
+    p.hline(6, 3, 12, LIGHT_WARM)
     p.hline(10, 3, 12, LIGHT_WARM)
     for x in range(4, 12, 3):
         p.set(x, 7, SHADOW_DEEP)
