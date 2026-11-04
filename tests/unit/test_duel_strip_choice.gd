@@ -7,7 +7,7 @@ extends GutTest
 ## the Tug of War every time) and with a bad `strip` word allowed to cost the
 ## level.
 
-const PATH := "user://test_duel_strip_choice.cfg"
+var _path := UserData.at("user://test_duel_strip_choice.cfg")
 const SCENE := "res://scenes/duel_select.tscn"
 const MATCH := preload("res://scenes/duel_match.tscn")
 
@@ -24,13 +24,13 @@ func after_each() -> void:
 
 
 func _remove() -> void:
-	if FileAccess.file_exists(PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
+	if FileAccess.file_exists(_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_path))
 
 
 func _page() -> DuelSelect:
 	var page := (load(SCENE) as PackedScene).instantiate() as DuelSelect
-	page.store_path = PATH
+	page.store_path = _path
 	page.play = func(scene: String) -> void: _played.append(scene)
 	page.leave = func() -> void: pass
 	add_child_autofree(page)
@@ -38,7 +38,7 @@ func _page() -> DuelSelect:
 
 
 func _write(lines: String) -> void:
-	var file := FileAccess.open(PATH, FileAccess.WRITE)
+	var file := FileAccess.open(_path, FileAccess.WRITE)
 	file.store_string(lines)
 	file.close()
 
@@ -60,7 +60,7 @@ func test_the_strip_row_steps_through_every_strip_then_random() -> void:
 	assert_eq(page.row_value(DuelSelect.STRIP_ROW), "RANDOM")
 	page.shift_strip(-1)
 	assert_eq(page.choice().strip, "roofs", "left: back")
-	assert_false(FileAccess.file_exists(PATH), "browsing saves nothing")
+	assert_false(FileAccess.file_exists(_path), "browsing saves nothing")
 
 
 func test_starting_a_duel_remembers_the_strip_and_jump_on_it_plays_the_way() -> void:
@@ -75,7 +75,7 @@ func test_starting_a_duel_remembers_the_strip_and_jump_on_it_plays_the_way() -> 
 	again.confirm()
 	assert_eq(_played, ["res://scenes/duel_match_cpu.tscn"] as Array[String],
 		"jump on the strip's row plays the way last played")
-	var saved := DuelChoice.open(PATH)
+	var saved := DuelChoice.open(_path)
 	assert_eq(saved.strip, "well", "and the strip is saved")
 	assert_eq(saved.way, 1, "without changing the way")
 	assert_eq(_page().row_value(DuelSelect.STRIP_ROW), "CLOCKWORK WELL",
@@ -84,20 +84,20 @@ func test_starting_a_duel_remembers_the_strip_and_jump_on_it_plays_the_way() -> 
 
 func test_the_strip_falls_back_alone() -> void:
 	_write("[duel]\nway=\"cpu\"\nlevel=\"hard\"\nstrip=\"atlantis\"\n")
-	var choice := DuelChoice.open(PATH)
+	var choice := DuelChoice.open(_path)
 	assert_eq(choice.strip, DuelStrips.TUG, "a strip that names nothing is the Tug of War")
 	assert_eq([choice.way, choice.level], [1, DuelBrain.Difficulty.HARD],
 		"and costs the way and the level nothing")
 	_write("[duel]\nway=\"sideways\"\nstrip=\"AQUEDUCT\"\n")
-	choice = DuelChoice.open(PATH)
+	choice = DuelChoice.open(_path)
 	assert_eq(choice.strip, "aqueduct", "a good strip survives a bad way, in any case")
 	_write("[duel]\nstrip=4\n")
-	assert_eq(DuelChoice.open(PATH).strip, DuelStrips.TUG, "a strip of the wrong type")
+	assert_eq(DuelChoice.open(_path).strip, DuelStrips.TUG, "a strip of the wrong type")
 	_write("[duel]\nway=\"local\"\nlevel=\"easy\"\n")
-	assert_eq(DuelChoice.open(PATH).strip, DuelStrips.TUG,
+	assert_eq(DuelChoice.open(_path).strip, DuelStrips.TUG,
 		"a file from before the strips opens on the Tug of War")
 	_write("[duel]\nstrip=\"random\"\n")
-	assert_eq(DuelChoice.open(PATH).strip, DuelStrips.RANDOM, "RANDOM is kept as a choice")
+	assert_eq(DuelChoice.open(_path).strip, DuelStrips.RANDOM, "RANDOM is kept as a choice")
 
 
 func test_random_is_drawn_once_from_the_strips() -> void:
@@ -114,11 +114,11 @@ func test_random_is_drawn_once_from_the_strips() -> void:
 
 func test_the_match_plays_the_strip_the_page_saved() -> void:
 	var choice := DuelChoice.new()
-	choice.path = PATH
+	choice.path = _path
 	choice.strip = "aqueduct"
 	assert_eq(choice.save(), OK)
 	var scene := MATCH.instantiate()
-	scene.set("choice_path", PATH)
+	scene.set("choice_path", _path)
 	add_child_autofree(scene)
 	var fight := scene.get_node(^"World/Match") as DuelMatch
 	assert_eq(fight.strip.id, "aqueduct", "the match is on the saved strip")
