@@ -215,6 +215,7 @@ func _process(delta: float) -> void:
 	_repeat_across = maxf(0.0, _repeat_across - delta)
 	_hold = maxf(0.0, _hold - delta)
 	queue_redraw()
+	TouchControls.label(self, "PLAY", "BACK")
 
 	var vertical := Input.get_axis("move_up", "move_down")
 	var across := Input.get_axis("move_left", "move_right")

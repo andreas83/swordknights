@@ -1,6 +1,6 @@
 class_name Hud
 extends Control
-## Health, relics, the level title card and the pause/complete overlay.
+## Health, relics, the level title card and the complete overlay.
 ##
 ## Drawn rather than built from Control nodes so it shares the exact palette,
 ## the exact light direction and the exact geometry as the rest of the game.
@@ -390,8 +390,9 @@ func _draw_eclipse(at: Vector2, alpha: float) -> void:
 	draw_circle(centre, 3.6, Palette.with_alpha(Palette.INK, alpha))
 
 
-## PAUSED / ESCAPED. The game is stopped, so this one gets weight: a scrim over
-## the world and a carved band across the reserved area.
+## ESCAPED. The game is stopped, so this one gets weight: a scrim over the
+## world and a carved band across the reserved area. Pause is not drawn here
+## any more: it is a list, and a page of its own (scripts/ui/pause_menu.gd).
 func _draw_overlay(view: Vector2) -> void:
 	draw_rect(Rect2(Vector2.ZERO, view), Palette.with_alpha(Palette.INK, 0.62))
 

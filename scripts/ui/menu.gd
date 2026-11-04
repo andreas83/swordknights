@@ -238,6 +238,10 @@ func _process(delta: float) -> void:
 
 	if _settings != null and _settings.visible:
 		return
+	# Both buttons open the row here, as both always have: the title screen
+	# is the root, and there is nothing for a back button to go back to
+	# (docs/ui.md, "Ways back").
+	TouchControls.label(self, "OPEN", "OPEN")
 
 	var axis := Input.get_axis("move_up", "move_down")
 	if absf(axis) > 0.5 and is_zero_approx(_repeat):

@@ -70,8 +70,8 @@ func _physics_process(delta: float) -> void:
 		_follow_the_match()
 		if session.stage == NetSession.Stage.ENDED:
 			_offer_fallback(session.status_detail)
-		elif Input.is_action_just_pressed("pause"):
-			_to_menu()
+		else:
+			_drive_online_menu(delta)
 		return
 
 	if _local:
@@ -82,13 +82,87 @@ func _physics_process(delta: float) -> void:
 	# is any session to do it, or ROOM_OK never arrives.
 	if transport != null:
 		transport.poll()
-	if Input.is_action_just_pressed("pause") and not lobby.is_typing():
-		if lobby.page == DuelLobby.Page.MENU:
-			_to_menu()
+	var thumbs := lobby.thumb_labels()
+	TouchControls.label(self, thumbs[0], thumbs[1])
+	if lobby.is_typing():
+		return
+	lobby.drive()
+	# Enter is SWORD as well as the GUI's accept: pressed on a row, it is the
+	# row's, never also a step back.
+	var sword := DuelLobby.pressed_alone(&"attack", &"ui_accept")
+	if Input.is_action_just_pressed("pause"):
+		_lobby_back()
+	elif sword:
+		if lobby.page == DuelLobby.Page.BUSY:
+			_offer_fallback("gave up waiting")
 		else:
-			lobby.show_menu()
-	elif Input.is_action_just_pressed("attack") and lobby.page == DuelLobby.Page.BUSY:
-		_offer_fallback("gave up waiting")
+			_lobby_back()
+
+
+## Back one step from the lobby: a text page to its list, the list to the
+## duel page.
+func _lobby_back() -> void:
+	if lobby.page == DuelLobby.Page.MENU:
+		_to_menu()
+	else:
+		lobby.show_menu()
+
+
+## --- the menu, online ---------------------------------------------------------
+##
+## The match cannot stop: the other phone is still stepping it, and the frame
+## this one is on is the host's. So the menu is two rows -- KEEP FIGHTING,
+## LEAVE MATCH -- over a lighter scrim, its heading says the match goes on,
+## and while it is up this phone sends no input at all (_local_bits()):
+## the fighter stands where he was, as he would if the player put the phone
+## down. Leaving is the session's own shutdown, which says BYE, so the other
+## phone hears "the other player left" and goes back to its lobby rather than
+## timing out on a silent socket. Once the match is over there is no rematch
+## to offer -- both phones would have to agree to it -- so SWORD or PAUSE
+## leaves.
+
+func menu_rows() -> Array[Dictionary]:
+	return [
+		{"id": &"resume", "title": "KEEP FIGHTING", "enabled": true},
+		{"id": &"leave", "title": "LEAVE MATCH", "enabled": true},
+	]
+
+
+func over_jump_label() -> String:
+	return ""
+
+
+func _drive_online_menu(delta: float) -> void:
+	_label_thumbs()
+	var over := fight.phase == DuelMatch.Phase.MATCH_OVER
+	if over:
+		menu.close()
+		hud.footer = "SWORD OR PAUSE TO LEAVE"
+		if Input.is_action_just_pressed("pause") or Input.is_action_just_pressed("attack"):
+			_to_menu()
+		return
+	if Input.is_action_just_pressed("pause"):
+		if menu.is_open():
+			menu.close()
+		else:
+			menu.title = "THE MATCH GOES ON"
+			menu.scrim = 0.5
+			menu.open(menu_rows())
+		_label_thumbs()
+		return
+	menu.step(delta)
+
+
+## This phone's byte for the frame: nothing while the menu is up.
+func _local_bits() -> int:
+	if menu != null and menu.is_open():
+		return 0
+	# And not the press that chose KEEP FIGHTING, while it is still down.
+	if _held_over:
+		if _menu_press_held():
+			return 0
+		_held_over = false
+	return PlayerInput.bits_from_actions("")
 
 
 ## --- opening a connection ---------------------------------------------------
@@ -137,7 +211,7 @@ func _start_session(as_host: bool) -> void:
 	session = NetSession.new()
 	# One player per device: the unsuffixed actions, which the keyboard, a
 	# gamepad and the touch controls all drive.
-	session.local_input = func() -> int: return PlayerInput.bits_from_actions("")
+	session.local_input = _local_bits
 	# Sent once, in the handshake, so the other phone can draw this player as
 	# they chose. Player one's look: a phone is one player.
 	session.local_look = _my_look().to_ids()
@@ -171,7 +245,7 @@ func _on_seated(slot: int) -> void:
 		push_warning("the other player's look was dropped: %s" % session.remote_look_error)
 	dress_fighters()
 	hud.your_slot = slot
-	hud.footer = "YOU ARE %s  ·  PAUSE TO LEAVE" % ("CRIMSON" if slot == 0 else "SEA-GREEN")
+	hud.footer = "YOU ARE %s  ·  %s" % ["CRIMSON" if slot == 0 else "SEA-GREEN", PLAY_FOOTER]
 	camera.setup(fight)
 
 
@@ -206,6 +280,7 @@ func _my_look() -> CharacterLook:
 ## say what happened and put the lobby back.
 func _offer_fallback(reason: String) -> void:
 	_teardown()
+	menu.close()
 	lobby.visible = true
 	lobby.show_menu()
 	lobby.set_status(reason if reason != "" else "could not connect")
@@ -218,7 +293,7 @@ func _play_locally() -> void:
 	_local = true
 	dress_fighters()
 	lobby.visible = false
-	hud.footer = "TWO PLAYERS, ONE KEYBOARD  ·  PAUSE TO QUIT"
+	hud.footer = "TWO PLAYERS, ONE KEYBOARD  ·  " + PLAY_FOOTER
 
 
 func _teardown() -> void:
@@ -235,9 +310,11 @@ func _teardown() -> void:
 	_online = false
 
 
+## Leaves cleanly: the session's shutdown says BYE before the socket closes,
+## and only then does the scene go.
 func _to_menu() -> void:
 	_teardown()
-	get_tree().change_scene_to_file(MENU_SCENE)
+	super._to_menu()
 
 
 func _exit_tree() -> void:

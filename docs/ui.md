@@ -162,7 +162,7 @@ Consequences:
 ### The reserved band
 
 `UiLayout.banner(view)` is a 48-unit band across the middle of the safe area.
-**It is the only place an overlay may put words.** Level title cards, PAUSED,
+**It is the only place an overlay may put words.** Level title cards,
 ESCAPED, round results, match results, the desync warning and the duel's hit
 flashes all live there and nowhere else.
 
@@ -171,7 +171,10 @@ so the floor can be a row of spikes. `PAUSE TO QUIT` used to be printed across
 them. Persistent duel hints now sit at the top centre, under the network line,
 for the same reason.
 
-The title card and the pause overlay share the band, so only one is ever drawn.
+The title card and the complete overlay share the band, so only one is ever
+drawn. The pause menu is not an overlay: it is a page (*The pause menu*,
+below). Four rows do not fit in 48 units, and while it is open nothing of the
+level is being read.
 
 ### The light
 
@@ -202,7 +205,8 @@ route, round it yourself.
 | Wardrobe | `scripts/ui/wardrobe_screen.gd`, `scripts/ui/figure_preview.gd`, `scenes/wardrobe.tscn` |
 | Chapter select | `scripts/ui/chapter_select.gd`, `scenes/chapter_select.tscn` |
 | Duel page | `scripts/ui/duel_select.gd`, `scripts/ui/duel_choice.gd`, `scenes/duel_select.tscn` |
-| Level HUD, title and chapter cards, pause/complete overlay | `scripts/ui/hud.gd` |
+| Level HUD, title and chapter cards, complete overlay | `scripts/ui/hud.gd` |
+| The pause menu, in a level and in a duel | `scripts/ui/pause_menu.gd` |
 | The dawn's words | `scripts/campaign/ending_card.gd`, over `scripts/campaign/dawn_frame.gd` |
 | Touch controls | `scripts/ui/touch_controls.gd`, `scripts/ui/touch_surface.gd` |
 | Duel HUD | `scripts/duel/match_hud.gd` |
@@ -547,6 +551,124 @@ the computer) lays itself out against the same `UiLayout.safe()`, up and to the 
 of JUMP. It used to convert the safe area by hand, which put it off the right
 edge whenever the reported area was wider than the window — the bug the stick
 and the other buttons had before UiLayout.
+
+### What the buttons say
+
+The two thumb buttons always said JUMP and SWORD, over the pause screen, the
+complete screen and every page, where they meant *choose* and *leave*. A
+thumb reads the button it is about to press, not the hint line under a list,
+so the owner and a second player on phones asked for the words to follow the
+function. They do, through one call every screen makes:
+
+```gdscript
+TouchControls.label(screen, "CONTINUE|NEXT", "QUIT")  # or controls.set_labels(...)
+controls.play_labels()                                # JUMP and SWORD
+```
+
+A label is phrasings, longest first, split on `|`; the button shows the first
+that fits inside its ring (`TouchControls.fit_label()`), as `UiFont.fit()`
+shortens a hint. The rings do not grow with the screen, so a word that fits
+at 320 units fits at 440: JUMP's ring holds six MICRO letters and SWORD's
+five — SWORD itself, with a unit to spare. CONTINUE (53 units) and REMATCH
+(48) are wider than JUMP's ring, which is why those buttons say NEXT and AGAIN
+where their hint lines say the long word. An empty label letters the button
+with nothing: on that screen it does nothing. THROW, which has no menu
+meaning, is hidden whenever the labels are not play's — TouchControls' own,
+and the duel's (`DuelTouchGuard.suppressed`).
+
+| Screen | JUMP | SWORD |
+| --- | --- | --- |
+| Play, a level or a duel | JUMP | SWORD |
+| A title card over play | JUMP | SWORD |
+| The pause menu (every mode) | SELECT | BACK (into the game) |
+| The death beat | RETRY (skips it to the torch) | — |
+| The complete screen | NEXT / DONE / DAWN / REPLAY | QUIT |
+| The duel's result | AGAIN | QUIT |
+| The online duel's result | — | LEAVE |
+| Title screen | OPEN | OPEN |
+| Settings | LOUDER / SWITCH / BACK, by row | BACK |
+| Chapter select | PLAY (— on a locked row) | BACK |
+| Duel page | PLAY | BACK |
+| Wardrobe | NEXT | BACK |
+| Duel lobby | SELECT | BACK; LOCAL while waiting |
+| The dawn | RETURN, once it can be left | BACK |
+| A ruin that would not generate | BACK | BACK |
+
+**A title card keeps the play words.** The first press of any verb takes a
+card away, but the press is play too — the jump happens (*Chapter cards*,
+above). A button lettered SKIP that also jumps would be a lie about the one
+thing the player is about to do. The dawn's card, whose press does nothing
+but leave, says so.
+
+**The lobby is driven by the stick now.** Its rows are real Buttons, moved and
+pressed by the GUI's `ui_*` actions, which the touch stick and JUMP never
+send; on a phone the only way in was to tap a row. `DuelLobby.drive()` reads
+the game's actions and steps the focus and presses the focused row, but only
+for a press the GUI did not get too, since Space is both `jump` and
+`ui_accept`.
+
+`tests/unit/test_touch_labels.gd` letters every screen through its own frame
+and fails a word that does not fit; its guard fails any scene with thumb
+buttons that it does not visit.
+
+### The pause menu
+
+`scripts/ui/pause_menu.gd`, one list for every mode that plays, opened by
+PAUSE — the touch pause button, Escape or P, a pad's Start — and closed by it.
+Up and down choose, JUMP chooses, SWORD goes back into the game; rows can be
+tapped (a tap selects, a tap on the selected row chooses, as on the chapter
+select), and with the thumbs up the list keeps clear of JUMP's corner and the
+caption of SWORD's reach. Under the list, one line says where you are: the
+clock, the relics and the secrets.
+
+It is a page over a scrim, not an overlay in the band, and the world shows
+dimly through it, stopped. A resume chosen with JUMP or SWORD waits for the
+button to come up, so the press is not also the prince's first jump or swing
+(`Game._resume()`); the duel holds its step the same way.
+
+| Mode | Rows | Why |
+| --- | --- | --- |
+| A level on its own, the feel lab | RESUME · RESTART FROM TORCH · RESTART LEVEL · QUIT TO TITLE | |
+| A chapter of the campaign, the boss | RESUME · RESTART FROM TORCH · RESTART CHAPTER · QUIT TO CHAPTERS | the campaign is a place: leaving goes to its chapter select |
+| Endless | RESUME · RESTART FROM TORCH · RESTART RUIN · QUIT TO TITLE | the same ruin, never a new one: a roll is reported by its seed |
+| One keyboard, VS CPU | RESUME · RESTART MATCH · LEAVE MATCH | no torch and nothing to keep; the match stops |
+| Online | KEEP FIGHTING · LEAVE MATCH | the match cannot stop |
+
+RESUME is first and under the cursor, so a stray pause costs one press.
+RESTART FROM TORCH is what a death does, without the death — the clock runs,
+latches hold, the fallen stay down — for a player who has walked into a state
+they would rather not play out; before any torch is taken it is dimmed and
+skipped, not hidden. RESTART is the level from nothing. QUIT is last and
+furthest from the thumb: the old pause screen quit on SWORD, the button the
+player had been swinging a moment before.
+
+**Online the match goes on.** The other phone is stepping it, so the menu's
+heading says THE MATCH GOES ON, the scrim is lighter, and while it is up this
+phone sends no input: the fighter stands where he was, as if the phone were
+put down. LEAVE MATCH is `NetSession.shutdown()`, which sends BYE before the
+socket closes, so the other phone hears *the other player left* and goes back
+to its lobby instead of timing out. A finished online match has no rematch to
+offer — both phones would have to agree — so its SWORD and PAUSE leave.
+
+### Ways back
+
+Every screen shows a way back, and `tests/unit/test_quit_routes.gd` leaves
+each one the way a player would, through the scene's own frame; its guard
+fails any scene that is in neither its routes nor its exemptions. The audit
+behind it found three dead ends and two traps:
+
+- **A ruin that would not generate** left a screen with no game on it — no
+  pause menu, no buttons. It now says SWORD OR PAUSE TO GO BACK, with buttons
+  lettered BACK.
+- **The online result screen** offered JUMP FOR A REMATCH, which nothing
+  answered.
+- **The dawn** had no buttons on a phone and said how to leave only once it
+  could be left; it now has both.
+- **Pause, then SWORD** quit a level at once, and **online PAUSE** left the
+  match with no question asked. Both are now the menu's last row.
+
+The title screen is the one screen with no way back: it is the root. Its
+buttons say OPEN.
 
 ---
 

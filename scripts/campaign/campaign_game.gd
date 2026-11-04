@@ -28,6 +28,7 @@ extends Node2D
 
 const GAME_SCENE := "res://scenes/game.tscn"
 const CHAPTER_SELECT := "res://scenes/chapter_select.tscn"
+const TOUCH_CONTROLS := preload("res://scenes/touch_controls.tscn")
 
 ## Test seams, set before _ready: where progress is kept, and what returning
 ## to the chapter select does (the scene change, by default).
@@ -77,6 +78,12 @@ func _build() -> void:
 	_game.advance = _advance
 	_game.advance_label = _advance_label()
 	_game.quit_scene = CHAPTER_SELECT
+	# The pause menu's words: a chapter is started over, and left for the
+	# chapter select. The boss is chapter V's last room, so it says chapter.
+	_game.restart_label = "RESTART CHAPTER"
+	_game.quit_label = "QUIT TO CHAPTERS"
+	if leave.is_valid():
+		_game.leave = leave
 	_game.level_completed.connect(_on_completed)
 	add_child(_game)
 	# The chapter's own card over the level's plain one, which Game._ready
@@ -124,6 +131,12 @@ func _show_ending() -> void:
 	add_child(_dawn)
 	_ending = _dawn.card
 	_ending.done.connect(_leave)
+	# The game's thumb buttons went with the game. The dawn is a screen too,
+	# and a phone needs to be told how to leave it (docs/ui.md, "Ways back").
+	var controls := TOUCH_CONTROLS.instantiate() as TouchControls
+	controls.name = "TouchControls"
+	add_child(controls)
+	_ending.controls = controls
 
 
 func _clear_game() -> void:

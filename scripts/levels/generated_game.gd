@@ -29,6 +29,8 @@ extends Node2D
 ## the whole descent and the readout's seed is still the one to report.
 
 const GAME_SCENE := "res://scenes/game.tscn"
+const MENU_SCENE := "res://scenes/menu.tscn"
+const TOUCH_CONTROLS := preload("res://scenes/touch_controls.tscn")
 ## Added per ruin descended.
 const DIFFICULTY_STEP := 0.1
 ## The top of the generator's dial, where every segment is in play and gaps
@@ -47,7 +49,12 @@ const MAX_DIFFICULTY := 0.95
 var seed_value: int = 0
 var depth: int = 1
 
+## Test seam: what leaving a ruin that would not generate does instead of
+## changing to the title screen.
+var leave := Callable()
+
 var _first_seed: int = 0
+var _stranded := false
 var _game: Game
 var _readout: Readout
 
@@ -99,6 +106,7 @@ func _build() -> void:
 		# tester can report the seed that broke it.
 		_readout.failure = "GENERATION FAILED"
 		push_error("GeneratedGame: %s" % String(result["reason"]))
+		_strand()
 		return
 
 	var level := result["level"] as AsciiLevel
@@ -112,6 +120,11 @@ func _build() -> void:
 	# Before add_child, or Game._ready falls back to its level_path export.
 	_game.level_source = level
 	_game.advance = _descend
+	# The pause menu starts this ruin over, never a new one: a roll is
+	# reported by its seed, and the seed on screen must stay the one played.
+	_game.restart_label = "RESTART RUIN"
+	if leave.is_valid():
+		_game.leave = leave
 	add_child(_game)
 
 	_readout.level_name = level.name
@@ -123,6 +136,31 @@ func _build() -> void:
 		seed_value, level.cols, _readout.beats, int(result["attempts"]),
 		String((result["report"] as Dictionary).get("reason", "")),
 	])
+
+
+## A ruin that would not generate leaves a screen with no game on it, so no
+## pause menu and no thumb buttons: once the only dead end in the game.
+## It gets the title screen's way back -- any of jump, sword or pause, or a
+## tap -- said on screen, and buttons lettered with it.
+func _strand() -> void:
+	_stranded = true
+	_readout.failure_hint = "SWORD OR PAUSE TO GO BACK"
+	var controls := TOUCH_CONTROLS.instantiate() as TouchControls
+	controls.name = "TouchControls"
+	add_child(controls)
+	controls.set_labels("BACK", "BACK")
+
+
+func _process(_delta: float) -> void:
+	if not _stranded:
+		return
+	if Input.is_action_just_pressed("attack") or Input.is_action_just_pressed("pause") \
+			or Input.is_action_just_pressed("jump"):
+		_stranded = false
+		if leave.is_valid():
+			leave.call()
+		else:
+			get_tree().change_scene_to_file(MENU_SCENE)
 
 
 func _mount_readout() -> void:
@@ -153,6 +191,7 @@ class Readout extends Control:
 	var beats: int = 0
 	var columns: int = 0
 	var failure: String = ""
+	var failure_hint: String = ""
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -182,6 +221,9 @@ class Readout extends Control:
 				UiFont.Cut.TEXT, Palette.PAPER, UiFont.Align.LEFT, 0.7)
 			UiFont.draw_text(self, "SEED %d" % seed_value, Vector2(left, bottom - 5.0),
 				UiFont.Cut.MICRO, Palette.LIGHT_SOFT, UiFont.Align.LEFT, 0.7)
+			if failure_hint != "":
+				UiFont.draw_text(self, failure_hint, Vector2(left, bottom - 25.0),
+					UiFont.Cut.MICRO, Palette.PAPER, UiFont.Align.LEFT, 0.7)
 			return
 
 		UiFont.draw_text(self, "RUIN %d  ·  SEED %d" % [depth, seed_value],

@@ -10,6 +10,29 @@ extends CanvasLayer
 ## Presses are injected straight into the input map, so gameplay code never
 ## learns that touch exists — the same `Input.is_action_pressed("jump")` works
 ## for a keyboard, a gamepad and a thumb.
+##
+## ## What the buttons say
+##
+## The action is always the same -- JUMP presses `jump` -- but what `jump`
+## does is the screen's: on the pause menu it chooses a row, on the complete
+## screen it goes on, on a page it plays. A button lettered JUMP over a menu
+## is an instruction that is wrong, and a thumb reads the button, not the hint
+## line under the list. So every screen says what the two thumb buttons do
+## there, right now, with one call: `set_labels(jump, sword)`, or
+## `TouchControls.label(screen, jump, sword)` from a screen that carries its
+## controls as a child named TouchControls, as every scene with them does.
+## Play is `play_labels()`: JUMP and SWORD, and THROW where the layout has
+## it. THROW has no meaning on a menu, so it is hidden whenever the labels
+## are not play's.
+##
+## A label is a list of phrasings, longest first, split on `|`
+## ("CONTINUE|NEXT"), and the button shows the first that fits inside its
+## ring (`fit_label()`), the way `UiFont.fit()` shortens a hint line. The
+## circles do not grow with the screen, so a word that fits at 320 units fits
+## at 440: JUMP holds six MICRO letters and SWORD five, which is why the
+## complete screen's button says NEXT where its hint says CONTINUE. A word
+## that does not fit is never drawn over the ring; a label none of whose
+## phrasings fits says nothing, and tests/unit/test_touch_labels.gd fails it.
 
 const STICK_RADIUS := 30.0
 const STICK_DEADZONE := 7.0
@@ -21,6 +44,15 @@ const HIT_PADDING := 8.0
 ## one layout finds the button in the other.
 const THROW_AT := Vector2(52.0, 78.0)
 const THROW_RADIUS := 18.0
+const JUMP_RADIUS := 24.0
+const SWORD_RADIUS := 19.0
+## --- labels --- the play words, and the ring a label must stay inside: it
+## is drawn 1.2 units wide on the radius.
+const PLAY_JUMP := "JUMP"
+const PLAY_SWORD := "SWORD"
+const LABEL_RING := 1.2
+## The buttons that carry words, by id.
+const LABELLED: Array[String] = ["jump", "attack"]
 
 ## --- the duel's moves --- whether this layout carries THROW. The adventure's
 ## scene sets it (scenes/game.tscn); the menus have nothing to throw, and the
@@ -34,6 +66,8 @@ var _stick_index := -1
 var _stick_origin := Vector2.ZERO
 var _stick_point := Vector2.ZERO
 var _active_directions: Array[String] = []
+# --- labels --- button id -> the phrasings it was given, "|"-separated.
+var _labels: Dictionary = {"jump": PLAY_JUMP, "attack": PLAY_SWORD}
 
 @onready var _surface: Control = $Surface
 
@@ -57,10 +91,10 @@ func _layout() -> void:
 	var bottom := safe.end.y
 
 	_buttons = [
-		{"id": "jump", "action": "jump", "label": "JUMP", "mark": "",
-			"at": Vector2(right - 34.0, bottom - 34.0), "r": 24.0},
-		{"id": "attack", "action": "attack", "label": "SWORD", "mark": "",
-			"at": Vector2(right - 82.0, bottom - 22.0), "r": 19.0},
+		{"id": "jump", "action": "jump", "label": "", "mark": "",
+			"at": Vector2(right - 34.0, bottom - 34.0), "r": JUMP_RADIUS},
+		{"id": "attack", "action": "attack", "label": "", "mark": "",
+			"at": Vector2(right - 82.0, bottom - 22.0), "r": SWORD_RADIUS},
 		{"id": "pause", "action": "pause", "label": "", "mark": "pause",
 			"at": Vector2(right - 12.0, safe.position.y + 12.0), "r": 10.0},
 		{"id": "mute", "action": "", "label": "", "mark": "sound",
@@ -70,6 +104,81 @@ func _layout() -> void:
 		_buttons.append({"id": "throw", "action": "throw", "label": "", "mark": "throw",
 			"at": Vector2(right, bottom) - THROW_AT, "r": THROW_RADIUS})
 	_surface.queue_redraw()
+
+
+## --- labels -----------------------------------------------------------------
+
+## What JUMP and SWORD do on this screen now, each as phrasings, longest
+## first, split on "|". An empty string letters the button with nothing: it
+## does nothing here.
+func set_labels(jump: String, sword: String) -> void:
+	if labels_of("jump") == jump and labels_of("attack") == sword:
+		return
+	_labels = {"jump": jump, "attack": sword}
+	if is_node_ready():
+		_surface.queue_redraw()
+
+
+## Back to the verbs: the screen is play.
+func play_labels() -> void:
+	set_labels(PLAY_JUMP, PLAY_SWORD)
+
+
+## Whether the buttons are lettered for play, and so THROW is up where the
+## layout has it.
+func is_play() -> bool:
+	return labels_of("jump") == PLAY_JUMP and labels_of("attack") == PLAY_SWORD
+
+
+## The phrasings button `id` ("jump" or "attack") was given.
+func labels_of(id: String) -> String:
+	return String(_labels.get(id, ""))
+
+
+## The word button `id` shows: the first of its phrasings that fits its ring.
+func label_of(id: String) -> String:
+	return fit_label(labels_of(id), radius_of(id))
+
+
+static func radius_of(id: String) -> float:
+	return JUMP_RADIUS if id == "jump" else SWORD_RADIUS
+
+
+## The first of `phrasings` ("|"-separated, longest first) that fits inside a
+## ring of `radius`, or "" when none does.
+static func fit_label(phrasings: String, radius: float) -> String:
+	for option: String in phrasings.split("|", false):
+		if label_fits(option, radius):
+			return option
+	return ""
+
+
+## Whether `word`, set in MICRO on a button's centre as draw_surface() sets
+## it, keeps all four corners of its box inside the ring's inner edge.
+static func label_fits(word: String, radius: float) -> bool:
+	var half := Vector2(UiFont.width(word, UiFont.Cut.MICRO) * 0.5,
+		UiFont.cap(UiFont.Cut.MICRO) * 0.5)
+	return half.length() <= radius - LABEL_RING
+
+
+## The TouchControls a screen carries as its child, or null on a screen with
+## none (the one-keyboard duel).
+static func of(screen: Node) -> TouchControls:
+	if screen == null:
+		return null
+	return screen.get_node_or_null(^"TouchControls") as TouchControls
+
+
+## `set_labels()` on the controls `screen` carries, if it carries any: the one
+## call every screen makes.
+static func label(screen: Node, jump: String, sword: String) -> void:
+	var controls := of(screen)
+	if controls != null:
+		controls.set_labels(jump, sword)
+
+
+func _shown(button: Dictionary) -> bool:
+	return String(button["id"]) != "throw" or is_play()
 
 
 func _input(event: InputEvent) -> void:
@@ -171,6 +280,8 @@ func _release(action: String) -> void:
 
 func _button_at(point: Vector2) -> Dictionary:
 	for button: Dictionary in _buttons:
+		if not _shown(button):
+			continue
 		var r: float = button["r"] + HIT_PADDING
 		if point.distance_squared_to(button["at"]) <= r * r:
 			return button
@@ -196,6 +307,8 @@ func _local(event: InputEvent) -> Vector2:
 
 func draw_surface() -> void:
 	for button: Dictionary in _buttons:
+		if not _shown(button):
+			continue
 		var at: Vector2 = button["at"]
 		var r: float = button["r"]
 		var action := String(button["action"])
@@ -206,6 +319,8 @@ func draw_surface() -> void:
 
 		var ink := Palette.with_alpha(Palette.PAPER, 1.0 if held else 0.75)
 		var label := String(button["label"])
+		if LABELLED.has(String(button["id"])):
+			label = label_of(String(button["id"]))
 		if label != "":
 			UiFont.draw_text(_surface, label,
 				Vector2(at.x, at.y - UiFont.cap(UiFont.Cut.MICRO) * 0.5),

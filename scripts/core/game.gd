@@ -51,6 +51,14 @@ var advance_label := "DESCEND"
 ## Where sword takes the player from the pause and complete screens: the
 ## title screen, or the chapter select for a chapter of the campaign.
 var quit_scene := MENU_SCENE
+## --- the pause menu --- what its last two rows say, from the mode: what
+## starting over is (the level, the chapter, the ruin) and where leaving goes.
+## See _menu_rows() for the list and why it is that list.
+var restart_label := "RESTART LEVEL"
+var quit_label := "QUIT TO TITLE"
+## Test seam: what quitting does instead of the wipe to `quit_scene`, which
+## would take the test runner's scene with it.
+var leave := Callable()
 
 @onready var level: Level = $Level
 @onready var player: Player = $Player
@@ -107,6 +115,10 @@ var secrets := SecretKeeper.new()
 # --- blood --- every foe's death, and the prince's wounds, as blood that
 # stays for the life of the level. See scripts/world/bloodshed.gd.
 var blood: Bloodshed
+## --- the pause menu --- and the frame a resume from it waits for (see
+## _resume()).
+var menu: PauseMenu
+var _resuming := false
 
 
 func _ready() -> void:
@@ -170,6 +182,10 @@ func _ready() -> void:
 
 	hud.show_title(data.name)
 	_update_hud()
+	# --- the pause menu --- last, so it is the last child and a tap on its
+	# rows is taken before the touch controls can start a stick with it.
+	menu = PauseMenu.install(self)
+	menu.chosen.connect(_on_menu_chosen)
 
 	# --- feel/flow (additive) --- lift the shadow off whatever just loaded. A
 	# no-op when the previous scene already drove the wipe.
@@ -187,28 +203,38 @@ func _physics_process(delta: float) -> void:
 		_apply_freeze()
 	if stopped:
 		return
+	# --- the pause menu --- a resume chosen with JUMP or SWORD lands here,
+	# once the button that chose it is up, so the press is not also the
+	# prince's first jump or swing (see _resume()).
+	if _resuming and not (Input.is_action_pressed("jump") or Input.is_action_pressed("attack")):
+		_resuming = false
+		if phase == Phase.PAUSED:
+			_set_phase(Phase.PLAYING)
 
 	# --- feel/flow (additive) --- a transition owns the screen while it
 	# runs, so nothing queues a second one behind it.
 	if Input.is_action_just_pressed("pause") and not Flow.busy():
 		if phase == Phase.PLAYING:
 			_set_phase(Phase.PAUSED)
+			menu.open(_menu_rows())
 			GameAudio.cue("pause_in")
-		elif phase == Phase.PAUSED:
+		elif phase == Phase.PAUSED and menu.is_open():
+			menu.close()
 			_set_phase(Phase.PLAYING)
 			GameAudio.cue("pause_out")
 
 	match phase:
 		Phase.PAUSED:
-			if Input.is_action_just_pressed("attack") and not Flow.busy():
-				Flow.change_scene(self, quit_scene)
+			if not Flow.busy():
+				menu.caption = _menu_caption()
+				menu.step(delta)
 		Phase.COMPLETE:
 			if Flow.busy():
 				pass
 			elif Input.is_action_just_pressed("jump"):
 				Flow.wipe(self, advance if advance.is_valid() else _restart)
 			elif Input.is_action_just_pressed("attack"):
-				Flow.change_scene(self, quit_scene)
+				_quit()
 		Phase.DYING:
 			# --- feel/flow (additive) --- the beat, then the respawn behind
 			# the wipe. Nothing is added to the wait: the player is already
@@ -228,12 +254,125 @@ func _physics_process(delta: float) -> void:
 			# --- mechanisms --- the wires' clock: holds count down, beats turn.
 			_bus.step()
 			_resolve_interactions()
+	_label_thumbs()
 
 
 func _set_phase(next: Phase) -> void:
 	phase = next
 	_apply_freeze()
 	hud.set_overlay(_overlay_title(), _overlay_subtitle())
+	_label_thumbs()
+
+
+## --- the pause menu ---------------------------------------------------------
+##
+## RESUME, RESTART FROM TORCH, RESTART <the mode's unit>, QUIT TO <where the
+## mode came from>. Each is something a player pauses to do, in the order
+## they are reached for:
+##
+## - **Resume** first and under the cursor, so pause-then-JUMP is the
+##   cheapest thing on the list and a stray pause costs nothing.
+## - **From the torch** is what a death does, without the death: for a player
+##   who has walked into a state they would rather not play out -- a gate shut
+##   behind them, a relic fallen out of reach. It keeps what a death keeps
+##   (the clock runs, the latches hold, the fallen stay down) because it IS
+##   the respawn, and before any torch is taken it is dimmed, since it would
+##   be the next row.
+## - **Restart** is the level from nothing -- clock, relics, secrets -- for a
+##   player going for a clean run; in the campaign it is the chapter, in
+##   Endless the same ruin, never a new one: a roll is reported by its seed.
+## - **Quit** is last and furthest from the thumb, and goes where the mode
+##   came from: the chapter select in the campaign, the title screen
+##   otherwise. It is the only way out, and it is never one press from play.
+func _menu_rows() -> Array[Dictionary]:
+	return [
+		{"id": &"resume", "title": "RESUME", "enabled": true},
+		{"id": &"torch", "title": "RESTART FROM TORCH",
+			"enabled": not checkpoint.is_equal_approx(level.spawn_world_position())},
+		{"id": &"restart", "title": restart_label, "enabled": true},
+		{"id": &"quit", "title": quit_label, "enabled": true},
+	]
+
+
+func _menu_caption() -> String:
+	var said := "%s  ·  %d/%d RELICS" % [ChapterSelect.format_time(elapsed), relics,
+		relics_total]
+	if secrets.total > 0:
+		said += "  ·  SECRETS %d/%d" % [secrets.count, secrets.total]
+	return said
+
+
+func _on_menu_chosen(id: StringName) -> void:
+	if phase != Phase.PAUSED or Flow.busy():
+		return
+	match id:
+		&"resume":
+			_resume()
+		&"torch":
+			menu.close()
+			Flow.wipe(self, _respawn, Flow.Pace.FAST)
+		&"restart":
+			menu.close()
+			Flow.wipe(self, _restart)
+		&"quit":
+			menu.close()
+			_quit()
+
+
+## Back to play once the button is up. The press that chose RESUME is JUMP or
+## SWORD, and the prince finds his presses as edges against what he last saw
+## held -- which, frozen, was nothing -- so thawed while it is down he would
+## jump or swing with it.
+func _resume() -> void:
+	menu.close()
+	GameAudio.cue("pause_out")
+	_resuming = true
+
+
+## Leaves the level for `quit_scene` behind the wipe: the pause menu's last
+## row, and SWORD on the complete screen.
+func _quit() -> void:
+	if leave.is_valid():
+		leave.call()
+	else:
+		Flow.change_scene(self, quit_scene)
+
+
+## --- labels --- what the thumb buttons say in each phase (TouchControls).
+## While a title card is up they still say JUMP and SWORD: the first press of
+## either takes the card away, but the press is play too -- the jump happens
+## -- and a button lettered SKIP that also jumps would be a lie about the one
+## thing the player is about to do (docs/ui.md, "What the buttons say").
+func _label_thumbs() -> void:
+	var controls := TouchControls.of(self)
+	if controls == null:
+		return
+	match phase:
+		Phase.PAUSED:
+			if menu != null and menu.is_open():
+				controls.set_labels("SELECT", "BACK")
+			else:
+				controls.set_labels("", "")
+		Phase.COMPLETE:
+			controls.set_labels(advance_words(), "QUIT")
+		Phase.DYING:
+			controls.set_labels("RETRY", "")
+		_:
+			controls.play_labels()
+
+
+## JUMP's word on the complete screen: the hint's word, and a shorter one for
+## a ring that cannot hold it -- CONTINUE is wider than JUMP's circle.
+func advance_words() -> String:
+	if not advance.is_valid():
+		return "REPLAY"
+	match advance_label:
+		"CONTINUE", "DESCEND":
+			return advance_label + "|NEXT"
+		"CHAPTERS":
+			return "CHAPTERS|DONE"
+		_:
+			return advance_label + "|NEXT"
 
 
 # --- feel/flow (additive) --- was the body of _set_phase, with hitstop added
@@ -252,9 +391,8 @@ func _apply_freeze() -> void:
 
 
 func _overlay_title() -> String:
+	# PAUSED has no overlay: the pause menu is a page of its own (PauseMenu).
 	match phase:
-		Phase.PAUSED:
-			return "PAUSED"
 		Phase.COMPLETE:
 			return "ESCAPED"
 		_:
@@ -263,18 +401,17 @@ func _overlay_title() -> String:
 
 func _overlay_subtitle() -> String:
 	match phase:
-		Phase.PAUSED:
-			return "PAUSE TO RESUME  ·  SWORD TO QUIT"
 		Phase.COMPLETE:
 			var next := advance_label if advance.is_valid() else "REPLAY"
-			# --- secrets --- counted only where there are any to count, and
-			# then the prompt takes a line of its own: all four will not fit
-			# across a phone held in landscape.
+			# --- secrets --- counted only where there are any to count. The
+			# prompt always takes a line of its own, and says how to leave as
+			# well as how to go on: the complete screen is a screen, and every
+			# screen shows its way back (docs/ui.md, "Ways back").
+			var tally := "%d/%d RELICS  ·  %.1fs" % [relics, relics_total, elapsed]
 			if secrets.total > 0:
-				return "%d/%d RELICS  ·  SECRETS %d/%d  ·  %.1fs\nJUMP TO %s" % [
-					relics, relics_total, secrets.count, secrets.total, elapsed, next]
-			return "%d/%d RELICS  ·  %.1fs  ·  JUMP TO %s" % [
-				relics, relics_total, elapsed, next]
+				tally = "%d/%d RELICS  ·  SECRETS %d/%d  ·  %.1fs" % [
+					relics, relics_total, secrets.count, secrets.total, elapsed]
+			return "%s\nJUMP TO %s  ·  SWORD TO QUIT" % [tally, next]
 		_:
 			return ""
 

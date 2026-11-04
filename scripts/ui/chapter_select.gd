@@ -230,6 +230,9 @@ func _process(delta: float) -> void:
 	_repeat = maxf(0.0, _repeat - delta)
 	_hold = maxf(0.0, _hold - delta)
 	queue_redraw()
+	# A row that cannot be played is jumped on for the back sound and nothing
+	# else, so JUMP says nothing over it.
+	TouchControls.label(self, "PLAY" if is_open(_index) else "", "BACK")
 
 	var vertical := Input.get_axis("move_up", "move_down")
 	if _hold > 0.0:

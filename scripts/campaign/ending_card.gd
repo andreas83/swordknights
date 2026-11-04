@@ -24,6 +24,10 @@ const HOLD := 3.4
 ## The dawn's light is from the east, so the words cast their shadow to the
 ## left, as everything else in the frame does (docs/ui.md, "The light").
 var light_from_east := false
+## The thumb buttons over the dawn, if a touch screen has them (CampaignGame
+## puts them up with the frame). They say nothing until the card can be left,
+## because until then nothing they do leaves it.
+var controls: TouchControls
 
 var _time := 0.0
 var _left := false
@@ -52,6 +56,11 @@ func leave() -> bool:
 func _process(delta: float) -> void:
 	_time += delta
 	queue_redraw()
+	if controls != null:
+		if can_leave():
+			controls.set_labels("RETURN|BACK", "BACK")
+		else:
+			controls.set_labels("", "")
 	if Input.is_action_just_pressed("jump") or Input.is_action_just_pressed("attack"):
 		leave()
 

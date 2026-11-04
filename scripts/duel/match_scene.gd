@@ -29,6 +29,9 @@ extends Node2D
 const MENU_SCENE := "res://scenes/duel_select.tscn"
 const FIGHTER_SCENE: PackedScene = preload("res://scenes/fighter.tscn")
 const MANIFEST := "res://levels/duel_zones.txt"
+## The persistent hint while the match is played, and once it is over.
+const PLAY_FOOTER := "PAUSE FOR THE MENU"
+const OVER_FOOTER := "JUMP FOR A REMATCH  ·  SWORD TO LEAVE"
 
 @onready var fight: DuelMatch = $World/Match
 @onready var zones: ZoneView = $World/ZoneView
@@ -43,9 +46,16 @@ var demo := false
 ## read or write the real save.
 var wardrobe_path := Wardrobe.PATH
 
+## Test seam: what leaving the match does instead of changing to the duel
+## page, which would take the test runner's scene with it.
+var leave := Callable()
+## The menu PAUSE opens (scripts/ui/pause_menu.gd). Null in the attract demo,
+## which is nobody's to pause.
+var menu: PauseMenu
+
 var _gates: Array[GateArt] = []
-var _paused := false
 var _demo_frame := 0
+var _held_over := false
 
 
 func _ready() -> void:
@@ -82,7 +92,10 @@ func _ready() -> void:
 	_build_gates()
 
 	hud.fight = fight
-	hud.footer = "PAUSE TO QUIT" if not demo else strip.name.to_upper()
+	hud.footer = PLAY_FOOTER if not demo else strip.name.to_upper()
+	if not demo:
+		menu = PauseMenu.install(self)
+		menu.chosen.connect(_on_menu_chosen)
 
 	fight.fighter_died.connect(_on_fighter_died)
 	fight.death_recorded.connect(_on_death_recorded)
@@ -175,7 +188,7 @@ func _build_gates() -> void:
 		_gates.append(gate)
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if demo:
 		_demo_frame += 1
 		var bits := _demo_input()
@@ -183,28 +196,104 @@ func _physics_process(_delta: float) -> void:
 		_follow_the_match()
 		return
 
+	_label_thumbs()
 	if Input.is_action_just_pressed("pause"):
 		if fight.phase == DuelMatch.Phase.MATCH_OVER:
 			_to_menu()
 			return
-		_paused = not _paused
-		hud.footer = "PAUSE TO RESUME  ·  SWORD TO QUIT" if _paused else "PAUSE TO QUIT"
+		if menu.is_open():
+			menu.close()
+			GameAudio.cue("pause_out")
+		else:
+			menu.title = "PAUSED"
+			menu.scrim = 0.74
+			menu.open(menu_rows())
+			GameAudio.cue("pause_in")
+		_label_thumbs()
+		return
 
-	if _paused:
-		if Input.is_action_just_pressed("attack"):
-			_to_menu()
+	if menu.is_open():
+		# On one device the match stops while the menu is up: nobody else is
+		# waiting on this frame.
+		menu.step(delta)
 		return
 
 	if fight.phase == DuelMatch.Phase.MATCH_OVER:
-		hud.footer = "JUMP FOR A REMATCH  ·  SWORD FOR THE MENU"
+		hud.footer = OVER_FOOTER
 		if Input.is_action_just_pressed("jump"):
 			_rematch()
 		elif Input.is_action_just_pressed("attack"):
 			_to_menu()
 		return
 
+	# The JUMP or SWORD that chose RESUME is still down: stepped now, the
+	# fighter would read it as a press and jump or swing with it.
+	if _held_over:
+		if _menu_press_held():
+			return
+		_held_over = false
+
 	_step()
 	_follow_the_match()
+
+
+## --- the menu ---------------------------------------------------------------
+##
+## RESUME, RESTART MATCH, LEAVE MATCH. A duel has no torch and nothing to keep,
+## so starting again is the whole match -- the rematch the result screen
+## offers, from wherever the rope stood -- and leaving goes to the duel page,
+## as the result screen's SWORD does. Online the list is shorter and the game
+## does not stop (match_online.gd).
+
+func menu_rows() -> Array[Dictionary]:
+	return [
+		{"id": &"resume", "title": "RESUME", "enabled": true},
+		{"id": &"rematch", "title": "RESTART MATCH", "enabled": true},
+		{"id": &"leave", "title": "LEAVE MATCH", "enabled": true},
+	]
+
+
+func _on_menu_chosen(id: StringName) -> void:
+	menu.close()
+	_held_over = true
+	match id:
+		&"resume":
+			GameAudio.cue("pause_out")
+		&"rematch":
+			_rematch()
+		&"leave":
+			_to_menu()
+	_label_thumbs()
+
+
+func _menu_press_held() -> bool:
+	for action: String in ["jump", "attack", "jump_p1", "attack_p1", "jump_p2", "attack_p2"]:
+		if InputMap.has_action(action) and Input.is_action_pressed(action):
+			return true
+	return false
+
+
+## What the thumb buttons say now, and whether the duel's THROW is up: only
+## in play, as TouchControls hides its own (TouchControls.is_play()).
+func _label_thumbs() -> void:
+	var controls := TouchControls.of(self)
+	if controls == null:
+		return
+	if menu != null and menu.is_open():
+		controls.set_labels("SELECT", "BACK")
+	elif fight.phase == DuelMatch.Phase.MATCH_OVER:
+		controls.set_labels(over_jump_label(), "QUIT")
+	else:
+		controls.play_labels()
+	var throw := get_node_or_null(^"ThrowLayer/ThrowButton") as DuelTouchGuard
+	if throw != null:
+		throw.suppressed = not controls.is_play()
+
+
+## JUMP's word once the match is over: a rematch, which REMATCH is too wide
+## for JUMP's ring to hold. The online match, which has none, says nothing.
+func over_jump_label() -> String:
+	return "REMATCH|AGAIN"
 
 
 ## The only line that matters: one frame of match is two bytes of intent. Here
@@ -234,11 +323,14 @@ func _rematch() -> void:
 	fight.reset_match()
 	gore.clear()
 	camera.setup(fight)
-	hud.footer = "PAUSE TO QUIT"
+	hud.footer = PLAY_FOOTER
 
 
 func _to_menu() -> void:
-	get_tree().change_scene_to_file(MENU_SCENE)
+	if leave.is_valid():
+		leave.call()
+	else:
+		get_tree().change_scene_to_file(MENU_SCENE)
 
 
 ## --- reactions --------------------------------------------------------------
@@ -315,7 +407,7 @@ func _on_blade_caught(_catcher: int, _thrower: int, _at: Vector2) -> void:
 
 
 func _on_match_over(_winner: int) -> void:
-	hud.footer = "JUMP FOR A REMATCH  ·  SWORD FOR THE MENU"
+	hud.footer = OVER_FOOTER
 
 
 ## --- the attract demo -------------------------------------------------------

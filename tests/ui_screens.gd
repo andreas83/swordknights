@@ -77,6 +77,20 @@ func _catalogue() -> Array[Dictionary]:
 		{"name": "hud_title", "scene": "res://scenes/game.tscn", "pose": "title"},
 		{"name": "hud_hurt", "scene": "res://scenes/game.tscn", "pose": "hurt"},
 		{"name": "hud_pause", "scene": "res://scenes/game.tscn", "pose": "pause"},
+		# The thumb buttons say what they do (TouchControls.set_labels()):
+		# every screen whose words change, with the thumbs up.
+		{"name": "hud_pause_touch", "scene": "res://scenes/game.tscn", "pose": "pause",
+			"thumbs": true},
+		{"name": "hud_complete_touch", "scene": "res://scenes/game.tscn",
+			"pose": "complete", "thumbs": true},
+		{"name": "settings_touch", "scene": "res://scenes/menu.tscn", "pose": "settings",
+			"thumbs": true},
+		{"name": "match_menu_touch", "scene": "res://scenes/duel_match_cpu.tscn",
+			"pose": "menu", "thumbs": true},
+		{"name": "match_over_touch", "scene": "res://scenes/duel_match_cpu.tscn",
+			"pose": "over", "thumbs": true},
+		{"name": "lobby_touch", "scene": "res://scenes/duel_match_online.tscn", "pose": "",
+			"thumbs": true},
 		{"name": "match", "scene": "res://scenes/duel_match.tscn", "pose": ""},
 		{"name": "match_flash", "scene": "res://scenes/duel_match.tscn", "pose": "flash"},
 		{"name": "match_over", "scene": "res://scenes/duel_match.tscn", "pose": "over"},
@@ -138,6 +152,10 @@ func _build(shot: Dictionary) -> void:
 ## Each screen state, reached through the public API of the thing being shot.
 func _pose(shot: Dictionary) -> void:
 	var hud := _stage.get_node_or_null(^"HudLayer/Hud")
+	if bool(shot.get("thumbs", false)):
+		var thumbs := _stage.get_node_or_null(^"TouchControls/Surface")
+		if thumbs != null:
+			thumbs.visible = true
 	match String(shot["pose"]):
 		"touch":
 			var surface := _stage.get_node_or_null(^"TouchControls/Surface")
@@ -183,9 +201,26 @@ func _pose(shot: Dictionary) -> void:
 				# screen; the card gets its own shot.
 				hud.show_title("")
 		"pause":
-			if hud != null:
+			# The pause menu, opened as PAUSE opens it (Game._menu_rows()).
+			var game := _stage as Game
+			if game != null and game.phase == Game.Phase.PLAYING:
 				hud.update_model(2, 3, 1, 3)
-				hud.set_overlay("PAUSED", "PAUSE TO RESUME  ·  SWORD TO QUIT")
+				hud.show_title("")
+				game._set_phase(Game.Phase.PAUSED)
+				game.menu.caption = game._menu_caption()
+				game.menu.open(game._menu_rows())
+				game._label_thumbs()
+		"complete":
+			var game := _stage as Game
+			if game != null and game.phase == Game.Phase.PLAYING:
+				hud.show_title("")
+				game._complete()
+		"menu":
+			# The duel's own menu, as PAUSE opens it.
+			var menu := _stage.get("menu") as PauseMenu
+			if menu != null and not menu.is_open():
+				menu.open(_stage.call("menu_rows"))
+				_stage.call("_label_thumbs")
 		"flash":
 			if hud != null:
 				hud.flash("ONE HAS THE INITIATIVE", "ONE LEADS")
@@ -193,8 +228,10 @@ func _pose(shot: Dictionary) -> void:
 			if hud != null and hud.fight != null:
 				hud.fight.phase = DuelMatch.Phase.MATCH_OVER
 				hud.fight.winner = 0
-				hud.footer = "JUMP FOR A REMATCH  ·  SWORD FOR THE MENU"
+				hud.footer = "JUMP FOR A REMATCH  ·  SWORD TO LEAVE"
 				hud.queue_redraw()
+				if _stage.has_method("_label_thumbs"):
+					_stage.call("_label_thumbs")
 		_:
 			pass
 

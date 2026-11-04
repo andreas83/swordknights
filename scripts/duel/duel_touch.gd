@@ -25,6 +25,18 @@ const HIT_PADDING := 8.0
 @export var glyph := "shield"
 
 var _at := Vector2.ZERO
+## Set while the thumb buttons mean something other than play -- the duel's
+## menu, a finished match -- as TouchControls hides its own THROW then
+## (TouchControls.is_play()): a throw has no meaning on a menu. Hidden, the
+## button neither draws nor takes a touch.
+var suppressed := false:
+	set(value):
+		suppressed = value
+		if suppressed and _held != -1:
+			Input.action_release(action)
+			_held = -1
+		queue_redraw()
+
 var _held := -1
 
 
@@ -53,7 +65,7 @@ func _layout() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not visible:
+	if not visible or suppressed:
 		return
 	if not (event is InputEventScreenTouch):
 		return
@@ -70,6 +82,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _draw() -> void:
+	if suppressed:
+		return
 	var down := _held != -1
 	draw_circle(_at, RADIUS, Palette.with_alpha(Palette.INK, 0.3 if down else 0.18))
 	draw_arc(_at, RADIUS, 0.0, TAU, 24,

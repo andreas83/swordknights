@@ -157,10 +157,24 @@ func back() -> void:
 	closed.emit()
 
 
+## What JUMP does on the selected row, for the thumb button's word: a gauge
+## steps up, a switch flips, BACK goes back.
+func jump_word() -> String:
+	match int(_rows[_index]["kind"]):
+		Kind.GAUGE:
+			return "LOUDER|MORE"
+		Kind.TOGGLE:
+			return "SWITCH"
+		_:
+			return "BACK"
+
+
 func _process(delta: float) -> void:
 	if not visible:
 		return
 	_repeat = maxf(0.0, _repeat - delta)
+	# The page draws over the title screen, whose controls these are.
+	TouchControls.label(get_parent(), jump_word(), "BACK")
 
 	var vertical := Input.get_axis("move_up", "move_down")
 	var horizontal := Input.get_axis("move_left", "move_right")
@@ -249,15 +263,21 @@ func _draw() -> void:
 	UiFont.draw_text(self, build, Vector2(cx, list_top + _rows.size() * ROW_HEIGHT + 4.0),
 		UiFont.Cut.MICRO, Palette.with_alpha(Palette.PAPER, 0.42), UiFont.Align.CENTER, 0.5)
 
-	# On the same course of stone the title screen cuts its hint into.
+	# On the same course of stone the title screen cuts its hint into, and
+	# like its hint it moves to the rail's left end when the thumb buttons
+	# are up: SWORD covers the right end, and says BACK itself.
+	var controls := TouchControls.of(get_parent())
+	var surface := controls.get_node_or_null(^"Surface") as Control if controls else null
+	var thumbs := surface != null and surface.visible
 	var hint := UiFont.fit(PackedStringArray([
 		"LEFT / RIGHT TO SET   ·   SWORD TO GO BACK",
 		"LEFT / RIGHT  ·  SWORD TO GO BACK",
 		"SWORD TO GO BACK",
-	]), content.size.x, UiFont.Cut.MICRO)
-	UiFont.draw_text(self, hint, Vector2(cx, UiLayout.rail(view) + 1.0),
+	]), content.size.x * (0.5 if thumbs else 1.0), UiFont.Cut.MICRO)
+	UiFont.draw_text(self, hint,
+		Vector2(content.position.x if thumbs else cx, UiLayout.rail(view) + 1.0),
 		UiFont.Cut.MICRO, Palette.with_alpha(Palette.PAPER, 0.66),
-		UiFont.Align.CENTER)
+		UiFont.Align.LEFT if thumbs else UiFont.Align.CENTER)
 
 
 func _draw_row(row: Dictionary, column: Rect2, y: float, selected: bool) -> void:

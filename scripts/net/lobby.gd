@@ -67,7 +67,7 @@ func _process(delta: float) -> void:
 
 func show_menu() -> void:
 	page = Page.MENU
-	_hint = "UP / DOWN TO CHOOSE   ·   JUMP TO CONFIRM"
+	_hint = "UP / DOWN  ·  JUMP TO CONFIRM  ·  SWORD TO GO BACK"
 	# Same Wi-Fi first: two phones in one room is the common case, and it needs
 	# nothing running anywhere. A relay room is for players who are apart.
 	var rows: Array[Array] = [
@@ -120,6 +120,68 @@ func show_busy(text: String) -> void:
 
 func is_typing() -> bool:
 	return _field_row.visible and _field.has_focus()
+
+
+## --- thumbs -----------------------------------------------------------------
+##
+## The rows are real Buttons, so the keyboard's arrows and Enter and a pad's
+## A already move and press them through the GUI's own ui_* actions. The
+## touch stick and the JUMP button press the game's actions instead, which
+## the GUI never sees -- so on a phone the stick did nothing here and JUMP did
+## nothing, and the only way in was to tap a row. drive() reads the game's
+## actions and moves the focus and presses the focused row, but only for a
+## press the GUI did not also get: Space is both `jump` and `ui_accept`, and
+## pressing a row twice would open two connections.
+
+## Steps the focus with the stick and presses the focused row with JUMP. The
+## scene calls it once a frame while the lobby is up and nothing is typed.
+func drive() -> void:
+	if page != Page.MENU:
+		return
+	if pressed_alone(&"move_down", &"ui_down"):
+		_step_focus(1)
+	elif pressed_alone(&"move_up", &"ui_up"):
+		_step_focus(-1)
+	if pressed_alone(&"jump", &"ui_accept"):
+		var focused := _focused()
+		if focused != null and not focused.disabled:
+			focused.pressed.emit()
+
+
+## What the two thumb buttons do on the page now (TouchControls.set_labels()).
+func thumb_labels() -> PackedStringArray:
+	match page:
+		Page.MENU:
+			return PackedStringArray(["SELECT", "BACK"])
+		Page.BUSY:
+			# Sword gives up waiting and plays on this device instead.
+			return PackedStringArray(["", "LOCAL"])
+		_:
+			return PackedStringArray(["", "BACK"])
+
+
+## Whether `action` was pressed this frame and the GUI's `twin` was not, so a
+## key bound to both is left to the GUI.
+static func pressed_alone(action: StringName, twin: StringName) -> bool:
+	return Input.is_action_just_pressed(action) and not Input.is_action_just_pressed(twin)
+
+
+func _focused() -> Button:
+	for button: Button in _buttons:
+		if button.has_focus():
+			return button
+	return null
+
+
+func _step_focus(by: int) -> void:
+	var open: Array[Button] = []
+	for button: Button in _buttons:
+		if not button.disabled:
+			open.append(button)
+	if open.is_empty():
+		return
+	var at := open.find(_focused())
+	open[wrapi(at + by, 0, open.size()) if at >= 0 else 0].grab_focus()
 
 
 ## --- row handlers -----------------------------------------------------------

@@ -235,6 +235,8 @@ func _process(delta: float) -> void:
 	_repeat = maxf(0.0, _repeat - delta)
 	_hold = maxf(0.0, _hold - delta)
 	queue_redraw()
+	# Jump steps the selected row to its next choice (confirm()).
+	TouchControls.label(self, "NEXT", "BACK")
 
 	var vertical := Input.get_axis("move_up", "move_down")
 	var horizontal := Input.get_axis("move_left", "move_right")
