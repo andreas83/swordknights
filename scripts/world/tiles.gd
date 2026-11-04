@@ -61,6 +61,8 @@ const ENTITY_LEGEND := {
 	"K": "kept_sun", ## the light he hoards, over his post: scripts/entities/kept_sun.gd
 	"w": "bastion", ## a posted guard behind a tall shield (scripts/entities/bastion.gd)
 	"L": "inscription", ## words cut into a wall; spawned by SecretKeeper
+	"j": "caracal", ## the King's hunting cat (scripts/entities/caracal.gd)
+	"v": "doves", ## a flock on a lit terrace (scripts/entities/dove_flock.gd)
 }
 
 ## Masonry that seals a secret room. The cell parses to the Kind it has in

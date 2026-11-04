@@ -69,6 +69,8 @@ static func kinds() -> Dictionary:
 		"plate": Plate,
 		"gate": Gate,
 		"crumbling": CrumblingStone,
+		"caracal": Caracal,
+		"doves": DoveFlock,
 	}
 	out.merge(_for_tests)
 	return out

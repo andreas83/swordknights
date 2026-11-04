@@ -22,6 +22,7 @@ const MAX_SECONDS := {
 	"secret": 1.4, "masonry": 1.0, "chain": 0.2,
 	"sun_gather": 1.0, "sunrise": 3.0,
 	"clash": 0.4, "disarm": 0.8, "kill": 0.9,
+	"hiss": 0.3, "yowl": 0.5,
 }
 
 ## Nothing shorter than this is a sound; it is a click.
