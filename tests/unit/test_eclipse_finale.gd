@@ -2,7 +2,7 @@ extends GutTest
 ## The Eclipse is the last entry of The Last Light, and defeating him ends the
 ## campaign through CampaignGame's own ending (scripts/campaign/campaign_game.gd):
 ## the clear is recorded, the complete screen offers JUMP TO DAWN, and jump
-## shows the ending card.
+## shows the dawn, with the ending card over it (DawnFrame).
 ##
 ## Played in the real catalogue's entry, with the King woken straight into his
 ## finale -- the phases before it are the business of the other Eclipse tests
@@ -74,6 +74,7 @@ func test_his_fall_records_the_clear_and_jump_goes_to_dawn() -> void:
 
 	campaign._advance()
 	assert_null(campaign.game(), "the arena is gone")
-	assert_not_null(campaign.ending(), "and the ending card is up: the campaign has ended")
+	assert_not_null(campaign.dawn(), "the dawn is shown: the campaign has ended")
+	assert_not_null(campaign.ending(), "with the ending's words over it")
 	assert_eq(_left, 0, "it has not gone back to the chapters yet")
 	await wait_physics_frames(2)
