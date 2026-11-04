@@ -217,6 +217,17 @@ that survives restarts; `defeated` makes Game remember it, and a respawn puts
 back every foe whose post it does not remember, whole, at its post. A foe
 brought in at runtime with `summon()` has no post: a respawn clears it.
 
+**A post can remember.** Everything placed at a post is handed the same
+dictionary every time, `EntitySite.memory`, which Game keeps across a respawn
+and empties on a restart. A guard ignores it; a boss writes into it what must
+outlive his body — the Eclipse, the phase he is in, so phases already won
+stay won through a death (`scripts/entities/eclipse.gd`).
+
+**A foe can hold the way out.** Anything in `ExitDoor.HELD_SHUT` keeps every
+door in the level shut, drawn closed and deaf to the prince. The proof never
+sees a holder: the door is open to it, and the holder stands in the arena it
+proves reachable.
+
 **Warnings go through `warn()`.** Every tell — a raise, a draw, a crouch
 before a pounce — and every timed window that stands between the prince and
 a death is read as `warn(seconds)`, never as the bare constant. That is the

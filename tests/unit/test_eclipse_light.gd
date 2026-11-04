@@ -31,6 +31,13 @@ func _grade() -> WorldGrade:
 	return get_tree().get_first_node_in_group(WorldGrade.GROUP) as WorldGrade
 
 
+## The tint on the level's stone (assets/world_shadow.gdshader).
+func _stone_tint() -> Color:
+	var material := _game.level.tilemap.material as ShaderMaterial
+	var tint: Variant = material.get_shader_parameter(&"tint")
+	return tint if tint is Color else Color.WHITE
+
+
 func _sun() -> KeptSun:
 	return get_tree().get_first_node_in_group(KeptSun.GROUP) as KeptSun
 
@@ -51,6 +58,10 @@ func test_the_eclipse_puts_the_vault_out_and_lifts_what_must_be_read() -> void:
 		"the prince lifted back to his own light")
 	assert_almost_eq(_king.modulate.g, lift.g, 0.001, "and the King")
 	assert_eq(_sun().brightness(), 0.0, "the kept sun an ember")
+	assert_almost_eq(_stone_tint().g, WorldGrade.DARK, 0.001,
+		"and the stone put out too, through the world shader")
+	assert_not_null(get_tree().get_first_node_in_group(PlayerAudio.HUSH),
+		"and the music down to its bed")
 
 
 func test_the_finale_brings_the_light_back() -> void:
@@ -59,3 +70,5 @@ func test_the_finale_brings_the_light_back() -> void:
 	await wait_process_frames(2)
 	assert_almost_eq(_grade().dim, 0.0, 0.001, "the vault lit again for the last blow")
 	assert_gt(_sun().brightness(), 0.0, "the kept sun burning, poured into the disc")
+	assert_eq(_stone_tint(), Color.WHITE, "the stone given back its light")
+	assert_null(get_tree().get_first_node_in_group(PlayerAudio.HUSH), "and the music its drive")

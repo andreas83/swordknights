@@ -58,6 +58,12 @@ const J := PlayerInput.BIT_JUMP
 const A := PlayerInput.BIT_ATTACK
 
 
+## The prince played by the expert pilot: what tools/screenshot.gd's --drive
+## hands him to, so a shot can be taken in the middle of the real fight.
+static func drive(game: Game) -> PlayerInput:
+	return Pilot.new(game)
+
+
 ## Replays `[frames, bits]` steps, one poll at a time; nothing once they run out.
 class Program extends PlayerInput:
 	var steps: Array = []

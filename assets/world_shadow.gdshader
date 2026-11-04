@@ -32,6 +32,14 @@ uniform float dissolve = 0.0;
 uniform vec2 dissolve_from = vec2(0.0, 0.0);
 uniform float dissolve_reach = 64.0;
 
+// A multiply over the result, white unless a scene puts the world out for a
+// while (WorldGrade.dim, the Eclipse's dark). This shader is unshaded and
+// writes COLOR outright, so neither a node's modulate nor the canvas's
+// CanvasModulate reaches the stone; a darkness that must fall on it comes in
+// here. At white it is a multiply by exactly one: every other level is the
+// same, pixel for pixel.
+uniform vec4 tint : source_color = vec4(1.0);
+
 const float BAYER[16] = float[16](
 	0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0,
 	3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
@@ -57,5 +65,5 @@ void fragment() {
 	// Hard edge. No smoothstep here, ever: the line between lit and unlit is
 	// the composition.
 	float s = step(0.5, texture(shadow_mask, (world_px - mask_origin) / level_px).r);
-	COLOR = vec4(mix(lit.rgb, shade.rgb, s), lit.a);
+	COLOR = vec4(mix(lit.rgb, shade.rgb, s) * tint.rgb, lit.a);
 }

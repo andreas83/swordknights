@@ -30,6 +30,12 @@ extends CanvasModulate
 ## hides what must be read. A grade is found by GROUP rather than handed round:
 ## whoever darkens the world for a moment is presentation too, and has no
 ## business holding Game's nodes.
+##
+## The tiles are the exception the dim has to reach by hand. The world shader
+## is unshaded and writes its colour outright, so the canvas multiply never
+## lands on the stone (the hour's grade does not either: its night is the
+## atlas's shade half). While the world is dimmed, the same factor is laid
+## on the stone through the shader's `tint`, and taken off again after.
 
 ## Every installed grade joins this.
 const GROUP := &"world_grade"
@@ -40,6 +46,8 @@ const DARK := 0.2
 var grade: Dictionary = {}
 ## How far the world is put out past its hour: 0 none, 1 DARK.
 var dim := 0.0
+## The factor last laid on the stone.
+var _stone := 1.0
 
 
 ## Grades `game`'s world and `sky` for `level`'s hour. Returns the node, or
@@ -74,8 +82,26 @@ func multiply() -> Color:
 
 func _process(_delta: float) -> void:
 	color = multiply()
+	_tint_the_stone()
 	var back := lift()
 	for node: Node in get_tree().get_nodes_in_group(MatchDusk.LIT):
 		var item := node as CanvasItem
 		if item != null:
 			item.modulate = back
+
+
+## The dim, on the level's stone: the world shader's tint, set while there is
+## any dim and once more to put it back to white.
+func _tint_the_stone() -> void:
+	var k := lerpf(1.0, DARK, clampf(dim, 0.0, 1.0))
+	if is_equal_approx(k, _stone):
+		return
+	_stone = k
+	var level := get_parent().get_node_or_null(^"Level") if get_parent() != null else null
+	if level == null:
+		return
+	for layer: Node in level.find_children("*", "TileMapLayer", true, false):
+		var material := (layer as TileMapLayer).material as ShaderMaterial
+		if material != null and material.shader == Level.SUN_SHADER:
+			material.set_shader_parameter(&"tint", Color(k, k, k))
+

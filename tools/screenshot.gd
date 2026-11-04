@@ -9,6 +9,15 @@ extends SceneTree
 ## --hold holds an input action for the whole run, which is enough to walk the
 ## character into the first few beats of a level.
 ##
+## --drive hands the prince to a script instead: its static `drive(game)`
+## returns the PlayerInput that plays him, so a shot can be taken in the middle
+## of a fight a held key could never reach. With --fixed-fps 60 every frame is
+## one step of the simulation, so a shot's time is a frame of play.
+##
+##     ... --fixed-fps 60 --script tools/screenshot.gd -- \
+##       --level res://levels/chapter_06_eclipse.txt --time night \
+##       --drive res://tests/eclipse_support.gd --out /tmp/eclipse --shots 6.0,30.0
+##
 ## For a scene that plays a level (Game), --level plays another file and
 ## --time sets the hour it is played at, as `;! time <stop>` would, without
 ## editing the file: how a level is judged at each stop of the grade.
@@ -33,6 +42,8 @@ var _level_path := ""
 var _time := ""
 var _chapter := -1
 var _ending := false
+var _drive := ""
+var _driving := false
 
 var _elapsed := 0.0
 var _taken := 0
@@ -71,6 +82,7 @@ func _initialize() -> void:
 
 func _process(delta: float) -> bool:
 	_elapsed += delta
+	_take_the_prince()
 
 	while _taken < _shot_times.size() and _elapsed >= _shot_times[_taken]:
 		_capture(_taken)
@@ -95,6 +107,22 @@ func _capture(index: int) -> void:
 		push_error("could not write %s: %d" % [path, err])
 		return
 	print("wrote %s (%dx%d) at t=%.2f" % [path, image.get_width(), image.get_height(), _elapsed])
+
+
+## --drive's player, once the scene is in the tree and its prince exists.
+func _take_the_prince() -> void:
+	if _drive == "" or _driving:
+		return
+	var game := root.get_meta("screenshot_target") as Game
+	if game == null or game.player == null:
+		return
+	var script := load(_drive) as Script
+	var input: Variant = script.call(&"drive", game) if script != null else null
+	if input is PlayerInput:
+		game.player.input = input
+	else:
+		push_error("screenshot: %s has no static drive(game) -> PlayerInput" % _drive)
+	_driving = true
 
 
 ## The level to play: the scene's own file, or --level's, at --time's hour.
@@ -166,5 +194,8 @@ func _parse_args() -> void:
 			"--ending":
 				_ending = true
 				i += 1
+			"--drive":
+				_drive = value
+				i += 2
 			_:
 				i += 1

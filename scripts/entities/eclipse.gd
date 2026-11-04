@@ -213,6 +213,8 @@ var _leap_to := 0.0
 var _slam_landed := false
 ## Phase 3: this leap is a retreat to the kept sun after a wound, not a pounce.
 var _retreat := false
+## The finale's rise follows the dark of phase 3, not a respawn.
+var _out_of_the_dark := false
 var _shove_from := 0.0
 var _shots: Array[FoeProjectile] = []
 var _beam: EclipseBeam
@@ -391,7 +393,11 @@ func darkness() -> float:
 		Phase.ECLIPSE:
 			return smoothstep(0.2, RISE_TIME, state_time) if state == State.RISE else 1.0
 		Phase.FINALE:
-			return 1.0 - smoothstep(0.0, RISE_TIME, state_time) if state == State.RISE else 0.0
+			# The light comes back over the finale's rise -- when there was a
+			# dark to come out of, and not after a respawn into the finale.
+			if state == State.RISE and _out_of_the_dark:
+				return 1.0 - smoothstep(0.0, RISE_TIME, state_time)
+			return 0.0
 	return 0.0
 
 
@@ -472,6 +478,7 @@ func tick(delta: float) -> void:
 		State.WON:
 			_step_won()
 			if _past(WON_TIME):
+				_out_of_the_dark = phase == Phase.ECLIPSE
 				phase = (phase + 1) as Phase
 				_reset_phase()
 				_rise()

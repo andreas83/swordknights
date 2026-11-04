@@ -790,6 +790,66 @@ whine as the Glassbearer's; in the dark, the music drops to its bed stem
 cracked disc is `masonry` under `sword_hit`; the release is
 `level_complete`, then a `sunrise` voice (to be built).
 
+#### As built
+
+![The Eclipse, phase by phase](eclipse-phases.png)
+
+*Every beat of the fight, posed by the game's own art (`tools/eclipse_poses.gd`):
+the prince for scale, the King drinking the kept sun, then each phase's
+pattern, tell, opening and wound. The third phase's cells are on the ground it
+is fought on, nearly black.*
+
+The arena is `levels/chapter_06_eclipse.txt` (the catalogue's sixth entry),
+38 × 17: the antechamber with the start and torch 4, a five-tile drop onto the
+west gallery that cannot be climbed back, the 26-tile floor with a five-tile
+gallery four tiles up at each end, the kept sun (`K`, `KeptSun`) over the
+King's post (`E`, `Eclipse`), and dawn's door in the east wall. The King's
+numbers are in `scripts/entities/eclipse.gd`; his art, `eclipse_art.gd`; his
+light, `kept_sun.gd`, `eclipse_bolt.gd` and `eclipse_beam.gd`.
+
+**Only the lesson wounds.** Every other blow — a sword at the disc, a plunge
+into the raised disc, a stomp on the crown — is `Outcome.BLOCKED`: Game's
+clang, no wound. A wrong answer is heard at once and costs time, not a heart.
+
+**The dark reaches the stone.** The world shader is unshaded and writes its
+colour outright, so the grade's multiply never lands on the tiles — the
+night's look is the atlas's shade half, not the multiply. The third phase's
+dim comes onto the stone through the shader's `tint` (white, and so a no-op,
+everywhere else); the hour's own grade still does not, which is a question for
+the time-of-day grade rather than for the boss.
+
+**What he has left is on him**, not in a bar: nine gold spikes in his crown,
+one put out per wound, outer pair first, the centre one the finale's; and a
+crack of light across the disc for every phase won.
+
+**Phases won are kept** by the post's memory (`EntitySite.memory`, which Game
+keeps across a respawn and empties on a restart): the phase is written the
+moment its last wound lands, and a King placed again waits under the kept sun
+in that phase and rises into its start when the prince drops back into the
+vault.
+
+**How long it takes.** The clear run (`tests/unit/test_eclipse_clear_run.gd`, a
+recorded input program, no warps, no kills, under the death watch) is a steady
+player — one plunge a pass, the first bolt of each volley parried, every
+pounce backstepped — and takes **79.07 s** on the game's clock. The expert line
+(the double plunge, the rest the same) takes 61.08 s; under LONGER WARNINGS the
+pilot clears it in 62.85 s.
+
+**Changed from the plan above, and why:**
+
+| | Planned | Built | Why |
+| --- | --- | --- | --- |
+| the shove | as the Bastion's: no heart | costs a heart | the Shield's only threat; without it phase 1 cannot hurt and the plunge is the only thing in the room |
+| bolts | a 27-frame tell per volley | each bolt its own 27-frame charge, 15 frames of rest before it: 42 apart | every threat told 27 frames ahead; the spacing is unchanged, and under the assist only the charge stretches |
+| a wound in phase 2 | — | puts out what is left of the volley | otherwise one perfect volley ends the phase and the 150/180/210 escalation is never seen |
+| a pounce that lands | skids 40 frames | recovers 33 with no opening; only a miss skids | taking the hit and cutting him in the skid made the backstep optional |
+| the leap | to where the prince stood, at most 5 tiles | at most 6, and never past the prince's near edge — at point-blank he comes straight down | a landing past the near edge is one no backstep clears |
+| after a wound in phase 3 | — | he leaps back under the kept sun | the next pounce comes from across the floor, told from a distance |
+| the beam | at chest height | a band 16 px tall at chest height | a crouch under the whole kept sun stalled the finale forever; now only the parry answers it |
+| a prince on a gallery | — | out of every attack from phase 2 on | a breather that wins nothing |
+| the vault | — | the kept sun draws the room it lights: a plain back wall under the tiles and its light in flat rings | underground, the night sky's city must not show, and the backdrop tile is too busy for a hall |
+| the music in the dark | `AudioDirector.set_intensity(0)` | `PlayerAudio.HUSH`: while the King is in it, the intensity `PlayerAudio` asks for is the bed | `PlayerAudio` sets the intensity every frame, so a one-off call would be overwritten on the next |
+
 ### The doves — the city's life
 
 Not a foe. Small flocks — three to five birds, 3 × 2 px, `LIGHT_SOFT` —
@@ -1248,8 +1308,8 @@ thing they guard broken (`CLAUDE.md`).
     `tests/unit/test_owl.gd` (to be built) shows it folds for a prince back on
     the stone, cannot catch a grab-and-mantle, and dies to an air slash.
 12. **The Eclipse.** The arena, the four parts, the runtime eclipse grade,
-    and phases kept through deaths. *Done when* `tests/unit/test_eclipse.gd`
-    (to be built) plays each phase's damage window, pins the volley spacing
+    and phases kept through deaths. *Built* (above, "As built"). *Done when*
+    `tests/unit/test_eclipse.gd` plays each phase's damage window, pins the volley spacing
     above `PARRY_TIME` plus `PARRY_ACTIVE` (so a riposte never eats the next
     parry), and the whole fight is timed between 60 and 120 s by a scripted
     player.

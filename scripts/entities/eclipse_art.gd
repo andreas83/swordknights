@@ -52,8 +52,9 @@ extends Node2D
 ##
 ## The pose is a pure function of the King's state; the mantle's sway and
 ## the hit flash are the only state this node keeps, all of it cosmetic. It
-## also lays the King's darkness over the world (WorldGrade.dim), because
-## presentation is where it belongs.
+## also lays the King's darkness over the world (WorldGrade.dim) and hushes
+## the music to its bed while it lasts (PlayerAudio.HUSH), because
+## presentation is where both belong.
 
 const ROBE := Palette.SHADOW
 const ROBE_SHADE := Palette.SHADOW_DEEP
@@ -138,6 +139,13 @@ func _lay_darkness() -> void:
 	var grade := get_tree().get_first_node_in_group(WorldGrade.GROUP) as WorldGrade
 	if grade != null:
 		grade.dim = _king.darkness()
+	# In the dark the music drops to its bed stem.
+	var dark := _king.darkness() > 0.5
+	if dark != is_in_group(PlayerAudio.HUSH):
+		if dark:
+			add_to_group(PlayerAudio.HUSH)
+		else:
+			remove_from_group(PlayerAudio.HUSH)
 
 
 func _c(base: Color) -> Color:
@@ -152,7 +160,8 @@ func _sun_local() -> Vector2:
 		var sun := get_tree().get_first_node_in_group(KeptSun.GROUP) as Node2D
 		if sun != null:
 			return to_local(sun.global_position)
-	return Vector2(0.0, -112.0)
+	# No kept sun -- a pose sheet -- and no shaft to draw.
+	return Vector2.ZERO
 
 
 ## --- drawing ------------------------------------------------------------------
@@ -212,8 +221,8 @@ func _plane(points: PackedVector2Array, lit: Color, shade: Color, rim := false) 
 	if not rim:
 		return
 	var toward := _side if not _dark else _f
-	var shifted := Transform2D(0.0, Vector2(-0.9 * toward, 0.0)) * points
-	var color := RIM if not _dark else Palette.MID
+	var shifted := Transform2D(0.0, Vector2((-0.9 if not _dark else -1.2) * toward, 0.0)) * points
+	var color := RIM if not _dark else Palette.SHADOW_WARM
 	for part: PackedVector2Array in Geometry2D.clip_polygons(points, shifted):
 		if part.size() >= 3:
 			draw_colored_polygon(part, _c(color))
@@ -281,7 +290,7 @@ func _draw_head(pose: Dictionary) -> void:
 	for i: int in 12:
 		var a := TAU * float(i) / 12.0
 		face.append(c + Vector2(cos(a) * HEAD_R, sin(a) * HEAD_R * 1.15).rotated(_tilt * _f))
-	_plane(face, ROBE, ROBE_SHADE, true)
+	_plane(face, Palette.SHADOW_DEEP, Palette.INK, true)
 	var ignite := float(pose["eyes"])
 	var eye := Palette.MID.lerp(Palette.PAPER, ignite)
 	var size := 1.0 + roundf(ignite)
@@ -416,6 +425,7 @@ func _draw_eclipse_disc(pose: Dictionary) -> void:
 			]), Palette.LIGHT if i % 2 == 0 else Palette.MID)
 		draw_arc(at, ring, 0.0, TAU, 28, Palette.LIGHT_SOFT, 1.5)
 	var radius := DISC_R * (1.0 - 0.25 * contract)
+	draw_circle(at, radius + 0.8, Palette.SHADOW_WARM)
 	draw_circle(at, radius, Palette.INK)
 	_draw_cracks(at, radius)
 	if contract > 0.0:
@@ -577,8 +587,8 @@ func _rise_pose(t: float) -> Dictionary:
 			return _pose({"disc": "polished", "disc_at": Vector2(2.0, -12.0), "flare": flare,
 				"burn": 0.2})
 		Eclipse.Phase.ECLIPSE:
-			return _pose({"disc": "eclipse", "disc_at": Vector2(lerpf(5.0, 6.0, e),
-				lerpf(8.0, -6.0, e)), "corona": e, "eyes": e, "flare": flare, "sink": 2.0 * e})
+			return _pose({"disc": "eclipse", "disc_at": Vector2(lerpf(5.0, 11.0, e),
+				lerpf(8.0, -9.0, e)), "corona": e, "eyes": e, "flare": flare, "sink": 2.0 * e})
 		Eclipse.Phase.FINALE:
 			return _pose({"disc": "eclipse", "disc_at": Vector2(6.0, 9.0), "flare": flare,
 				"corona": 1.0 - e * 0.5})
@@ -651,7 +661,7 @@ func _stagger_pose(t: float, dark: bool) -> Dictionary:
 		at = Vector2(3.0, -10.0)
 	elif dark:
 		disc = "eclipse"
-		at = Vector2(6.0, -4.0)
+		at = Vector2(11.0, -7.0)
 	return _pose({
 		"tilt": lerpf(-0.22, -0.05, back), "lean": -2.0, "stride": -1.2, "mantle": 1.6,
 		"disc": disc, "disc_at": at, "corona": 0.4 if dark else 0.0, "eyes": 0.3,
@@ -674,7 +684,7 @@ func _stalk_pose(t: float) -> Dictionary:
 	var c := sin(t * 6.0)
 	return _pose({
 		"sink": 2.0, "lean": 1.2, "stride": c * 2.0, "bob": -absf(c) * 0.5,
-		"mantle": 0.6, "disc": "eclipse", "disc_at": Vector2(6.0, -6.0),
+		"mantle": 0.6, "disc": "eclipse", "disc_at": Vector2(11.0, -9.0),
 		"corona": 0.5 + 0.1 * float(int(_time * FPS) % 2), "eyes": 0.5,
 	})
 
@@ -687,7 +697,7 @@ func _crouch_pose(t: float) -> Dictionary:
 	return _pose({
 		"sink": lerpf(2.0, 5.0, e), "lean": lerpf(1.2, -1.4, e) + sin(_time * 50.0) * 0.25 * p,
 		"stride": 2.2, "mantle": 0.8 + e, "disc": "eclipse",
-		"disc_at": Vector2(lerpf(6.0, 4.0, e), lerpf(-6.0, -3.0, e)),
+		"disc_at": Vector2(lerpf(11.0, 12.0, e), lerpf(-9.0, -5.0, e)),
 		"corona": 0.6 + 1.4 * e, "eyes": smoothstep(0.1, 0.5, p), "flare": e,
 	})
 
@@ -696,7 +706,7 @@ func _leap_pose(t: float) -> Dictionary:
 	var p := clampf(t / Eclipse.LEAP_TIME, 0.0, 1.0)
 	return _pose({
 		"tilt": lerpf(-0.15, 0.25, p), "lean": 2.0, "stride": lerpf(3.0, 1.0, p),
-		"mantle": 2.4, "disc": "eclipse", "disc_at": Vector2(9.0, lerpf(-2.0, 6.0, p)),
+		"mantle": 2.4, "disc": "eclipse", "disc_at": Vector2(13.0, lerpf(-6.0, 6.0, p)),
 		"corona": 1.6, "eyes": 1.0,
 	})
 
@@ -706,7 +716,7 @@ func _land_pose(t: float) -> Dictionary:
 	return _pose({
 		"sink": lerpf(5.0, 2.0, rise), "lean": lerpf(3.0, 1.0, rise), "stride": 2.4,
 		"mantle": lerpf(1.6, 0.6, rise), "disc": "eclipse",
-		"disc_at": Vector2(lerpf(10.0, 6.0, rise), lerpf(10.0, -6.0, rise)),
+		"disc_at": Vector2(lerpf(13.0, 11.0, rise), lerpf(10.0, -9.0, rise)),
 		"corona": 1.0, "eyes": 0.8,
 	})
 

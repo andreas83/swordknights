@@ -17,6 +17,12 @@ extends Node
 ## Everything else hangs off the character's signals, which is why this file
 ## needs no changes to player.gd.
 
+## Anything in this group holds the music down to its bed stem, whatever the
+## prince is doing: the Eclipse while the Vault is put out (docs/campaign.md,
+## "The Eclipse"). Asked every frame, like the rest of the intensity, so the
+## drive comes back the moment the last member leaves.
+const HUSH := &"hushes_the_music"
+
 ## Cycle rate of each locomotion state, in radians per second, matching
 ## PlayerArt's leg swing. A footfall happens every PI radians.
 const STEP_RATES := {
@@ -166,6 +172,8 @@ func _update_footsteps(state: int) -> void:
 
 func _wanted_intensity() -> float:
 	if not _player.is_alive():
+		return 0.0
+	if is_inside_tree() and get_tree().get_first_node_in_group(HUSH) != null:
 		return 0.0
 	var wounded := float(Tuning.MAX_HEALTH - _player.health) / float(maxi(1, Tuning.MAX_HEALTH))
 	var moving := 0.12 if _player.state == Player.State.RUN else 0.0
