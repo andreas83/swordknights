@@ -271,8 +271,10 @@ far away and dark, in its sky.
 
 ### II. The Long Arcade — golden hour
 
-[`chapter_02.txt`](campaign/drafts/chapter_02.txt) · 126 × 26 ·
-[stand-in](campaign/drafts/chapter_02_static.txt)
+**Built:** [`levels/chapter_02.txt`](../levels/chapter_02.txt) · 126 × 26
+(drafted as [`chapter_02.txt`](campaign/drafts/chapter_02.txt), with its
+[stand-in](campaign/drafts/chapter_02_static.txt); *As built*, below, says what
+building it changed and why).
 
 **The place.** The gate quarter: gatehouses with portcullises in horseshoe
 arches, a rampart walk, a market street, and the Long Arcade — a colonnade of
@@ -286,7 +288,7 @@ hanging beside every gate is its clock.
 
 | Step | Where | What is learned |
 | --- | --- | --- |
-| introduce | plate 1, gate 1 (x 7–11) | a plate and a gate carry the same mason's mark; step on, it rises and stays |
+| introduce | plate 1, gate 1 (x 7–11) | a plate and a gate carry the same mason's mark; step on, the gate rises and its counterweight is hauled up, and both stay |
 | develop | the lift (x 17–18); the race street (x 43–53) | weight moves lifts; a held gate falls when its counterweight lands — four seconds here, nearly twice what the run needs |
 | twist | the weighed gate (x 65–71) | a Bastion's weight holds gate 3 open for you; kill him and the 2.2-second race starts as he falls |
 | master | the Long Arcade (x 95–119) | four races back to back, a pit, a kerb, and a Bastion on the last plate |
@@ -308,7 +310,7 @@ hanging beside every gate is its clock.
 4. The courtyard — the first Bastion; secret B in the rampart's face. *(Bastion: introduce)*
 5. The race street — a four-second hold; secret A in the paving. *(counterweights: develop)*
 6. Torch 1.
-7. The balcony — optional: a grab, a sentinel on four tiles of stone, R2.
+7. The balcony — optional: a grab onto one course of stone over the street, a sentinel on four tiles of it, R2.
 8. The weighed gate. *(counterweights: twist; Bastion: develop)*
 9. The corridor and its hatch. *(Bastion: twist)*
 10. Torch 2.
@@ -316,8 +318,9 @@ hanging beside every gate is its clock.
 12. The plaza and the door.
 
 **The set piece.** Each of the arcade's four holds is set to drop its gate
-about half a second behind a prince running flat out — 1.2, 1.6, 1.6, 1.6
-seconds against runs of 0.78, 1.14, 1.14 and 0.96 — so a clean run is a
+about half a second behind a prince running flat out — 1.2, 1.7, 1.6, 1.6
+seconds against runs the proof measures at 0.78, 1.21, 1.03 and 0.96 — so a
+clean run is a
 rhythm: click, run, *slam* behind you, click. Fail one and you are in a bay
 with its own plate: you lose time, never the chapter. The columns stripe the
 floor with shadow the whole way down.
@@ -338,6 +341,39 @@ and a sentinel on a four-tile ledge), and one in each secret.
 
 **Expert line, about 40 s:** hop the stall and grab across the lift shaft;
 rebound double plunges; leap the weighed Bastion; never stop at a gate.
+
+![Chapter II as built, the whole level in one frame](campaign/chapter-02-tour.png)
+
+*The Long Arcade as built, rendered by the game at 1:1 at the golden hour:
+the road and gatehouse, the lift court and rampart, the courtyard, the race
+street, the balcony, the weighed gate, the corridor and its hatch, the
+arcade's four gates and its pit, and the door in the plaza.*
+
+**As built.** Building the draft changed five things, each because playing
+it showed a flaw:
+
+- **The balcony is one course of stone over the street**, not a block four
+  courses tall across it. As drafted it was a wall on the only way east, so
+  the "optional" grab, sentinel and R2 were forced on everyone. Now the
+  street runs on underneath, and the grab up to R2 is still four courses.
+- **The corridor's roof runs on to the arcade's wall.** As drafted it stopped
+  two tiles short, and a prince could walk the roof and drop down past the
+  Bastion; now the hatch is the way down.
+- **The second bay's hold is 1.7 s, not 1.6.** The kerb's hop is an arc the
+  proof charges frame by frame: 1.21 s of run, 76% of 1.6 — past the 25%
+  slack every race must keep. At 1.7 it is 71%, and the gate still falls
+  half a second behind the runner.
+- **A latched gate's counterweight goes up and stays**, the same reading as a
+  held gate's (up: time in hand; sinking: running out; landed: shut), so the
+  first gate teaches what the race street tests.
+- **The Bastion steps back to his post while he recovers.** As first built,
+  each shove was a step forward, and the courtyard Bastion herded the prince
+  eight tiles back into secret B.
+
+The proof measures every race (`ReachRace.measure`), and
+`tests/unit/test_chapter_02.gd` holds them beside the arithmetic above; a
+scripted clear run, replayed blind through the real scene, reaches the door
+without a death inside par.
 
 ### III. The Aqueduct — sunset
 
@@ -946,7 +982,9 @@ body**: it waits above it, so there is no crush death to misread. A **lift**
 moves at 40 px/s (`WALK_SPEED`). Unwired, it is ridden: it leaves 30 frames
 after a body stands on it, goes to its other stop and waits, and goes home
 180 frames after it is empty. Wired, it is at the far stop while its channel
-is on. It never moves into a body.
+is on. It never moves into a body, and coming down it waits two tiles above
+one: parked on a prince's head in the pit its home stop leaves, it left him
+no room to hop out.
 
 **The twist: the counterweight is the clock.** Every gate's counterweight
 hangs beside it, a stone on a chain, and sinks for exactly the hold — so the
@@ -977,6 +1015,10 @@ voice (to be built), Karplus–Strong on a short delay); the slam (`land_hard`
    II's races, by arithmetic: the race street 2.05 s of 4.0; the weighed gate
    1.32 of 2.2; the arcade's bays 0.78 of 1.2, 1.14 of 1.6, 1.14 of 1.6 and
    0.96 of 1.6. The proof should measure them rather than trust that table.
+   **Built** (`scripts/levels/reach_race.gd`), it measures: 2.07 of 4.0
+   (52%), 1.32 of 2.2 (60%), 0.78 of 1.2 (65%), 1.21 of 1.6 (76% — refused,
+   so that bay's hold became 1.7, 71%), 1.03 of 1.6 (64%) and 0.96 of 1.6
+   (60%).
 4. A gate a foe holds open (the weighed gate) is proved as if nobody held
    it — shut, opened by its plate, with its race — because the foe can die.
 5. A lift is a ladder between its stops — the stand-ins draw it as one. An

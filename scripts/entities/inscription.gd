@@ -24,6 +24,9 @@ const AUTHORED := {
 	"The Sun Terrace": [
 		["THE KING", "NEVER KNEW"],
 	],
+	"The Long Arcade": [
+		["SAME MARK", "SAME GATE"],
+	],
 }
 
 ## Two lines of at most nine letters. The smallest cut sets about seven units

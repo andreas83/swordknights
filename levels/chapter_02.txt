@@ -1,0 +1,84 @@
+; The Long Arcade
+;
+; Chapter II of The Last Light (docs/campaign.md, "II. The Long Arcade"). The
+; golden hour: the sun a hand above the roofs. The city is closing its gates,
+; and the gates are counterweighted -- weight is the chapter's verb, and the
+; counterweight hanging beside every gate is its clock.
+;
+;! time golden
+;! channel 1 latch
+;! channel 2 hold 4.0
+;! channel 3 hold 2.2
+;! channel 4 hold 1.2
+;! channel 5 hold 1.7
+;! channel 6 hold 1.6
+;! channel 7 hold 1.6
+;
+; Legend (scripts/world/tiles.gd), beyond Chapter I's:
+;   o  pressure plate: a floor stone      !  portcullis, hung from a lintel
+;   1-9  mason's mark: stone carved with a channel number, wiring the one
+;        mechanism it touches. Same mark, same gate.
+;   [ ]  the lift's slab at its home stop     '  the lift's shaft
+;   w  Bastion: a posted guard behind a tall shield
+;
+; Beat sheet, left to right (columns):
+;   1. The road in (0-12). Plate 1 lies across the road; its stone carries
+;      mark 1, and so does gate 1's lintel. Step on it: the counterweight is
+;      hauled up and stays up, and so does the gate.  [counterweights: introduce]
+;   2. The lift court (13-18). The ridden lift, five courses up to the
+;      rampart; R1 on the stall. An expert grabs across the shaft instead.
+;                                                     [counterweights: develop]
+;   3. The rampart (19-25). A sentinel walks it.
+;   4. The courtyard (26-38). A Bastion is posted under the rampart's lip:
+;      jump off and plunge. A shove here only puts you against the rampart,
+;      where secret B is.                             [Bastion: introduce]
+;   5. The race street (41-54). Plate 2 holds gate 2 for four seconds; hop
+;      the stall at a run. Secret A is the cracked paving beside the stall.
+;                                                     [counterweights: develop]
+;   6. Torch 1 (56).
+;   7. The balcony (58-61). Optional: a grab onto one course of stone, a
+;      sentinel on four tiles of it, R2. The street runs on underneath.
+;   8. The weighed gate (62-72). A Bastion's weight on plate 3 holds gate 3
+;      open: leap him and walk through, or plunge him and race its 2.2 s.
+;                                                     [counterweights: twist]
+;   9. The corridor (78-94). Two courses high, a Bastion in it: no leap, no
+;      height to plunge from. Grab onto the roof, drop through the hatch,
+;      plunge.                                        [Bastion: twist]
+;  10. Torch 2 (91), at the corridor's far end.
+;  11. The Long Arcade (95-119). Four plates, four gates, each hold about
+;      half a second behind a prince running flat out: click, run, slam. A
+;      kerb in the second bay, a three-deep pit in the third (its east wall
+;      is false: secret C), and a Bastion on the last plate.
+;                                   [counterweights + Bastion: master; SET PIECE]
+;  12. The plaza (120-125). The door, in the gold.
+;
+; Secrets: A, the race street's cracked paving (SAME MARK / SAME GATE); B,
+; the rampart's face, a false wall; C, the arcade pit's east wall, false.
+; Relics: R1 (stall), R2 (balcony), one in each secret. Par 1:45.
+;
+
+
+
+                                                                                             ####
+                                                                                             ####
+                                                                                             ####
+                                                                                             ####
+                                                                                             ####
+###                                                                                          ####
+###       # #                          #            # #               # #                    ####
+###       ###                          ##           ###               ###                    ####
+###       ###                          ##           ###               ###                    ####
+###       ###                          ##           ###               ###                    ####    #      #      #
+###       ###                          ##           ###               ###                    ###########################
+###       ###          p               ##           ###               ###                    ###########################
+###       ###    ''#######             ##           ###   * p         ###                    #####4######5######6######7
+::        ###    ''#######             ##           ###   ####        ###     ######  ######### | !    | !      !    | !
+::        #1#  * ''#######             ##           #2#               #3#     ######==######### | !    | !      !    | !
+:A         !   ##''##::::%                     ##    !                 !                        | !    | !      !    | !
+:: @       !   ##''##*:::%   w                 ##    !  t        w     !            w      t    | !   #| !      !  w | !    D
+#######o#########[]########################o#####&&##############o#############################o####o######o   ####o##########
+#######1###################################2####:::::############3#############################4####5######6   %::#7##########
+################################################::L:*#######################################################   %:*############
+##############################################################################################################################
+##############################################################################################################################
+##############################################################################################################################

@@ -25,6 +25,10 @@ extends SceneTree
 ##     ... --script tools/screenshot.gd -- --level res://levels/level_01.txt \
 ##       --time dusk --out /tmp/dusk --shots 1.0,3.0 --hold move_right
 ##
+## --at x,y stands the prince on a cell of the level (column, row: the cell his
+## feet are in) once it has loaded, with the camera framed on him there, so a
+## long level is judged beat by beat rather than only from its first screen.
+##
 ## --chapter plays The Last Light from entry N of the catalogue (0 is chapter
 ## I), as the chapter select would: its card, its sky and its tower, at its
 ## hour. An entry still being built is stood in for by its draft's static
@@ -40,6 +44,7 @@ var _shot_times: Array[float] = [1.0]
 var _hold: Array[String] = []
 var _level_path := ""
 var _time := ""
+var _at := Vector2i(-1, -1)
 var _chapter := -1
 var _ending := false
 var _drive := ""
@@ -82,6 +87,7 @@ func _initialize() -> void:
 
 func _process(delta: float) -> bool:
 	_elapsed += delta
+	_stand_at()
 	_take_the_prince()
 
 	while _taken < _shot_times.size() and _elapsed >= _shot_times[_taken]:
@@ -123,6 +129,19 @@ func _take_the_prince() -> void:
 	else:
 		push_error("screenshot: %s has no static drive(game) -> PlayerInput" % _drive)
 	_driving = true
+
+
+## --at: on the first frame, once the root -- and the game with it -- is in the
+## tree. During _initialize it is not yet, and the game's _ready would put
+## the prince back on the spawn.
+func _stand_at() -> void:
+	var game := root.get_meta("screenshot_target") as Game
+	if game == null or _at.x < 0 or not game.is_node_ready():
+		return
+	game.checkpoint = Vector2((float(_at.x) + 0.5) * Level.TILE, float(_at.y + 1) * Level.TILE)
+	game.player.respawn(game.checkpoint)
+	game.camera.setup(game.player, game.level.world_size())
+	_at = Vector2i(-1, -1)
 
 
 ## The level to play: the scene's own file, or --level's, at --time's hour.
@@ -187,6 +206,10 @@ func _parse_args() -> void:
 				i += 2
 			"--time":
 				_time = value
+				i += 2
+			"--at":
+				var cell := value.split(",")
+				_at = Vector2i(int(cell[0]), int(cell[1]))
 				i += 2
 			"--chapter":
 				_chapter = int(value)

@@ -7,8 +7,10 @@ extends GutTest
 ## reached only through a non-empty ReachModel, and these tests hold that
 ## line from both sides:
 ##
-## - **Nothing shipping takes the new path.** Every level in levels/ and every
-##   ruin the generator builds has an empty model.
+## - **Nothing without a mechanism takes the new path.** Every level in levels/
+##   with no mechanism in it, and every ruin the generator builds, has an
+##   empty model. A campaign chapter built on plates and gates takes the
+##   masked path, as it must, and is proved by its own tests.
 ## - **The old path gives the old answers.** The Sun Terrace's proof and four
 ##   Endless ruins are pinned to numbers taken from the proof on the commit
 ##   before the framework landed: states explored, the audit's states, the
@@ -42,12 +44,14 @@ func _sun_terrace() -> AsciiLevel:
 	return AsciiLevel.from_file("res://levels/level_01.txt")
 
 
-func test_no_shipping_level_or_ruin_takes_the_masked_path() -> void:
+func test_no_level_without_a_mechanism_takes_the_masked_path() -> void:
 	var checked := 0
 	for name: String in DirAccess.get_files_at("res://levels"):
 		if name.get_extension() != "txt" or name == "duel_zones.txt":
 			continue
 		var level := AsciiLevel.from_file("res://levels".path_join(name))
+		if _has_mechanism(level):
+			continue
 		assert_true(ReachModel.for_level(level).is_empty(), "%s has no mechanism" % name)
 		checked += 1
 	for ruin: Array in RUINS:
@@ -55,6 +59,17 @@ func test_no_shipping_level_or_ruin_takes_the_masked_path() -> void:
 		assert_true(ReachModel.for_level(level).is_empty(), "ruin %d has none" % int(ruin[0]))
 		checked += 1
 	assert_gt(checked, 4, "found levels to check")
+
+
+## Whether any mark in `level` places a mechanism.
+static func _has_mechanism(level: AsciiLevel) -> bool:
+	for mark: Dictionary in level.entities:
+		var script := EntityRegistry.script_for(String(mark["kind"]))
+		while script != null:
+			if script == Mechanism:
+				return true
+			script = script.get_base_script()
+	return false
 
 
 func test_the_sun_terrace_is_proved_exactly_as_before() -> void:

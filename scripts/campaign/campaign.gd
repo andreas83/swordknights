@@ -71,7 +71,8 @@ static func entries() -> Array[Dictionary]:
 	return [
 		_entry("sun_terrace", "I", "The Sun Terrace", "The last hour of light",
 			"afternoon", "res://levels/level_01.txt"),
-		_entry("long_arcade", "II", "The Long Arcade", "The gates are falling", "golden"),
+		_entry("long_arcade", "II", "The Long Arcade", "The gates are falling", "golden",
+			"res://levels/chapter_02.txt"),
 		_entry("aqueduct", "III", "The Aqueduct", "The old stone is tired", "sunset"),
 		_entry("mirror_tower", "IV", "The Mirror Tower", "Catch the last light", "dusk"),
 		_entry("sun_well", "V", "The Sun Well", "What the city kept", "night"),
