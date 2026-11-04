@@ -542,10 +542,10 @@ func _step_burning() -> void:
 
 
 func _fire() -> void:
-	var bolt := EclipseBolt.new()
 	var speed := VOLLEY[clampi(volley - 1, 0, VOLLEY.size() - 1)]
-	bolt.velocity = Vector2(facing * speed, 0.0)
-	bolt.position = Vector2(position.x + facing * (BODY.x * 0.5 + 4.0), floor_y - BOLT_HEIGHT)
+	var at := Vector2(position.x + facing * (BODY.x * 0.5 + 4.0), floor_y - BOLT_HEIGHT)
+	var bolt := Sunbolt.make(at, Vector2(facing, 0.0), speed)
+	bolt.kept = true
 	launch(bolt)
 	var flying: Array[FoeProjectile] = []
 	for shot: FoeProjectile in _shots:

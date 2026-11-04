@@ -233,11 +233,11 @@ class Pilot extends PlayerInput:
 		var face := _face(prince, boss)
 		if face != 0:
 			return face
-		var shot := _nearest_shot(prince, EclipseBolt)
+		var shot := _nearest_shot(prince, Sunbolt)
 		if shot == null:
 			return 0
 		var gap := absf(shot.global_position.x - prince.position.x) - Tuning.BODY_WIDTH * 0.5 \
-			- EclipseBolt.LENGTH * 0.5
+			- Sunbolt.LENGTH * 0.5
 		var first := not _parried.has(boss.volley)
 		if gap <= 12.0 and prince.state != Player.State.PARRY:
 			if parry_every_bolt or first:

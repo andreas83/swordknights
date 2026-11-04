@@ -999,8 +999,9 @@ death (`guard_hit` and `shatter`).
   pivot, a mirror mid-turn swallows it, a seal takes it as a full fill, it
   stops where a beam stops, and until a parry turns it, it costs any body it
   meets a heart -- the prince, a sentinel, another Glassbearer -- except the
-  hand that threw it. `Sunbolt.make()` takes a speed, so a boss's volleys can
-  be the same bolt thrown harder.
+  hand that threw it. `Sunbolt.make()` takes a speed, and the King's volleys
+  are the same bolt thrown harder: one class, with the kept sun's look
+  (`Sunbolt.kept`) for the dark of the Vault.
 
 ### The owl — the air slash (Chapter V)
 
@@ -1127,7 +1128,8 @@ west gallery that cannot be climbed back, the 26-tile floor with a five-tile
 gallery four tiles up at each end, the kept sun (`K`, `KeptSun`) over the
 King's post (`E`, `Eclipse`), and dawn's door in the east wall. The King's
 numbers are in `scripts/entities/eclipse.gd`; his art, `eclipse_art.gd`; his
-light, `kept_sun.gd`, `eclipse_bolt.gd` and `eclipse_beam.gd`.
+light, `kept_sun.gd`, `eclipse_beam.gd`, and Chapter IV's sunbolt
+(`scripts/entities/sunbolt.gd`), thrown harder and drawn as the kept sun's.
 
 **Only the lesson wounds.** Every other blow — a sword at the disc, a plunge
 into the raised disc, a stomp on the crown — is `Outcome.BLOCKED`: Game's

@@ -31,7 +31,26 @@ extends FoeProjectile
 ## parry is for.
 ##
 ## Kept to what any thrower needs -- a speed, a direction, a size -- so the
-## boss's volleys can be the same bolt thrown harder (`make()`).
+## boss's volleys are the same bolt thrown harder (`make()`): the King's
+## second phase throws this class, at the volley's speeds, and nothing about
+## how it flies, what stops it, who it hurts or how a parry turns it is his
+## own. The vault has no mirror, seal, grate or bystander in a bolt's row, so
+## the rules above that he never meets cost his fight nothing -- and a
+## mirror set in his line one day would turn his light as it turns a
+## Glassbearer's, which is the story (the kept sun is the light the prince
+## sent down).
+##
+## ## The look
+##
+## A streak of light along its flight: PAPER at the head, LIGHT_SOFT behind.
+## The King's, `kept`, is the kept sun's and is drawn for where it flies --
+## alone in the dark of the Vault at night, 8 x 2 is a speck on a phone -- so
+## it carries the sun's whole ramp (PAPER, LIGHT_SOFT, LIGHT), a pixel of
+## halo round it, a fading trail and a one-pixel MID tail stepping behind on
+## a 12 fps clock like a torch's flame, so it reads as fire and not as a bar.
+## Turned, either carries the parry's steel: the prince's now. The halo and
+## the trail are drawn and never refereed; the bolt hits at 8 x 2 whoever
+## threw it.
 
 ## Presentation, through Game: GameAudio.cue and the impact budget.
 signal cue(voice: StringName, options: Dictionary)
@@ -43,9 +62,14 @@ const SPEED := 150.0
 const LENGTH := 8.0
 const THICK := 2.0
 
+## Drawn as the kept sun's light, the King's (above, "The look").
+var kept := false
+
 ## The mirror cell it was last turned in, so it is not turned again while it
 ## is still crossing that cell.
 var _turned_in := Vector2i(-1, -1)
+## The kept look's flame clock.
+var _time := 0.0
 
 
 ## A bolt at `at` flying along `direction` (a unit step) at `speed`.
@@ -103,6 +127,9 @@ func _strike_bystander() -> bool:
 func _physics_process(delta: float) -> void:
 	if is_spent():
 		return
+	if kept:
+		_time += delta
+		queue_redraw()
 	life -= delta
 	if life <= 0.0:
 		spend()
@@ -154,6 +181,9 @@ func _strike_stone(cell: Vector2i, at: Vector2) -> void:
 
 ## A streak of light: PAPER at the head, LIGHT_SOFT behind it.
 func _draw() -> void:
+	if kept:
+		_draw_kept()
+		return
 	var along := velocity.normalized() if velocity != Vector2.ZERO else Vector2.RIGHT
 	var half := LENGTH * 0.5
 	var tail := (-along * half).floor()
@@ -166,3 +196,25 @@ func _draw() -> void:
 	if reflected:
 		# Sent back, it carries the parry's steel at its tail: the prince's now.
 		draw_rect(Rect2(tail, Vector2.ONE + across), Palette.STEEL)
+
+
+## The kept sun's bolt, flying along the floor: the sun's ramp head to tail,
+## a halo and a trail behind, and a tail that steps like a flame.
+func _draw_kept() -> void:
+	var dir := signf(velocity.x) if velocity.x != 0.0 else 1.0
+	var half := LENGTH * 0.5
+	var top := -THICK * 0.5
+	draw_rect(Rect2(-half, top, LENGTH, THICK), Palette.LIGHT)
+	var head := half - 3.0 if dir > 0.0 else -half
+	draw_rect(Rect2(head, top, 3.0, THICK), Palette.PAPER)
+	var mid := head - 2.0 * dir if dir > 0.0 else head + 3.0
+	draw_rect(Rect2(mid, top, 2.0, THICK), Palette.LIGHT_SOFT)
+	var flicker := int(_time * 12.0) % 2
+	draw_rect(Rect2(-half - 1.0, top - 1.0, LENGTH + 2.0, THICK + 2.0),
+		Palette.with_alpha(Palette.LIGHT_SOFT, 0.35))
+	var trail := -half - 6.0 if dir > 0.0 else half
+	draw_rect(Rect2(trail, top, 6.0, THICK), Palette.with_alpha(Palette.LIGHT, 0.45))
+	var tail := -half - 1.0 - float(flicker) if dir > 0.0 else half + float(flicker)
+	draw_rect(Rect2(tail, top + 0.5, 1.0, 1.0), Palette.MID)
+	if reflected:
+		draw_rect(Rect2(-half, top - 1.0, LENGTH, 1.0), Palette.STEEL)
