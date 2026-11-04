@@ -202,10 +202,11 @@ func test_his_front_is_a_wall_and_his_shove_costs_no_heart() -> void:
 	await _play(YARD)
 	var guard := _bastion()
 	var face := guard.global_position.x - Bastion.BODY.x * 0.5
-	var nearest := [INF, false]
+	var nearest := [INF, false, 0.0]
 	await _drive(func(t: int) -> int:
 		var gap := face - (_game.player.position.x + Tuning.BODY_WIDTH * 0.5)
 		nearest[0] = minf(float(nearest[0]), gap)
+		nearest[2] = maxf(float(nearest[2]), absf(guard.global_position.x - guard.post_x))
 		if guard.state == Bastion.State.SHOVE:
 			nearest[1] = true
 		return -1 if t > 240 else PlayerInput.BIT_RIGHT, 300)
@@ -214,6 +215,10 @@ func test_his_front_is_a_wall_and_his_shove_costs_no_heart() -> void:
 	assert_eq(_game.player.health, Tuning.MAX_HEALTH, "the shove cost no heart")
 	assert_eq(_game.player.invulnerable, 0.0, "and gave no grace to walk through him in")
 	assert_eq(_game.deaths, 0, "alive")
+	assert_lte(float(nearest[2]), Bastion.LUNGE + 0.5, "he never strayed past one lunge")
+	await _drive(func(_t: int) -> int: return 0, 60)
+	assert_almost_eq(guard.global_position.x, guard.post_x, 0.5,
+		"and holds his spot: shove after shove, he steps back to his post")
 
 
 func test_a_shove_throws_him_about_two_tiles() -> void:

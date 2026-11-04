@@ -358,6 +358,11 @@ func _update_free(delta: float) -> void:
 
 	if grounded and input.down and input.just_pressed_jump:
 		_drop_through = 0.25
+		# The press asked for the drop, not a jump: spent here, or it waits
+		# in the buffer and coyote time fires it on the next frame, back up
+		# through the floor (tests/unit/test_drop_through.gd).
+		_jump_buffer = 0.0
+		_coyote = 0.0
 
 	var falling_speed := velocity.y
 	var was_airborne := not grounded

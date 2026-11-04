@@ -42,7 +42,7 @@ extends Foe
 ##
 ## He is heavy (Foe.has_weight()), so a plate he stands on is held: Chapter
 ## II's weighed gate is open for exactly as long as he lives on its plate.
-## His lunge carries him off it, and he walks back.
+## His lunge carries him off it, and he steps back onto it while he recovers.
 ##
 ## ## Sound, through Game and GameAudio.cue
 ##
@@ -91,6 +91,7 @@ const WALL_STAGGER := 0.12
 ## How far past his front the shove reaches, and the clang's recoil.
 const SHOVE_REACH := 12.0
 const RECOIL_REACH := 26.0
+const FRAME := 1.0 / 60.0
 ## Feet within this of his are on his floor.
 const SAME_FLOOR := 10.0
 
@@ -246,7 +247,12 @@ func tick(delta: float, grounded: bool) -> void:
 				velocity.x = 0.0
 				_enter(State.RECOVER)
 		State.RECOVER:
-			velocity.x = 0.0
+			# The lunge is taken back inside the recovery, shield still up:
+			# he holds a spot. Left where it landed, every shove was a step,
+			# and the first one played herded the prince eight tiles back
+			# across the courtyard.
+			var home := post_x - global_position.x
+			velocity.x = signf(home) * minf(absf(home) / FRAME, LUNGE / RECOVER_TIME)
 			if state_time >= RECOVER_TIME:
 				_enter(State.STAND)
 		State.TURN:
