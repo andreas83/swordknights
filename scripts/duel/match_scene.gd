@@ -58,7 +58,11 @@ func _ready() -> void:
 
 	zones.setup(strip)
 	gore.setup(strip)
-	gore.z_index = -1 # beneath the actors, in one pass
+	# Over the zone's stone and under the actors and the foreground plane:
+	# after ZoneView in the tree at its z, so blood lies ON the floor and the
+	# walls. It was once at -1, beneath the stone, where every stain in front
+	# of a backdrop was drawn and hidden. See tests/unit/test_duel_blood.gd.
+	gore.z_index = 0
 
 	fight.fighter_scene = FIGHTER_SCENE
 	if not fight.build(strip, zones):
@@ -217,6 +221,7 @@ func _step() -> void:
 ## zones to draw gore for, and how far through being consumed the winner is.
 func _follow_the_match() -> void:
 	gore.show_zones(camera.visible_zones())
+	gore.tick(fight.frame)
 	for seat: int in _gates.size():
 		_gates[seat].consuming = (
 			clampf(fight.phase_time / DuelMatch.CONSUMED_TIME, 0.0, 1.0)
@@ -252,8 +257,8 @@ func _on_fighter_died(victim: int, _killer: int, at: Vector2) -> void:
 
 ## The dead fighter's colour, and it stays for the match -- unless the host
 ## says the death did not happen, or happened elsewhere.
-func _on_death_recorded(victim: int, at: Vector2, frame: int) -> void:
-	gore.spill(at, victim, frame)
+func _on_death_recorded(victim: int, at: Vector2, frame: int, blow: int) -> void:
+	gore.spill(at, victim, frame, blow)
 
 
 ## A kill the host never had. The shake and the sound are spent; the blood

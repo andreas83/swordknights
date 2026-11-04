@@ -191,6 +191,7 @@ func _weigh(since: int, seats: Array) -> void:
 			"kind": "died", "victim": victim,
 			"killer": int(shown.get("killer", -1)),
 			"at": shown.get("at", down["at"]),
+			"blow": int(shown.get("blow", 0)),
 		})
 
 

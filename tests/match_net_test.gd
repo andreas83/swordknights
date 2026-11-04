@@ -86,7 +86,7 @@ class Witness:
 		fight = watched
 		fight.fighter_died.connect(func(victim: int, _k: int, _at: Vector2) -> void:
 			beats.append({"victim": victim, "frame": fight.frame}))
-		fight.death_recorded.connect(func(victim: int, at: Vector2, frame: int) -> void:
+		fight.death_recorded.connect(func(victim: int, at: Vector2, frame: int, _blow: int) -> void:
 			if _just_taken == Vector2i(fight.frame, victim):
 				moves += 1
 			_just_taken = Vector2i(-1, -1)

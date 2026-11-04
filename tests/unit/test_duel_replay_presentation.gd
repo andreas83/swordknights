@@ -36,7 +36,7 @@ class Ears:
 	func _init(fight: DuelMatch) -> void:
 		fight.fighter_died.connect(
 			func(victim: int, _k: int, _at: Vector2) -> void: beats.append(victim))
-		fight.death_recorded.connect(func(victim: int, at: Vector2, frame: int) -> void:
+		fight.death_recorded.connect(func(victim: int, at: Vector2, frame: int, _blow: int) -> void:
 			recorded += 1
 			blood[Vector2i(frame, victim)] = at)
 		fight.death_retracted.connect(func(victim: int, frame: int) -> void:

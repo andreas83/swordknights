@@ -59,9 +59,10 @@ signal zone_changed(index: int)
 signal fighter_died(victim: int, killer: int, at: Vector2)
 ## The record of a death: where its blood goes. `frame` is the frame it happened
 ## on in the history as now known, which both peers agree on and seed the
-## splatter from. A correction that moves a death retracts it and records it
-## again; one that undoes it only retracts it.
-signal death_recorded(victim: int, at: Vector2, frame: int)
+## splatter from. `blow` is the way the killing blow travelled, +1 east and -1
+## west, from where the killer stood; 0 for a hazard. A correction that moves a
+## death retracts it and records it again; one that undoes it only retracts it.
+signal death_recorded(victim: int, at: Vector2, frame: int, blow: int)
 signal death_retracted(victim: int, frame: int)
 signal fighter_respawned(slot: int, at: Vector2, facing: int)
 signal leader_consumed(winner: int, at: Vector2)
@@ -347,7 +348,8 @@ func _settle() -> void:
 		var now: Dictionary = pair[1]
 		if now["kind"] == "died":
 			death_retracted.emit(int(was["victim"]), int(was["frame"]))
-			death_recorded.emit(int(now["victim"]), now["at"] as Vector2, int(now["frame"]))
+			death_recorded.emit(int(now["victim"]), now["at"] as Vector2, int(now["frame"]),
+				int(now.get("blow", 0)))
 	for event: Dictionary in change["told"]:
 		_tell(event)
 
@@ -376,7 +378,7 @@ func _tell(event: Dictionary) -> void:
 		"died":
 			var victim := int(event["victim"])
 			var at: Vector2 = event["at"]
-			death_recorded.emit(victim, at, int(event["frame"]))
+			death_recorded.emit(victim, at, int(event["frame"]), int(event.get("blow", 0)))
 			fighter_died.emit(victim, int(event["killer"]), at)
 		"respawned":
 			fighter_respawned.emit(
@@ -453,9 +455,14 @@ func _on_fighter_died(victim: int, killer: int) -> void:
 
 	respawn[victim] = RESPAWN_DELAY
 	var at := seats[victim].position()
+	# Which way the blood is thrown. Read off positions the step already has,
+	# and written only into the event: no step reads it back.
+	var blow := 0
+	if killer == 0 or killer == 1:
+		blow = signi(roundi(at.x - seats[killer].position().x))
 	# The gore layer hears of this one, by way of the ledger, and only of this
 	# one; and it is one-way: nothing it does comes back into the step.
-	_happened({"kind": "died", "victim": victim, "killer": killer, "at": at})
+	_happened({"kind": "died", "victim": victim, "killer": killer, "at": at, "blow": blow})
 
 
 ## --- respawn ---------------------------------------------------------------

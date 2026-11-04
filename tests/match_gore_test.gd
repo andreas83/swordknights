@@ -110,13 +110,14 @@ func _spilling_does_not_move_the_checksum() -> void:
 	gory.queue_free()
 
 
-## Far more spills than the bound allows, into every zone.
+## Far more spills than the bound allows, into every zone: three times as many
+## kills as it takes to fill a zone's droplets, each flown against the tiles.
 func _the_list_is_bounded() -> void:
 	var field := GoreField.new()
 	root.add_child(field)
 	field.setup(_strip)
 	var width := float(_strip.zone_width())
-	var spills := GoreField.MAX_PER_ZONE * 4
+	var spills := GoreField.MAX_DROPS / GoreField.DROPS_PER_KILL * 3
 	for zone: int in _strip.zone_count():
 		for i: int in spills:
 			var x := width * zone + fmod(float(i) * 7.3, width)
@@ -126,6 +127,9 @@ func _the_list_is_bounded() -> void:
 		_s.check(n > 0, "zone %d kept some gore" % zone)
 		_s.check(n <= GoreField.MAX_PER_ZONE,
 			"zone %d holds %d decals, bound is %d" % [zone, n, GoreField.MAX_PER_ZONE])
+		_s.check(field.marks_in(zone) <= GoreField.MAX_MARKS,
+			"zone %d holds %d pools and streaks, bound is %d" % [
+				zone, field.marks_in(zone), GoreField.MAX_MARKS])
 	field.queue_free()
 
 

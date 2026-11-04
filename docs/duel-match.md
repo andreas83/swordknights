@@ -22,8 +22,10 @@ Rings are respawn timers, the track at the top is zone and initiative.*
 | `scripts/duel/match_ledger.gd` (`MatchLedger`) | what the scene has been told, against what the history holds; presentation only |
 | `scripts/duel/zones.gd` (`ZoneStrip`) | the zones as data, and every collision question |
 | `scripts/duel/zones_view.gd` | streams the zones' drawn layers near the camera, dressed and lit |
-| `scripts/duel/gore.gd` (`GoreField`) | decals, presentation only |
-| `scripts/duel/match_camera.gd`, `match_hud.gd`, `match_gate.gd` | presentation |
+| `scripts/duel/gore.gd` (`GoreField`) | decals and the death spurt, presentation only |
+| `scripts/duel/match_camera.gd`, `match_framing.gd` | where the view is, and how close it stands; presentation |
+| `scripts/duel/match_hud.gd`, `match_gate.gd` | presentation |
+| `scripts/ui/duel_select.gd`, `duel_choice.gd` | the menu's second step: one keyboard, VS CPU or online, remembered |
 | `scripts/duel/duel_brain.gd` (`DuelBrain`) | the computer opponent: one input byte a frame from a `DuelView` |
 | `scripts/duel/duel_view.gd`, `duel_eyes.gd`, `duel_cpu.gd` | what it may see, how late, and the order that keeps it honest |
 | `scripts/duel/duel_feet.gd` (`DuelFeet`) | where its jumps land: the moat, the pit and the benches |
@@ -140,22 +142,126 @@ columns; the strip is 86 of 150, a little over half.
 A respawn's zone is streamed in when its timer **starts**, not when the fighter
 appears, so the only stream not triggered by travel has two seconds' warning.
 
+## The camera
+
+`MatchCamera` puts the view where the simulation's window is; how close it
+stands is `MatchFraming`, a pure model it feeds the fighters and the clock.
+Neither touches the match: the camera reads `scroll`, the fighters and the
+respawn timers, and nothing it holds is in the snapshot, so DUEL VS CPU and the
+online duel use it unchanged and two peers may frame one frame differently.
+
+**The frame breathes.** The owner played on a phone and liked the adventure's
+framing better. So the scale is a *level* — a whole number of screen pixels
+per texel — between two ends:
+
+| | Level | At 1080 px tall | Fighter on screen |
+| --- | --- | --- | --- |
+| far | `round(height × 0.085 / 22)`, the old fixed framing | 4 px/texel, 480 × 270 world px at 320 units | 8.1% |
+| close | `floor(stretch)`, the adventure's scale, never closer | 6 px/texel, 320 × 180 at 320 units, 440 × 180 at 440 | 12.2% |
+
+Other screens: 1170 px tall is 5 to 6 (the adventure there is a fractional 6.5,
+and the duel stays at 6); 1440 is 6 to 8; a 720 px desktop is 3 to 4.
+
+**The curve.** A step function of the distance between the two, with a gap
+between its up and down edges: the frame goes out a level when the pair no
+longer fits it with `SIDE` (40 px: a thrust's reach and a step of warning) in
+front of each, and comes in a level when they fit the closer one with `SIDE` +
+`HYSTERESIS` (88 px) each. In world pixels between the two:
+
+| Screen (1080 px tall) | 6 px/texel (adventure) | 5 px/texel | 4 px/texel (far) |
+| --- | --- | --- | --- |
+| 320 units, 16:9 | in at ≤ 144, out at > 240 | in at ≤ 208, out at > 304 | beyond |
+| 400 units, 20:9 phone | in at ≤ 224, out at > 320 | in at ≤ 304, out at > 400 | beyond |
+| 440 units, 22:9 | in at ≤ 264, out at > 360 | in at ≤ 352, out at > 448 | beyond |
+
+The window is 480 px, so on a wide phone a fight is mostly at the adventure's
+scale and reaches the far level only with the two at opposite ends of it.
+Vertically the frame also wants their jump's height (24 px) above the higher
+head, which only the gallery and the ladders ever ask for.
+
+**No pumping**, three ways: a level is entered only with `HYSTERESIS` (48 px,
+more than a lunge) more room than it is left at; only after the pair has fitted
+it for `DWELL` (0.6 s) without a break, which is longer than a jump; and never
+within `COOLDOWN` (1.2 s) of stepping out. Twenty seconds of lunging across the
+line move it at most once (`tests/unit/test_match_framing.gd`).
+
+**Never fights a kill or a read.** On a death the frame holds for `KILL_HOLD`
+(0.8 s), at the scale the kill happened and with the body's spot kept in it,
+before it stands back. A step in is a 0.6 s ease, centred between the two.
+
+**The texel grid.** At rest the scale is a whole level and the position is
+snapped to the screen's pixel grid, so every texel is one size. Between levels
+the scale eases (smoothstep; 0.6 s calm, 0.3 s when someone is running for the
+edge), and only those frames are fractional: in motion, for a fraction of a
+second, a texel n or n+1 pixels wide reads as the zoom moving. A fractional
+scale at rest is the shimmer `docs/feel.md` rules out; one that moves and lands
+is a camera move. Judged on frames rendered mid-ease at 320 and 440 units.
+
+**Both fighters, always.** The closest level at which every living fighter in
+the window fits with `EDGE` (6 px) to spare is a ceiling nothing overrides —
+not the hysteresis, the hold or an ease, which is capped by the exact fit
+frame by frame — and the camera's glide is clamped so it cannot lag a fighter
+out. A 16:9 desktop is narrower than a zone at the far level, so there the
+floor drops a whole level below it rather than lose one. Close framing is
+allowed only while both are alive and inside the window. A fighter respawned
+ahead is 720 px from the leader by the spec — outside the window, and outside
+any framing that keeps a fighter readable — so while anyone is down the frame
+stands at the far level and leans toward where they will come back, and the
+respawned fighter is on screen no later than the frame they enter the window.
+`tests/unit/test_match_camera.gd` plays matches at three screen sizes and
+checks every frame.
+
 ## Gore
 
-A bounded list per zone (`GoreField.MAX_PER_ZONE`, 192), not a render target.
-Five zones are about fifty kilobytes and no VRAM, against tens of megabytes for
-a render target on a phone. The list survives a zone being streamed out and
-back because it is not in the tilemap. Shapes are seeded from the frame and the
-seat, so both screens show the same splatter — without it being simulation.
+Two bounded lists per zone, not a render target: pools and streaks
+(`GoreField.MAX_MARKS`, 48) and droplet stains (`MAX_DROPS`, 384). Five zones
+at the bound are well under a hundred kilobytes and no VRAM, against tens of
+megabytes for a render target on a phone. The lists survive a zone being
+streamed out and back because they are not in the tilemap. Bounded apart, a
+busy zone sheds its oldest droplets and keeps its pools.
+
+**A kill reads as a kill.** The first version threw six splats and laid one
+pool, and on a phone it read as a smudge. A kill is now:
+
+- **a spurt** — three pulses of droplets out of the wound, 12, 8 and 5, eight
+  frames apart and each weaker, thrown the way the blow travelled and up, two
+  a pulse spattering back. Each flies a real arc against the tiles and lands
+  on a floor or platform, or sticks to a wall and runs down it; one that
+  reaches water is gone. A hazard has no blow and throws up and to both sides;
+- **a streak** along the floor from under the body in the blow's direction,
+  as far as the floor runs flat;
+- **a pool** that spreads for a second and a half, wet — a fresh-coloured sheen
+  on its sunward side — for four seconds, then dark for the rest of the match.
+
+All in the seat's two tones, hard-edged, droplets and their stains as whole-
+pixel rects on the texel grid; no gradient, no glow. The blow's direction is
+read in the step from where the killer stood and carried only in the event
+(`death_recorded`'s fourth argument); no step reads it back.
+
+**On the match's clock.** The spurt is not a particle system. Every droplet's
+arc and landing are worked out once, at `spill()`, and drawn at "frames since
+the death" against the match frame the scene passes to `tick()`. A death a
+correction moves carries on at the host's age instead of spurting again; a
+kill found late is shown mid-flight; `wipe()` takes a retracted kill's
+droplets out of the air as well as off the floor. The field redraws every
+frame only while a death is younger than its spurt and pool.
+
 The blood is fed by `death_recorded` and `death_retracted`, not by the beat
 (`fighter_died`): a reconciling client paints each death once, takes back the
 blood of a predicted kill the host never had, and moves a kill the correction
 moved to the host's frame and place. `docs/netplay.md`, "Corrected outcomes",
-has the rule and the argument for it.
+has the rule and the argument for it. Shapes are seeded from the frame, the
+seat, the place and the blow, so both screens show the same splatter without
+it being simulation.
+
+**Drawn over the stone.** The field sits after the zones at their z, under the
+fighters and the foreground plane. It used to be at z -1, beneath the zones'
+own layers, where every stain in front of a backdrop was drawn and hidden;
+`tests/unit/test_duel_blood.gd` now holds the order.
 
 ## The computer opponent
 
-**Duel vs CPU** (`scenes/duel_match_cpu.tscn`) is the one-keyboard match with
+**VS CPU** (`scenes/duel_match_cpu.tscn`) is the one-keyboard match with
 seat two's input byte taken from the computer instead of the keyboard
 (`_step()` in `scripts/duel/match_cpu.gd`; the rest of that file is names and
 seeds). It is the only way to duel on one phone. The player is seat one,
@@ -310,8 +416,6 @@ the behaviour behind it broken.
   beatable by a newcomer on a phone, and whether HARD is a fight rather than a
   wall, wants playing on a phone, as the disarm window did. The knobs are in
   one table for that.
-- **The level is not saved.** The menu remembers it for the session
-  (`ModeRegistry.choose`) and opens every launch on EASY.
 - **A real match cannot be replayed from its seed alone** until the player's
   inputs are recorded with it.
 - **Moves it does not use:** the dive kick, the thrust in the air, and turning
@@ -337,10 +441,22 @@ the behaviour behind it broken.
   run being fetched.
 - `tests/unit/test_duel_cpu_feet.gd` — every hazard crossed by the real fighter
   from a run and from a standstill, and the landing rule against an oracle.
-- `tests/unit/test_duel_cpu_mode.gd` — the menu's row and levels, and the scene
-  stepping both seats.
+- `tests/unit/test_duel_cpu_mode.gd` — the scene at the level the duel page
+  saved, stepping both seats.
+- `tests/unit/test_duel_select.gd` — the one DUEL row, the page's three ways,
+  the level on its row, what is remembered and its field-by-field fallback,
+  taps, and the thumb buttons.
+- `tests/unit/test_match_framing.gd` — the zoom levels per screen, coming in
+  and going out, the ease, no pumping, the kill hold, and a minute of running
+  about without a fighter framed out.
+- `tests/unit/test_match_camera.gd` — the camera on matches: every fighter in
+  the window always on screen, the stand-back for a respawn ahead, and a match
+  framed every frame stepping to the same bytes as one never framed.
 - `tests/match_gore_test.gd` — gore never reaches state or checksum, and the
-  list is bounded.
+  lists are bounded.
+- `tests/unit/test_duel_blood.gd` — a kill's spurt, streak and pool, the spray
+  thrown the blow's way, the match's clock, a moved and a wiped death, the
+  bound, and the blood drawn over the stone.
 
 ## Status
 
@@ -354,7 +470,7 @@ byte for byte. Each of those checks was seen to fail with its fix removed.
 The match's own suites still run on the placeholder in `match_stub_fighter.gd`,
 on purpose: they test the rope, and do not need a physics space.
 
-All three menu entries run the match — Duel, Duel vs CPU and Duel Online —
+All three ways on the duel page run the match — one keyboard, VS CPU and online —
 and **the round duel is retired**: its
 simulation, scenes, camera, HUD and art are gone, and so is the duel-only code
 it needed in `scripts/player/player.gd` (guard, stagger, first-blood and its own
@@ -386,7 +502,11 @@ The five items that stood between the match and replacing the round duel:
    neighbour, chosen to keep the most open ground, so every gate, ladder,
    ledge and mark survived and the share of respawnable floor held at about
    half. The respawn lead is 1.5 × 480 = 720 px. `--framing=<px>` still frames
-   a fixed width, for comparisons.
+   a fixed width, for comparisons. **Since then the frame breathes**: this
+   framing is now the far end of a zoom that comes in to the adventure's
+   scale as the fighters close (see *The camera* above), because on a phone
+   the owner preferred the adventure's. A zone still fits across a phone at
+   the far end, which is what the strip was cut for.
 2. ~~The fighter is drawn as its hitboxes.~~ **The fighter wears the
    prince's figure** (`fighter_art.gd` extends `PlayerArt`), with the sword
    drawn exactly on the simulation's blade rect. See
@@ -407,8 +527,8 @@ The five items that stood between the match and replacing the round duel:
    events and the result only in the reserved band, and a second, shorter
    phrasing for a 320-unit screen. `tests/ui_screens.gd` renders it as
    `match`, `match_flash` and `match_over`.
-5. ~~The menu and the network session.~~ The menu's **Duel** is the match on
-   one keyboard, and **Duel Online** is the match between two devices
+5. ~~The menu and the network session.~~ The duel page's **One keyboard** is
+   the match on one keyboard, and **Online** is the match between two devices
    (`scenes/duel_match_online.tscn`, `scripts/duel/match_online.gd`): the lobby,
    transport and session of the round duel around the match's own scene, with
    touch controls and a THROW button. Phones on one Wi-Fi pair with a
