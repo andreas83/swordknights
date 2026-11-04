@@ -28,6 +28,18 @@ extends Control
 ## every other page, so the level needs no page of its own; a third step would
 ## be one press more for the choice made most often.
 ##
+## ## Where, on its own row
+##
+## A fourth row, STRIP, says where the duel is fought -- the Tug of War, the
+## Clockwork Well, the Floodgates, the Aqueduct, the Rooftops, or RANDOM -- and
+## left and right step it, as they step the level, stopping at the ends. It is
+## a row rather than a page for the level's reason: the choice made most often
+## is the way and the place together, and both are one look at this page. It
+## is a setting, not a way to duel, so jump on it plays the way last played.
+## The caption under it says what the strip does to a duel, in one line.
+## Online, the host's strip is the match's: the guest's own choice is only
+## what its screen shows until it is seated (docs/netplay.md).
+##
 ## ## Driven like every other page
 ##
 ## Up/down choose, left/right set the level, jump plays, sword or pause go back
@@ -71,8 +83,18 @@ const ROWS: Array[Dictionary] = [
 		"caption": ["TWO PHONES ON ONE WI-FI, PAIRED WITH A CODE",
 			"TWO PHONES ON ONE WI-FI"],
 	},
+	{
+		"title": "STRIP",
+		"value": "",
+		# The strip's own line, from DuelStrips.CAPTIONS.
+		"caption": [],
+	},
 ]
 const CPU_ROW := 1
+## The row that says where, and the width of its value between the carets: the
+## longest strip name at the MICRO cut, and a caret's room either side.
+const STRIP_ROW := 3
+const STRIP_SLOT := 104.0
 
 ## Test seams, set before _ready: where the choice is kept, what playing does
 ## (`play.call(scene_path)`; a scene change by default), and what going back
@@ -89,6 +111,7 @@ var _repeat_across := 0.0
 var _hold := 0.0
 var _row_rects: Array[Rect2] = []
 var _level_rect := Rect2()
+var _strip_rect := Rect2()
 
 
 func _ready() -> void:
@@ -119,6 +142,8 @@ func row_title(row: int) -> String:
 func row_value(row: int) -> String:
 	if row == CPU_ROW:
 		return DuelBrain.level_name(_choice.level)
+	if row == STRIP_ROW:
+		return DuelStrips.label(_choice.strip)
 	return String(ROWS[row]["value"])
 
 
@@ -143,9 +168,25 @@ func shift_level(by: int) -> void:
 	queue_redraw()
 
 
-## Plays the selected way, and remembers it and the level.
+## Steps the strip, if its row is selected: through the strips, then RANDOM,
+## stopping at either end.
+func shift_strip(by: int) -> void:
+	if _index != STRIP_ROW:
+		return
+	var next := DuelStrips.step(_choice.strip, by)
+	if next == _choice.strip:
+		GameAudio.cue("ui_back")
+		return
+	_choice.strip = next
+	GameAudio.cue("ui_move")
+	queue_redraw()
+
+
+## Plays the selected way -- or, from the strip's row, the way last played --
+## and remembers it, the level and the strip.
 func confirm() -> void:
-	_choice.way = _index
+	if _index != STRIP_ROW:
+		_choice.way = _index
 	if _choice.save() != OK:
 		push_warning("the duel choice was not saved to %s" % store_path)
 	var scene := _choice.scene()
@@ -177,6 +218,8 @@ func tap(at: Vector2) -> bool:
 			continue
 		if row == _index and row == CPU_ROW and _level_rect.has_point(at):
 			shift_level(-1 if at.x < _level_rect.get_center().x else 1)
+		elif row == _index and row == STRIP_ROW and _strip_rect.has_point(at):
+			shift_strip(-1 if at.x < _strip_rect.get_center().x else 1)
 		elif row == _index:
 			confirm()
 		else:
@@ -198,6 +241,10 @@ func row_rect(row: int) -> Rect2:
 
 func level_rect() -> Rect2:
 	return _level_rect
+
+
+func strip_rect() -> Rect2:
+	return _strip_rect
 
 
 func _input(event: InputEvent) -> void:
@@ -228,6 +275,7 @@ func _process(delta: float) -> void:
 	elif absf(across) > 0.5:
 		if is_zero_approx(_repeat_across):
 			shift_level(signi(int(signf(across))))
+			shift_strip(signi(int(signf(across))))
 			_repeat_across = REPEAT_FIRST
 	else:
 		_repeat = 0.0
@@ -291,6 +339,8 @@ func _draw() -> void:
 	if _thumbs_up():
 		caption_right = minf(caption_right, view.x - SWORD_REACH.x)
 	var phrasings := PackedStringArray(ROWS[_index]["caption"] as Array)
+	if _index == STRIP_ROW:
+		phrasings = PackedStringArray(DuelStrips.caption(_choice.strip))
 	var text := UiFont.fit(phrasings, caption_right - column.position.x, UiFont.Cut.MICRO)
 	UiFont.draw_text(self, text,
 		Vector2(roundf((column.position.x + caption_right) * 0.5), caption_y),
@@ -316,26 +366,39 @@ func _draw_row(row: int, rect: Rect2) -> void:
 		UiFont.Cut.TEXT, ink, UiFont.Align.LEFT, 0.6)
 
 	var right := rect.end.x - 6.0
-	if row != CPU_ROW:
-		UiFont.draw_text(self, row_value(row), Vector2(right, y + 1.0), UiFont.Cut.MICRO,
-			Palette.with_alpha(Palette.PAPER, 0.45), UiFont.Align.RIGHT, 0.5)
+	if row == CPU_ROW:
+		var level := int(_choice.level)
+		_level_rect = _draw_stepper(rect, right, LEVEL_SLOT, selected, level > 0,
+			level < DuelBrain.LEVEL_NAMES.size() - 1, row_value(row))
 		return
+	if row == STRIP_ROW:
+		var order := DuelStrips.choices()
+		var at := order.find(_choice.strip)
+		_strip_rect = _draw_stepper(rect, right, STRIP_SLOT, selected, at > 0,
+			at < order.size() - 1, row_value(row))
+		return
+	UiFont.draw_text(self, row_value(row), Vector2(right, y + 1.0), UiFont.Cut.MICRO,
+		Palette.with_alpha(Palette.PAPER, 0.45), UiFont.Align.RIGHT, 0.5)
 
-	# The level, centred in its slot between the carets that say which way it
-	# can go. Lit while the row is selected, since only then do they move it.
-	var slot := Rect2(right - LEVEL_SLOT, rect.position.y, LEVEL_SLOT, rect.size.y)
-	_level_rect = slot
-	var level := row_value(row)
+
+## A value stepped on its row -- the level, the strip -- centred in its slot
+## between the carets that say which way it can go. Lit while the row is
+## selected, since only then do they move it. Returns the slot, for taps.
+func _draw_stepper(rect: Rect2, right: float, wide: float, selected: bool,
+		can_left: bool, can_right: bool, text: String) -> Rect2:
+	var y := rect.position.y + 4.0
+	var slot := Rect2(right - wide, rect.position.y, wide, rect.size.y)
 	var mid := y + 1.0 + UiFont.cap(UiFont.Cut.MICRO) * 0.5
 	var lit := Palette.LIGHT if selected else Palette.with_alpha(Palette.LIGHT, 0.7)
-	UiFont.draw_text(self, level, Vector2(roundf(slot.get_center().x), y + 1.0),
+	UiFont.draw_text(self, text, Vector2(roundf(slot.get_center().x), y + 1.0),
 		UiFont.Cut.MICRO, lit, UiFont.Align.CENTER, 0.5)
 	if not selected:
-		return
-	if int(_choice.level) > 0:
+		return slot
+	if can_left:
 		UiMarks.caret(self, Vector2(slot.position.x + 4.0, mid), -3.0, Palette.LIGHT)
-	if int(_choice.level) < DuelBrain.LEVEL_NAMES.size() - 1:
+	if can_right:
 		UiMarks.caret(self, Vector2(slot.end.x - 4.0, mid), 3.0, Palette.LIGHT)
+	return slot
 
 
 ## The instructions, on the rail, as the title screen cuts its own. With the
@@ -354,6 +417,12 @@ func _draw_hint(view: Vector2, cx: float, rail: float) -> void:
 		phrasings = PackedStringArray([
 			"LEFT / RIGHT: HOW HARD   ·   JUMP TO BEGIN   ·   SWORD TO GO BACK",
 			"LEFT / RIGHT: HOW HARD  ·  JUMP TO BEGIN",
+			"LEFT / RIGHT  ·  JUMP",
+		])
+	elif _index == STRIP_ROW:
+		phrasings = PackedStringArray([
+			"LEFT / RIGHT: WHERE   ·   JUMP TO BEGIN   ·   SWORD TO GO BACK",
+			"LEFT / RIGHT: WHERE  ·  JUMP TO BEGIN",
 			"LEFT / RIGHT  ·  JUMP",
 		])
 	var hint := UiFont.fit(phrasings, room, UiFont.Cut.MICRO)

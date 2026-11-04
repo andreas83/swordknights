@@ -39,12 +39,17 @@ var sky: ParallaxSky
 
 ## 0 at noon, 1 in full dusk. Public so a screenshot or a test can read it.
 var amount := 0.0
+## The strip's own hour (ZoneStrip.hour, through TimeOfDay): the light the
+## whole strip is in before the gate rooms add their dusk. The afternoon for
+## the Tug of War, which is the light it always had.
+var hour: Dictionary = {"world": Color.WHITE, "sky": 0.0, "night": 0.0}
 
 
 func setup(view: MatchCamera, zones: ZoneStrip, sky_node: ParallaxSky) -> void:
 	camera = view
 	strip = zones
 	sky = sky_node
+	hour = TimeOfDay.grade_of(strip.as_level(0, 1)) if strip != null else hour
 	_apply()
 
 
@@ -62,11 +67,16 @@ func _apply() -> void:
 	var east := smoothstep(BEGINS, COMPLETE, from_east)
 	amount = maxf(west, east)
 
-	color = Color.WHITE.lerp(DUSK, amount)
+	# The darker of the hour and the gate's dusk, channel by channel: a strip
+	# already at night is not lit back up by walking into its last room.
+	var gate := Color.WHITE.lerp(DUSK, amount)
+	var base: Color = hour["world"]
+	color = Color(minf(gate.r, base.r), minf(gate.g, base.g), minf(gate.b, base.b))
 	# The sky paints its own dusk -- a burning sun under ink -- rather than being
 	# multiplied down, which would dim the very sun that is meant to glow.
 	if sky != null:
-		sky.dusk = amount
+		sky.dusk = maxf(amount, float(hour["sky"]))
+		sky.night = float(hour["night"])
 	camera.tremor = amount
 	# Lifted back to full light: the inverse of the world's multiply, so the
 	# dusk falls on the room and not on what is lit.

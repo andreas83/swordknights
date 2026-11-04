@@ -137,7 +137,9 @@ func parse(text: String) -> void:
 		# Catch files still using the old '#' header. Tested by content rather
 		# than by position: "#  ###" is a legitimate first row, while
 		# "# The Sun Terrace" contains glyphs no tile uses.
-		if line.begins_with("#") and _has_unknown_glyphs(line):
+		# A glyph the header declared with `;! mark` is known by the time its
+		# row is read: a flood basin cut into a floor is a row that starts '#'.
+		if line.begins_with("#") and _has_unknown_glyphs(line, declared):
 			push_warning(
 				"'#' is a solid tile, not a comment — use ';' for headers: %s" % line
 			)
@@ -447,10 +449,10 @@ static func _connected(cells: Array) -> Array[Array]:
 
 ## True if the line contains a character that is neither a tile nor an entity
 ## mark — i.e. it is prose rather than level geometry.
-static func _has_unknown_glyphs(line: String) -> bool:
+static func _has_unknown_glyphs(line: String, known: Dictionary = {}) -> bool:
 	for i: int in line.length():
 		var glyph := line[i]
-		if not (_in_a_legend(glyph) or Tiles.is_masons_mark(glyph)):
+		if not (_in_a_legend(glyph) or Tiles.is_masons_mark(glyph) or known.has(glyph)):
 			return true
 	return false
 

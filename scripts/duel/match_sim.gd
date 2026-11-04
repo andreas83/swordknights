@@ -25,6 +25,10 @@ extends Node2D
 ##                         unexplained desync in the third zone.
 ##   match_length()        the one integer the host dictates about the shape of
 ##                         the match — rounds to win, or zones in the strip.
+##   arena_id(), set_arena(id)
+##                         the arena's name, which the host dictates too: the
+##                         guest loads the strip the host chose before the
+##                         hashes are compared.
 ##
 ## REPLAYS, the other half of purity
 ##
@@ -101,6 +105,19 @@ func snapshot_bytes() -> int:
 ## must not start a match.
 func arena_identity() -> int:
 	return 0
+
+
+## The name of the arena the host plays, carried in its WELCOME so the guest
+## can load the same one. Empty for a duel with only one arena.
+func arena_id() -> String:
+	return ""
+
+
+## Applied by the guest when the host's WELCOME names an arena: put this duel
+## on it, or return false if this build has no such arena, which fails the
+## handshake in the lobby with the arena's name in the sentence.
+func set_arena(id: String) -> bool:
+	return id == arena_id()
 
 
 ## The host's one dictate about the match's shape.

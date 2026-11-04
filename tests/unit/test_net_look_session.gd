@@ -42,8 +42,9 @@ const POLLS := 20
 ## tests/unit/test_net_look_wire.gd for how they are spelled.
 const V1_HELLO := [NetProtocol.VERSION, 1, 1, 0, 0, 0, 1, 0x78]
 ## And a lookless host's welcome: seat 1, a match length of 1, arena hash 0,
-## which is what StubSim answers to.
-const V1_WELCOME := [NetProtocol.VERSION, 2, 1, 1, 0, 0, 0, 0]
+## which is what StubSim answers to, and no strip named: a zero length byte,
+## the field protocol 3 added (scripts/net/protocol.gd).
+const V1_WELCOME := [NetProtocol.VERSION, 2, 1, 1, 0, 0, 0, 0, 0]
 ## A build from before the sword catch: protocol 1.
 const PRE_CATCH_HELLO := [1, 1, 1, 0, 0, 0, 1, 0x78]
 

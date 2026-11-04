@@ -36,6 +36,7 @@ class Glance:
 	var bodies: Array[DuelView.Body] = []
 	var swords: Array[DuelView.Sword] = []
 	var respawn := PackedFloat64Array([0.0, 0.0])
+	var stones := PackedByteArray()
 	var tuning: DuelTuning
 
 
@@ -58,6 +59,7 @@ func record(fight: DuelMatch) -> void:
 	glance.phase = int(fight.phase)
 	glance.leader = fight.leader_slot()
 	glance.respawn = PackedFloat64Array([fight.respawn_left(0), fight.respawn_left(1)])
+	glance.stones = fight.stones.duplicate()
 	for seat: DuelSeat in fight.seats:
 		var fighter := seat.node as Fighter
 		if fighter == null:
@@ -98,6 +100,7 @@ func view(seat: int, delay: int) -> DuelView:
 	out.phase = old.phase
 	out.leader = old.leader
 	out.their_respawn = old.respawn[1 - seat]
+	out.stones = old.stones
 	out.strip = _strip
 	out.tuning = newest.tuning
 	return out

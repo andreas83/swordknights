@@ -65,6 +65,8 @@ const SUBJECT := {
 	"catch": "by",
 	"consumed": "winner",
 	"over": "winner",
+	# A slab of crumbling stone, by its index: a slab falls once a match.
+	"stone": "index",
 }
 
 ## frame -> Array[Dictionary]: the presentable events the timeline holds there.

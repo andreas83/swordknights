@@ -47,7 +47,7 @@ func _sun_terrace() -> AsciiLevel:
 func test_no_level_without_a_mechanism_takes_the_masked_path() -> void:
 	var checked := 0
 	for name: String in DirAccess.get_files_at("res://levels"):
-		if name.get_extension() != "txt" or name == "duel_zones.txt":
+		if name.get_extension() != "txt" or DuelStrips.is_duel_file(name):
 			continue
 		var level := AsciiLevel.from_file("res://levels".path_join(name))
 		if _has_mechanism(level):

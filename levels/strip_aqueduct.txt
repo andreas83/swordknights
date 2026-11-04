@@ -1,0 +1,30 @@
+; The Crumbling Aqueduct
+;! time sunset
+;
+; A duel strip (scripts/duel/duel_strips.gd): its zones, west to east.
+;
+; An aqueduct's deck at sunset, high over the channel it carries, with its
+; old slabs cracked through. A slab lights the first frame a foot finds it,
+; shudders for thirty-six frames and drops into the water, taking the one
+; beside it with it, and it does not come back: the strip a match ends on is
+; not the strip it began on. The state of every slab is one byte in the
+; match's snapshot and checksum, so both phones wear the same holes into it.
+;
+; WHAT IT DOES TO A DUEL. It punishes standing still. Nidhogg's fencing is
+; done from a planted stance at the edge of reach, and here a planted stance
+; on cracked stone is a stance with a fuse under it. Every fight leaves its
+; mark, the holes it leaves are moats a clash can knock a fighter into, and
+; the run home gets harder for whoever wins the rope late.
+;
+;   zone 3  the Channel Span    the start: three pairs of cracked slabs
+;   zone 2  the Broken Arches   the long span, five pairs between four piers
+;   zone 1  the Aqueduct Gate   two pairs before the arch
+;
+; Zones 4 and 5 are 2 and 1 reversed. No run of cracked stone is wider than
+; two slabs, so the deck can be worn down to jumps but never cut.
+
+aqueduct_01.txt
+aqueduct_02.txt
+aqueduct_03.txt
+aqueduct_04.txt
+aqueduct_05.txt

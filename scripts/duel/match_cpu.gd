@@ -30,10 +30,6 @@ extends "res://scripts/duel/match_scene.gd"
 
 const CPU_SEAT := 1
 
-## Where the level is read from. A seam for a test, which must never read or
-## write the real file.
-var choice_path := DuelChoice.PATH
-
 var level: DuelBrain.Difficulty = DuelBrain.Difficulty.EASY
 var seed_value := 0
 var cpu: DuelCpu

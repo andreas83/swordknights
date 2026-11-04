@@ -1,0 +1,30 @@
+; The Gate of Hours, East
+;
+; Zone 5 of 5 of the Clockwork Well: levels/well_01.txt reversed cell for
+; cell. Player two's gate, every blade on the same beat as its twin.
+;
+;! channel 1 beat 50
+;! channel 2 beat 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+                      ########
+           #2#        ########
+            z          :::::::
+            z          :::::::
+            z          :::::::
+            z          :::::::
+     t           ii t  :::::D:
+##################1###########
+##############################
+##############################

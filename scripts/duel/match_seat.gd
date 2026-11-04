@@ -97,12 +97,44 @@ func missing() -> String:
 ## Object.set() on a typed property silently does nothing when the type does
 ## not match, and the real fighter's first wiring failed exactly that way: its
 ## world stayed null and nothing said so. Reading the value back is the check.
-func give_world(strip: ZoneStrip) -> bool:
+##
+## `ground` is what a fighter typed for any DuelWorld is given instead, when
+## the match has one: the strip with its crumbling stone (MatchGround). The
+## placeholder takes a ZoneStrip by name and is always handed the strip.
+func give_world(strip: ZoneStrip, ground: DuelWorld = null) -> bool:
 	for property: String in WORLD_PROPERTIES:
 		if property in node:
-			node.set(property, strip)
-			return node.get(property) == strip
+			var world: Object = ground if ground != null and property == "world" else strip
+			node.set(property, world)
+			return node.get(property) == world
 	return true
+
+
+## Adds `bits` to the layers a physics-bodied fighter collides with: the match's
+## crumbling stone, which lives on a layer of its own so that two matches in one
+## physics space -- a host and a client in a test -- never stand on each
+## other's slabs. Read back, as everything set on a fighter from here is; and
+## set again on `ready` if the fighter has not entered the tree yet, because
+## its _ready() writes its mask whole.
+func collide_with(bits: int) -> bool:
+	var body := node as CollisionObject2D
+	if body == null or bits == 0:
+		return true
+	body.collision_mask |= bits
+	if not body.is_node_ready():
+		body.ready.connect(func() -> void: body.collision_mask |= bits, CONNECT_ONE_SHOT)
+	return body.collision_mask & bits == bits
+
+
+## Where this fighter's feet are, if it is alive and standing on something:
+## Vector3(left x, right x, y). Vector3.ZERO otherwise. What crumbling stone
+## asks of a fighter, and all it asks.
+func feet() -> Vector3:
+	var fighter := node as Fighter
+	if fighter == null or not fighter.is_alive() or not fighter.grounded:
+		return Vector3.ZERO
+	var half := fighter.tuning.body_width * 0.5
+	return Vector3(fighter.position.x - half, fighter.position.x + half, fighter.position.y)
 
 
 func setup(profile: Resource) -> void:
@@ -140,7 +172,12 @@ func simulate(delta: float) -> void:
 ## The placeholder resolves its own kills and its own hazards, so for it this
 ## does nothing. That is the one place this seam still branches on which
 ## fighter it holds.
-static func referee(a: DuelSeat, b: DuelSeat, strip: ZoneStrip) -> Array[Dictionary]:
+##
+## `frame` is the match frame being stepped: the strip's blades and floods are
+## a pure function of it (StripHazards), so the same frame on two peers cuts
+## the same body.
+static func referee(a: DuelSeat, b: DuelSeat, strip: ZoneStrip,
+		frame: int = 0) -> Array[Dictionary]:
 	var events: Array[Dictionary] = []
 	var first := a.node as Fighter
 	var second := b.node as Fighter
@@ -151,7 +188,9 @@ static func referee(a: DuelSeat, b: DuelSeat, strip: ZoneStrip) -> Array[Diction
 	for fighter: Fighter in [first, second]:
 		if not fighter.is_alive():
 			continue
-		if strip.rect_is_deadly(fighter.hurt_rect()) or fighter.position.y > floor_of_world:
+		var body := fighter.hurt_rect()
+		if strip.rect_is_deadly(body) or strip.hazards.rect_is_deadly(body, frame) \
+				or fighter.position.y > floor_of_world:
 			fighter.kill(-1)
 	return events
 

@@ -113,8 +113,13 @@ var leader := -1
 ## Seconds until the other fighter is back, as seen; 0 when up.
 var their_respawn := 0.0
 
-## The level, which nobody's input changes and both players see whole.
+## The level, which nobody's input changes and both players see whole. Its
+## blades and its water are a function of `frame`, which is on the screen as
+## surely as the level is: the brain may read them for any frame it likes.
 var strip: ZoneStrip
+## The crumbling stone, one byte a slab (StripHazards), as seen `age` frames
+## ago like everything else that a fight changes. Empty on a strip without.
+var stones := PackedByteArray()
 ## The fighter's movement profile: public numbers, the same for both seats.
 var tuning: DuelTuning
 

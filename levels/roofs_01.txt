@@ -1,0 +1,30 @@
+; The Last Roof
+;
+; Zone 1 of 5 of the Rooftops: player one's gate, an arch on the last roof
+; before the city wall. The last stake is the alley in front of it, two tiles
+; across and nothing under it, and a chimney on the far roof to come over
+; first. The arch's lintel is high, so a pinned respawn in front of it can be
+; jumped.
+
+
+
+
+
+
+
+
+
+
+
+
+########
+########
+:::::::
+:::::::
+:::::::
+:::::::             ###
+:D:::::             ###
+###########  #################
+###########  #################
+###########::#################
+###########::#################

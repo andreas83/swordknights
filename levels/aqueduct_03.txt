@@ -1,0 +1,40 @@
+; The Channel Span
+;
+; Zone 3 of 5 of the Crumbling Aqueduct, where every match starts: symmetric
+; about its own centre, one spawn mark, mirrored by the match.
+;
+; The deck runs whole from wall to wall at the start of a match. Three pairs
+; of its slabs are cracked stone (`,`, the campaign's crumbling stone): each
+; one lights the first frame a foot finds it, shudders for six tenths of a
+; second, and drops into the channel, taking its neighbour a quarter of a
+; second later -- and it stays down for the rest of the match. A runner is
+; across a pair before it goes; a fencer who stands on one is not. So the
+; middle of the strip starts as a floor and is worn, by the fight itself,
+; into three moats two tiles wide, each one a jump and each one a place to be
+; parried into. The piers between them never fall.
+;
+; Every gap the stone can leave is two tiles, a running jump, because no
+; slab run is wider: the strip can be worn down but never cut.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ t  @                       t
+#########,,###,,###,,#########
+#########::###::###::#########
+#########::###::###::#########
+#########~~###~~###~~#########

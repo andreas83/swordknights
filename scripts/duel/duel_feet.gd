@@ -25,6 +25,43 @@ extends RefCounted
 ## keeps steering in the air when the margin turns out thin.
 ## tests/unit/test_duel_cpu_feet.gd runs the real fighter at every hazard on the
 ## strip from both sides and holds it to crossing alive.
+##
+## HAZARDS ON A CLOCK, AND STONE THAT GOES
+## The other strips add three things the grid alone does not say (StripHazards):
+## blades that cut on the beat, water that rises on a timer, and slabs that
+## fall. The first two are a pure function of the match frame, so the
+## prediction asks about them on the frame it is predicting -- `_clock` is the
+## frame being decided, set by look() -- and a jump whose arc crosses a slot
+## while it is up is as unsafe as one that lands in the moat. Walking is
+## planned the same way: a cell ahead is a gap if a blade or the water will be
+## in it while the body passes, and the feet stop at its lip and wait for the
+## beat, or take the stones. The stones are on the grid itself: look() writes
+## the slabs as the view saw them, and a slab that is burning or gone is not
+## somewhere to put a foot. doomed() and refuge() are for when the ground
+## itself is about to kill a fighter standing still: the brain asks them first.
+
+## How much wider than the body, each side in px, a blade or the water is kept
+## from in a prediction.
+const SLACK := 3.0
+## How far from a wall too tall to hop from a standstill the feet back off to,
+## in px, for the run-up that clears it.
+const RUN_UP := 10.0
+## Frames a landing must stay safe to count as one: a body that lands in a
+## slot's lane on the frame before it rises has not landed safely.
+const SETTLE := 20
+## Frames a body takes to pass a cell, at a run, with slack. A cell a blade
+## cuts inside this window of the body's arrival is a gap.
+const PASS := 22
+## A basin is not walked into if it floods within this many frames of the
+## body reaching it: long enough to cross the widest basin and climb out.
+const FLOOD_MARGIN := 150
+
+## The frame the next predictions start on, and what the stones looked like.
+## Set by look(); both describe the view the brain is deciding on, and both
+## are static for the reason the grid cache is: the feet are a set of static
+## questions about one strip, asked many times a frame.
+static var _clock := 0
+static var _stones_seen := PackedByteArray()
 
 const DT := DuelRules.DT
 ## Frames a predicted leap may last before it is called a fall into nothing.
@@ -62,6 +99,20 @@ static var _grid_of: ZoneStrip = null
 static var _grid := PackedByteArray()
 static var _grid_cols := 0
 static var _grid_rows := 0
+
+
+## Takes the frame and the stones of `view` as the ground the next questions
+## are about. The brain calls it first thing every frame it decides.
+static func look(view: DuelView) -> void:
+	_clock = view.frame
+	_kind(view.strip, 0, 0)
+	var hazards := view.strip.hazards
+	for i: int in hazards.stone_count():
+		var byte := view.stones[i] if i < view.stones.size() else 0
+		var cell: Vector2i = hazards.stones[i]
+		var kind := Tiles.Kind.SOLID if StripHazards.is_whole(byte) else Tiles.Kind.EMPTY
+		_grid[cell.y * _grid_cols + cell.x] = kind
+	_stones_seen = view.stones
 
 
 ## Where a jump (or, with `jump` false, a step) from `me` lands if `dir` is held.
@@ -109,13 +160,14 @@ static func leap(strip: ZoneStrip, tuning: DuelTuning, me: DuelView.Body, dir: i
 			y = pos.y
 			vel.y = 0.0
 		pos.y = y
-		if _deadly(strip, tuning, pos):
+		if _deadly(strip, tuning, pos, _clock + f):
 			return {"safe": false, "landed": false, "position": pos, "margin": -INF,
 				"frames": f}
 		if grounded and (f > 0 or not jump):
 			var margin := _margin(strip, pos, half)
-			return {"safe": margin >= -half + FOOTHOLD, "landed": true, "position": pos,
-				"margin": margin, "frames": f}
+			var settles := _settles(strip, pos, _clock + f)
+			return {"safe": margin >= -half + FOOTHOLD and settles, "landed": true,
+				"position": pos, "margin": margin, "frames": f}
 	return {"safe": false, "landed": false, "position": pos, "margin": -INF,
 		"frames": HORIZON}
 
@@ -145,6 +197,10 @@ static func steer(strip: ZoneStrip, tuning: DuelTuning, me: DuelView.Body, dir: 
 
 	var ahead := scan(strip, tuning, me, dir)
 	var brink := _at_brink(strip, tuning, me, dir)
+	# A cell a blade or the water is about to take is a lip to stop at, like
+	# the moat's, until the beat lets the body through.
+	if bool(ahead.get("timed", false)):
+		brink = brink or float(ahead["distance"]) <= tuning.run_speed * DT * 3.0 + 1.0
 	if int(ahead["kind"]) == Ahead.NOTHING and not brink:
 		return {"dir": dir, "jump": false, "hold": 0}
 
@@ -157,9 +213,18 @@ static func steer(strip: ZoneStrip, tuning: DuelTuning, me: DuelView.Body, dir: 
 			best = arc
 			best["hold"] = hold
 	var jump := {"dir": dir, "jump": true, "hold": int(best.get("hold", HOLD))}
+	var walled := int(ahead["kind"]) == Ahead.WALL and float(ahead["distance"]) < 1.0
+	# Face to the stone with no jump that lands on top of it: a chimney two
+	# tiles tall is cleared from a run and not from a standstill, so step back
+	# for a run-up rather than push at it for the rest of the match.
+	var climbs := not best.is_empty() \
+		and (best["position"] as Vector2).y < me.position.y - 1.0
+	if int(ahead["kind"]) == Ahead.WALL and float(ahead["distance"]) < RUN_UP:
+		if not climbs:
+			return {"dir": -dir, "jump": false, "hold": 0}
+		return {"dir": dir, "jump": true, "hold": int(best["hold"])}
 	if best.is_empty():
 		return {"dir": 0 if brink else dir, "jump": false, "hold": 0}
-	var walled := int(ahead["kind"]) == Ahead.WALL and float(ahead["distance"]) < 1.0
 	if brink or walled:
 		return jump
 	if slop <= 0 and float(best["margin"]) >= _wanted_margin(strip, best):
@@ -195,7 +260,10 @@ static func gap_between(strip: ZoneStrip, me: DuelView.Body, x: float) -> bool:
 	for column: int in range(from, to + 1):
 		if not _stands(_kind(strip, column, row)) and _drop_is_deadly(strip, column, row):
 			return true
-	return false
+	# A roll is about a second along the floor, and cannot stop for the beat.
+	var span := Rect2(minf(me.position.x, x), me.position.y - 22.0, absf(x - me.position.x),
+		22.0)
+	return strip.hazards.rect_is_deadly_between(span, _clock, _clock + 40)
 
 
 ## Whether holding `dir` for the next few frames keeps the feet on something.
@@ -221,8 +289,91 @@ static func scan(strip: ZoneStrip, tuning: DuelTuning, me: DuelView.Body,
 			return {"kind": Ahead.WALL, "distance": distance}
 		if not _stands(_kind(strip, column, row)) and _drop_is_deadly(strip, column, row):
 			return {"kind": Ahead.GAP, "distance": distance}
+		if _cell_taken(strip, tuning, column, row, distance):
+			return {"kind": Ahead.GAP, "distance": distance, "timed": true}
 		column += dir
 	return {"kind": Ahead.NOTHING, "distance": INF}
+
+
+## Whether a blade or the water takes the body's place in `column`, standing on
+## `row`, while a runner `distance` px off would be passing through it.
+static func _cell_taken(strip: ZoneStrip, tuning: DuelTuning, column: int, row: int,
+		distance: float) -> bool:
+	var hazards := strip.hazards
+	if hazards.blades.is_empty() and hazards.floods.is_empty():
+		return false
+	var tile := float(ZoneStrip.TILE)
+	var body := Rect2(column * tile, row * tile - tuning.body_height, tile, tuning.body_height)
+	var arrive := _clock + floori(distance / maxf(1.0, tuning.run_speed * DT))
+	var leave := arrive + PASS
+	if hazards.in_a_basin(body.grow_individual(0.0, 0.0, 0.0, 2.0 * tile)):
+		leave = arrive + FLOOD_MARGIN
+	return hazards.rect_is_deadly_between(body, maxi(_clock, arrive - 2), leave)
+
+
+## --- when the ground itself is the danger ---------------------------------------
+
+## Whether a fighter standing where `me` stands, as it stands, dies within
+## `within` frames: a blade about to cut its place, the water about to come
+## over it, or a slab under it that is going or gone.
+static func doomed(strip: ZoneStrip, tuning: DuelTuning, me: DuelView.Body,
+		within: int) -> bool:
+	if not me.grounded:
+		return false
+	if _timed(strip, tuning, me.position, _clock, _clock + within):
+		return true
+	return _footing(strip, me.position).x == me.position.x and _on_stone(strip, me.position)
+
+
+## Whether ducking where `me` stands keeps it alive for `within` frames: a
+## scythe at head height passes over a ducked fighter.
+static func duck_saves(strip: ZoneStrip, tuning: DuelTuning, me: DuelView.Body,
+		within: int) -> bool:
+	if not me.grounded:
+		return false
+	# A duck is no answer to the floor going.
+	if _footing(strip, me.position).x == me.position.x and _on_stone(strip, me.position):
+		return false
+	var half := tuning.body_width * 0.5
+	var low := Rect2(me.position.x - half, me.position.y - tuning.duck_height,
+		half * 2.0, tuning.duck_height)
+	return not strip.hazards.rect_is_deadly_between(low, _clock, _clock + within)
+
+
+## The way out of a doomed place: the direction of the nearer column, within
+## a few tiles, where the body stands on something and nothing timed takes it
+## for a while after it gets there. 0 if there is none either way.
+static func refuge(strip: ZoneStrip, tuning: DuelTuning, me: DuelView.Body) -> int:
+	var tile := float(ZoneStrip.TILE)
+	var speed := maxf(1.0, tuning.run_speed * DT)
+	for reach: int in range(1, 9):
+		for dir: int in [me.facing, -me.facing]:
+			var x := me.position.x + dir * reach * tile
+			var column := floori(x / tile)
+			var row := _standing_row(strip, column, _feet_row(me.position.y))
+			if row < 0:
+				continue
+			var feet := Vector2(column * tile + tile * 0.5, row * tile)
+			var arrive := _clock + ceili(absf(feet.x - me.position.x) / speed)
+			if not _timed(strip, tuning, feet, arrive, arrive + 2 * SETTLE):
+				return dir
+	return 0
+
+
+## Where in `column` a body that starts on `row` could stand: that row, or one
+## within a hop up or a short drop down. -1 for nowhere.
+static func _standing_row(strip: ZoneStrip, column: int, row: int) -> int:
+	for y: int in [row, row - 1, row - 2, row + 1, row + 2]:
+		if _stands(_kind(strip, column, y)) and not _blocks(_kind(strip, column, y - 1)) \
+				and not _blocks(_kind(strip, column, y - 2)):
+			return y
+	return -1
+
+
+static func _on_stone(strip: ZoneStrip, feet: Vector2) -> bool:
+	var tile := float(ZoneStrip.TILE)
+	var row := _feet_row(feet.y)
+	return strip.hazards.stone_index(Vector2i(floori(feet.x / tile), row)) >= 0
 
 
 ## --- the grid ---------------------------------------------------------------
@@ -240,15 +391,31 @@ static func _blocks(kind: int) -> bool:
 
 
 ## Falling down this column from `row`, does anything catch the feet before a
-## hazard or the bottom of the world does?
+## hazard or the bottom of the world does? And is what catches them about to
+## be under water or a blade -- a dry basin floods, and a body in it has to
+## get out first.
 static func _drop_is_deadly(strip: ZoneStrip, column: int, row: int) -> bool:
 	for y: int in range(row, strip.rows()):
 		var kind := _kind(strip, column, y)
 		if kind == Tiles.Kind.SPIKES or kind == Tiles.Kind.WATER:
 			return true
 		if _stands(kind):
-			return false
+			if strip.hazards.blades.is_empty() and strip.hazards.floods.is_empty():
+				return false
+			var tile := float(ZoneStrip.TILE)
+			return not _settles(strip, Vector2(column * tile + tile * 0.5, y * tile), _clock)
 	return true
+
+
+## Whether a fighter whose feet come down at `feet` on frame `frame` may stay a
+## while: nothing timed takes it for SETTLE frames, or, in a basin, for long
+## enough to walk out of it (FLOOD_MARGIN).
+static func _settles(strip: ZoneStrip, feet: Vector2, frame: int) -> bool:
+	var body := Rect2(feet.x - 4.5, feet.y - 22.0, 9.0, 22.0)
+	var window := SETTLE
+	if strip.hazards.in_a_basin(body.grow_individual(0.0, 0.0, 0.0, 2.0)):
+		window = FLOOD_MARGIN
+	return not strip.hazards.rect_is_deadly_between(body, frame, frame + window)
 
 
 static func _hits_solid(strip: ZoneStrip, tuning: DuelTuning, feet: Vector2) -> bool:
@@ -256,11 +423,27 @@ static func _hits_solid(strip: ZoneStrip, tuning: DuelTuning, feet: Vector2) -> 
 	return _body_touches(strip, feet, half, tuning.body_height - 0.5, SOLID_MASK)
 
 
-static func _deadly(strip: ZoneStrip, tuning: DuelTuning, feet: Vector2) -> bool:
+static func _deadly(strip: ZoneStrip, tuning: DuelTuning, feet: Vector2, frame: int) -> bool:
 	if feet.y > strip.world_size().y:
 		return true
 	var half := tuning.body_width * 0.5
-	return _body_touches(strip, feet, half, tuning.body_height, DEADLY_MASK)
+	if _body_touches(strip, feet, half, tuning.body_height, DEADLY_MASK):
+		return true
+	# Wider than the body by SLACK each side, two frames either way: the arc is
+	# the grid's prediction and the flight is the physics engine's, and a slot
+	# missed by a pixel in the prediction is a slot landed in.
+	var body := Rect2(feet.x - half - SLACK, feet.y - tuning.body_height,
+		half * 2.0 + SLACK * 2.0, tuning.body_height)
+	return strip.hazards.rect_is_deadly_between(body, frame - 2, frame + 2)
+
+
+## Whether a standing body at `feet` is cut or drowned on any frame in [from, to].
+static func _timed(strip: ZoneStrip, tuning: DuelTuning, feet: Vector2, from: int,
+		to: int) -> bool:
+	var half := tuning.body_width * 0.5
+	var body := Rect2(feet.x - half - SLACK, feet.y - tuning.body_height,
+		half * 2.0 + SLACK * 2.0, tuning.body_height)
+	return strip.hazards.rect_is_deadly_between(body, from, to)
 
 
 ## Whether a body `half` wide each side and `height` tall, feet at `feet`,
@@ -290,6 +473,9 @@ static func _kind(strip: ZoneStrip, x: int, y: int) -> int:
 		for row: int in _grid_rows:
 			for column: int in _grid_cols:
 				_grid[row * _grid_cols + column] = int(strip.kind_at(column, row))
+		# Every slab whole until look() says otherwise.
+		for cell: Vector2i in strip.hazards.stones:
+			_grid[cell.y * _grid_cols + cell.x] = Tiles.Kind.SOLID
 	if y < 0 or y >= _grid_rows:
 		return Tiles.Kind.EMPTY
 	if x < 0 or x >= _grid_cols:

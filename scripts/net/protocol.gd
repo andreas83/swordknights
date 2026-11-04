@@ -28,8 +28,19 @@ extends RefCounted
 ## version reads a message without one as "no look". So a lookless peer of this
 ## version plays on and is drawn in its seat's default. Anything that changes a
 ## field the duel depends on -- or, as here, what an input does -- bumps VERSION.
+##
+## VERSION 3: the strips. WELCOME gained a fixed field, the name of the strip
+## the host chose (DuelStrips), between the arena hash and the look, so a
+## version-2 decoder would read its length byte as a look format. And a strip
+## is more than its tiles now: blades on the beat, water on a timer and stone
+## that falls are rules a version-2 build does not have, so the two would step
+## one strip into two matches. The version says so in the lobby first.
 
-const VERSION := 2
+const VERSION := 3
+## The longest strip name WELCOME carries. A name is an id -- lower-case ASCII,
+## digits and underscores, as a look's ids are -- so a hostile host cannot
+## hand the guest a string to log.
+const MAX_ARENA_ID := 16
 
 enum Type {
 	## --- the duel ---
@@ -139,13 +150,23 @@ static func hello(build: int, name: String, look: Dictionary = {}) -> PackedByte
 
 
 ## The host's look rides on its WELCOME, as the guest's rides on its HELLO.
+## `arena_id` is the strip the host chose, which the guest loads; empty is a
+## duel with one arena. A name that is not an id is sent empty rather than
+## sent to be refused.
 static func welcome(
-	slot: int, rounds_to_win: int, arena_hash: int, look: Dictionary = {}
+	slot: int, rounds_to_win: int, arena_hash: int, look: Dictionary = {},
+	arena_id: String = ""
 ) -> PackedByteArray:
 	var buf := _open(Type.WELCOME)
 	buf.put_u8(slot)
 	buf.put_u8(rounds_to_win)
 	buf.put_u32(arena_hash)
+	var raw := arena_id.to_ascii_buffer()
+	if raw.size() > MAX_ARENA_ID or not (raw.is_empty() or is_look_id(raw)):
+		raw = PackedByteArray()
+	buf.put_u8(raw.size())
+	if not raw.is_empty():
+		buf.put_data(raw)
 	_put_look(buf, look)
 	return buf.data_array
 
@@ -303,13 +324,22 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			_get_look(buf, out)
 
 		Type.WELCOME:
-			if left < 6:
+			if left < 7:
 				return _short(type)
 			out["slot"] = buf.get_u8()
 			out["rounds_to_win"] = buf.get_u8()
 			out["arena_hash"] = buf.get_u32()
 			if out["slot"] > 1:
 				return {"error": "WELCOME names seat %d" % out["slot"]}
+			var length := buf.get_u8()
+			if length > MAX_ARENA_ID or buf.get_position() + length > bytes.size():
+				return _short(type)
+			var raw := PackedByteArray()
+			if length > 0:
+				raw = buf.get_data(length)[1]
+			if not raw.is_empty() and not is_look_id(raw):
+				return {"error": "WELCOME names a strip that is not a name"}
+			out["arena_id"] = raw.get_string_from_ascii()
 			_get_look(buf, out)
 
 		Type.INPUT:

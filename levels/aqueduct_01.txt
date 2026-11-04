@@ -1,0 +1,31 @@
+; The Aqueduct Gate
+;
+; Zone 1 of 5 of the Crumbling Aqueduct: player one's gate. Two pairs of
+; cracked slabs and a pier between them guard the approach. Whole, they are
+; nothing; once a fight has crossed them they are the moat the Tug of War has
+; from the start, and then a second one. Both stand clear of the spot in front
+; of the arch where a pinned respawn appears, so the leader can always go over
+; the top of whoever waits there.
+
+
+
+
+
+
+
+
+
+
+
+
+########
+########
+:::::::
+:::::::
+:::::::
+:::::::
+:D:::::  t                  t
+############,,###,,###########
+############::###::###########
+############::###::###########
+############~~###~~###########

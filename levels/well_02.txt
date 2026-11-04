@@ -1,0 +1,34 @@
+; The Gallery of Hours
+;
+; Zone 2 of 5 of the Clockwork Well. Two ways across, both in time. The low
+; way is a field of six spike slots that rise on the off-beat: a runner who
+; sets off the frame they drop is across with a quarter of a second to spare,
+; and one who hesitates is not. The high way is a bridge over it, reached from
+; a step, with a scythe swinging across it at head height on the beat. A
+; fighter on the bridge is out of reach of one under it -- a thrust does not
+; climb two tiles -- so the gallery splits a chase in two.
+;! channel 1 beat 50
+;! channel 2 beat 0
+
+
+
+
+
+
+
+
+
+
+
+              #2#
+               z
+               z
+               z
+               z
+
+          ==========
+
+  t  t  ##  iiiiii  ##  t  t
+############1#################
+##############################
+##############################

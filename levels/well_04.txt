@@ -1,0 +1,31 @@
+; The Gallery of Hours, East
+;
+; Zone 4 of 5 of the Clockwork Well: levels/well_02.txt reversed cell for
+; cell, by the authoring tool, so the strip's fairness is a property of the
+; files.
+;
+;! channel 1 beat 50
+;! channel 2 beat 0
+
+
+
+
+
+
+
+
+
+
+
+             #2#
+              z
+              z
+              z
+              z
+
+          ==========
+
+  t  t  ##  iiiiii  ##  t  t
+#################1############
+##############################
+##############################

@@ -25,12 +25,17 @@ Rings are respawn timers, the track at the top is zone and initiative.*
 | `scripts/duel/gore.gd` (`GoreField`) | decals and the death spurt, presentation only |
 | `scripts/duel/match_camera.gd`, `match_framing.gd` | where the view is, and how close it stands; presentation |
 | `scripts/duel/match_hud.gd`, `match_gate.gd` | presentation |
-| `scripts/ui/duel_select.gd`, `duel_choice.gd` | the menu's second step: one keyboard, VS CPU or online, remembered |
+| `scripts/ui/duel_select.gd`, `duel_choice.gd` | the menu's second step: one keyboard, VS CPU or online, and the strip, remembered |
 | `scripts/duel/duel_brain.gd` (`DuelBrain`) | the computer opponent: one input byte a frame from a `DuelView` |
 | `scripts/duel/duel_view.gd`, `duel_eyes.gd`, `duel_cpu.gd` | what it may see, how late, and the order that keeps it honest |
-| `scripts/duel/duel_feet.gd` (`DuelFeet`) | where its jumps land: the moat, the pit and the benches |
+| `scripts/duel/duel_feet.gd` (`DuelFeet`) | where its jumps land: the moat, the pit, the benches, the beat, the tide and the stone |
 | `scripts/duel/match_cpu.gd`, `scenes/duel_match_cpu.tscn` | Duel vs CPU: the match with seat two's byte from the computer |
-| `levels/duel_zones.txt`, `levels/zone_0*.txt` | the strip: a manifest and five zones |
+| `scripts/duel/duel_strips.gd` (`DuelStrips`) | the strips by name: the catalogue, RANDOM, the page's captions |
+| `scripts/duel/strip_hazards.gd` (`StripHazards`) | blades, floods and crumbling stone: their rules, as functions of the frame and the stones |
+| `scripts/duel/match_ground.gd` (`MatchGround`) | the strip with its unfallen stone, as a fighter's world |
+| `scripts/duel/hazard_view.gd` (`HazardView`) | the hazards drawn and heard; presentation |
+| `levels/duel_zones.txt`, `levels/zone_0*.txt` | the Tug of War: a manifest and five zones |
+| `levels/strip_*.txt` and their zones | the other four strips (*The strips*, below) |
 
 ## One frame
 
@@ -141,6 +146,122 @@ columns; the strip is 86 of 150, a little over half.
 
 A respawn's zone is streamed in when its timer **starts**, not when the fighter
 appears, so the only stream not triggered by travel has two seconds' warning.
+
+## The strips
+
+The Tug of War is one strip of five. The others are each a place, an hour and
+one rule that changes how a Nidhogg duel is fought on it, not only how it
+looks. The duel page chooses among them, with RANDOM; online, the host's choice
+is the match's (*The handshake*, in [`netplay.md`](netplay.md)).
+
+![Every strip mid-fight, at 320 and 440 units](duel-strips.png)
+
+*Rendered with `tools/screenshot.gd` from `scenes/duel_match.tscn --demo-cpu
+--strip=<id>`: two MEDIUM computers fighting it out, at 1280 × 720 (320 units)
+and 1760 × 720 (440 units).*
+
+| Strip | Hour | The rule | What it does to a duel |
+| --- | --- | --- | --- |
+| **The Tug of War** (`tug`) | afternoon, dusk at the gates | a spike pit with a stone, a moat | the original |
+| **The Clockwork Well** (`well`) | night, by torchlight | scythes swing through the lane at head height on the beat; spike slots rise on the off-beat | a scythe kills a standing fighter and passes over a ducking or rolling one; the room plays heights too, and a fighter who reads the beat makes the other stand where it is about to cut |
+| **The Floodgates** (`floodgates`) | golden hour | the sunken courts flood two tiles deep and drain, on a twenty-second tide | the floor moves the fight: a court is the short way and the place to fight while dry, and a trap when the sluices gush; the middle and gates flood together, the long cisterns on the other half of the cycle |
+| **The Crumbling Aqueduct** (`aqueduct`) | sunset | a slab of cracked stone lights the first frame a foot finds it, shudders, drops into the channel with its neighbour, and stays down | standing still to fence on cracked stone is standing on a fuse; every fight wears its holes into the deck for the rest of the match |
+| **The Rooftops** (`roofs`) | dusk | alleys between the roofs, two tiles across with nothing at the bottom; chimneys; a plank over the widest gap | an edge under every exchange: a clash's knock-back is a step toward an alley |
+
+### One rule for every hazard: the frame, or the snapshot
+
+A blade and a flood are **pure functions of the match frame**
+(`StripHazards.is_live()`, `surface_of()`): a scythe on phase 0 cuts on frames
+100k to 100k + 15. The frame is already in the snapshot and the checksum, so
+these add nothing to either, cost nothing on the wire, and a rewind or a replay
+cannot get them wrong -- there is nothing to replay. It is the adventure's own
+choice for its Well, made for the same reason: never the music's clock, which
+drifts. The tempo is the Well's, 72 beats a minute, which at 60 Hz is exactly 50
+frames a beat.
+
+Crumbling stone is the one hazard with state, because what it remembers is
+who stood on it. It is one byte a slab -- whole, burning (frames since lit), or
+fallen -- in `DuelMatch.stones`, written after the fighters in the snapshot and
+hashed into the checksum. Its collision is one static body per slab on a
+physics layer of the match's own, switched by `collision_layer` whenever the
+bytes change: the physics server reads the layer on the next query, so a slab
+that fell on frame N is gone for frame N + 1's move, and a snapshot from before
+puts it back. The layer is the match's own so that the two matches of a
+networked test, which share one physics space, never stand on each other's
+stone. A loose sword lands on unfallen stone too: the fighter's world on such a
+strip is `MatchGround`, the strip plus the bytes.
+
+`move_and_slide()` is still nowhere. The bytes go through the ledger as a
+presentable event (`stone`), so a slab's fall rings its dust and sound once,
+and what the floor looks like is read from the state, never from the beat --
+the rope's rule from "Corrected outcomes".
+
+### Told before it kills
+
+Every hazard is told at least **27 frames** ahead -- the adventure's one
+telegraph, `Patrol.WINDUP_TIME` -- or is static and obvious:
+
+| Hazard | Tell | Lethal |
+| --- | --- | --- |
+| scythe | drawn back three ratchet notches over 27 frames, the edge glinting, three ticks | 16 frames, through the lane |
+| spike slot | tips rattling at the grille for 27 frames | 30 frames up |
+| flood | the sluices gush for 90 frames; the tide mark is always on the walls | water deeper than 6 px over the feet, 28 frames after it starts to climb |
+| crumbling stone | an ink crack across the cap, always; lit, it shudders and sheds grit for 36 frames | the fall |
+| alley, moat, pit | static | always |
+
+No hazard reads the LONGER WARNINGS assist, unlike the campaign's: two phones
+with different settings would step different matches. `HazardView` draws them
+in steel for blades and spikes and teal for water, in `MatchDusk.LIT` so no hour
+dims a tell, and keys its sounds on the frame, each frame heard at most once
+however often a client steps it.
+
+### Fair under the respawn rules
+
+`ZoneStrip.is_open_ground()` refuses any column within `FLAT_RUN +
+HAZARD_CLEARANCE` (four) columns of a cell a blade or a basin can ever take,
+from the top of the headroom to two rows under the floor; crumbling stone is not
+solid rock, so the flat run refuses it anyway. Whatever the clock says when a
+fighter comes back, nothing on the beat reaches them, and
+`tests/unit/test_duel_strips.gd` checks every spot a respawn can be put on every
+strip against a whole flood cycle. Each strip keeps the Tug of War's other
+rules: five 30-column zones, mirror symmetry cell for cell and beat for beat,
+the gates mirrored with their high lintels, both start marks on open ground,
+eight columns of open ground in every zone (the strips have 8 to 14; the Tug of
+War 16 to 18), and a respawn found for every position. No run of cracked stone
+is wider than two slabs and no alley wider than two tiles, so the strip can be
+worn to jumps but never cut. The window, the initiative and the camera are
+untouched: a strip is only geometry and hazards.
+
+### The computer opponent on the strips
+
+`DuelFeet` predicts on the frame it is predicting (`look()` gives it the view's
+frame and stones): a jump whose arc crosses a slot while it is up, or lands
+in a lane about to be cut or a basin about to flood, is unsafe like one into the
+moat. Walking, a cell ahead is a gap while a blade or the water will be in it as
+the body passes, so the feet stop at its lip and wait for the beat, or take the
+stones. A basin is not entered if it floods within 150 frames. The slabs are on
+the feet's grid as the view saw them, and a burning one is not a place to put a
+foot. Before any fencing, the brain asks whether where it stands is about to
+kill it (`DuelBrain._mind_the_ground`): it ducks under a scythe if a duck is
+enough, and otherwise goes to the nearer safe footing (`DuelFeet.refuge()`).
+A wall too tall to hop from a standstill -- a chimney -- is backed off from for a
+run-up. The blunder knob does not reach any of it.
+
+Computer against computer, each level against itself, six-minute limit,
+three seeds a level unless said:
+
+| Strip | EASY | MEDIUM | HARD |
+| --- | --- | --- | --- |
+| Clockwork Well (8 seeds) | 8 of 8 finish, mean 1,809 frames; 0 of 16 deaths to hazards | 8 of 8, mean 6,893, longest 12,402; 3 of 93 | 8 of 8, mean 2,357; 1 of 26 |
+| Floodgates | 3 of 3, mean 935; 0 of 4 | 3 of 3, mean 2,878; 0 of 15 | 3 of 3, mean 1,459; 0 of 8 |
+| Aqueduct | 3 of 3, mean 939; 0 of 3 | 3 of 3, mean 1,194; 0 of 5 | 3 of 3, mean 1,787; 0 of 10 |
+| Rooftops | 3 of 3, mean 1,392; 0 of 4 | 3 of 3, mean 1,569; 0 of 7 | 3 of 3, mean 1,866; 0 of 8 |
+
+`tests/unit/test_duel_strip_cpu.gd` holds every pairing on every strip to an end
+inside six minutes, HARD to one hazard death in twenty and every level to one in
+eight. The Well's evenly matched MEDIUM pairs are the long ones: the rope goes
+back and forth for up to three and a half minutes, because a runner home waits
+for the beat and the chaser catches up while it does.
 
 ## The camera
 
@@ -474,6 +595,19 @@ the behaviour behind it broken.
 - `tests/unit/test_duel_blood.gd` — a kill's spurt, streak and pool, the spray
   thrown the blow's way, the match's clock, a moved and a wiped death, the
   bound, and the blood drawn over the stone.
+- `tests/unit/test_duel_strips.gd` — every strip: its name and hour, its shape,
+  the mirror of tiles, hazards and beats, open ground in every zone, no respawn
+  a blade or the water can reach, every hazard told 27 frames ahead, no slab run
+  wider than a jump, and the hazards in the handshake hash.
+- `tests/unit/test_duel_strip_net.gd` — every strip between two NetSessions on
+  clean, laggy and lossy links with no desync; each gimmick rewound and replayed
+  byte for byte; a fallen slab gone from the physics and back on a rewind.
+- `tests/unit/test_duel_strip_cpu.gd` — two computers finish on every strip at
+  every level, the hazard share, ducking a scythe and leaving a burning slab.
+- `tests/unit/test_duel_strip_choice.gd` — the STRIP row, RANDOM, what is saved
+  and its fallback, and the scene playing the strip saved.
+- `tests/unit/test_net_strip_handshake.gd` — the strip on WELCOME, protocol 3,
+  the guest switched to the host's strip, and a guest without it refused.
 
 ## Status
 

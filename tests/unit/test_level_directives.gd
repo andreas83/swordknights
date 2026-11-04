@@ -300,8 +300,9 @@ func test_every_malformed_line_is_a_problem_and_breaks_nothing() -> void:
 func test_the_shipping_levels_have_no_problems() -> void:
 	var checked := 0
 	for name: String in DirAccess.get_files_at("res://levels"):
-		# The duel's strip is ZoneStrip's manifest, a list of files.
-		if name.get_extension() != "txt" or name == "duel_zones.txt":
+		# The duel's strips are ZoneStrip's: a manifest is a list of files, and
+		# tests/unit/test_duel_strips.gd holds their zones to the duel's rules.
+		if name.get_extension() != "txt" or DuelStrips.is_duel_file(name):
 			continue
 		var level := AsciiLevel.from_file("res://levels".path_join(name))
 		assert_eq(level.problems, PackedStringArray(), "%s parses clean" % name)

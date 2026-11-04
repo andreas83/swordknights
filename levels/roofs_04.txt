@@ -1,0 +1,28 @@
+; The Tiles, East
+;
+; Zone 4 of 5 of the Rooftops: levels/roofs_02.txt reversed cell for cell, by
+; the authoring tool.
+;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        c          c
+        c          c
+
+           ######
+           ######
+## == ################  ######
+##    ################  ######
+##::::################::######
+##::::################::######

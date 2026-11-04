@@ -1,0 +1,31 @@
+; The Floodgates
+;! time golden
+;
+; A duel strip (scripts/duel/duel_strips.gd): its zones, west to east.
+;
+; A cistern quarter at the golden hour, where the city lets its reservoirs
+; down through the courts on a timer. Each sunken court is the short way and
+; the open place to fight while it is dry; then its sluices gush, the water
+; climbs two tiles to the walkways in two and a half seconds, stands for six,
+; and drains. Twenty seconds a cycle, on the match's own frame, so it is the
+; same tide on both phones without a byte sent for it (StripHazards).
+;
+; WHAT IT DOES TO A DUEL. It moves the fight. A Nidhogg duel is fought where
+; the floor is, and here the floor comes and goes: a fighter who reads the
+; sluices takes the low road and leaves the other on the stones, and one who
+; is pushed back into a court as it fills hands the rope over without a
+; blade touching them. The middle court and the gates flood together; the
+; long cisterns between flood on the other half of the cycle, so there is
+; always a low road open somewhere.
+;
+;   zone 3  the Sluice Court    the start: a sunken court under stepping stones
+;   zone 2  the Long Cistern    two basins and an island, out of phase
+;   zone 1  the Floodgate       a moat that comes and goes, before the arch
+;
+; Zones 4 and 5 are 2 and 1 reversed, on the same tide.
+
+floodgates_01.txt
+floodgates_02.txt
+floodgates_03.txt
+floodgates_04.txt
+floodgates_05.txt

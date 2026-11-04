@@ -1,0 +1,33 @@
+; The Long Cistern
+;
+; Zone 2 of 5 of the Floodgates. Two sunken basins with an island of walkway, three tiles across,
+; between them and four stepping stones over them. It floods on the other
+; half of the cycle from the Sluice Court beside it: while the middle zone is
+; under water this one is dry, and the other way about, so a chase that has
+; to take the stones in one zone gets the low road in the next. Dry, the
+; basins are two tiles down and a hop back up; flooded, the island is the
+; only floor between the walkways and a duel on it is a duel on a raft.
+;! mark u flood phase=600
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        == ==   ==  ==
+  t                        t
+########uuuuu###uuuuuu########
+########uuuuu###uuuuuu########
+##############################
+##############################
+##############################

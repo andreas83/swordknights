@@ -23,12 +23,17 @@ extends Node2D
 ##     xvfb-run -a godot --path . --rendering-driver opengl3 \
 ##       --script tools/screenshot.gd -- --scene res://scenes/duel_match.tscn \
 ##       --out /tmp/shots --shots 3.4,9.0,15.5 --demo
+##
+## `--demo-cpu` instead hands both seats to the computer (DuelCpu, MEDIUM, seed
+## `--seed=N` or 1), so a strip can be looked at with a real fight on it: the
+## beat, the tide and the falling stone are worth nothing in a picture with
+## nobody standing in them. With `--strip=<id>` it is how docs/duel-strips.png
+## is made (docs/duel-match.md, "The strips").
 
 ## Where quitting a match goes: the duel page, as quitting a chapter goes to
 ## the chapter select. The title screen is one SWORD further back.
 const MENU_SCENE := "res://scenes/duel_select.tscn"
 const FIGHTER_SCENE: PackedScene = preload("res://scenes/fighter.tscn")
-const MANIFEST := "res://levels/duel_zones.txt"
 ## The persistent hint while the match is played, and once it is over.
 const PLAY_FOOTER := "PAUSE FOR THE MENU"
 const OVER_FOOTER := "JUMP FOR A REMATCH  ·  SWORD TO LEAVE"
@@ -45,6 +50,11 @@ var demo := false
 ## Where the seats' looks are read from. A seam for a test, which must never
 ## read or write the real save.
 var wardrobe_path := Wardrobe.PATH
+## Where the duel page's choices are read from: the strip here, and the
+## computer's level in match_cpu.gd. A seam for a test, likewise.
+var choice_path := DuelChoice.PATH
+## The blades, the water and the crumbling stone, drawn (HazardView).
+var hazards: HazardView
 
 ## Test seam: what leaving the match does instead of changing to the duel
 ## page, which would take the test runner's scene with it.
@@ -54,42 +64,45 @@ var leave := Callable()
 var menu: PauseMenu
 
 var _gates: Array[GateArt] = []
+var _dusk: MatchDusk
 var _demo_frame := 0
 var _held_over := false
+## Both seats' computers, for `--demo-cpu`; empty otherwise.
+var _demo_cpus: Array[DuelCpu] = []
 
 
 func _ready() -> void:
-	demo = OS.get_cmdline_user_args().has("--demo")
+	var args := OS.get_cmdline_user_args()
+	demo = args.has("--demo") or args.has("--demo-cpu")
 
-	strip = ZoneStrip.from_manifest(MANIFEST)
-	if strip == null:
-		push_error("no zone strip at %s" % MANIFEST)
-		return
-
-	zones.setup(strip)
-	gore.setup(strip)
 	# Over the zone's stone and under the actors and the foreground plane:
 	# after ZoneView in the tree at its z, so blood lies ON the floor and the
 	# walls. It was once at -1, beneath the stone, where every stain in front
 	# of a backdrop was drawn and hidden. See tests/unit/test_duel_blood.gd.
 	gore.z_index = 0
+	# The hazards over the blood and under the fighters, as the floor's own
+	# furniture; the water alone is drawn over the fighters (HazardView).
+	hazards = HazardView.new()
+	hazards.name = "Hazards"
+	$World.add_child(hazards)
+	$World.move_child(hazards, gore.get_index() + 1)
 
 	fight.fighter_scene = FIGHTER_SCENE
-	if not fight.build(strip, zones):
-		push_error("the match would not build")
-		return
-
-	_start_in_zone_argument()
-
-	dress_fighters()
-
+	fight.arena_switch = use_strip
 	camera.framing_width = _framing_argument()
-	camera.setup(fight)
 	sky.camera = camera
-	_light_the_last_rooms()
-	sky.seed_value = hash(strip.name)
 
-	_build_gates()
+	if not use_strip(chosen_strip()):
+		return
+	if args.has("--demo-cpu"):
+		var seed_value := 1
+		for arg: String in args:
+			if arg.begins_with("--seed="):
+				seed_value = arg.trim_prefix("--seed=").to_int()
+		for slot: int in 2:
+			var cpu := DuelCpu.new(slot, DuelBrain.Difficulty.MEDIUM, seed_value + slot)
+			cpu.watch(fight)
+			_demo_cpus.append(cpu)
 
 	hud.fight = fight
 	hud.footer = PLAY_FOOTER if not demo else strip.name.to_upper()
@@ -105,6 +118,50 @@ func _ready() -> void:
 	fight.leader_consumed.connect(_on_leader_consumed)
 	fight.match_over.connect(_on_match_over)
 	fight.blade_caught.connect(_on_blade_caught)
+	fight.stone_fell.connect(_on_stone_fell)
+
+
+## Which strip this match is fought on: `--strip=<id>` in the user arguments,
+## or the duel page's saved choice, with RANDOM drawn here, once. The attract
+## demo is the Tug of War unless told otherwise, so its screenshots never
+## depend on what someone last chose.
+func chosen_strip() -> String:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--strip="):
+			var named := arg.trim_prefix("--strip=")
+			if DuelStrips.is_choice(named):
+				return DuelStrips.resolve(named, Time.get_ticks_usec())
+			push_warning("there is no duel strip called '%s'" % named)
+	if demo:
+		return DuelStrips.TUG
+	return DuelStrips.resolve(DuelChoice.open(choice_path).strip, Time.get_ticks_usec())
+
+
+## Builds the match, and everything drawn around it, on strip `id`: the zones,
+## the blood, the hazards, the fighters, the gates, the light. Called once from
+## _ready(), and again by DuelMatch.set_arena() when the host of an online duel
+## names another strip in its WELCOME. False, with an error, if it would not
+## build; the match is then left on the strip it had.
+func use_strip(id: String) -> bool:
+	var next := DuelStrips.open(id)
+	if next == null:
+		push_error("no duel strip '%s'" % id)
+		return false
+	strip = next
+	zones.setup(strip)
+	gore.setup(strip)
+	gore.clear()
+	if not fight.build(strip, zones):
+		push_error("the match would not build on %s" % id)
+		return false
+	hazards.setup(strip, fight, zones.zone_materials)
+	_start_in_zone_argument()
+	dress_fighters()
+	camera.setup(fight)
+	_light_the_last_rooms()
+	sky.seed_value = hash(strip.name)
+	_build_gates()
+	return true
 
 
 ## Puts each seat in its look. Seat two wears sea-green whatever look it has;
@@ -129,16 +186,17 @@ func look_for(slot: int) -> CharacterLook:
 	return Wardrobe.open(wardrobe_path).look(slot)
 
 
-## Dusk over the gate zone at each end of the strip. See MatchDusk.
+## The strip's hour, and dusk over the gate zone at each end. See MatchDusk.
 func _light_the_last_rooms() -> void:
 	for seat: DuelSeat in fight.seats:
 		var art := seat.node.get_node_or_null("FighterArt")
 		if art != null:
 			art.add_to_group(MatchDusk.LIT)
-	var dusk := MatchDusk.new()
-	dusk.name = "Dusk"
-	add_child(dusk)
-	dusk.setup(camera, strip, sky)
+	if _dusk == null:
+		_dusk = MatchDusk.new()
+		_dusk.name = "Dusk"
+		add_child(_dusk)
+	_dusk.setup(camera, strip, sky)
 
 
 ## `--start-zone=N` in the user arguments opens the match with the window on
@@ -174,6 +232,9 @@ func _framing_argument() -> float:
 
 
 func _build_gates() -> void:
+	for old: GateArt in _gates:
+		old.queue_free()
+	_gates.clear()
 	for seat: int in 2:
 		var gate := GateArt.new()
 		gate.name = "Gate%d" % seat
@@ -189,6 +250,13 @@ func _build_gates() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if not _demo_cpus.is_empty():
+		var pair := Vector2i(_demo_cpus[0].next_bits(), _demo_cpus[1].next_bits())
+		fight.step(pair.x, pair.y)
+		for cpu: DuelCpu in _demo_cpus:
+			cpu.watch(fight)
+		_follow_the_match()
+		return
 	if demo:
 		_demo_frame += 1
 		var bits := _demo_input()
@@ -404,6 +472,14 @@ func _on_blade_caught(_catcher: int, _thrower: int, _at: Vector2) -> void:
 	camera.shake(1.6, 0.14)
 	GameAudio.cue(&"catch", {"pitch": 1.15})
 	hud.flash("CAUGHT")
+
+
+## A slab of the Aqueduct's deck gave way: a short shake and the stone's
+## voice, once, from the ledger. What the floor looks like is the state's.
+func _on_stone_fell(_index: int, at: Vector2) -> void:
+	if camera.get_screen_center_position().distance_to(at) < strip.zone_width():
+		camera.shake(1.2, 0.18)
+		GameAudio.cue(&"masonry", {"pitch": 0.8, "volume_db": -6.0})
 
 
 func _on_match_over(_winner: int) -> void:

@@ -1,0 +1,28 @@
+; The Aqueduct Gate, East
+;
+; Zone 5 of 5 of the Crumbling Aqueduct: levels/aqueduct_01.txt reversed cell
+; for cell. Player two's gate.
+;
+
+
+
+
+
+
+
+
+
+
+
+
+                      ########
+                      ########
+                       :::::::
+                       :::::::
+                       :::::::
+                       :::::::
+ t                  t  :::::D:
+###########,,###,,############
+###########::###::############
+###########::###::############
+###########~~###~~############

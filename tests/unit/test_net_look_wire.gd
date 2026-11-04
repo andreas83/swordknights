@@ -19,8 +19,9 @@ const NAME := "challenger"
 ## HELLO, build 1 as a little-endian u32, then the name as one length byte and
 ## its bytes. This is what a peer that sends no look says.
 const V1_HELLO_HEAD := [NetProtocol.VERSION, 1, 1, 0, 0, 0, 10]
-## A lookless WELCOME: seat 1, five zones, arena hash 0x04030201.
-const V1_WELCOME := [NetProtocol.VERSION, 2, 1, 5, 1, 2, 3, 4]
+## A lookless WELCOME: seat 1, five zones, arena hash 0x04030201, and no strip
+## named -- one zero length byte, the field protocol 3 put before the look.
+const V1_WELCOME := [NetProtocol.VERSION, 2, 1, 5, 1, 2, 3, 4, 0]
 ## What every build before the sword catch said hello with: protocol 1.
 const PRE_CATCH_HELLO := [1, 1, 1, 0, 0, 0, 1, 0x78]
 
@@ -118,7 +119,7 @@ func test_without_a_look_hello_is_byte_for_byte_the_lookless_message() -> void:
 ## The catch changed what an empty hand's THROW does, so a protocol-1 build
 ## would step the same inputs into a different match. It must be refused.
 func test_a_build_from_before_the_catch_is_refused() -> void:
-	assert_eq(NetProtocol.VERSION, 2, "the catch bumped the protocol")
+	assert_gte(NetProtocol.VERSION, 2, "the catch bumped the protocol (and the strips again)")
 	var hello := NetProtocol.decode(PackedByteArray(PRE_CATCH_HELLO))
 	assert_true(hello.has("error"), "a protocol-1 HELLO does not read")
 	assert_eq(hello.get("version"), 1, "and says which version it was")

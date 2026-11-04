@@ -1,0 +1,29 @@
+; The Long Cistern, East
+;
+; Zone 4 of 5 of the Floodgates: levels/floodgates_02.txt reversed cell for
+; cell, by the authoring tool, on the same tide.
+;
+;! mark u flood phase=600
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        ==  ==   == ==
+  t                        t
+########uuuuuu###uuuuu########
+########uuuuuu###uuuuu########
+##############################
+##############################
+##############################

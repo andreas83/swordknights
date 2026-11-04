@@ -1,0 +1,35 @@
+; The Floodgate
+;
+; Zone 1 of 5 of the Floodgates: player one's gate. The last stake is a
+; moat that comes and goes. Two tiles wide and two deep, in front of the
+; arch: dry, it is a dip to step down into and hop out of; in flood, it is
+; open water a running jump clears and a walk does not. The sluices tell
+; which it is about to be a second and a half before it changes.
+;
+; The arch's lintel is high (rows 11 and 12), so the five rows over the
+; walkway in front of it are clear: a pinned respawn stands there, and the
+; leader must be able to go over the top of it.
+;! mark u flood phase=0
+
+
+
+
+
+
+
+
+
+
+
+########
+########
+:::::::
+:::::::
+:::::::
+:::::::
+:D:::::  t                 t
+###########uu#################
+###########uu#################
+##############################
+##############################
+##############################

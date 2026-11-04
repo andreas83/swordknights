@@ -1,0 +1,31 @@
+; The Tiles
+;
+; Zone 2 of 5 of the Rooftops. An alley, a taller house two tiles up to hop
+; onto and off again, and then the widest gap on the strip, four tiles, which
+; nobody jumps: a plank has been laid across it, two tiles of one-way board
+; with a tile of nothing either side, so the crossing is two short jumps with
+; a landing in the middle that is exactly as wide as a duellist's footwork.
+; Fighting on the plank is fighting on a plank.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+          c          c
+          c          c
+
+             ######
+             ######
+######  ################ == ##
+######  ################    ##
+######::################::::##
+######::################::::##

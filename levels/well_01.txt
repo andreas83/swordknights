@@ -1,0 +1,34 @@
+; The Gate of Hours
+;
+; Zone 1 of 5 of the Clockwork Well: player one's gate. The last stake is the
+; clock itself. A pair of spike slots on the off-beat, then a scythe on the
+; beat, stand between the runner and the arch; a runner who counts gets
+; through both in one pass, and one who does not hands the rope back two
+; screens from winning. Both stand well clear of the spot in front of the
+; arch where a pinned respawn appears (ZoneStrip.GATE_STANDOFF), so the leader
+; can always go over the top of whoever is waiting there.
+;! channel 1 beat 50
+;! channel 2 beat 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+########
+########        #2#
+:::::::          z
+:::::::          z
+:::::::          z
+:::::::          z
+:D:::::  t ii           t
+###########1##################
+##############################
+##############################

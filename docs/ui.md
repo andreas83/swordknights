@@ -457,13 +457,30 @@ up the list keeps out of JUMP's corner and the caption out of SWORD's reach;
 `tests/unit/test_duel_select.gd` holds every row's hit rectangle clear of
 both buttons.
 
-**It remembers.** Starting a duel writes the way and the level to
+**Where.** A fourth row, **STRIP**, says where the duel is fought: TUG OF WAR,
+CLOCKWORK WELL, FLOODGATES, AQUEDUCT, ROOFTOPS, then RANDOM, stepped with left
+and right between carets exactly as the level is, stopping at either end
+(`DuelStrips.step()`), with the hint `LEFT / RIGHT: WHERE`. Its slot is wider
+than the level's (104 units against 66) so CLOCKWORK WELL fits in the MICRO cut
+between the carets. The caption under the list, on that row, says what the
+strip does to a duel in one line, longest phrasing first —
+`SCYTHES ON THE BEAT, SLOTS ON THE OFF-BEAT · NIGHT` down to `BLADES ON THE
+BEAT` (`DuelStrips.CAPTIONS`). It is a setting rather than a way to duel, so
+jump on it plays the way last played. One row rather than a page of its own,
+for the level's reason: the way and the place are the choice made most often,
+and both are one look at this page. Online the host's strip is the match's;
+the guest's row is only what its screen shows until it is seated
+([`netplay.md`](netplay.md), "The strip").
+
+**It remembers.** Starting a duel writes the way, the level and the strip to
 `user://duel.cfg` (`DuelChoice`), as words, and the page opens on them next
 time: someone who plays the computer every evening presses DUEL and then
 jump. Browsing saves nothing. A missing file, one that does not parse, a key
 that is not there, a value of the wrong type or a word that names nothing
-falls back for exactly that field — ONE KEYBOARD, EASY — and a broken way
-never costs the level. Tests and `tests/ui_screens.gd` take the file through
+falls back for exactly that field — ONE KEYBOARD, EASY, TUG OF WAR — and a
+broken way never costs the level or the strip. A file from before the strips
+has no `strip` and opens on the Tug of War, which is the duel it was saved
+from; `random` is kept as RANDOM and drawn when a match is built. Tests and `tests/ui_screens.gd` take the file through
 an injected `store_path` (and the VS CPU scene through `choice_path`).
 
 Back is sword or pause, to the title screen; quitting a match from any of the

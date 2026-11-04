@@ -61,7 +61,22 @@ const GATE_STANDOFF := 5
 ## ground. Fourteen tiles is a third of a screen — within "roughly".
 const SPAWN_SEARCH := 14
 
+## Columns beyond the flat run that must be clear of every blade and basin for
+## a respawn to stand there. Two tiles is a step and a thrust: a fighter who
+## comes back is never handed a beat or a rising tide in their first second.
+const HAZARD_CLEARANCE := 2
+
 var name: String = "Untitled"
+## The strip's short name, for the duel page, the save file and the handshake
+## (DuelStrips). The manifest's file name without its extension.
+var id: String = ""
+## The hour the strip is set at: a TimeOfDay stop, from the manifest's
+## `;! time` line. Presentation only -- it lights the strip and is not in
+## identity(), because two peers may look at one match in different light.
+var hour: String = TimeOfDay.DEFAULT
+## Blades, floods and crumbling stone: StripHazards. Empty for a strip that has
+## none, which then plays exactly as it always did.
+var hazards := StripHazards.new()
 var zones: Array[AsciiLevel] = []
 var zone_cols: int = 0
 var zone_rows: int = 0
@@ -94,10 +109,14 @@ static func from_manifest(path: String) -> ZoneStrip:
 	file.close()
 
 	var strip := ZoneStrip.new()
+	strip.id = path.get_file().get_basename()
 	var directory := path.get_base_dir()
 	for raw: String in text.split("\n", true):
 		var line := raw.trim_suffix("\r").strip_edges()
 		if line == "":
+			continue
+		if AsciiLevel.is_directive(line):
+			strip._read_directive(line)
 			continue
 		if AsciiLevel.is_comment(line):
 			var stripped := line.lstrip("; ").strip_edges()
@@ -123,9 +142,22 @@ const MIN_ZONES := 3
 const MAX_ZONES := 5
 
 
+## `;! time <stop>` is the one directive a manifest reads. Anything else is a
+## typo the strip refuses, rather than an hour silently left at noon.
+func _read_directive(line: String) -> void:
+	var words := line.substr(AsciiLevel.DIRECTIVE_MARKER.length()).split(" ", false)
+	if words.size() == 2 and words[0] == "time" and TimeOfDay.is_stop(words[1]):
+		hour = words[1]
+		return
+	_problem = "the manifest says '%s'; the only directive it reads is ';! time <stop>'" \
+		% line.strip_edges()
+
+
 ## Derives everything the match reads, and refuses a strip that cannot be
 ## played. Returns false with `_problem` set.
 func _finish() -> bool:
+	if _problem != "":
+		return false
 	if zones.size() < MIN_ZONES or zones.size() > MAX_ZONES:
 		_problem = "%d zones; wanted %d to %d" % [zones.size(), MIN_ZONES, MAX_ZONES]
 		return false
@@ -146,11 +178,20 @@ func _finish() -> bool:
 		return false
 
 	props.clear()
+	hazards = StripHazards.new()
 	var west := Vector2i(-1, -1)
 	var east := Vector2i(-1, -1)
 	for i: int in zones.size():
+		if not zones[i].problems.is_empty():
+			_problem = "zone %d: %s" % [i, zones[i].problems[0]]
+			return false
+		if not hazards.read_zone(zones[i], i * zone_cols):
+			_problem = "zone %d: %s" % [i, hazards.problem]
+			return false
 		for entity: Dictionary in zones[i].entities:
 			var cell: Vector2i = entity["cell"] + Vector2i(i * zone_cols, 0)
+			if StripHazards.is_hazard_kind(String(entity["kind"])):
+				continue
 			if String(entity["kind"]) == "exit":
 				if i == 0:
 					west = cell
@@ -344,6 +385,13 @@ func ground_row(x: int) -> int:
 ## stepping stone over a hazard, so the cistern's columns have no floor at all
 ## as far as this predicate is concerned. Ladders and background niches do not
 ## block the air — they are not solid, and the gate's own arch is a niche.
+##
+## Nor is a blade's lane or a basin's water anywhere near it: no cell either
+## can ever take may lie within FLAT_RUN + HAZARD_CLEARANCE columns, from the
+## top of the headroom down to two rows under the floor (a basin beside a
+## walkway lies below the walkway). Whatever the clock says when a fighter
+## comes back, nothing on the beat reaches them. Crumbling stone is not solid
+## rock, so the flat run already refuses to stand on it or beside it.
 func is_open_ground(x: int) -> bool:
 	var row := ground_row(x)
 	if row < HEADROOM:
@@ -356,7 +404,15 @@ func is_open_ground(x: int) -> bool:
 		for j: int in range(1, HEADROOM + 1):
 			if _blocks_the_air(kind_at(x + k, row - j)):
 				return false
-	return true
+	return not _near_a_hazard(x, row)
+
+
+func _near_a_hazard(x: int, row: int) -> bool:
+	var reach := FLAT_RUN + HAZARD_CLEARANCE
+	for cell: Vector2i in hazards.clearance_cells():
+		if absi(cell.x - x) <= reach and cell.y >= row - HEADROOM and cell.y <= row + 2:
+			return true
+	return false
 
 
 static func _blocks_the_air(kind: Tiles.Kind) -> bool:
@@ -415,6 +471,7 @@ func identity() -> int:
 	for x: int in cols():
 		for y: int in zone_rows:
 			words.append(int(kind_at(x, y)))
+	hazards.identity_words(words)
 	return DuelSim.fnv1a(words)
 
 
@@ -451,6 +508,11 @@ func as_level(from_col: int = 0, to_col: int = -1) -> AsciiLevel:
 	var level := AsciiLevel.new()
 	level.parse("\n".join(rows_text))
 	level.name = name
+	# The strip's hour, so the shadow solve casts as long as the light says.
+	if hour != TimeOfDay.DEFAULT:
+		level.directives.append({
+			"name": "time", "args": PackedStringArray([hour]), "params": {},
+		})
 	var shift := Vector2i(from_col, 0)
 	var marks: Array[Dictionary] = props.duplicate()
 	marks.append({"kind": "exit", "cell": gates[0]})

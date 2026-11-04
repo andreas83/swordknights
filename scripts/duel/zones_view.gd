@@ -132,6 +132,7 @@ func setup(zones: ZoneStrip) -> void:
 	# purpose -- the duelling ground is a stage, not a lived-in street.
 	mid_decor = dressing["mid"]
 	fore_decor = dressing["fore"]
+	_clear_the_hazards()
 	dress_ms = float(Time.get_ticks_usec() - started) / 1000.0
 
 	started = Time.get_ticks_usec()
@@ -139,6 +140,23 @@ func setup(zones: ZoneStrip) -> void:
 	for zone: int in strip.zone_count():
 		zone_materials.append(_light_zone(zone))
 	shadow_ms = float(Time.get_ticks_usec() - started) / 1000.0
+
+
+## No architecture on a hazard's cells. A blade's lane, a basin and a slab are
+## air in the stitched level the dresser reads -- they are not terrain -- so it
+## would plant a balustrade where a slot rises or a planter in the water. A
+## hazard is read in silhouette first (docs/art-direction.md), and nothing may
+## stand in front of it.
+func _clear_the_hazards() -> void:
+	var cells: Array[Vector2i] = strip.hazards.clearance_cells()
+	cells.append_array(strip.hazards.stones)
+	for blade: Dictionary in strip.hazards.blades:
+		cells.append_array(blade["arm"] as Array[Vector2i])
+	# And the cell over each: a planter's bloom stands on the planter.
+	for cell: Vector2i in cells:
+		for at: Vector2i in [cell, cell + Vector2i.UP]:
+			mid_decor.erase(at)
+			fore_decor.erase(at)
 
 
 ## The columns a zone's shadow is solved over: [from, to) in strip cells.

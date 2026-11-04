@@ -170,7 +170,7 @@ func test_the_rows_stay_clear_of_the_thumb_buttons() -> void:
 		Vector3(safe.end.x - 34.0, safe.end.y - 34.0, 24.0 + TouchControls.HIT_PADDING),
 		Vector3(safe.end.x - 82.0, safe.end.y - 22.0, 19.0 + TouchControls.HIT_PADDING),
 	]
-	for row: int in 3:
+	for row: int in DuelSelect.ROWS.size():
 		var rect := page.row_rect(row)
 		assert_true(rect.has_area(), "row %d was drawn" % row)
 		for b: Vector3 in buttons:

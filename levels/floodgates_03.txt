@@ -1,0 +1,42 @@
+; The Sluice Court
+;
+; Zone 3 of 5 of the Floodgates, where every match starts: symmetric about its
+; own centre, one spawn mark, mirrored by the match.
+;
+; Two walkways and a sunken court between them, two tiles down, with a row of
+; stepping stones over it two tiles up. While the court is dry it is the short
+; way and the place to fight: down in it, a fighter on the stones above is out
+; of reach. Then the sluices in its walls gush -- a second and a half of
+; warning -- and the water rises to the walkways and stands there for six
+; seconds before it drains. Whoever is still down there when it comes over
+; their ankles has handed the rope across. The stones are the only way over
+; while it stands.
+;
+; The water is the `u` run, its highest reach (StripHazards): a pure function
+; of the match frame, so both phones flood together without a byte between
+; them. Zones 2 and 4 flood on the other half of the cycle, so the low route
+; is always open somewhere.
+;! mark u flood phase=0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+         == ====== ==
+ t  @                       t
+#########uuuuuuuuuuuu#########
+#########uuuuuuuuuuuu#########
+##############################
+##############################
+##############################

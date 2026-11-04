@@ -103,6 +103,11 @@ const FLICK_PERIOD := 4
 const WAIT := 150
 ## A sword in flight is worth reacting to this many frames before it arrives.
 const DODGE_LOOK := 16.0
+## How far ahead it checks that the place it stands will not cut it: a little
+## over the blades' tell, so it moves while the ratchet is still ticking.
+const DOOM_LOOK := 34
+## The same in a basin, where the way out may be six tiles and a hop.
+const FLOOD_LOOK := 120
 
 ## Which seat this brain plays.
 var seat := 1
@@ -181,6 +186,7 @@ static func level_name(which: Difficulty) -> String:
 func decide(view: DuelView) -> int:
 	if view == null or view.me == null or view.them == null:
 		return _emit(0)
+	DuelFeet.look(view)
 	_cool = maxi(0, _cool - 1)
 	if not view.is_fighting() or not view.me.alive:
 		_calm()
@@ -193,7 +199,9 @@ func decide(view: DuelView) -> int:
 		# frame can press anything as a fresh edge.
 		_hold = 0
 		return _emit(0)
-	if not _dodge(view, want):
+	if _mind_the_ground(view, want):
+		pass
+	elif not _dodge(view, want):
 		if not view.me.armed:
 			_fetch(view, want)
 		elif view.leader == seat:
@@ -219,6 +227,40 @@ class Want:
 	var throw := false
 	## Down, whatever the stance: a duck, or a hand reaching for a sword.
 	var down := false
+	## Getting off ground that is about to kill: the direction is the way out,
+	## taken as it is. Steering would see the slab going under the feet as a
+	## lip, and stop on it.
+	var flee := false
+
+
+## --- the ground ------------------------------------------------------------
+
+## When the place it stands is about to kill it -- a blade's beat coming, the
+## water coming, the slab under it going -- getting out comes before any
+## fencing: ducking under a scythe if a duck is enough, otherwise to the
+## nearer safe footing (DuelFeet.refuge). Returns true when the frame was
+## spent on that. The clock and the stones are on the screen, so this is what
+## a player who has learned the strip does without thinking; the blunder knob
+## does not reach it, because a computer that stood in a slot on purpose would
+## not be making a mistake a person makes.
+func _mind_the_ground(view: DuelView, want: Want) -> bool:
+	var me := view.me
+	var strip := view.strip
+	if strip.hazards.is_empty() or not me.grounded:
+		return false
+	var half := view.tuning.body_width * 0.5
+	var body := Rect2(me.position.x - half, me.position.y - view.tuning.body_height,
+		half * 2.0, view.tuning.body_height)
+	var within := FLOOD_LOOK if strip.hazards.in_a_basin(body.grow(2.0)) else DOOM_LOOK
+	if not DuelFeet.doomed(strip, view.tuning, me, within):
+		return false
+	want.stance = _guard
+	if DuelFeet.duck_saves(strip, view.tuning, me, within):
+		want.down = true
+		return true
+	want.dir = DuelFeet.refuge(strip, view.tuning, me)
+	want.flee = want.dir != 0
+	return want.flee
 
 
 ## --- reading the other fighter ---------------------------------------------
@@ -757,6 +799,8 @@ func _compose(view: DuelView, want: Want) -> int:
 	var tuning := view.tuning
 	var steer := DuelFeet.steer(strip, tuning, me, want.dir, _hold, int(_p["slop"]))
 	var dir := int(steer["dir"])
+	if want.flee and dir == 0:
+		dir = want.dir
 	var hop := want.jump
 	if hop == 0 and bool(steer["jump"]):
 		hop = int(steer["hold"])

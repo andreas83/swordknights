@@ -163,7 +163,22 @@ there with open hands; a low throw cannot be caught at all
 ([`docs/duel-combat.md`](docs/duel-combat.md#the-catch)).
 
 **Duel** on the title screen asks how: **One keyboard**, **VS CPU** or
-**Online**, and opens next time on the way and the level last played.
+**Online**, and where: the **Strip** row, stepped with left and right, chooses
+among five, or **Random**. It opens next time on the way, the level and the
+strip last played.
+
+| Strip | Hour | What it does to a duel |
+| --- | --- | --- |
+| The Tug of War | afternoon | a spike pit and a moat at the gates: the original |
+| The Clockwork Well | night | scythes swing at head height on the beat, spike slots rise on the off-beat: duck, or count |
+| The Floodgates | golden hour | the sunken courts flood and drain on a twenty-second tide |
+| The Crumbling Aqueduct | sunset | cracked slabs fall where they are stood on, and stay down |
+| The Rooftops | dusk | alleys with nothing at the bottom, chimneys, a plank |
+
+Online, the host's strip is the match's. Every hazard is a function of the
+match's frame or of its snapshot, so they never desync, and each is told at
+least 27 frames before it kills
+([`docs/duel-match.md`](docs/duel-match.md#the-strips)).
 
 **VS CPU** is the duel on one phone: you in the crimson seat, the computer
 in the sea-green one. Left and right on its row choose **EASY**,
@@ -216,7 +231,7 @@ scripts/
   duel/      the tug-of-war duel: fighter, combat, zones, match, camera, HUD
   net/       transport, protocol, session, lobby, rendezvous server
 scenes/      boot, menu, game, player, duel, rendezvous, touch controls
-levels/      ASCII levels, and the duel's zone files
+levels/      ASCII levels, and the duel strips: manifests and zone files
 assets/      generated tile atlas + TileSet
 tools/       project configuration, asset generation, screenshots
 tests/       headless test scripts

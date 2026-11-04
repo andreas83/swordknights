@@ -1,0 +1,29 @@
+; The Floodgate, East
+;
+; Zone 5 of 5 of the Floodgates: levels/floodgates_01.txt reversed cell for
+; cell. Player two's gate, its moat on the same tide as its twin.
+;
+;! mark u flood phase=0
+
+
+
+
+
+
+
+
+
+
+
+                      ########
+                      ########
+                       :::::::
+                       :::::::
+                       :::::::
+                       :::::::
+  t                 t  :::::D:
+#################uu###########
+#################uu###########
+##############################
+##############################
+##############################

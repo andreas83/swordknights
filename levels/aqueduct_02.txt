@@ -1,0 +1,31 @@
+; The Broken Arches
+;
+; Zone 2 of 5 of the Crumbling Aqueduct. The long span: five pairs of
+; cracked slabs between four piers two tiles wide. Whole, it is a road; worn,
+; it is five jumps from pier to pier over the channel, each landing on a
+; place two tiles across. The first fighter through at a run leaves it whole
+; for the second; the first to stop and fight on it leaves holes behind them
+; for the rest of the match.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  t                         t
+######,,##,,##,,##,,##,,######
+######::##::##::##::##::######
+######::##::##::##::##::######
+######~~##~~##~~##~~##~~######

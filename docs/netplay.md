@@ -179,8 +179,9 @@ desyncing in the third zone.
 guest                         host
   |  HELLO (build, name, look) |      repeated every 30 frames until answered
   |--------------------------->|
-  |      WELCOME (seat, zones, strip hash, look)
-  |<---------------------------|      a mismatched strip is refused here
+  |      WELCOME (seat, zones, strip hash, strip name, look)
+  |<---------------------------|      the guest loads the host's strip; a strip
+  |                            |      it lacks, or that differs, is refused here
   |                            |
   |  INPUT (first_frame, bits[6])     every frame, a redundant window
   |--------------------------->|
@@ -277,17 +278,73 @@ file by (`scripts/net/protocol.gd`, `_get_look`):
   able to do with it. The reason is kept in `remote_look_error` and logged.
 - Once seated, later `HELLO`s cannot change the look.
 
-**Versions.** The protocol version is **2**, bumped for the sword catch. The
-catch changed what an empty hand's THROW does without changing a byte on the
-wire, so a protocol-1 build and this one would seat each other and diverge the
-first time an empty hand pressed throw. Now the HELLO is refused and the lobby
-says the other phone runs a different build.
+**Versions.** The protocol version is **3**, bumped for the strips (below).
+Version 2 was the sword catch: it changed what an empty hand's THROW does
+without changing a byte on the wire, so a protocol-1 build and a protocol-2 one
+would have seated each other and diverged the first time an empty hand pressed
+throw. In both cases the HELLO is refused and the lobby says the other phone
+runs a different build.
 
 The look on the end of `HELLO` and `WELCOME` needed no bump of its own: it is an
 optional block after the last fixed field, and a message without one reads as
 "no look". A lookless peer of the same version plays on and is drawn in its
 seat's default. A future change to the look itself bumps the look's own format
 byte, which this build reads as "no look".
+
+### The strip
+
+The host chooses where the duel is fought -- its duel page's STRIP row, with
+RANDOM drawn on the host when the match is built -- and the guest fights there,
+whatever its own page says. `WELCOME` carries the strip's name after the arena
+hash and before the look:
+
+```
+[u8 seat][u8 zones][u32 strip hash][u8 length][name bytes][look block, optional]
+```
+
+A **name**, not an index, for the looks' reason: two builds may list the strips
+in a different order, and an index would put the guest on the wrong one. It is
+an id -- lower-case ASCII, digits, underscores, at most 16 bytes -- checked as
+bytes before it becomes a string; a WELCOME naming anything else fails to
+decode, and a host that cannot send its strip's name as an id sends none.
+
+The guest, on `WELCOME`:
+
+1. If the name is not empty and is not the strip it has loaded, it asks the
+   duel to switch (`DuelSim.set_arena()`): `DuelMatch` calls the scene's
+   `arena_switch`, which loads the strip from the catalogue and rebuilds the
+   match and everything drawn around it (`match_scene.gd`, `use_strip()`).
+   A build without that strip says so: *"the host chose CLOCKWORK WELL, which
+   this build does not have"*.
+2. Only then are the hashes compared, on the strip now loaded. A strip of the
+   right name whose tiles or beats differ -- a modded file, a build from a
+   branch -- is still refused: *"the two sides are not fighting in the same
+   arena"*. The hash covers every cell and every hazard: each blade's cells,
+   kind and phase, each basin and its phase, each slab
+   (`StripHazards.identity_words()`).
+
+Either refusal sends the host a `BYE` with reason `ARENA_MISMATCH` before the
+guest gives up, so the host's lobby says *"the other player cannot fight on this
+strip"* rather than that the guest left.
+
+**Why this bumped the version.** The name is a fixed field, not an optional
+block after the last one: a version-2 decoder would read its length byte as
+the look's format and lose the look, and a version-2 *encoder* has no name for
+a version-3 guest to read. And a strip is more than its tiles now. A version-2
+build has no blades on the beat, no tide and no falling stone, so given the
+Well's files it would step a different match from the same inputs. The version
+check refuses that in the lobby; the arena hash would only have refused it if
+the version-2 build had the files at all.
+
+**Nothing else on the wire changed.** The blades and the water are a pure
+function of the match frame, which the snapshot already carries, so they cost
+nothing. The crumbling stone is one byte a slab after the fighters' blocks --
+34 bytes on the Aqueduct, none on any other strip -- and in the checksum.
+`tests/unit/test_duel_strip_net.gd` plays every strip between two sessions on
+the clean, laggy and lossy links of `tests/match_net_test.gd` with no desync,
+and rewinds each gimmick to a snapshot taken just before it acts and replays it
+byte for byte; `tests/unit/test_net_strip_handshake.gd` holds the wire and the
+two refusals.
 
 `tests/unit/test_net_look_wire.gd` holds the encoding — every look round-trips,
 lookless bytes, a protocol-1 HELLO refused, truncation at every length, noise —

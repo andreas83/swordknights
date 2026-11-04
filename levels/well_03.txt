@@ -1,0 +1,42 @@
+; The Escapement
+;
+; Zone 3 of 5 of the Clockwork Well, where every match starts. Symmetric about
+; its own centre, like every middle zone, with one spawn mark mirrored by the
+; match.
+;
+; Between the two marks the machine keeps time. A scythe hangs from a beam on
+; each side, swinging through the lane at head height ON the beat, and a pair
+; of spike slots in the middle comes up on the OFF-beat. Seventy-two beats a
+; minute is fifty frames a beat, so the whole room cuts every half a second,
+; alternately high and low: duck the scythe, jump or wait out the slots. The
+; opening exchange is fought in rhythm or not at all.
+;
+; Wiring, as in the Well (docs/campaign.md, "Blades on the beat"): the mason's
+; mark under the slots is wire 1, the marks in the beams wire 2, and each wire
+; is given its beat below. Respawns keep four columns clear of every blade
+; (ZoneStrip.HAZARD_CLEARANCE).
+;! channel 1 beat 50
+;! channel 2 beat 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+         #2#      #2#
+          z        z
+          z        z
+          z        z
+       :: z        z ::
+ t   @ ::   t ii t   ::     t
+##############1###############
+##############################
+##############################

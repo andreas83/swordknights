@@ -1,0 +1,31 @@
+; The Clockwork Well
+;! time night
+;
+; A duel strip (scripts/duel/duel_strips.gd): its zones, west to east, read by
+; scripts/duel/zones.gd exactly as levels/duel_zones.txt is.
+;
+; The Well at night, lit by its torches, with the machine that keeps its time
+; still running: scythes that swing across the lane at head height on the beat
+; and spike slots that come up on the off-beat, all on the match's own frame
+; (StripHazards). Seventy-two beats a minute -- the Well's tempo in the
+; adventure -- is fifty frames a beat, so the whole strip cuts every half
+; second, high and low in turn.
+;
+; WHAT IT DOES TO A DUEL. Nidhogg is a game of heights, and here the room
+; plays one too. A scythe kills a standing fighter and passes over a ducking
+; or rolling one; a slot kills anything on it and nothing beside it. So the
+; stance you hold and the moment you step are both answers to the clock as
+; well as to the other blade, and a fighter who reads the beat can make the
+; other one stand where it is about to cut.
+;
+;   zone 3  the Escapement      the start: a scythe each side, slots between
+;   zone 2  the Gallery of Hours  a slot field below, a scythed bridge above
+;   zone 1  the Gate of Hours   slots then a scythe before the arch
+;
+; Zones 4 and 5 are 2 and 1 reversed, every blade on its twin's beat.
+
+well_01.txt
+well_02.txt
+well_03.txt
+well_04.txt
+well_05.txt

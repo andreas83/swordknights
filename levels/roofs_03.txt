@@ -1,0 +1,38 @@
+; The Ridge
+;
+; Zone 3 of 5 of the Rooftops, where every match starts: symmetric about its
+; own centre, one spawn mark, mirrored by the match.
+;
+; Three roofs and the two alleys between them, two tiles across, with nothing
+; at the bottom: a missed jump is a fall out of the city. A chimney in the
+; middle of the centre roof, two tiles tall and four across, is the one thing to vault, and
+; the washing on the lines either side of it hangs in front of everything.
+; The fighters start each on an outer roof, so the first exchange is decided
+; by who crosses an alley first -- and a clash at an alley's lip throws the
+; loser over it.
+;
+; Static and obvious, all of it: the alleys are the strip's only hazard and
+; they never move.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+           c      c
+           c      c
+
+             ####
+    @        ####
+########  ##########  ########
+########  ##########  ########
+########::##########::########
+########::##########::########

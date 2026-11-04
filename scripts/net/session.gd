@@ -473,7 +473,8 @@ func _on_received(bytes: PackedByteArray) -> void:
 			if role == Role.HOST:
 				_take_remote_look(message)
 				transport.send(NetProtocol.welcome(
-					DuelRules.SLOT_B, duel.match_length(), _arena_hash, local_look
+					DuelRules.SLOT_B, duel.match_length(), _arena_hash, local_look,
+					duel.arena_id()
 				))
 				_begin_running()
 
@@ -481,8 +482,17 @@ func _on_received(bytes: PackedByteArray) -> void:
 			if role == Role.CLIENT:
 				local_slot = int(message["slot"])
 				remote_slot = 1 - local_slot
+				# The host chose the strip; the guest fights on it. Loaded first,
+				# then compared: a strip of the right name with the wrong tiles
+				# or the wrong beat is still refused by the hash below.
+				var named := String(message.get("arena_id", ""))
+				if named != "" and not duel.set_arena(named):
+					_refuse("the host chose %s, which this build does not have"
+						% DuelStrips.label(named))
+					return
+				_arena_hash = duel.arena_identity()
 				if int(message["arena_hash"]) != _arena_hash:
-					_fail("the two sides are not fighting in the same arena")
+					_refuse("the two sides are not fighting in the same arena")
 					return
 				# WELCOME's one number is the shape of the match: rounds to win
 				# for a round duel, zones in the strip for a tug-of-war. A host
@@ -534,6 +544,9 @@ func _on_received(bytes: PackedByteArray) -> void:
 				)
 
 		NetProtocol.Type.BYE:
+			if int(message["reason"]) == NetProtocol.Bye.ARENA_MISMATCH:
+				_fail("the other player cannot fight on this strip")
+				return
 			stage = Stage.ENDED
 			status_detail = "the other player left"
 			peer_departed.emit()
@@ -606,6 +619,14 @@ func _begin_running() -> void:
 	stage = Stage.RUNNING
 	status_detail = "connected"
 	handshake_complete.emit(local_slot)
+
+
+## A handshake this peer will not complete over the arena: the host is told
+## why in a BYE, so its lobby says so too rather than that the guest left.
+func _refuse(reason: String) -> void:
+	if transport != null and transport.has_peer():
+		transport.send(NetProtocol.bye(NetProtocol.Bye.ARENA_MISMATCH))
+	_fail(reason)
 
 
 func _fail(reason: String) -> void:

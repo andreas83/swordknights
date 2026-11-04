@@ -1,0 +1,28 @@
+; The Broken Arches, East
+;
+; Zone 4 of 5 of the Crumbling Aqueduct: levels/aqueduct_02.txt reversed cell
+; for cell, by the authoring tool.
+;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ t                         t
+######,,##,,##,,##,,##,,######
+######::##::##::##::##::######
+######::##::##::##::##::######
+######~~##~~##~~##~~##~~######

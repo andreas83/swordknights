@@ -70,6 +70,11 @@ signal match_over(winner: int)
 ## A thrown sword was caught out of the air. Presentation only: the catch itself
 ## happened in DuelCombat and is in both fighters' state already.
 signal blade_caught(catcher: int, thrower: int, at: Vector2)
+## A slab of crumbling stone fell: the sound and the dust. Presentation; the
+## fall itself is in `stones`, and what the floor looks like is read from
+## there, so a predicted fall the host never had is put back by the state and
+## only this beat -- rung once, by the ledger, like every other -- was early.
+signal stone_fell(index: int, at: Vector2)
 
 enum Phase {
 	COUNTDOWN, ## Both on their marks in the middle zone. Inputs ignored.
@@ -126,8 +131,18 @@ var scroll: float = 0.0
 var respawn := PackedFloat64Array([0.0, 0.0])
 var kills := PackedInt32Array([0, 0])
 var winner: int = DuelRules.DRAW
+## One byte per slab of the strip's crumbling stone: whole, burning, or fallen
+## for good (StripHazards). Simulation state like a respawn timer: it is the
+## floor, and it is in the snapshot and the checksum. Empty on a strip with
+## none. The blades and floods need no state here; they are the frame's.
+var stones := PackedByteArray()
 
 var seats: Array[DuelSeat] = []
+
+## Asked by set_arena() to put this match on another strip, when the host of an
+## online duel names one this peer has not loaded. Set by the scene, which owns
+## everything drawn around the strip; `func(id: String) -> bool`.
+var arena_switch := Callable()
 
 ## Set by the scene to the real fighter. Left null in a test, which builds the
 ## placeholder in scripts/duel/match_stub_fighter.gd instead.
@@ -151,6 +166,19 @@ var _stepping := false
 var _between: Array[Dictionary] = []
 ## What the fighters were last told about `replaying`.
 var _fighters_replaying := false
+## The crumbling stone's collision: one body per slab, on a layer of this
+## match's own (`_stone_layer`), enabled while the slab holds. See _build_stones().
+var _stone_bodies: Array[StaticBody2D] = []
+var _stone_layer := 0
+## What a fighter is handed as its world on a strip with crumbling stone.
+var _world: MatchGround
+
+## Which of STONE_LAYERS the next match with stones takes. Two matches share a
+## physics space only in a test (a host and a client side by side), and eight
+## layers is more than any test builds at once.
+static var _next_stone_layer := 0
+const STONE_LAYERS := 8
+const FIRST_STONE_LAYER := 16
 
 
 ## --- construction ----------------------------------------------------------
@@ -160,7 +188,12 @@ var _fighters_replaying := false
 func build(zones: ZoneStrip, view: ZoneView = null) -> bool:
 	strip = zones
 	_view = view
-	seats.clear()
+	_free_seats()
+	_world = MatchGround.new(strip, self) if strip.hazards.stone_count() > 0 else null
+	_stone_layer = 0
+	if _world != null:
+		_stone_layer = 1 << (FIRST_STONE_LAYER + _next_stone_layer % STONE_LAYERS)
+		_next_stone_layer += 1
 
 	for slot: int in 2:
 		var fighter := _make_fighter()
@@ -176,8 +209,11 @@ func build(zones: ZoneStrip, view: ZoneView = null) -> bool:
 			push_error("seat %d's fighter does not answer the interface: %s"
 				% [slot, seat.missing()])
 			return false
-		if not seat.give_world(strip):
+		if not seat.give_world(strip, _world):
 			push_error("seat %d's fighter refused the strip as its world" % slot)
+			return false
+		if not seat.collide_with(_stone_layer):
+			push_error("seat %d's fighter would not stand on the crumbling stone" % slot)
 			return false
 		seat.setup(fighter_profiles[slot])
 		seat.on_died(_on_fighter_died)
@@ -195,6 +231,7 @@ func build(zones: ZoneStrip, view: ZoneView = null) -> bool:
 	_scratch.resize(2 * _fighter_bytes)
 	if seats[0].node is PhysicsBody2D:
 		_build_ground()
+		_build_stones()
 	_built = true
 
 	reset_match()
@@ -233,6 +270,78 @@ func _build_ground() -> void:
 	_ground.update_internals()
 
 
+## One static body per slab of crumbling stone, on this match's own layer.
+##
+## Not cells of _ground: a TileMapLayer rebuilds a whole physics quadrant when
+## one cell changes, and a rewind may have to put slabs back as well as take
+## them away. A body per slab is switched by its collision layer, which the
+## physics server reads on the very next query, so a slab that fell on frame N
+## is gone for frame N + 1's move and back again the moment a snapshot from
+## before it is read. Each match has a layer of its own (_stone_layer) and its
+## fighters are given it as an extra mask bit, so the two matches of a
+## networked test, built in one physics space, never stand on each other's
+## stone. Nothing about a body is state: _apply_stones() derives every one of
+## them from `stones`.
+func _build_stones() -> void:
+	for body: StaticBody2D in _stone_bodies:
+		body.queue_free()
+	_stone_bodies.clear()
+	var tile := float(ZoneStrip.TILE)
+	for cell: Vector2i in strip.hazards.stones:
+		var body := StaticBody2D.new()
+		body.name = "Stone_%d_%d" % [cell.x, cell.y]
+		body.collision_layer = _stone_layer
+		body.collision_mask = 0
+		body.position = Vector2(cell) * tile + Vector2(tile, tile) * 0.5
+		var shape := CollisionShape2D.new()
+		var rect := RectangleShape2D.new()
+		rect.size = Vector2(tile, tile)
+		shape.shape = rect
+		body.add_child(shape)
+		add_child(body)
+		_stone_bodies.append(body)
+
+
+## Every slab's body to what `stones` says: there while whole or burning, gone
+## once fallen.
+func _apply_stones() -> void:
+	for i: int in mini(_stone_bodies.size(), stones.size()):
+		var layer := _stone_layer if StripHazards.holds(stones[i]) else 0
+		if _stone_bodies[i].collision_layer != layer:
+			_stone_bodies[i].collision_layer = layer
+
+
+## One frame of the crumbling stone, after the fighters have moved: lights the
+## slabs under living feet, burns the lit ones, drops the spent ones.
+func _advance_stones() -> void:
+	if stones.is_empty():
+		return
+	var feet: Array[Vector3] = []
+	for seat: DuelSeat in seats:
+		var span := seat.feet()
+		if span != Vector3.ZERO:
+			feet.append(span)
+	var dropped := strip.hazards.step_stones(stones, feet)
+	if dropped.is_empty():
+		return
+	_apply_stones()
+	var tile := float(ZoneStrip.TILE)
+	for i: int in dropped:
+		var cell: Vector2i = strip.hazards.stones[i]
+		_happened({"kind": "stone", "index": i,
+			"at": Vector2(cell) * tile + Vector2(tile * 0.5, 0.0)})
+
+
+## Takes the fighters of a previous build out of the tree and the physics
+## space at once: a match put on another strip builds two new ones.
+func _free_seats() -> void:
+	for seat: DuelSeat in seats:
+		if seat.node != null and seat.node.get_parent() == self:
+			remove_child(seat.node)
+			seat.node.queue_free()
+	seats.clear()
+
+
 func _make_fighter() -> Node2D:
 	if fighter_scene != null:
 		return fighter_scene.instantiate() as Node2D
@@ -248,6 +357,8 @@ func reset_match() -> void:
 	respawn = PackedFloat64Array([0.0, 0.0])
 	kills = PackedInt32Array([0, 0])
 	winner = DuelRules.DRAW
+	stones = strip.hazards.fresh_stones()
+	_apply_stones()
 	events.clear()
 	_between.clear()
 	_ledger.clear()
@@ -289,7 +400,8 @@ func step(bits_a: int, bits_b: int) -> void:
 
 	seats[0].simulate(DT)
 	seats[1].simulate(DT)
-	events.append_array(DuelSeat.referee(seats[0], seats[1], strip))
+	events.append_array(DuelSeat.referee(seats[0], seats[1], strip, frame))
+	_advance_stones()
 
 	if phase != Phase.MATCH_OVER:
 		_advance_respawns()
@@ -389,6 +501,8 @@ func _tell(event: Dictionary) -> void:
 			zone_changed.emit(int(event["index"]))
 		"catch":
 			blade_caught.emit(int(event["by"]), int(event["from"]), event["at"] as Vector2)
+		"stone":
+			stone_fell.emit(int(event["index"]), event["at"] as Vector2)
 		"consumed":
 			leader_consumed.emit(int(event["winner"]), event["at"] as Vector2)
 		"over":
@@ -689,6 +803,24 @@ func arena_identity() -> int:
 	return strip.identity()
 
 
+## The strip's name, which the host's WELCOME carries (DuelStrips).
+func arena_id() -> String:
+	return strip.id
+
+
+## Puts the match on strip `id` if it is not on it already, through the scene's
+## `arena_switch`, which rebuilds what is drawn around it. False if this build
+## has no such strip or nothing here can switch. The handshake then compares
+## arena hashes as before, so a strip of the same name that differs is still
+## refused.
+func set_arena(id: String) -> bool:
+	if strip != null and strip.id == id:
+		return true
+	if not DuelStrips.is_strip(id) or not arena_switch.is_valid():
+		return false
+	return bool(arena_switch.call(id)) and strip.id == id
+
+
 func match_length() -> int:
 	return strip.zone_count()
 
@@ -717,8 +849,10 @@ const HEADER_BYTES := 44
 const GROUND_TILES: TileSet = preload("res://assets/tiles.tres")
 
 
+## The header, both fighters, then one byte per slab of crumbling stone -- after
+## the fighters, so a strip without stones has exactly the snapshot it had.
 func snapshot_bytes() -> int:
-	return HEADER_BYTES + 2 * _fighter_bytes
+	return HEADER_BYTES + 2 * _fighter_bytes + stones.size()
 
 
 func fighter_state_bytes() -> int:
@@ -746,6 +880,9 @@ func write_state() -> PackedByteArray:
 	out.resize(snapshot_bytes())
 	seats[0].write_state(out, HEADER_BYTES)
 	seats[1].write_state(out, HEADER_BYTES + _fighter_bytes)
+	var at := HEADER_BYTES + 2 * _fighter_bytes
+	for i: int in stones.size():
+		out[at + i] = stones[i]
 	return out
 
 
@@ -779,6 +916,9 @@ func read_state(bytes: PackedByteArray) -> bool:
 
 	seats[0].read_state(bytes, HEADER_BYTES)
 	seats[1].read_state(bytes, HEADER_BYTES + _fighter_bytes)
+	var at := HEADER_BYTES + 2 * _fighter_bytes
+	stones = bytes.slice(at, at + stones.size())
+	_apply_stones()
 	# Presentation bookkeeping, not state: from here on the history has not
 	# happened yet, and will be recorded again as it is stepped.
 	_ledger.rewind(frame)
@@ -805,6 +945,8 @@ func checksum() -> int:
 	words.append(quantise(respawn[0]))
 	words.append(quantise(respawn[1]))
 	words.append(quantise(scroll))
+	for i: int in stones.size():
+		words.append(stones[i])
 
 	if seats[0].hashes_itself():
 		seats[0].checksum_into(words)

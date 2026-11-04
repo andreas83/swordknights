@@ -1,0 +1,29 @@
+; The Rooftops
+;! time dusk
+;
+; A duel strip (scripts/duel/duel_strips.gd): its zones, west to east.
+;
+; The city's roofs at dusk, the sun burning down behind the domes, with the
+; alleys between the houses open to the dark. Every gap is two tiles, a
+; running jump, except the widest, which has a plank laid over it; none has a
+; bottom, so a fall is out of the world and the rope goes to the other one.
+; Chimneys to vault, a taller house to hop onto, washing on the lines.
+;
+; WHAT IT DOES TO A DUEL. It puts an edge under every exchange. Blade on
+; blade knocks both fighters back (DuelCombat's clash), and on a roof that
+; knock is a step toward an alley; a parry at the lip is a kill without a
+; touch. The rooftops have no clock and nothing that moves -- static and
+; obvious, the one strip whose hazards are all of them always visible -- and
+; they are the hardest to run home across.
+;
+;   zone 3  the Ridge           the start: two alleys and a chimney
+;   zone 2  the Tiles           an alley, a taller house, and the plank
+;   zone 1  the Last Roof       an alley and a chimney before the arch
+;
+; Zones 4 and 5 are 2 and 1 reversed.
+
+roofs_01.txt
+roofs_02.txt
+roofs_03.txt
+roofs_04.txt
+roofs_05.txt
