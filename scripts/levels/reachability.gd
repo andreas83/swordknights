@@ -22,8 +22,9 @@ extends RefCounted
 ##
 ## The search is deliberately conservative — where a real player has an option
 ## this model does not reproduce (coyote jumps, releasing the stick mid-arc,
-## jumping off a ladder, wall-sliding to a lower ledge, crouch-walking under a
-## one-tile ceiling), the edge is simply not offered. So "verified" means
+## jumping off a ladder, wall-sliding to a lower ledge, crawling off the end of
+## a ledge), the edge is simply not offered. The crawl itself is offered, flat
+## through a one-tile passage to standing room (scripts/levels/reach_crawl.gd). So "verified" means
 ## "reachable even by this reduced character", never "reachable if you are
 ## perfect". Erring the other way would make the proof worthless.
 ##
@@ -450,6 +451,9 @@ class Solver extends RefCounted:
 	## outside an arc. Nothing in this file reads it: a search that charges
 	## moves by their time does (ReachRace.Timed).
 	var arc_frame := -1
+	## The cells a crawl took to reach the stand it is offering, 0 outside a
+	## crawl (ReachCrawl). Read by the same timed search, for the same reason.
+	var crawl_tiles := 0
 
 	func _init(level: AsciiLevel, model: ReachModel = null) -> void:
 		cols = maxi(level.cols, 1)
@@ -754,6 +758,9 @@ class Solver extends RefCounted:
 
 		# grab onto a ladder the body is already overlapping
 		_offer_ladder(x, y, out)
+
+		# crawl through a passage one tile high, to standing room beyond it
+		ReachCrawl.offer(self, x, y, out)
 
 		for dir: int in [-1, 1]:
 			# A single walkable cell behind is enough to reach RUN_SPEED:

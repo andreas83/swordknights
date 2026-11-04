@@ -184,6 +184,17 @@ Plus **drop-through** when the floor is a one-way platform, and **ladder**
 entry whenever the body overlaps one — including mid-arc, which is how falling
 into a cistern and climbing out works.
 
+And the **crawl** (`scripts/levels/reach_crawl.gd`): through a run of cells
+too low to stand in, with the crouch's room and a floor, to a cell he can
+stand in at the far end, on the same row. One call from the standing
+expansion and nothing else, so the proof every level had before it is the
+proof with `ReachCrawl.enabled` off, and `tests/unit/test_crawl.gd` holds
+the two against each other: in every chapter the crawl reaches no cell that
+was not already reached, no race is run in fewer frames, and every secrets
+audit still holds. The race proof charges it by its own clock
+(`ReachRace.CRAWL_TILE`, a crawl being half a walk), so a passage can only be
+a slower way to somewhere.
+
 Each arc is stepped frame by frame and records everything it proves: where it
 lands, every ledge it could grab on the way down, every ladder it passes
 through. An arc that touches spikes or water stops there and contributes
@@ -205,7 +216,8 @@ is simply not offered:
 - releasing or reversing the stick mid-arc;
 - jumping off a ladder;
 - wall-sliding down to a lower ledge;
-- crouch-walking under a one-tile ceiling;
+- crawling off the end of a ledge, or out of a passage into a fall: the
+  crawl is offered only flat, from standing room to standing room;
 - leaning the last ~4 px out over a drop before jumping — the lip takeoff is
   modelled at the tile boundary, where half the body is still over solid
   ground, and the genuine overhang past that is given up;

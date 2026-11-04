@@ -44,6 +44,8 @@ extends RefCounted
 const SLACK := 0.75
 ## A tile at a run, in frames: Tuning.RUN_SPEED over Tuning.TILE.
 const RUN_TILE := Tuning.TILE / Tuning.RUN_SPEED * 60.0
+## A cell crawled, in frames (Tuning.CRAWL_SPEED, ReachCrawl): twice a walk's.
+const CRAWL_TILE := Tuning.TILE / Tuning.CRAWL_SPEED * 60.0
 ## A rung, in frames.
 const RUNG := Tuning.TILE / Tuning.LADDER_SPEED * 60.0
 ## A ledge grab's hang and mantle, on top of the arc that caught the ledge.
@@ -94,6 +96,8 @@ class Timed extends LevelReachability.Solver:
 	func _cost(standing: bool) -> float:
 		if arc_frame >= 0:
 			return float(arc_frame + 1) + (GRAB if _grabbing else 0.0)
+		if crawl_tiles > 0:
+			return float(crawl_tiles) * CRAWL_TILE
 		if _from_ladder:
 			return LADDER_OFF if standing else RUNG
 		return RUN_TILE if standing else 1.0

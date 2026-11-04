@@ -581,7 +581,8 @@ func _grounded() -> bool:
 		Player.State.IDLE, Player.State.WALK, Player.State.RUN, Player.State.TURN, \
 		Player.State.CROUCH, Player.State.LAND, Player.State.ATTACK, \
 		Player.State.PLUNGE_LAND, Player.State.PARRY, Player.State.BACKSTEP, \
-		Player.State.ROLL, Player.State.KICK_LAND, Player.State.SWEEP, Player.State.PICKUP:
+		Player.State.ROLL, Player.State.KICK_LAND, Player.State.SWEEP, Player.State.PICKUP, \
+		Player.State.CRAWL:
 			return true
 		_:
 			return _player.is_grounded()
@@ -669,7 +670,7 @@ func _state_pose() -> Dictionary:
 		Player.State.BACKSTEP:
 			return _pose(SwordPoses.backstep(t))
 		Player.State.ROLL, Player.State.DIVE_KICK, Player.State.KICK_LAND, \
-		Player.State.THROW, Player.State.SWEEP, Player.State.PICKUP:
+		Player.State.THROW, Player.State.SWEEP, Player.State.PICKUP, Player.State.CRAWL:
 			return _pose(MovePoses.for_state(_player.state, t))
 		Player.State.HURT:
 			return _hurt(t)

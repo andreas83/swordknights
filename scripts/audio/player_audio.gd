@@ -45,6 +45,7 @@ const CLOTH_ON_ENTER := {
 	Player.State.FALL: -6.0,
 	Player.State.TURN: -3.0,
 	Player.State.CROUCH: -5.0,
+	Player.State.CRAWL: -7.0,
 	Player.State.LAND: -4.0,
 	Player.State.HANG: -4.0,
 	Player.State.CLIMB_UP: -3.0,

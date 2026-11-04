@@ -33,7 +33,40 @@ static func for_state(state: Player.State, t: float) -> Dictionary:
 			return sweep(t)
 		Player.State.PICKUP:
 			return pickup(t)
+		Player.State.CRAWL:
+			return crawl(t)
 	return {}
+
+
+## On hands and knees, pitched forward over the front hand: the crouch's
+## height (Tuning.CROUCH_HEIGHT) -- the body the world and every foe see in
+## a crawl -- with the hood low and forward, the hands reaching one after the
+## other and the knees drawn up under the hem in counter-time. The sword
+## stays in the back hand, laid flat along the floor, out of a one-tile
+## ceiling: there is no room to carry it any other way, and the pose should
+## say that no swing is coming. Here, not in PlayerArt, so the heroine's
+## costume crawls on the same rig without a line of her own.
+static func crawl(t: float) -> Dictionary:
+	var c := sin(t * 9.0)
+	return {
+		"sink": Tuning.BODY_HEIGHT - Tuning.CROUCH_HEIGHT + 1.0,
+		"squash": 0.92,
+		"lean": 3.4,
+		"tilt": 0.32,
+		"bob": -absf(c) * 0.4,
+		"stride": c * 1.6,
+		"knee": 1.6 + maxf(0.0, -c) * 1.2,
+		"stance": 0.9,
+		"hem_lift": 1.8,
+		"hem_fwd": -1.0,
+		"hem_spread": 1.0,
+		"hood_tilt": 0.55,
+		"hood_push": 1.0,
+		"arm_a": 1.05 - c * 0.35, "arm_a_len": 5.4,
+		"arm_b": 1.25 + c * 0.35, "arm_b_len": 5.0,
+		"cloak_sweep": 2.0, "cloak_rise": -0.6, "cloak_flare": 0.9,
+		"blade": 3.05, "blade_len": 8.0,
+	}
 
 
 ## Pitched forward over the knees and folded, hood tucked to the chest, the

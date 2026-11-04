@@ -329,11 +329,10 @@ together read as a backstep.
 collision shape: only the body a *foe* aims at is tucked
 (`PrinceMoves.hurt_rect()`, which Game hands the foes); floors, ceilings,
 spikes and water see the standing body, so a roll enters no space and passes
-no hazard the proof's body does not. A one-tile slot stops it at the mouth.
-That was a choice: a roll under a one-tile gap would have had to be taught to
-`LevelReachability`, re-proving every level built on the current proof while
-chapters are being drafted against it, and a roll under a closing gate would
-shorten every race the gates are timed against. And it covers less floor a
+no hazard the proof's body does not. A one-tile slot stops it at the mouth,
+still: the way through a slot is the crawl (*The crawl*, below), not the
+roll. A roll under a one-tile gap would shorten every race the gates are
+timed against, at 115 px/s under a closing gate. And it covers less floor a
 second than a run (40 px in 33 frames), so chaining rolls shortens no race.
 
 ### The dive kick: the feet, not the blade
@@ -403,6 +402,58 @@ stick: up for the parry, down in the air for the plunge, back for the
 backstep. The one slot left, down + SWORD on the ground, would buy a low cut
 with no target the swing does not already reach -- even the Caracal's 9-px
 body is inside the swing's band. So there are no heights here.
+
+### The crawl: through a gap one tile high
+
+The owner, playing the Mirror Tower, tried to get through R5's west wall,
+which comes down to one tile above the floor -- the slot the balcony
+Glassbearer fires through -- and could not: the prince crouched only
+standing still, and a crouch was all that fitted. Now he crawls.
+
+**A crawl, not a roll that fits.** Down and then the stick: on hands and
+knees in the crouch's 13 px, at `Tuning.CRAWL_SPEED` (22 px/s, a little over
+half a walk). Of the two ways through a one-tile gap it is the one a thumb
+finds -- down is where the stick already is when the prince is crouched at
+the mouth, and the stick is how anything moves -- and the one that cannot
+shorten anything: a roll at 115 px/s through a slot would be the fastest way
+under a closing gate in the game, where a crawl at half a walk is the
+slowest way anywhere. The roll keeps its rule; a slot stops it at the mouth.
+
+**Chosen, never fallen into.** A crawl starts from a crouch or from standing
+still with down held. A run or a walk with the stick drifted low -- which a
+touch stick does, often -- stays upright (`PrinceCrawl.take()`). Under a
+ceiling too low to stand in he stays down whatever the stick says: let go of
+down halfway through and he keeps crawling, let go of everything and he
+crouches there; out the far side, with room, he stands as a crouch does.
+
+**What it costs.** The crawl is defenceless: under a one-tile ceiling no
+sword comes out (the press waits in the buffer for room), no jump, no roll.
+Out in the open, a crawl is the crouch's body moving, and the crouch's
+answers are the crawl's.
+
+**What can hit a crawling prince.** Whatever reaches the crouch: the body
+every foe and every hazard sees is `body_rect()`, 13 px tall while he is
+down. So a sunbolt at chest height goes over a crawl as it goes over a
+crouch -- which is how the R5 slot is crawled under the balcony
+Glassbearer's fire -- and a sentinel's cut, a cat's claws, the King's slam
+and the beam all find it. Spikes in the floor of a passage are spikes; a
+passage under spikes hung from its ceiling is passable, because the crouch
+does not reach them, and the proof says the same (`ReachCrawl.is_passage()`).
+
+**The proof.** `scripts/levels/reach_crawl.gd`, one call from the standing
+expansion, offers the crawl flat from standing room to standing room
+(*docs/level-generation.md*, "The search"). Built against every chapter, it
+reaches nothing that was not already reached, shortens no race and keeps
+every secret hidden (`tests/unit/test_crawl.gd`): the five one-tile cells
+in the campaign are the Mirror Tower's slot, which joins two places already
+joined, and four dead-end notches in Chapters II and V a crawl goes into and
+backs out of.
+
+**The pose** is `MovePoses.crawl()`, in the pose file so the heroine crawls
+on the same rig without a line of her own: pitched forward over the leading
+hand, hood low, hands reaching in turn and knees in counter-time, the sword
+laid flat in the back hand along the floor -- no swing is coming, and the
+pose says so.
 
 ### The assist
 

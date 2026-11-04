@@ -35,6 +35,7 @@ enum State {
 	ATTACK, HURT, DEAD,
 	AIR_SLASH, PLUNGE, PLUNGE_LAND, PARRY, BACKSTEP,
 	ROLL, DIVE_KICK, KICK_LAND, THROW, SWEEP, PICKUP,
+	CRAWL,
 }
 
 const TILE := 16.0
@@ -379,9 +380,10 @@ func _update_free(delta: float) -> void:
 
 func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) -> void:
 	if moves.take_frame(delta, want_x, grounded): return # --- the duel's moves ---
+	var hemmed := PrinceCrawl.hemmed(self, grounded) # --- the crawl ---
 	# Buffered, like jump: a press from the end of a fall, a turn, a landing or
 	# the tail of the last swing comes out here, on the first frame it can.
-	if _attack_buffer > 0.0 and _start_sword(delta, want_x, walking, grounded):
+	if _attack_buffer > 0.0 and not hemmed and _start_sword(delta, want_x, walking, grounded):
 		return
 
 	var reaching := (input.up or input.down) and _ladder_lockout <= 0.0
@@ -390,7 +392,8 @@ func _free_movement(delta: float, want_x: int, walking: bool, grounded: bool) ->
 		_enter(State.LADDER)
 		return
 
-	var crouching := grounded and input.down and want_x == 0
+	if PrinceCrawl.take(self, delta, want_x, grounded, hemmed): return # --- the crawl ---
+	var crouching := grounded and (input.down or hemmed) and want_x == 0
 	_set_crouched(crouching)
 	if crouching:
 		velocity.x = move_toward(velocity.x, 0.0, Tuning.GROUND_FRICTION * delta)
@@ -621,8 +624,8 @@ func _steer(delta: float, want_x: int, walking: bool, grounded: bool) -> void:
 ## longer jump than Tuning.gap_tiles() is derived from.
 func _jump_allowed() -> bool:
 	match state:
-		State.ATTACK, State.AIR_SLASH, State.CROUCH, State.PLUNGE, State.PLUNGE_LAND, \
-		State.PARRY, State.BACKSTEP, \
+		State.ATTACK, State.AIR_SLASH, State.CROUCH, State.CRAWL, State.PLUNGE, \
+		State.PLUNGE_LAND, State.PARRY, State.BACKSTEP, \
 		State.ROLL, State.DIVE_KICK, State.KICK_LAND, State.THROW, State.SWEEP, State.PICKUP:
 			return false
 		_:
@@ -950,13 +953,8 @@ func _set_crouched(crouched: bool) -> void:
 	if _crouched == crouched and _shape != null and _shape.shape != null:
 		return
 	# Standing up into a ceiling is not allowed.
-	if not crouched and _crouched and level != null:
-		var stand := Rect2(
-			position.x - Tuning.BODY_WIDTH * 0.5, position.y - Tuning.BODY_HEIGHT,
-			Tuning.BODY_WIDTH, Tuning.BODY_HEIGHT
-		)
-		if level.rect_hits_solid(stand):
-			return
+	if not crouched and _crouched and not PrinceCrawl.room_to_stand(self):
+		return
 
 	_crouched = crouched
 	if _shape == null:

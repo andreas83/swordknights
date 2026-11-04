@@ -609,8 +609,14 @@ playing it showed a flaw:
   As drafted, R2's pillar and R6's balcony shaded the R5 Glassbearer's glass
   at his post, and the way up out of R5 was at its east end, fifteen tiles
   from him: he never fired. Now his balcony is out of their shadow, his bolt
-  comes through a slot a prince cannot pass, and the ladder up to R6 is at
-  R5's west end, so the way on crosses his line of fire.
+  comes through a slot one tile high, and the ladder up to R6 is at R5's
+  west end, so the way on crosses his line of fire. The slot was a wall the
+  owner tried to crawl through on a phone; since the crawl (docs/character.md,
+  "The crawl") he can, out onto the balcony and under the bolts -- which
+  pass over a crawl at chest height -- to the Glassbearer's own floor. It
+  opens no shortcut: the balcony was reached already, by the route up the
+  face, and `tests/unit/test_crawl.gd` holds that the crawl reaches nothing
+  new anywhere in the chapter.
 - **Every ladder that pierces a floor has an open cell beside it.** A
   one-wide hole through a floor admits a body only within 3.5 px of the
   ladder's middle, and the prince is not centred on a ladder; the roof's

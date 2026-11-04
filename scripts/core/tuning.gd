@@ -26,6 +26,13 @@ extends RefCounted
 const BODY_WIDTH := 9.0
 const BODY_HEIGHT := 22.0
 const CROUCH_HEIGHT := 13.0
+## THE CRAWL: from a crouch, the stick moves him along the floor on hands and
+## knees, in the crouch's 13 px -- under a one-tile ceiling, which a standing
+## man cannot pass and a roll was kept from (docs/character.md, "The crawl").
+## Slower than a walk by half: a crawl is a way through, never a way to be
+## quicker, so no route it opens can beat one a run already had, and a race
+## timed against a run is never shortened by one (ReachRace.CRAWL_TILE).
+const CRAWL_SPEED := 22.0
 
 # Horizontal motion
 const RUN_SPEED := 88.0
