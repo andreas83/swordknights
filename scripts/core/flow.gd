@@ -143,7 +143,15 @@ static func install(from: Node) -> Flow:
 ## `change_scene_to_file()` elsewhere still gets the incoming half.
 static func enter(from: Node, pace: Pace = Pace.NORMAL) -> void:
 	var flow := install(from)
-	if flow == null or flow.is_busy():
+	if flow == null:
+		return
+	# A hitstop is a beat of the blow that struck it, and dies with the scene
+	# it was struck in. Flow outlives scenes, so a kill on the last frame
+	# before a door -- or the last frame of one test -- froze the next level's
+	# first frames, and a run started late by as many: whether the prince
+	# spawned moving depended on what had happened before him.
+	flow._hitstop = 0.0
+	if flow.is_busy():
 		return
 	flow._lead = 1.0
 	flow._trail = 0.0

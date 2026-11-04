@@ -164,6 +164,11 @@ While a hitstop holds, `Game` stops stepping the player and the entities,
 holds its particles and the sword trail. All four have to agree or the freeze
 reads as a dropped frame instead of as weight.
 
+A hitstop belongs to the scene it was struck in. `Flow` outlives scenes, so
+`Flow.enter()` puts out any hitstop still running when a scene comes in: a
+kill on the frame before a door used to freeze the next chapter's first
+frames (`tests/unit/test_hitstop_scene.gd`).
+
 ### The specials' beats
 
 The two special moves (`docs/character.md`) each get one beat, built from the
