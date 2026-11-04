@@ -308,6 +308,9 @@ func _the_rope_goes_both_ways() -> void:
 
 func _the_gate() -> void:
 	var fight := _open_match()
+	# One round: the series that a duel is (tests/unit/test_duel_series.gd) would
+	# go on to a second one after the beat, and this is about the gate.
+	fight.series_wins = 1
 	_fight(fight)
 	_slay(fight, 1, 0)
 

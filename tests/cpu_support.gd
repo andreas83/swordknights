@@ -19,15 +19,22 @@ const Support := preload("res://tests/duel_support.gd")
 
 
 ## Plays one match. `drivers` holds, per seat, a DuelCpu or a Callable as above.
+##
+## A MATCH HERE IS ONE ROUND. The duel is a best of three (DuelMatch.SERIES_WINS),
+## and what the suites that use this measure -- who wins, how long it takes,
+## how often the ground kills -- is a round: the win rates and the frame limits
+## in them were all set for one. So the match is asked for one round, unless
+## `rounds` says otherwise.
 ## Returns { winner, over, frames, kills, deaths, hazards, checksums, bits }:
 ## `deaths` and `hazards` count each seat's deaths, and those of them that were
 ## the ground's (spikes, water, falling out); `bits` is every frame's pair of
 ## inputs, and `checksums` every frame's checksum when `trace` is set.
 static func bout(root: Node, strip: ZoneStrip, drivers: Array, limit: int,
-		trace: bool = false) -> Dictionary:
+		trace: bool = false, rounds: int = 1) -> Dictionary:
 	var fight := Support.spawn_match(root, strip)
 	if fight == null:
 		return {}
+	fight.series_wins = rounds
 	var deaths := PackedInt32Array([0, 0])
 	var hazards := PackedInt32Array([0, 0])
 	var tally := func(victim: int, killer: int, _at: Vector2) -> void:

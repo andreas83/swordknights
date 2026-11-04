@@ -34,6 +34,15 @@ extends Control
 ## mute buttons' on a phone. The names then carry through the line under the
 ## rope and the result. The one-keyboard duel sets no tags: ONE and TWO are
 ## the arrow's colours, and the arrow says it.
+##
+## THE SERIES
+## A duel is a best of three (DuelMatch.SERIES_WINS). When a gate is reached the
+## band gets a plate for the beat the crowd takes the winner away: who took the
+## round, and the score -- YOU 1 - 0 CPU, ONE 2 - 1 TWO -- cut into the rule
+## under it. When the series is won the same plate says who won the duel, and
+## what to press. The score is read from the match's `series`, which is
+## simulation state: on a client it is the host's, corrected like everything
+## else, so the HUD keeps no count of its own that could disagree.
 
 ## Each seat's mark on the rope, the arrow, the tags and the rings: the bright
 ## step of the colour it is dressed in (FighterArt.SEAT_CLOTH). These were the
@@ -65,6 +74,12 @@ var footer := ""
 var _time := 0.0
 var _flash := 0.0
 var _flash_options := PackedStringArray()
+
+## "YOU 2 - 1 CPU": seat one's name and rounds, then seat two's, in strip order.
+func series_text() -> String:
+	if fight == null:
+		return ""
+	return "%s %d - %d %s" % [seat_name(0), fight.series[0], fight.series[1], seat_name(1)]
 
 
 func _ready() -> void:
@@ -106,7 +121,8 @@ func _draw() -> void:
 	var y := _draw_rope(content)
 	y = _draw_status(content, y)
 	_draw_respawns(content)
-	if fight.phase == DuelMatch.Phase.MATCH_OVER:
+	var between := fight.phase == DuelMatch.Phase.CONSUMED and fight.series_wins > 1
+	if fight.phase == DuelMatch.Phase.MATCH_OVER or between:
 		_draw_result(band)
 		return
 	_draw_hint(content, y)
@@ -280,9 +296,10 @@ func _draw_flash(band: Rect2) -> void:
 
 
 ## Who was taken through which gate, on the carved plate the adventure HUD
-## sets its overlays on. Four things in forty-eight units: title, rule, how,
+## sets its overlays on. Four things in forty-eight units: title, score, how,
 ## and what to press. The numbers are the band's, not the screen's, so a taller
-## phone does not spread them out.
+## phone does not spread them out. Between rounds the title is the round's and
+## there is nothing to press: the next round comes on its own.
 func _draw_result(band: Rect2) -> void:
 	var winner := maxi(fight.winner, 0)
 	var cx := band.position.x + band.size.x * 0.5
@@ -290,26 +307,52 @@ func _draw_result(band: Rect2) -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Palette.with_alpha(Palette.INK, 0.45))
 	_band_plate(band, 0.6)
 
-	var title := UiFont.fit(PackedStringArray([
-		"YOU WIN" if winner == your_slot else "%s WINS" % seat_name(winner),
-	]), room, UiFont.Cut.DISPLAY)
-	UiFont.draw_text(self, title, Vector2(cx, band.position.y + 4.0),
+	var you := winner == your_slot
+	var options := PackedStringArray([
+		"YOU WIN THE DUEL" if you else "%s WINS THE DUEL" % seat_name(winner),
+		"YOU WIN" if you else "%s WINS" % seat_name(winner),
+	])
+	if fight.series[winner] < fight.series_wins:
+		options = PackedStringArray([
+			"YOU TAKE THE ROUND" if you else "%s TAKES THE ROUND" % seat_name(winner),
+			"YOUR ROUND" if you else "%s'S ROUND" % seat_name(winner),
+		])
+	var title := UiFont.fit(options, room, UiFont.Cut.DISPLAY)
+	UiFont.draw_text(self, title, Vector2(cx, band.position.y + 3.0),
 		UiFont.Cut.DISPLAY, Palette.PAPER, UiFont.Align.CENTER, 0.8)
-	UiMarks.rule(self, Vector2(cx, band.position.y + 22.0),
-		minf(band.size.x * 0.3, 48.0), Palette.with_alpha(SEAT[winner], 0.9))
+	_draw_score_rule(Vector2(cx, band.position.y + 20.0), room,
+		Palette.with_alpha(SEAT[winner], 0.9))
 	var gate := "WEST" if ZoneStrip.goal_direction(winner) < 0 else "EAST"
 	var how := UiFont.fit(PackedStringArray([
 		"TAKEN THROUGH THE %s GATE" % gate, "THROUGH THE %s GATE" % gate,
 	]), room, UiFont.Cut.TEXT)
 	UiFont.draw_text(self, how, Vector2(cx, band.position.y + 27.0),
 		UiFont.Cut.TEXT, Palette.LIGHT_SOFT, UiFont.Align.CENTER, 0.6)
-	if footer != "":
+	if footer != "" and fight.phase == DuelMatch.Phase.MATCH_OVER:
 		var hint := UiFont.fit(PackedStringArray([
 			footer, footer.replace(HINT_BREAK, "  "),
 		]), room, UiFont.Cut.MICRO)
 		UiFont.draw_text(self, hint, Vector2(cx, band.position.y + 39.0),
 			UiFont.Cut.MICRO, Palette.with_alpha(Palette.PAPER, 0.8),
 			UiFont.Align.CENTER, 0.6)
+
+
+## The rule under the winner, cut in two by the series score: a rule each side
+## of "YOU 2 - 1 CPU", the words on the rule's own line. With no room for both
+## rules beside the words, the words alone.
+func _draw_score_rule(at: Vector2, room: float, colour: Color) -> void:
+	var cut := UiFont.Cut.MICRO
+	var said := series_text()
+	var width := UiFont.width(said, cut)
+	var half := minf(room * 0.5, 72.0)
+	var side := (half - width * 0.5 - 10.0) * 0.5
+	UiFont.draw_text(self, said, Vector2(at.x, roundf(at.y + 1.5 - UiFont.cap(cut) * 0.5)),
+		cut, Palette.PAPER, UiFont.Align.CENTER, 0.6)
+	if side < 6.0:
+		return
+	for way: float in [-1.0, 1.0]:
+		UiMarks.rule(self, Vector2(at.x + way * (width * 0.5 + 10.0 + side), at.y), side,
+			colour)
 
 
 ## A match that has quietly stopped agreeing with itself is worse than one that

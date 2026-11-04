@@ -18,6 +18,7 @@ Rings are respawn timers, the track at the top is zone and initiative.*
 |---|---|
 | `scripts/duel/match.gd` (`DuelMatch`) | initiative, scroll, respawn timers, win condition, snapshot, checksum |
 | `scripts/duel/match_sim.gd` (`DuelSim`) | the surface the network session drives; the match implements it |
+| `scripts/duel/match_placement.gd` (`MatchPlacement`) | where a fighter is put: ahead of the leader, on a mark, in the window, onto a bench |
 | `scripts/duel/match_seat.gd` (`DuelSeat`) | the **only** place that touches a fighter |
 | `scripts/duel/match_ledger.gd` (`MatchLedger`) | what the scene has been told, against what the history holds; presentation only |
 | `scripts/duel/zones.gd` (`ZoneStrip`) | the zones as data, and every collision question |
@@ -82,10 +83,13 @@ disagree about.
 
 ## The snapshot is the bandwidth
 
-`snapshot_bytes()` is `HEADER_BYTES` (44) plus two fighter blocks. The four
+`snapshot_bytes()` is `HEADER_BYTES` (52) plus two fighter blocks. The four
 time-and-distance values in the header are doubles, not floats: they are
 compared against thresholds, and rounding a threshold comparison to 32 bits
-moves a transition by a whole frame.
+moves a transition by a whole frame. Ahead of them are the series (each seat's
+rounds and the rounds that win, a byte each; *The series* below) and the two
+trailing-edge counters (`held`, *Passed* below) as 16-bit frame counts. They
+grew the header from 44 bytes, which is one reason the protocol is version 4.
 
 The checksum quantises every float to 1/256 before hashing, so noise in the
 last bit cannot fire it. The real fighter supplies its own share
@@ -100,6 +104,18 @@ The spec's `LeaderState`, kept to its names. A match opens `NEUTRAL`; nothing
 scrolls until someone has died. **Every death hands the initiative to the other
 fighter**, whatever did the killing: a fall onto spikes is credited to the
 opponent. A death reported twice scores once.
+
+**A double kill hands it to nobody.** When both fighters fall on one frame (two
+thrusts at different heights, or a cut and a fall together), the initiative
+stays where it was, and stays `NEUTRAL` if nobody had it. The deaths of a frame
+are collected while the referee runs and settled once it is done
+(`_settle_initiative`). That state lives only inside the step, so there is
+nothing new in the snapshot. Before, each death was settled as it happened, in
+the order `DuelCombat` applies kills, which is seat two's death first. So every
+double kill left **seat two** leading, whoever had been, and seat two then came
+back on its start mark. In a window two zones from the middle, that was a jump
+of about a thousand pixels, decided by seat order. A leader's corpse no longer
+drags the window either.
 
 The playable window is one zone wide and **slides continuously**. The leader
 drags it, and it only ever moves in the leader's goal direction. That one-way
@@ -122,6 +138,88 @@ From the spec, with its numbers:
 - At the final zone the respawn goes in front of the gate, with a standoff
   (`GATE_STANDOFF`). The gate's lintel in `zone_01.txt` sits high for exactly
   this reason: the leader has to be able to go over the top.
+- **After a double kill** there is no living leader to be ahead of. Both come
+  back in the window as it stands, as far either side of its middle as the
+  start marks are from theirs (`MatchPlacement.in_window`). The leader is on
+  the side away from its gate. The other fighter stands between the leader and
+  that gate, facing it, as after any respawn. The rule is the same for either
+  seat, and in neutral it is the start marks themselves. All plans for a frame
+  are made before anyone is placed, so which seat comes first in the loop
+  changes nothing. `tests/unit/test_duel_fair_rope.gd` plays a double kill in
+  neutral, with seat one leading and with seat two leading, each with either
+  seat on the left. It was seen to fail with the deaths settled one by one.
+
+### Passed
+
+A defender the runner has got past used to be dragged along by the trailing
+edge for the rest of the run, with nothing to do. At EASY the fighter who drew
+first blood won 11 matches in 12, and 10 matches in 12 had a single kill. Now
+a living fighter **held against the trailing edge for `PASSED_HOLD` frames (60,
+a second)** is put back ahead of the runner. The match uses the respawn's own
+placement: a screen and a half ahead, on open ground, facing the runner, with
+its own sword. It is the comeback Nidhogg gives the fighter left behind.
+
+- It is not a death. Nobody scores, the initiative does not move, and no blood
+  is shed. The scene hears a `respawned` event marked `passed`.
+- It happens only while fighting, only to the fighter who is not leading, and
+  only to a spot ahead of the runner. Near the gate the spot is pinned in front
+  of it, and a spot behind the runner would only be the trailing edge again.
+- A chaser who keeps up never touches the edge and is never moved. Only being
+  left behind is.
+- The count is `held`, one per seat, in the snapshot and the checksum. Both
+  peers re-place on the same frame, and a rewind into the middle of a count
+  re-places exactly where the first pass did.
+
+`tests/unit/test_duel_fair_rope.gd` holds all of this, and was seen to fail
+with the re-placing switched off and with the count left out of the snapshot.
+
+## The series
+
+**A duel is a best of three.** Reaching a gate wins a *round*, and the first
+seat to `SERIES_WINS` (2) rounds wins the duel. The owner approved this, and it
+is the same on one keyboard, against the computer and online.
+
+It lives inside the simulation, not around it:
+
+- `series` (each seat's rounds) and `series_wins` are in the snapshot header
+  and the checksum. A gate reached adds the round to the score on that frame.
+- After the beat the crowd takes the winner away (`CONSUMED_TIME`, the beat a
+  match always ended on), `_advance_phase()` either ends the duel (`MATCH_OVER`,
+  `match_over`, as before) or starts the next round (`_start_round()`). The next
+  round is on the same strip, both fighters on their marks, nobody leading, the
+  window in the middle zone, the crumbling stone whole again, and a countdown.
+  The frame runs on, because it is the clock the hazards and the network count
+  by, and so do the kills. The ledger tells the scene `round_started`, then the
+  initiative and the zone, once each, like every other beat.
+- Online, that is all there is to it. The client steps into the next round
+  with the host on the same frame, from the same state. There is no rematch
+  handshake, and nothing to agree that is not already in a snapshot. The
+  rule is the same for both seats; nothing about a round depends on who is
+  seat A.
+- A rematch, after the duel is won, is a new series (`reset_match()`).
+- The beat between rounds is 2.4 s, then the 1.25 s countdown. That is long
+  enough that no death from the round before is still inside the window the
+  ledger checks deaths against (two seconds), so a new round never makes the
+  ledger take back blood that was really shed.
+
+**The plate.** During the beat between rounds the band shows who took the round
+and the score, cut into the rule under it, with the gate under that: `ONE TAKES
+THE ROUND`, `ONE 1 - 0 TWO`. At the end it shows who won the duel and the final
+score, with what to press: `YOU WIN THE DUEL`, `YOU 2 - 1 CPU`. The score is
+read from the match's `series`, so a client shows the host's, and the HUD keeps
+no count of its own (`MatchHud`, THE SERIES). This replaced the per-session
+tally the fairness work first put on the plate: one score, not two. Nothing is
+saved.
+
+**What the measurements mean.** The suites that count matches against the
+computer (`tests/cpu_support.gd`) count **rounds**. `bout()` asks the match for
+one round unless told otherwise, and every win rate and frame limit in this
+document is per round. `tests/unit/test_duel_series.gd` plays series to the
+end for either seat, and checks that the score survives a snapshot. It replays
+the turn from one round into the next byte for byte. It was seen to fail with
+every gate ending the duel, and with the score left out of the snapshot.
+`tests/unit/test_match_hud_series.gd` holds the plate's words to the match's
+score.
 
 ## The zones
 
@@ -272,10 +370,18 @@ and the longest match in frames. Every match finished.
 
 | Strip | EASY | MEDIUM | HARD |
 | --- | --- | --- | --- |
-| Clockwork Well | 0 of 3; 2,410 | 1 of 30; 12,402 | 0 of 6; 2,102 |
-| Floodgates | 0 of 2; 940 | 0 of 10; 3,957 | 0 of 7; 1,743 |
-| Aqueduct | 0 of 2; 941 | 0 of 2; 901 | 0 of 9; 2,695 |
-| Rooftops | 0 of 3; 2,153 | 0 of 4; 1,925 | 0 of 3; 1,848 |
+| Clockwork Well | 1 of 5; 1,611 | 0 of 7; 3,424 | 0 of 7; 3,602 |
+| Floodgates | 0 of 2; 927 | 1 of 7; 3,353 | 0 of 10; 2,506 |
+| Aqueduct | 1 of 3; 1,815 | 1 of 5; 1,897 | 1 of 11; 3,315 |
+| Rooftops | 0 of 4; 1,282 | 0 of 5; 3,185 | 0 of 18; 6,466 |
+
+Measured again after the fairness work, one round a match. Two loops it
+exposed were fixed on the way, both in the feet and the fetch rather than the
+rules. Two HARD computers closing over the Floodgates' court both let go of the
+stick mid-jump and drowned on one frame; with a double kill no longer handing
+seat two the rope, they did it again every round. And two EASY computers stood
+either side of a hole their double kill had worn in the Aqueduct, each waiting
+for the other to cross, for six minutes.
 
 Eight seeds a level on the Well, measured while tuning: every match finished;
 EASY died to the ground 0 times in 16 deaths, MEDIUM 3 in 93, HARD 1 in 26.
@@ -488,13 +594,20 @@ Range is most of Nidhogg. A thrust reaches a body at 27 px between the feet
 edge — a thrust can be parried or read but cannot kill, so the computer fences
 from there:
 
-- **Guard.** It holds the other fighter's height, which parries, as often as
-  its level guards, reconsidered every 8 to 24 frames rather than every frame.
+- **Guard.** It holds the height the other fighter's thrust is likeliest to
+  come at, which parries, as often as its level guards. Usually that is the
+  height they hold. Once one height has been most of three or more of their
+  thrusts, it is that height, whatever their blade shows on the way in. The
+  guard is reconsidered every 8 to 24 frames, and again the frame they step to
+  the edge of reach. LOW is held standing, as down is for a person
+  ([`duel-combat.md`](duel-combat.md#stance-footwork-and-the-duck)). Before
+  that, the computer's LOW guard and LOW flick were ducks, which LOW kills.
 - **Read.** From the edge it flicks into the other's height one frame in four.
   Four is inside the five-frame disarm window
   ([`duel-combat.md`](duel-combat.md#the-disarm-window)), so a thrust from the
   edge always meets a flick on its way in. Inside the edge it stops flicking:
-  a mismatched stance there is a dead one.
+  a mismatched stance there is a dead one. Backing out of reach is a WALK,
+  facing them, never a run that turns its back.
 - **Attack.** It picks an open line — a height the other is not holding, and
   of those the one they hold least, from a running count of their stances —
   shows it for `tell` frames, steps in and thrusts. If they moved into it
@@ -505,23 +618,32 @@ from there:
   an attack, so two careful fighters do not stand there forever.
 - **Throw.** At a back running away, low by preference, because a low throw
   cannot be caught and has to be jumped; at range now and then. A throw coming
-  at it is ducked if high, rolled under if middle and jumped if low, and the
-  dodge is held until the blade is out the other side of the body. Empty-handed
+  at it is ducked (down with WALK) if high, rolled under if middle and jumped
+  if low, and the dodge is held until the blade is out the other side of the
+  body. Empty-handed
   it snatches a high or middle throw instead, then fetches the nearest sword it
   can reach — never one in the water — and sweeps and stamps if there is none.
-- **With the initiative** it runs for its gate and does not fight. A respawn
-  in its way is vaulted: jumped if its blade is low, and otherwise rolled under
-  seven times in ten and jumped the rest, so the vault is not a certainty to
-  wait for. A jump comes down inside the other's reach, so once past, with them
-  following, it rolls, which is faster than they can run. Near the end of the
-  strip it stops short of the spot in front of the gate where the other is
-  about to reappear: the rule (`DuelMatch.respawn_plan`) and the ring counting
-  it down are both on the screen.
+- **With the initiative** it runs for its gate. A respawn in its way is
+  vaulted or fought. Now and then (`contest`, twice as often against a LOW
+  blade, which a jump comes down inside the reach of) it fences its way
+  through. Otherwise it jumps a low blade and mostly rolls under a high or
+  middle one. A roll ends standing with no blade up (`roll_recover`), so it
+  rolls from close enough that the roll ends a resting blade's reach past them.
+  A jump comes down inside the other's reach, so once past, with them
+  following, it rolls. The roll and the rise after it carry further than they
+  can run in the time. Near the end of the strip it stops short of the spot in
+  front of the gate where the other is about to reappear: the rule
+  (`DuelMatch.respawn_plan`) and the ring counting it down are both on the
+  screen.
 - **Without it**, it waits on the open ground a respawn puts it on, blade up,
   and meets the runner where it stands rather than running at them (two
   fighters closing at once close faster than either can see); thrusts low at a
-  roller; chases, and throws at, one who got past; and goes and gets one who
-  stops coming rather than waiting for a runner who will not run.
+  roller and into the rise at the end of a roll; chases, and throws at, one who
+  got past; and goes and gets one who stops coming rather than waiting for a
+  runner who will not run. "Coming" means getting nearer their gate, a new
+  best, not feet pointing that way. A runner shuffling back and forth against
+  the trailing edge used to reset the wait with every step, and the fetch
+  could take two minutes.
 
 **The ground.** Every step goes through `DuelFeet`, which integrates the
 fighter's own motion — the acceleration, gravity, jump cut and terminal speed
@@ -530,8 +652,14 @@ tiles the referee kills on, and says where a jump lands. It tries a full jump
 and two hops and takes the best on the first frame one lands well onto its
 footing; at the lip it takes any safe one; with none it stops. A jump, roll,
 thrust or throw the brain asks for is refused if it would come down in a
-hazard. The prediction is the grid's and the fighter's motion is the physics
-engine's, and the two part at corners: a one-way platform's corner does not
+hazard. A thrust is refused where its half-tile drift would carry the body
+into a cut or a flood before it is over. In the air, letting go of the stick is
+a choice the feet check like any other: a brain that wanted no direction, in
+reach and facing the other, used to let go mid-jump and drop short into a
+flooded court. Two of them did it on the same frame on the Floodgates, over
+and over, once a double kill stopped handing seat two the initiative. The
+prediction is the grid's and the fighter's motion is the physics engine's, and
+the two part at corners: a one-way platform's corner does not
 reliably catch a body falling past it, so a landing counts only with three
 pixels of the body over footing (`DuelFeet.FOOTHOLD`). The easy opponent once
 drowned off a landing with six hundredths of a pixel of the moat's far lip
@@ -546,15 +674,23 @@ feel; none of them is how much it is allowed to know.
 | | EASY | MEDIUM | HARD |
 | --- | --- | --- | --- |
 | reaction: frames late it sees the other | 20 | 13 | 8 |
-| anticipate: how far it leads a moving fighter | 0.4 | 0.5 | 1.0 |
-| tell: frames it shows a thrust's height first | 22 | 10 | 4 |
+| anticipate: how far it leads a moving fighter | 0.4 | 0.8 | 1.0 |
+| tell: frames it shows a thrust's height first | 22 | 7 | 4 |
 | feint: chance to switch line on the thrust | 0 | 0.15 | 0.4 |
-| guard: chance to hold the other's height | 0.3 | 0.65 | 0.9 |
-| flick: chance to fish for a disarm at the edge | 0 | 0.25 | 0.5 |
+| guard: chance to hold the height it expects | 0.3 | 0.75 | 0.9 |
+| flick: chance to fish for a disarm at the edge | 0 | 0.35 | 0.5 |
 | blunder: chance a thrust, vault or dodge goes wrong | 0.35 | 0.12 | 0.04 |
 | aggression: attacks a second at the edge | 0.45 | 1.0 | 1.8 |
 | throw: chance a second at a back running away | 0.2 | 0.5 | 0.9 |
 | slop: frames late it jumps a hazard, never past the lip | 2 | 1 | 0 |
+| contest: chance a runner fights a fighter in its way | 0.1 | 0.25 | 0.35 |
+
+MEDIUM was retuned with the fairness changes (anticipate 0.5, tell 10, guard
+0.65 and flick 0.25 before). With a LOW guard that holds, a LOW-only bot no
+longer wins by default, and a spammer is beaten at the edge or not at all.
+MEDIUM had been losing the runs home, not the exchanges. It saw a runner 13
+frames late and led them by half that, so its thrusts at a back fell short and
+its vaults came late.
 
 EASY is built to be beaten by someone who has just picked the game up: it sees
 a third of a second late, shows every thrust's height for a third of a second
@@ -576,20 +712,61 @@ see the open items.
 
 ### Measured
 
-Headless, on the real fighter, at most three minutes a match:
+Headless, on the real fighter, at most three minutes a round. Every number
+here is per **round** (*The series*, above), as the suites measure it.
 
 | Against | Result |
 | --- | --- |
-| the closing bot of `tests/match_net_test.gd`, made to run for its gate when it leads; 20 seeds a level | EASY won 7, MEDIUM 17, HARD 20 |
-| the same in the suite, 10 seeds a level | EASY 5, MEDIUM 8, HARD 10 |
-| itself, 10 seeds a pairing | every match finished: EASY–EASY in 1,004 frames on average, MEDIUM–MEDIUM in 2,057 (longest 4,988), HARD–HARD in 3,145 (longest 8,917); HARD beat EASY 10 times in 10 and MEDIUM 8 |
-| a scripted human (the determinism suites' input stream), 12 seeds a level | the computer won every match; the hands killed EASY 6 times, MEDIUM 8, HARD 2 |
-| the ground, across all of the above | no deaths |
+| the closing bot of `tests/match_net_test.gd`, made to run for its gate when it leads, in the suite, 10 seeds a level | EASY won 5, MEDIUM 10, HARD 10 |
+| itself, in the suite, two seeds a pairing | every round finished, the longest in 2,151 frames; HARD beat EASY 3 times in 4 and MEDIUM 2 in 2 |
+| the ground, across the suite's rounds on the Tug of War | 1 death in 21 against the bot, none in 31 between computers |
 
 The suite holds HARD to eight wins in ten against the bot, EASY to losing some
-and winning some, MEDIUM between them, every computer-against-computer match to
+and winning some, MEDIUM between them, every computer-against-computer round to
 an end, and hazard deaths to one in twenty; each of those was seen to fail with
 the behaviour behind it broken.
+
+**Against scripted strategies**, measured for the fairness work: a scratch
+harness put one simple bot in seat one against each level, 12 seeds a cell, on
+the Tug of War, one round of at most three minutes. Each cell reads *bot wins -
+computer wins (rounds not finished)*.
+
+| Bot | EASY before | EASY after | MEDIUM before | MEDIUM after | HARD before | HARD after |
+| --- | --- | --- | --- | --- | --- | --- |
+| closes and thrusts MID | 9-3 | 10-2 | 5-7 | 1-11 | 1-11 | 1-11 |
+| runs in and thrusts LOW | 12-0 | 12-0 | 8-1 (3) | 5-3 (4) | 1-9 (2) | 1-1 (10) |
+| ducks, then thrusts LOW | 12-0 | 12-0 | 9-0 (3) | 4-8 | 2-8 (2) | 0-9 (3) |
+| closes and thrusts HIGH | 9-3 | 12-0 | 4-8 | 1-11 | 1-11 | 1-11 |
+| a random height each approach | 12-0 | 11-1 | 9-3 | 4-7 (1) | 1-10 (1) | 2-8 (2) |
+| dive kick, then LOW | 12-0 | 11-1 | 8-4 | 0-12 | 2-8 (2) | 0-12 |
+| throws LOW from range | 12-0 | 12-0 | 1-11 | 1-11 | 0-12 | 0-12 |
+
+What moved, and why:
+
+- **LOW only** no longer beats MEDIUM. Down standing still parries it now, and
+  the computer guards the height a fighter thrusts at, not only the height it
+  shows. The LOW runner still takes more rounds off MEDIUM than it loses, but by
+  the last pass home, not by the exchanges: the kills were 116 to 117. Against
+  HARD, ten rounds in twelve do not finish. Neither side gets past the other's
+  respawn, and they trade 364 kills in 12 rounds. A pass is harder for
+  everybody now that a roll ends standing with no blade up.
+- **The dive kick** went from 12 kills in 12 kicks to none. Against MEDIUM and
+  HARD the kicking bot loses every round.
+- **The random bot** steps 11-1, 4-7, 2-8, against 12-0, 9-3, 1-10 before.
+- **EASY is still beaten by every scripted bot.** It sees a third of a second
+  late and shows every thrust for a third of a second, and the brief allowed it
+  to stay beatable. Against the closing bot it still wins half its rounds.
+- **First blood at EASY.** In twelve EASY mirror rounds the fighter who drew
+  first blood won 12, and 9 rounds had a single kill (11 and 10 before). The
+  comeback is not what decides these. From a kill in the middle zone, a
+  respawn a screen and a half ahead lands about a screen from the gate, so one
+  pass wins the round. An EASY chaser keeps up with the runner and so never
+  touches the trailing edge. The comeback fires for a fighter who stops, turns
+  back or falls behind, which is what a person does and the computer does not.
+  The best of three is the comeback at the level of the duel.
+- **MEDIUM and HARD mirrors** went from first blood winning 7 and 4 rounds in
+  12 to 5 and 11. Double kills are 8 and 11, and no longer hand seat two the
+  rope.
 
 ### Open
 
@@ -599,8 +776,23 @@ the behaviour behind it broken.
   one table for that.
 - **A real match cannot be replayed from its seed alone** until the player's
   inputs are recorded with it.
-- **Moves it does not use:** the dive kick, the thrust in the air, and turning
-  a throw aside with a thrust.
+- **Moves it does not use:** the dive kick, the thrust in the air, turning
+  a throw aside with a thrust, and WALK except to back out of reach.
+- **A LOW spammer and HARD do not finish.** Ten rounds in twelve run out the
+  three minutes with the kills even. Each kills the other's runner at the
+  respawn. Whether a pass should be easier -- a shorter `roll_recover`, a faster
+  roll, a rise that keeps the blade -- is a feel question for a phone.
+- **HARD is not clearly ahead of MEDIUM against every bot.** Against the
+  random bot it is (2-8 against 4-7), and against MID, HIGH, the kick and the
+  throw both levels win 11 or 12. Its edge against people is its reaction
+  time, which no bot here tests.
+- **The duck on a phone is a lean.** Down with a small sideways push is the
+  duck (the stick presses WALK for a small push). It wants trying on a phone,
+  and the touch layer could give the duck a gesture of its own; the touch
+  layer is not this package's.
+- **The keyboard hint and the touch labels** do not mention that the duck is
+  down with WALK. They belong to the menus and the touch layer.
+
 
 ## Tests
 
@@ -622,6 +814,16 @@ the behaviour behind it broken.
   run being fetched.
 - `tests/unit/test_duel_cpu_feet.gd` — every hazard crossed by the real fighter
   from a run and from a standstill, and the landing rule against an oracle.
+- `tests/unit/test_duel_fair_fencing.gd` — the standing LOW guard and its
+  disarm read, WALK, the duck on down + WALK, the thrust made standing, the
+  roll's rise and the dive kick's reset.
+- `tests/unit/test_duel_fair_rope.gd` — a double kill in every seat order, and
+  the passed defender put back ahead, as snapshot state.
+- `tests/unit/test_duel_series.gd` — the best of three for either seat, the
+  turn between rounds replayed from a snapshot, a rematch, and one round when
+  one is asked for.
+- `tests/unit/test_match_hud_series.gd` — the plate's score is the match's.
+- `tests/unit/test_net_fairness_version.gd` — protocol 4 refuses protocol 3.
 - `tests/unit/test_duel_cpu_mode.gd` — the scene at the level the duel page
   saved, stepping both seats.
 - `tests/unit/test_duel_select.gd` — the one DUEL row, the page's three ways,
@@ -649,7 +851,7 @@ the behaviour behind it broken.
   every level, the hazard share, ducking a scythe and leaving a burning slab.
 - `tests/unit/test_duel_strip_choice.gd` — the STRIP row, RANDOM, what is saved
   and its fallback, and the scene playing the strip saved.
-- `tests/unit/test_net_strip_handshake.gd` — the strip on WELCOME, protocol 3,
+- `tests/unit/test_net_strip_handshake.gd` — the strip on WELCOME, protocol 3 and on,
   the guest switched to the host's strip, and a guest without it refused.
 
 ## Status

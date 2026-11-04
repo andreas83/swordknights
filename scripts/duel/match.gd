@@ -6,7 +6,8 @@ extends DuelSim
 ## been retired. A duel is no longer first-to-three on one screen; it is a
 ## rope. Kill the other fighter and
 ## the screen starts moving your way. Die and it stops, and then it starts
-## moving theirs. Reach your own gate and the city takes you.
+## moving theirs. Reach your own gate and the city takes you -- and the round
+## is yours; the first to SERIES_WINS rounds takes the duel.
 ##
 ## `step(bits_a, bits_b)` keeps every promise the round duel made: one call is
 ## one frame, and that frame is a function of nothing but this object's state
@@ -67,6 +68,9 @@ signal death_retracted(victim: int, frame: int)
 signal fighter_respawned(slot: int, at: Vector2, facing: int)
 signal leader_consumed(winner: int, at: Vector2)
 signal match_over(winner: int)
+## A round of the series is over and the next begins from the marks: the beat
+## between rounds. `number` counts from 1; the score is in `series`.
+signal round_started(number: int)
 ## A thrown sword was caught out of the air. Presentation only: the catch itself
 ## happened in DuelCombat and is in both fighters' state already.
 signal blade_caught(catcher: int, thrower: int, at: Vector2)
@@ -105,6 +109,10 @@ const RESPAWN_LEAD := 1.5 * ZoneStrip.SCREEN_WIDTH
 const COUNTDOWN_TIME := DuelRules.COUNTDOWN_TIME
 ## Long enough to watch the crowd take the winner off the board.
 const CONSUMED_TIME := 2.4
+## A duel is a series: the first to this many rounds -- gates reached -- wins
+## it, which is a best of three. See _advance_phase() and THE SERIES in
+## docs/duel-match.md.
+const SERIES_WINS := 2
 ## How close to the gate's mouth the leader has to get.
 const ENDPOINT_REACH := 20.0
 
@@ -114,6 +122,11 @@ const WINDOW_WALL := 7.0
 ## Where in the window the leader is held. Centre: the leader always has half a
 ## screen of warning ahead of them and half a screen of rope behind.
 const WINDOW_ANCHOR := 0.5
+## Frames a living fighter may be held against the trailing edge before it is
+## put back ahead of the runner, as a respawn would put it: a second. Dragged
+## along behind with nothing to do, the one passed lost the match to the first
+## kill eleven times in twelve at EASY. See _hold_inside_window().
+const PASSED_HOLD := 60
 
 var strip: ZoneStrip
 
@@ -129,7 +142,18 @@ var zone_index: int = 0
 var scroll: float = 0.0
 ## Seconds until each fighter comes back. Zero when they are up.
 var respawn := PackedFloat64Array([0.0, 0.0])
+## Frames each fighter has been held against the trailing edge, unbroken.
+## Simulation state, in the snapshot and the checksum: it decides a re-placing.
+var held := PackedInt32Array([0, 0])
 var kills := PackedInt32Array([0, 0])
+## Rounds each seat has won in this duel, and how many win it. In the snapshot
+## and the checksum like the rest of the rope, so a client never needs to be
+## told a round is over: it steps into the next one with the host. A test that
+## measures one round says so by setting `series_wins` to 1.
+var series := PackedInt32Array([0, 0])
+var series_wins := SERIES_WINS
+## The seat that reached a gate this round, and at the end of the series the
+## seat that won it.
 var winner: int = DuelRules.DRAW
 ## One byte per slab of the strip's crumbling stone: whole, burning, or fallen
 ## for good (StripHazards). Simulation state like a respawn timer: it is the
@@ -150,7 +174,7 @@ var fighter_scene: PackedScene = null
 var fighter_profiles: Array[Resource] = [null, null]
 
 var _view: ZoneView
-## The collision a physics-bodied fighter moves against. See _build_ground().
+## The collision a physics-bodied fighter moves against. See MatchGround.
 var _ground: TileMapLayer
 var _fighter_bytes := 0
 var _scratch := PackedByteArray()
@@ -164,10 +188,13 @@ var _ledger := MatchLedger.new()
 ## the state will say it happened on.
 var _stepping := false
 var _between: Array[Dictionary] = []
+## Who each death in this step credits with the initiative (_settle_initiative).
+## Empty between steps, so no part of what a snapshot carries.
+var _claims: Array[int] = []
 ## What the fighters were last told about `replaying`.
 var _fighters_replaying := false
 ## The crumbling stone's collision: one body per slab, on a layer of this
-## match's own (`_stone_layer`), enabled while the slab holds. See _build_stones().
+## match's own (`_stone_layer`), enabled while the slab holds. See MatchGround.
 var _stone_bodies: Array[StaticBody2D] = []
 var _stone_layer := 0
 ## What a fighter is handed as its world on a strip with crumbling stone.
@@ -238,68 +265,23 @@ func build(zones: ZoneStrip, view: ZoneView = null) -> bool:
 	return true
 
 
-## Every solid and one-way cell of the whole strip, as one hidden tilemap,
-## built once and never streamed.
-##
-## The real fighter moves with move_and_collide(), so the ground it stands on
-## is whatever the physics space holds. ZoneView streams its cells in and out
-## around the camera, which is right for drawing and wrong for this: a fighter
-## on a peer whose view had not reached a zone yet would fall through a floor
-## that the other peer has, and the two would disagree about a frame. The rule
-## this layer already keeps for its own queries -- the geometry the simulation
-## reads is never streamed -- now holds for the physics space too. ZoneView's
-## tilemap has collision switched off; it only draws.
-##
-## Five zones of 30 x 23 cells is at most 3,450 tiles of static collision,
-## and far fewer in practice -- only solid and one-way cells -- built once per
-## match. Hidden, because a TileMapLayer collides
-## whether or not it draws.
+## The physics a fighter moves against: the strip's solid and one-way cells as
+## one hidden tilemap, and one body per slab of crumbling stone on this match's
+## own layer. MatchGround.ground_layer() and stone_bodies() argue both.
 func _build_ground() -> void:
 	if _ground != null:
 		_ground.queue_free()
-	_ground = TileMapLayer.new()
-	_ground.name = "Ground"
-	_ground.tile_set = GROUND_TILES
-	_ground.visible = false
-	for y: int in strip.rows():
-		for x: int in strip.cols():
-			var kind := strip.kind_at(x, y)
-			if kind == Tiles.Kind.SOLID or kind == Tiles.Kind.PLATFORM:
-				_ground.set_cell(Vector2i(x, y), 0, strip.atlas_for(x, y))
+	_ground = MatchGround.ground_layer(strip, GROUND_TILES)
 	add_child(_ground)
 	_ground.update_internals()
 
 
-## One static body per slab of crumbling stone, on this match's own layer.
-##
-## Not cells of _ground: a TileMapLayer rebuilds a whole physics quadrant when
-## one cell changes, and a rewind may have to put slabs back as well as take
-## them away. A body per slab is switched by its collision layer, which the
-## physics server reads on the very next query, so a slab that fell on frame N
-## is gone for frame N + 1's move and back again the moment a snapshot from
-## before it is read. Each match has a layer of its own (_stone_layer) and its
-## fighters are given it as an extra mask bit, so the two matches of a
-## networked test, built in one physics space, never stand on each other's
-## stone. Nothing about a body is state: _apply_stones() derives every one of
-## them from `stones`.
 func _build_stones() -> void:
 	for body: StaticBody2D in _stone_bodies:
 		body.queue_free()
-	_stone_bodies.clear()
-	var tile := float(ZoneStrip.TILE)
-	for cell: Vector2i in strip.hazards.stones:
-		var body := StaticBody2D.new()
-		body.name = "Stone_%d_%d" % [cell.x, cell.y]
-		body.collision_layer = _stone_layer
-		body.collision_mask = 0
-		body.position = Vector2(cell) * tile + Vector2(tile, tile) * 0.5
-		var shape := CollisionShape2D.new()
-		var rect := RectangleShape2D.new()
-		rect.size = Vector2(tile, tile)
-		shape.shape = rect
-		body.add_child(shape)
+	_stone_bodies = MatchGround.stone_bodies(strip, _stone_layer)
+	for body: StaticBody2D in _stone_bodies:
 		add_child(body)
-		_stone_bodies.append(body)
 
 
 ## Every slab's body to what `stones` says: there while whole or burning, gone
@@ -348,20 +330,33 @@ func _make_fighter() -> Node2D:
 	return StubFighter.new()
 
 
-## Back to the middle zone, nobody leading, both fighters on their marks.
+## A new duel: no rounds won, frame 0, and the first round.
 func reset_match() -> void:
 	frame = 0
+	series = PackedInt32Array([0, 0])
+	kills = PackedInt32Array([0, 0])
+	events.clear()
+	_between.clear()
+	_claims.clear()
+	_ledger.clear()
+	_start_round()
+	if not replaying:
+		initiative_changed.emit(-1)
+		zone_changed.emit(zone_index)
+
+
+## Back to the middle zone, nobody leading, both fighters on their marks, the
+## stone whole again. The frame runs on -- it is the clock the hazards and the
+## network count by -- and so do the series and the kills.
+func _start_round() -> void:
 	phase = Phase.COUNTDOWN
 	phase_time = 0.0
 	initiative = Initiative.NEUTRAL
 	respawn = PackedFloat64Array([0.0, 0.0])
-	kills = PackedInt32Array([0, 0])
+	held = PackedInt32Array([0, 0])
 	winner = DuelRules.DRAW
 	stones = strip.hazards.fresh_stones()
 	_apply_stones()
-	events.clear()
-	_between.clear()
-	_ledger.clear()
 
 	@warning_ignore("integer_division")
 	var middle := strip.zone_count() / 2
@@ -371,11 +366,7 @@ func reset_match() -> void:
 	for slot: int in seats.size():
 		# They start facing each other: seat 0 is on the left of the mark.
 		seats[slot].respawn_at(strip.start_position(slot), 1 if slot == 0 else -1)
-
 	_refresh_streaming()
-	if not replaying:
-		initiative_changed.emit(-1)
-		zone_changed.emit(zone_index)
 
 
 ## --- the step --------------------------------------------------------------
@@ -401,6 +392,7 @@ func step(bits_a: int, bits_b: int) -> void:
 	seats[0].simulate(DT)
 	seats[1].simulate(DT)
 	events.append_array(DuelSeat.referee(seats[0], seats[1], strip, frame))
+	_settle_initiative()
 	_advance_stones()
 
 	if phase != Phase.MATCH_OVER:
@@ -505,6 +497,8 @@ func _tell(event: Dictionary) -> void:
 			stone_fell.emit(int(event["index"]), event["at"] as Vector2)
 		"consumed":
 			leader_consumed.emit(int(event["winner"]), event["at"] as Vector2)
+		"round":
+			round_started.emit(int(event["round"]))
 		"over":
 			match_over.emit(int(event["winner"]))
 		_:
@@ -565,7 +559,12 @@ func _on_fighter_died(victim: int, killer: int) -> void:
 	var credited := killer if killer == 0 or killer == 1 else 1 - victim
 	if credited != victim:
 		kills[credited] += 1
-		_take_initiative(credited)
+		# Inside a step the claim waits for the referee to finish: the other
+		# fighter may fall on this same frame. See _settle_initiative().
+		if _stepping:
+			_claims.append(credited)
+		else:
+			_take_initiative(credited)
 
 	respawn[victim] = RESPAWN_DELAY
 	var at := seats[victim].position()
@@ -579,79 +578,68 @@ func _on_fighter_died(victim: int, killer: int) -> void:
 	_happened({"kind": "died", "victim": victim, "killer": killer, "at": at, "blow": blow})
 
 
+## The initiative after a frame's deaths. One death hands it to the other
+## fighter, as the spec says. Two on one frame -- a double kill, or a cut and a
+## fall together -- hand it to nobody: it stays where it was. Settled death by
+## death, in the order DuelCombat kills, every double kill went to seat two, who
+## then came back on its start mark: a jump of the window of ~1,000 px.
+func _settle_initiative() -> void:
+	if _claims.size() == 1:
+		_take_initiative(_claims[0])
+	_claims.clear()
+
+
 ## --- respawn ---------------------------------------------------------------
 
+## Every plan is made before anyone is put back: two fighters due together, from
+## a double kill, are placed from the same picture whichever seat comes first.
 func _advance_respawns() -> void:
+	var due: Array[int] = []
 	for slot: int in seats.size():
 		if respawn[slot] <= 0.0:
 			continue
 		respawn[slot] -= DT
-		if respawn[slot] > 0.0:
-			continue
+		if respawn[slot] <= 0.0:
+			due.append(slot)
+	var plans: Array[Dictionary] = []
+	for slot: int in due:
+		plans.append(respawn_plan(slot))
+	for i: int in due.size():
+		var slot := due[i]
 		respawn[slot] = 0.0
-		var plan := respawn_plan(slot)
-		var at: Vector2 = plan["position"]
-		var facing: int = int(plan["facing"])
+		held[slot] = 0
+		var at: Vector2 = plans[i]["position"]
+		var facing: int = int(plans[i]["facing"])
 		seats[slot].respawn_at(at, facing)
 		_happened({"kind": "respawned", "slot": slot, "at": at, "facing": facing})
 
 
-## Where a fighter will come back, as a pure function of the current state.
+## Where a fighter will come back, as a pure function of the current state:
+## a screen and a half ahead of the leader, facing them, on open ground, as the
+## specification has it (MatchPlacement.ahead_of argues the algorithm and the
+## pacifist line it keeps).
 ##
-## THE ALGORITHM, from the specification
-##   3. computed from the LEADER's position, roughly 1.5 screen widths ahead in
-##      the leader's direction of travel
-##   4. facing the leader, to intercept them
-##   5. edge case: if the leader is already at the edge of the final zone, the
-##      opponent spawns directly in front of the exit
-##
-## Step 5 is not a separate branch here, it is the same clamp: the band of legal
-## respawn columns stops five tiles short of each gate, so a target that would
-## land behind the gate is pushed up against its mouth — which is what "directly
-## in front of the exit" is. The leader then has to get past a fighter standing
-## between them and the gate, which is the point of the rule.
-##
-## THE PACIFIST LINE
-## A leader who killed and ran must be able to go over or under the respawn
-## rather than being forced to fight it. That survives here because the chosen
-## column is not simply the nearest one to the target but the nearest one with
-## open ground: five columns of unbroken floor and eighty pixels of clear air.
-## ZoneStrip.is_open_ground is the predicate and tests/match_respawn_test.gd
-## walks the leader across the whole strip asserting it for every spawn the
-## algorithm can produce.
+## NOBODY TO BE AHEAD OF. With no leader -- before the first kill -- a fighter
+## comes back on its mark. With a leader who is down too -- a double kill keeps
+## the initiative where it was (_settle_initiative) and puts both on the floor
+## -- there is nobody standing to be ahead of, and both come back in the window
+## as it is (MatchPlacement.in_window): the leader on the side away from its
+## gate, the other between it and the gate, as far apart as the marks. The
+## same rule for either seat, so neither comes back a zone from the fight.
 ##
 ## Callable at any time, including while the timer is still running, which is
 ## what gives the streaming two seconds of warning about a zone it is about to
 ## need. Returns { position, facing, column, pinned, ok }.
 func respawn_plan(slot: int) -> Dictionary:
 	var leader := leader_slot()
-	if leader < 0 or leader == slot or not _built:
-		# Nobody is leading, so there is no direction to be ahead in. Back to
-		# the mark. Only reachable before the first kill.
-		var mark := strip.start_position(slot)
-		return {
-			"ok": true, "position": mark, "facing": 1 if slot == 0 else -1,
-			"column": strip.cell_of(mark).x, "pinned": false,
-		}
-
+	if leader < 0 or not _built:
+		# Nobody is leading, so there is no direction to be ahead in, and the
+		# window has never moved: back to the mark.
+		return MatchPlacement.on_mark(strip, slot)
 	var direction := ZoneStrip.goal_direction(leader)
-	var leader_x := seats[leader].position().x
-	var wanted := leader_x + direction * RESPAWN_LEAD
-
-	var band := strip.spawn_columns()
-	var column := floori(wanted / ZoneStrip.TILE)
-	var pinned := column < band.x or column > band.y
-
-	var found := strip.find_open_ground(wanted, leader_x)
-	var at: Vector2 = found["position"]
-	return {
-		"ok": bool(found["ok"]),
-		"position": at,
-		# Facing the leader, to intercept them.
-		"facing": 1 if leader_x >= at.x else -1,
-		"column": int(found["column"]),
-		"pinned": pinned,
-	}
+	if leader == slot or not seats[leader].is_alive():
+		return MatchPlacement.in_window(strip, scroll, direction, slot == leader)
+	return MatchPlacement.ahead_of(strip, seats[leader].position().x, direction, RESPAWN_LEAD)
 
 
 ## --- the window ------------------------------------------------------------
@@ -664,10 +652,11 @@ func window_rect() -> Rect2:
 	return Rect2(scroll, 0.0, strip.zone_width(), strip.world_size().y)
 
 
-## Drags the window after the leader, one way only.
+## Drags the window after the leader, one way only. A leader's corpse -- after
+## a double kill -- drags nothing: thrown toward its gate, it hauled the window.
 func _advance_window() -> void:
 	var leader := leader_slot()
-	if leader < 0:
+	if leader < 0 or not seats[leader].is_alive():
 		return # neutral: the court is closed at both ends
 
 	var direction := ZoneStrip.goal_direction(leader)
@@ -696,6 +685,11 @@ func _advance_window() -> void:
 ## placed a screen and a half ahead and has to be allowed to stand there until
 ## the leader arrives. In neutral both edges hold, and the zone is a closed
 ## court.
+##
+## PASSED. A fighter the trailing edge has held for PASSED_HOLD frames running
+## has been got past, and is put back ahead of the runner as a respawn would
+## be: Nidhogg's comeback for the one left behind. Not a death -- nobody scores
+## -- and counted in `held`, snapshot state, so both peers re-place together.
 func _hold_inside_window() -> void:
 	var direction := leader_direction()
 	var left := scroll + WINDOW_WALL
@@ -703,40 +697,37 @@ func _hold_inside_window() -> void:
 
 	for slot: int in seats.size():
 		if not seats[slot].is_alive():
+			held[slot] = 0
 			continue # a corpse may fall out of frame
 		var at := seats[slot].position()
-		var held := at.x
+		var x := at.x
 		if direction <= 0:
-			held = minf(held, right)
+			x = minf(x, right)
 		if direction >= 0:
-			held = maxf(held, left)
-		if held != at.x:
-			seats[slot].set_position(_shoved_onto_ground(Vector2(held, at.y)))
+			x = maxf(x, left)
+		var shoved := x != at.x
+		if shoved:
+			seats[slot].set_position(MatchPlacement.shoved_onto_ground(strip, Vector2(x, at.y)))
+		var passed := shoved and direction != 0 and phase == Phase.FIGHTING
+		held[slot] = held[slot] + 1 if passed else 0
+		if held[slot] >= PASSED_HOLD:
+			_put_back_ahead(slot)
 
 
-## A fighter the trailing edge shoves sideways can be shoved into the side of a
-## bench. Lifted onto it instead, a tile at a time, which reads as being pushed
-## up a step rather than sunk into the stone.
-##
-## This and set_x are the only two places the match moves a fighter, and both
-## would rather be a `push()` on the fighter itself — see the report.
-func _shoved_onto_ground(at: Vector2) -> Vector2:
-	var lifted := at
-	for _step: int in 3:
-		if not strip.rect_hits_solid(_body_at(lifted)):
-			return lifted
-		lifted.y = float(floori((lifted.y - 1.0) / ZoneStrip.TILE)) * ZoneStrip.TILE
-	return lifted
-
-
-## The match does not know how big a fighter is; the interface does not say. A
-## tile-and-a-bit, which is every character in this project, and only ever used
-## to decide whether a shove would bury one in rock.
-const BODY := Vector2(9.0, 22.0)
-
-
-func _body_at(feet: Vector2) -> Rect2:
-	return Rect2(feet.x - BODY.x * 0.5, feet.y - BODY.y, BODY.x, BODY.y)
+## The passed fighter, re-placed exactly as a respawn, and only ever ahead: by
+## the gate the spot is pinned, and one behind the runner is the edge again.
+func _put_back_ahead(slot: int) -> void:
+	held[slot] = 0
+	var leader := leader_slot()
+	var plan := respawn_plan(slot)
+	var at: Vector2 = plan["position"]
+	if leader < 0 or leader == slot or not seats[leader].is_alive() or not bool(plan["ok"]) \
+			or (at.x - seats[leader].position().x) * leader_direction() <= 0.0:
+		return
+	var facing: int = int(plan["facing"])
+	seats[slot].respawn_at(at, facing)
+	_happened({"kind": "respawned", "slot": slot, "at": at, "facing": facing,
+		"passed": true})
 
 
 ## --- the gate --------------------------------------------------------------
@@ -751,6 +742,7 @@ func _check_endpoint() -> void:
 		return
 
 	winner = leader
+	series[leader] += 1
 	_set_phase(Phase.CONSUMED)
 	_happened({"kind": "consumed", "winner": leader, "at": at})
 
@@ -762,9 +754,18 @@ func _advance_phase() -> void:
 			if phase_time >= COUNTDOWN_TIME:
 				_set_phase(Phase.FIGHTING)
 		Phase.CONSUMED:
-			if phase_time >= CONSUMED_TIME:
+			if phase_time < CONSUMED_TIME:
+				pass
+			elif series[winner] >= series_wins:
 				_set_phase(Phase.MATCH_OVER)
 				_happened({"kind": "over", "winner": winner})
+			else:
+				# The series goes on, on the same strip, from the marks, after
+				# the same beat a match ends on: no handshake, no rematch.
+				_start_round()
+				_happened({"kind": "round", "round": series[0] + series[1] + 1})
+				_happened({"kind": "initiative", "leader": -1})
+				_happened({"kind": "zone", "index": zone_index})
 		_:
 			pass
 
@@ -835,8 +836,9 @@ func set_match_length(length: int) -> bool:
 ## --- snapshots and the checksum --------------------------------------------
 ##
 ## The header is the match: initiative, the zone index, the scroll, both respawn
-## timers, the kills and the phase. Then both fighters' state blocks, written by
-## the fighters themselves at their own offsets.
+## timers, both trailing-edge counters, the series, the kills and the phase. Then both
+## fighters' state blocks, written by the fighters themselves at their own
+## offsets.
 ##
 ## Doubles for the four time-and-distance values, for the reason docs/netplay.md
 ## gives at length: they are GDScript floats compared against thresholds, and
@@ -844,7 +846,7 @@ func set_match_length(length: int) -> bool:
 ## frame. A respawn landing a frame early is a fighter appearing in a different
 ## place; a scroll a frame late is a gate reached or not reached.
 
-const HEADER_BYTES := 44
+const HEADER_BYTES := 52
 
 const GROUND_TILES: TileSet = preload("res://assets/tiles.tres")
 
@@ -870,7 +872,12 @@ func write_state() -> PackedByteArray:
 	buf.put_8(winner)
 	buf.put_u8(mini(kills[0], 255))
 	buf.put_u8(mini(kills[1], 255))
-	buf.put_u8(0) # padding, keeps the float block 4-byte aligned
+	buf.put_u8(series[0])
+	buf.put_u8(series[1])
+	buf.put_u8(series_wins)
+	buf.put_u16(clampi(held[0], 0, 0xffff))
+	buf.put_u16(clampi(held[1], 0, 0xffff))
+	buf.put_u16(0) # padding, keeps the float block 4-byte aligned
 	buf.put_double(phase_time)
 	buf.put_double(respawn[0])
 	buf.put_double(respawn[1])
@@ -903,7 +910,12 @@ func read_state(bytes: PackedByteArray) -> bool:
 	winner = buf.get_8()
 	kills[0] = buf.get_u8()
 	kills[1] = buf.get_u8()
-	buf.get_u8()
+	series[0] = buf.get_u8()
+	series[1] = buf.get_u8()
+	series_wins = buf.get_u8()
+	held[0] = buf.get_u16()
+	held[1] = buf.get_u16()
+	buf.get_u16()
 	phase_time = buf.get_double()
 	respawn[0] = buf.get_double()
 	respawn[1] = buf.get_double()
@@ -941,6 +953,11 @@ func checksum() -> int:
 	words.append(winner)
 	words.append(kills[0])
 	words.append(kills[1])
+	words.append(held[0])
+	words.append(held[1])
+	words.append(series[0])
+	words.append(series[1])
+	words.append(series_wins)
 	words.append(quantise(phase_time))
 	words.append(quantise(respawn[0]))
 	words.append(quantise(respawn[1]))

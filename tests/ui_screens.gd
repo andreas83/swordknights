@@ -93,6 +93,7 @@ func _catalogue() -> Array[Dictionary]:
 			"thumbs": true},
 		{"name": "match", "scene": "res://scenes/duel_match.tscn", "pose": ""},
 		{"name": "match_flash", "scene": "res://scenes/duel_match.tscn", "pose": "flash"},
+		{"name": "match_round", "scene": "res://scenes/duel_match.tscn", "pose": "round"},
 		{"name": "match_over", "scene": "res://scenes/duel_match.tscn", "pose": "over"},
 		{"name": "duel_select", "scene": "res://scenes/duel_select.tscn", "pose": ""},
 		{"name": "duel_select_cpu", "scene": "res://scenes/duel_select.tscn", "pose": "touch",
@@ -224,10 +225,18 @@ func _pose(shot: Dictionary) -> void:
 		"flash":
 			if hud != null:
 				hud.flash("ONE HAS THE INITIATIVE", "ONE LEADS")
+		"round":
+			if hud != null and hud.fight != null:
+				hud.fight.phase = DuelMatch.Phase.CONSUMED
+				hud.fight.winner = 0
+				hud.fight.series = PackedInt32Array([1, 0])
+				hud.queue_redraw()
 		"over":
 			if hud != null and hud.fight != null:
 				hud.fight.phase = DuelMatch.Phase.MATCH_OVER
 				hud.fight.winner = 0
+				# The series it ends: two rounds to one.
+				hud.fight.series = PackedInt32Array([2, 1])
 				hud.footer = "JUMP FOR A REMATCH  ·  SWORD TO LEAVE"
 				hud.queue_redraw()
 				if _stage.has_method("_label_thumbs"):

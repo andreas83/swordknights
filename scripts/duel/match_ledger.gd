@@ -65,7 +65,9 @@ const SUBJECT := {
 	"catch": "by",
 	"consumed": "winner",
 	"over": "winner",
-	# A slab of crumbling stone, by its index: a slab falls once a match.
+	# The next round of the series, by its number.
+	"round": "round",
+	# A slab of crumbling stone, by its index: a slab falls once a round.
 	"stone": "index",
 }
 

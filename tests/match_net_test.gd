@@ -262,13 +262,21 @@ func _presentation(label: String, host_match: WatchedMatch, client_match: Watche
 ## respawn and initiative goes untested. The chance is a hash of the frame and
 ## the seat, not a random generator's running state, so whatever the session
 ## asks for a frame it is always given the same answer.
+##
+## The stance is held for a third of a second at a time rather than drawn every
+## frame. A blade that moves every frame is a disarm read on every thrust that
+## meets it (the read is the posture moving: docs/duel-combat.md), and with the
+## stand-up LOW guard such a pair spent the run disarming each other and dying
+## not at all -- which left the death path this suite exists for untested.
 func _bot(fight: DuelMatch, seat: int, seed_value: int) -> Callable:
-	var chance := PlayerInput.BIT_UP | PlayerInput.BIT_DOWN | PlayerInput.BIT_JUMP \
-		| PlayerInput.BIT_ATTACK | PlayerInput.BIT_THROW
+	var chance := PlayerInput.BIT_JUMP | PlayerInput.BIT_ATTACK | PlayerInput.BIT_THROW
+	var stances := PlayerInput.BIT_UP | PlayerInput.BIT_DOWN
 	return func() -> int:
 		var me := fight.fighter_position(seat)
 		var them := fight.fighter_position(1 - seat)
-		var bits := hash(Vector3i(fight.frame, seat, seed_value)) & chance
+		@warning_ignore("integer_division")
+		var held := hash(Vector3i(fight.frame / 20, seat, seed_value)) & stances
+		var bits := (hash(Vector3i(fight.frame, seat, seed_value)) & chance) | held
 		# A sword thrown every few frames would leave both of them unarmed for
 		# the whole run; keep the throws rare.
 		if fight.frame % 7 != 0:
