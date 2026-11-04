@@ -11,6 +11,7 @@ scripts/audio/
   synth.gd ............ oscillators, filtered noise, plucked strings, envelopes
   voices.gd ........... the catalogue: one entry per sound the game can make
   steel_voices.gd ..... the catalogue's fight recipes: clash, disarm, kill, the blow
+  creature_voices.gd .. the animals' throats: the cat's hiss and yowl, the owl's hoot
   music.gd ............ the procedural loop, in two stems
   audio_director.gd ... autoload: buses, player pool, variation, ducking
   player_audio.gd ..... the character's body — footsteps, cloth, sword, damage
@@ -374,6 +375,7 @@ the game loads anything from there.
 | yowl | 0.420 | 22050 | 0.620 | 0.1844 | -0.00067 | 18 |
 | glass_charge | 0.470 | 22050 | 0.400 | 0.1583 | -0.00000 | 20 |
 | shatter | 0.550 | 22050 | 0.600 | 0.0391 | -0.00002 | 23 |
+| hoot | 0.500 | 22050 | 0.500 | 0.1669 | -0.00006 | 21 |
 | ui_move | 0.075 | 22050 | 0.420 | 0.0416 | -0.00001 | 3 |
 | ui_confirm | 0.360 | 22050 | 0.580 | 0.0428 | -0.00003 | 15 |
 | ui_back | 0.360 | 22050 | 0.500 | 0.0423 | -0.00002 | 15 |

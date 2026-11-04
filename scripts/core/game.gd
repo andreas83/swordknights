@@ -422,6 +422,7 @@ func _read_contact(_body: Rect2) -> void:
 func _resolve_foe(foe: Foe) -> void:
 	var body := _contact.body
 	foe.target_rect = body if player.is_alive() else Rect2()
+	foe.target_off_stone = player.is_alive() and Owl.off_the_stone(player)
 	if not foe.is_alive():
 		return
 	var id := foe.get_instance_id()

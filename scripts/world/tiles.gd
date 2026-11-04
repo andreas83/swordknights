@@ -64,6 +64,7 @@ const ENTITY_LEGEND := {
 	"j": "caracal", ## the King's hunting cat (scripts/entities/caracal.gd)
 	"v": "doves", ## a flock on a lit terrace (scripts/entities/dove_flock.gd)
 	"g": "glassbearer", ## fires sunbolts while his glass is lit (Chapter IV)
+	"Y": "owl", ## the night's hunter, perched on the stone under it (Owl)
 }
 
 ## Masonry that seals a secret room. The cell parses to the Kind it has in

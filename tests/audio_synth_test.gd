@@ -19,7 +19,7 @@ const MAX_SECONDS := {
 	"land_hard": 0.6, "sword_hit": 0.6, "pause_in": 0.5, "pause_out": 0.5,
 	"ui_confirm": 0.5, "ui_back": 0.5, "relic": 0.9, "exit": 1.5,
 	"die": 2.0, "level_complete": 2.5, "wind": 6.0,
-	"secret": 1.4, "masonry": 1.0, "chain": 0.2,
+	"secret": 1.4, "masonry": 1.0, "chain": 0.2, "hoot": 0.6,
 	"sun_gather": 1.0, "sunrise": 3.0,
 	"clash": 0.4, "disarm": 0.8, "kill": 0.9,
 	"hiss": 0.3, "yowl": 0.5,

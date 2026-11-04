@@ -348,6 +348,7 @@ he came. That makes it the move that opens what a blade cannot:
 | Sentinel | knocked back, reeling 42 frames (`Patrol.KICKED_TIME`): a raise is broken | the same |
 | Bastion | the pavise knocked wide, from either side: `OPENED`, 54 frames, no wall and no shove, a blade from the front wounds | clangs off the shield from the front; rocks him from behind |
 | Caracal | bowled into its skid, claws spent; knocked out of a pounce into a fall that ends in one | the same |
+| Owl | knocked off its perch or out of its stoop into a pull-up, up and away, hittable all the way home | the same, at an owl perched on the floor |
 | Eclipse | blocked: only each phase's lesson wounds him | blocked |
 
 Never faster across than a run and as fast down as anything falls, it lands

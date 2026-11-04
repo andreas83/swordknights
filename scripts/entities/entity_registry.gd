@@ -78,6 +78,7 @@ static func kinds() -> Dictionary:
 		"glassbearer": Glassbearer,
 		"scythe": Scythe,
 		"spike_slot": SpikeSlot,
+		"owl": Owl,
 	}
 	out.merge(_for_tests)
 	return out

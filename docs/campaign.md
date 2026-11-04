@@ -740,9 +740,8 @@ phone:
   roll passes those only by being lower than them (the tuck is 9 px).
 
 What each foe does with the duel's moves (`docs/character.md`, "The duel's
-moves in the adventure"). The owl is not built; its row is what its chapter
-should build to. The Glassbearer's row is built and pinned by
-`tests/unit/test_glassbearer.gd`:
+moves in the adventure"). The Glassbearer's row is pinned by
+`tests/unit/test_glassbearer.gd` and the owl's by `tests/unit/test_owl.gd`:
 
 | Foe | Roll | Dive kick | Sweep | Thrown sword |
 | --- | --- | --- | --- | --- |
@@ -750,7 +749,7 @@ should build to. The Glassbearer's row is built and pinned by
 | Bastion | under the face and the shove: the corridor's answer from the front, to his back and his 30-frame turn | the pavise knocked wide, 54 frames: no wall, no shove, a front blade wounds | clangs off the front, rocks his back | clangs off the front and drops in his shove's reach; wounds his back |
 | Caracal | the claws are not rollable; the roll passes under the leap only where the arc is higher than the tuck | bowled into its skid, claws spent; knocked out of a pounce | the same | over a cat on the floor (it is lower than a chest); kills a cat in the air |
 | Glassbearer | the bolt is over the tuck by height: the roll closes on him under fire | knocked out of his aim into SPENT, no wound | the same | kills -- from six tiles, inside his aim, and leaves the prince with nothing to parry the next bolt with |
-| Owl | no meeting: it never stoops at the stone | a perched owl knocked into its pull-up, no wound | -- | kills it in its stoop or pull-up |
+| Owl | no meeting: it never stoops at the stone, and its talons are not rollable | knocked off its perch or out of its stoop into a pull-up thrown up and away, no wound (`Owl.knock()`) | the same, at an owl perched on the floor | kills it, perched or in flight |
 | Eclipse | under his shove, which gains nothing; not under his slam (not rollable) or the beam (16 px reaches the tuck) | blocked | blocked | blocked: only each phase's lesson wounds |
 
 The numbers the bestiary is tied to, all from `scripts/core/tuning.gd` and

@@ -111,6 +111,10 @@ var post := ""
 ## The prince's body this frame, or an empty rect when there is nobody to
 ## fight. Game writes it every physics frame.
 var target_rect := Rect2()
+## Whether he is off the stone this frame (Owl.off_the_stone()): in the
+## air, on a ledge, a ladder or a lift. Written with `target_rect`; a foe that
+## hunts what is not standing -- the owl -- reads it rather than the Player.
+var target_off_stone := false
 
 
 ## On no collision layer, so the prince's body passes through and every
