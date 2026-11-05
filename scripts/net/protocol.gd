@@ -46,8 +46,16 @@ extends RefCounted
 ## gate reached wins a round of a best of three instead of the match. A
 ## version-3 build steps the same inputs into a different match; the lobby
 ## says so before the desync detector would.
+##
+## VERSION 5: the jump's forgiveness. No message changed shape -- the fighter's
+## block is still 100 bytes, the three new frame counters (coyote, buffer, cut
+## lock) riding in its flags word -- but a JUMP now does something on frames it
+## did nothing before: a press up to seven frames before landing jumps on
+## landing, one up to six frames after the feet leave an edge still jumps, and
+## letting go cuts no rise in its first four frames. A version-4 build would
+## step the same inputs into a different arc (docs/duel-combat.md, "The jump").
 
-const VERSION := 4
+const VERSION := 5
 ## The longest strip name WELCOME carries. A name is an id -- lower-case ASCII,
 ## digits and underscores, as a look's ids are -- so a hostile host cannot
 ## hand the guest a string to log.

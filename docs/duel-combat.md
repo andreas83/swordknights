@@ -100,10 +100,11 @@ of a clash.
 
 ### Why down is the guard and down + WALK the duck, not the other way round
 
-The choice is made for the phone stick. The stick
+The choice is made for the phone stick. The adventure's stick
 (`scripts/ui/touch_controls.gd`) presses a direction past a 7-unit dead zone,
 up or down past 14, and WALK when the push is sideways and small (between 7
-and 16.5 units of a 30-unit stick).
+and 16.5 units of a 30-unit stick). The duel's now reads the same push by its
+angle; see *The stick*, below, for why and for the numbers.
 
 - **The guard is held; the duck is a moment.** A fencer holds a stance for
   seconds at the edge of reach. The duck is a dodge for the frames a HIGH blade
@@ -145,6 +146,93 @@ parry, the LOW disarm from a standstill and from a duck, WALK backing off with
 the guard still up (and a run turning the back), the duck planted under HIGH,
 and the thrust from a duck as designed. Each was seen to fail with the old
 rule put back.
+
+### The stick
+
+The owner, after the build above: *ducking works well; the LOW guard is not
+quite clear*. Asked whether he could tell he was in a LOW guard, and tell it
+from the duck, he said no. Two things were wrong, one in the thumb and one in
+the picture.
+
+**The thumb.** On the adventure's stick, straight down was the guard only while
+the thumb stayed within the 7-unit dead zone of the vertical: under 3 mm on a
+phone. A thumb pulled down to hold a guard wanders more than that, and past it
+the stick pressed a direction and WALK as well, which is the duck, which every
+LOW thrust kills. The guard flickered into ducks, and every flicker moved the
+posture. So the scenes that duel on a phone set `TouchControls.stance_stick`,
+and below the stick's middle the push is read by its angle
+(`TouchControls.stance_actions()`):
+
+| Push, below the middle | Pressed | The fighter |
+|---|---|---|
+| within 22.5° of straight down (`STANCE_CONE`, the eight-way stick's own sector) | down | **LOW guard**, standing still |
+| leaning further, or any sideways push short of a run | down, the direction, WALK | **duck**, planted |
+| flatter than 45° with a run's push (16.5 units or more aside) | the direction | **run**, no down |
+
+- **The lane widens with the push.** It is an angle, not a width: at a 30-unit
+  push the thumb may wander 12 units either side and still hold LOW. The
+  further a player pulls to say "guard", the more room the guard gets.
+- **The duck stays a lean away.** It is still down and a little sideways, as
+  the owner liked it; it now starts at 22.5° rather than at 7 units, which at a
+  20-unit push is 8 units instead of 7, and a full diagonal push -- which used
+  to be a run at LOW -- is a duck too. The duck plants, so which way it leans
+  costs nothing.
+- **A sagging run holds no down.** A running thumb that drifts below the
+  horizontal used to press down past 14 units, which held LOW and turned the
+  next JUMP into a roll. Flatter than 45° at a run's push, the stick is a run
+  and nothing else. Down + JUMP is still the roll, from straight down or a
+  lean, standing or running.
+- **Up is the same lane.** Straight up holds HIGH standing still; a lean up
+  shuffles at HIGH and a run up runs at HIGH, as before.
+- **The adventure keeps its stick.** The prince crawls on down and a direction,
+  and a crouch that needed a 22.5° lean to crawl would change a game that was
+  not broken. `tests/unit/test_duel_stick.gd` holds the adventure's mapping push
+  for push.
+
+On the stick's base the two guard lanes are scored, and over it -- above the
+thumb, which covers the knob -- the stick says what it holds: **HIGH**, **LOW**,
+**DUCK**, or a dim **MID**. Read off the actions the stick is pressing, so the
+word and the fighter cannot disagree about the buttons.
+
+**Where it is said.** Every round opens with a plate in the band (MatchHud,
+THE ROUND): ROUND n, or FINAL ROUND, the score, and how the guard and the duck
+are held on this screen -- *STICK STRAIGHT DOWN: LOW GUARD · DOWN AND ASIDE:
+DUCK* on a phone, *S OR DOWN: LOW GUARD · WITH SHIFT: DUCK* on a keyboard,
+both seats' keys on one keyboard. It shows over the countdown, when the
+fighters are held on their marks and the band is free.
+
+### Seeing the guard
+
+**The picture.** The LOW guard was the MID figure with its level blade seven
+pixels lower: at phone scale, a blade at the knee of the same figure. The duck
+was a folded figure holding the *same* level blade at the *same* height, since
+the duck is down with WALK and down is LOW. Two pictures with a low blade in
+them, one a guard and one the posture LOW kills. Now each height has a body of
+its own (`FighterArt.GUARDS`, a table) and the blade a slant (`BLADE_SLOPE`):
+
+| | Body | Blade |
+|---|---|---|
+| HIGH | back on the heels, free hand before the chest | point up |
+| MID | the square stance it always had | level |
+| LOW | the tallest of the three, feet planted wide, hood down the blade, the free arm thrown up and back | point down at the other's shins |
+| duck | folded to 13 px | none along the guard: the sword is pulled up behind the shoulder |
+
+The slant is drawn inside the simulation's blade rect, a pixel in from its top
+and bottom, so the rule that the picture of the sword *is* what parries still
+holds. A duck parries nothing, so it no longer draws a blade where a guard
+would be. A thrust keeps its height's slant, so a LOW thrust is seen aimed at
+the shins, and the rise out of a roll carries the sword trailing behind.
+
+**The parry.** When blades meet, each fighter's blade strikes a spark where it
+is (`FighterArt._on_clashed()`): at the shins for a LOW parry. The height that
+turned the thrust is the height that lights up.
+
+Judged on rendered pixels, at a phone's scale, on both figures and in the
+Well's night as well as the Tug's afternoon: `docs/fighter-poses.png` and
+`docs/heroine-fighter-poses.png` set HIGH, MID, LOW, the duck and a LOW parry
+side by side. `tests/unit/test_duel_guard_poses.gd` holds the slants, LOW's
+height and arm, the duck's empty guard and the spark on the rig's own points,
+and was seen to fail against the art as it was.
 
 ## The disarm window
 
@@ -405,6 +493,82 @@ long this knockdown is in the commitment counter, which was already in the
 snapshot, so no bytes were added. `tests/unit/test_duel_fair_fencing.gd` plays a
 kick and the LOW thrust after it, and was seen to fail with the sweep's 45
 frames put back.
+
+## The jump
+
+The owner, on a phone: jumping felt better in the adventure than in the duel.
+Measured frame by frame on the real bodies (the prince in `scenes/game.tscn`,
+the fighter on a ledge of tiles, stepped one 60 Hz frame at a time):
+
+| | Adventure (prince) | Duel, before | Duel, now |
+|---|---|---|---|
+| Held jump: apex | 38.1 px, frame 19 | 33.4 px, frame 10 | 33.4 px, frame 10 |
+| Held jump: airtime | 39 frames | 21 frames | 21 frames |
+| Running jump: reach | 57.2 px at 88 px/s | 42.0 px at 120 px/s | 42.0 px |
+| Gravity | 900 px/s², 0.62 of it while \|vy\| < 52 | 2400 px/s², no float | unchanged |
+| Terminal fall | 360 px/s | 660 px/s | unchanged |
+| Air accel / friction | 480 / 260 px/s² | 2400 / 900 px/s² | unchanged |
+| Jump cut on release | ×0.38 a frame, from frame 6 | ×0.35 a frame, from frame 1 | ×0.35 a frame, from frame 4 |
+| Tap of 1 / 2 / 3 / 4 frames | 25.5 px each | 8.0 / 13.4 / 18.2 / 22.3 px | 22.3 px each |
+| Coyote: presses off an edge that jump | 6 | 0 | 6 |
+| Buffer: presses before landing that jump on it | 8 | 0 | 8 |
+| Landing | no lockout below 265 px/s; a flat jump lands at 252 | none | none |
+| Press to feet off the ground | the press frame | the press frame | the press frame |
+| Input delay added locally | none | none: VS CPU and one keyboard step the press on the frame it is read, and an online client predicts its own with none | none |
+| What a thumb's down does to JUMP | down + JUMP rolls only standing, not at a run | down + JUMP rolls; a run sagging 14 units down held down | the duel's stick: a sagging run holds no down (*The stick*) |
+
+The held arcs were not the difference. The duel's is the spec's: high gravity,
+two tiles in 21 frames, no float, and `tests/fighter_profile_test.gd` holds it
+there. Its reach and height are what every strip's moat, alley and bench was
+cut for. What differed was everything at the edges of a press, which is where a
+thumb lives:
+
+- **A tap was a twitch.** The cut multiplied the rise by 0.35 on every frame
+  JUMP was up, from the first, and a tap on glass is one to four frames. Most
+  phone jumps were 8 to 22 px hops. Now the cut waits `jump_min_hold` (4)
+  frames, so a tap of one to four frames is the four-frame hop, 22 px: two
+  thirds of a held jump, the same share the prince's tap gets. Holding is still
+  the only way up two tiles.
+- **A late press was eaten.** No coyote time: a press on the first frame after
+  the feet left an edge did nothing. Now `coyote_frames` (7) lets a press on
+  any of the first six frames off an edge jump, as many as the prince's 0.1 s.
+  Six frames of fall is 14 px, so the jump still clears the ledge it left by
+  19. Down + JUMP in the air is the dive kick, coyote or not.
+- **An early press was eaten.** No buffer: a press a frame before landing, or
+  in the last frames of a thrust, a roll's rise or a dive kick's landing, did
+  nothing. Now a plain JUMP is kept `jump_buffer` (9) frames, the press's own
+  frame included, and fires on the first frame a jump can: a press up to seven
+  frames before the feet land jumps on landing, as the prince's does. Down +
+  JUMP is never kept: a roll or a dive kick is a commitment chosen on its
+  frame, and one queued from the air or from a recovery would be a roll the
+  player did not choose.
+- **A run's thumb rolled.** See *The stick*.
+
+**Why the arc was not matched.** The prince's arc is longer (39 frames against
+21) and floats at the apex; the duel's is quick on purpose, and a longer jump
+would stretch every gap on every strip -- a three-tile moat would become a
+jump, and the alley under a clash's knock-back a step -- and slow the fighting.
+`tests/fighter_profile_test.gd` still asserts a jump under 0.4 s, about two
+tiles high, shorter than the adventure's. The forgiveness changes no held arc,
+so no strip needed re-proving; `tests/unit/test_duel_cpu_feet.gd` still crosses
+every hazard from a run and a standstill, and `tests/match_fighter_test.gd`
+still crosses the moat and dies walking into it.
+
+**Snapshot and wire.** The three windows are frame counters, four bits each, in
+the fighter's flags word above the input's press-edge memory, so the block is
+still 100 bytes and the checksum covers them. `DuelFeet.leap()` flies a hold
+shorter than the minimum as the minimum, as the fighter does, so the computer
+plans the hop it will get. The inputs now do something on frames they did not,
+so the protocol is version 5 and a version-4 build is refused in the lobby
+(`tests/unit/test_net_jump_version.gd`).
+
+`tests/unit/test_duel_jump_feel.gd` measures the coyote and buffer windows on
+both characters the same way and holds them equal, holds the tap, the held arc,
+the feet's prediction, a press kept through a roll's rise, down + JUMP never
+queued, and a restore from a snapshot taken with a press in the buffer. With
+the three windows set to nothing -- the old fighter exactly -- six of its
+eight tests fail, and with the buffer left out of the flags word the snapshot
+test does.
 
 ## Where else the duel is decided
 

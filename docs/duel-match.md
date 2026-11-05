@@ -190,7 +190,11 @@ It lives inside the simulation, not around it:
   window in the middle zone, the crumbling stone whole again, and a countdown.
   The frame runs on, because it is the clock the hazards and the network count
   by, and so do the kills. The ledger tells the scene `round_started`, then the
-  initiative and the zone, once each, like every other beat.
+  initiative and the zone, once each, like every other beat. The scene opens
+  the round on a plate in the band over the countdown -- ROUND n, or FINAL
+  ROUND at one gate each, the score, and how the LOW guard and the duck are
+  held on this screen's controls (`MatchHud.announce_round()`); round one gets
+  the same plate from the scene itself, since no round starts a match.
 - Online, that is all there is to it. The client steps into the next round
   with the host on the same frame, from the same state. There is no rematch
   handshake, and nothing to agree that is not already in a snapshot. The
@@ -717,12 +721,13 @@ here is per **round** (*The series*, above), as the suites measure it.
 
 | Against | Result |
 | --- | --- |
-| the closing bot of `tests/match_net_test.gd`, made to run for its gate when it leads, in the suite, 10 seeds a level | EASY won 5, MEDIUM 10, HARD 10 |
+| the closing bot of `tests/match_net_test.gd`, made to run for its gate when it leads, in the suite, 10 seeds a level | EASY won 4, MEDIUM 10, HARD 9 (5, 10, 10 before the jump's forgiveness; over thirty seeds MEDIUM 30, HARD 29, both 30 before) |
 | itself, in the suite, two seeds a pairing | every round finished, the longest in 2,151 frames; HARD beat EASY 3 times in 4 and MEDIUM 2 in 2 |
 | the ground, across the suite's rounds on the Tug of War | 1 death in 21 against the bot, none in 31 between computers |
 
 The suite holds HARD to eight wins in ten against the bot, EASY to losing some
-and winning some, MEDIUM between them, every computer-against-computer round to
+and winning some, MEDIUM between them (to within one round: the bot cannot
+separate two levels at its ceiling, and HARD's one loss is a first exchange), every computer-against-computer round to
 an end, and hazard deaths to one in twenty; each of those was seen to fail with
 the behaviour behind it broken.
 
@@ -786,12 +791,14 @@ What moved, and why:
   random bot it is (2-8 against 4-7), and against MID, HIGH, the kick and the
   throw both levels win 11 or 12. Its edge against people is its reaction
   time, which no bot here tests.
-- **The duck on a phone is a lean.** Down with a small sideways push is the
-  duck (the stick presses WALK for a small push). It wants trying on a phone,
-  and the touch layer could give the duck a gesture of its own; the touch
-  layer is not this package's.
-- **The keyboard hint and the touch labels** do not mention that the duck is
-  down with WALK. They belong to the menus and the touch layer.
+- ~~**The duck on a phone is a lean.**~~ Tried on a phone: the duck works
+  well, and the LOW guard was the unclear one -- a straight-down thumb drifted
+  into ducks, and the two looked alike. The duel's stick now reads the push by
+  its angle and LOW has a pose of its own ([`duel-combat.md`](duel-combat.md),
+  *The stick* and *Seeing the guard*).
+- ~~**The keyboard hint and the touch labels**~~ The round's plate says how the
+  guard and the duck are held on the screen's own controls, and the stick says
+  which it holds.
 
 
 ## Tests
@@ -823,7 +830,19 @@ What moved, and why:
   turn between rounds replayed from a snapshot, a rematch, and one round when
   one is asked for.
 - `tests/unit/test_match_hud_series.gd` — the plate's score is the match's.
-- `tests/unit/test_net_fairness_version.gd` — protocol 4 refuses protocol 3.
+- `tests/unit/test_net_fairness_version.gd` — protocol 4 and on refuse protocol 3.
+- `tests/unit/test_net_jump_version.gd` — protocol 5 (the jump's forgiveness)
+  refuses protocol 4.
+- `tests/unit/test_duel_jump_feel.gd` — the tap, the coyote and buffer windows
+  measured on the prince and the fighter alike, the held arc unchanged, the
+  feet's prediction, and the windows through a snapshot.
+- `tests/unit/test_duel_stick.gd` — the phone stick's guard lanes, the duck's
+  lean, a sagging run holding no down, and the adventure's stick untouched.
+- `tests/unit/test_duel_guard_poses.gd` — HIGH, MID, LOW and the duck as four
+  pictures: the blade's slant, LOW's height and free arm, the duck's empty
+  guard, the parry's spark.
+- `tests/unit/test_duel_round_beat.gd` — each round's plate, its title, and
+  the guard's hint for each scene's controls.
 - `tests/unit/test_duel_cpu_mode.gd` — the scene at the level the duel page
   saved, stepping both seats.
 - `tests/unit/test_duel_select.gd` — the one DUEL row, the page's three ways,

@@ -127,7 +127,9 @@ static func leap(strip: ZoneStrip, tuning: DuelTuning, me: DuelView.Body, dir: i
 	var grounded := me.grounded
 	var half := tuning.body_width * 0.5
 	for f: int in HORIZON:
-		var pressed := jump and f < hold
+		# The fighter will not cut a rise before jump_min_hold frames, so a
+		# shorter hold flies as that one does.
+		var pressed := jump and f < maxi(hold, tuning.jump_min_hold)
 		if jump and f == 0 and grounded:
 			vel.y = -tuning.jump_speed
 			grounded = false

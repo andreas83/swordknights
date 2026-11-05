@@ -725,7 +725,11 @@ What the fighter adds is one rule: **the sword is drawn where the simulation's
 blade rect is.** Same height as the stance band, same reach, the front hand
 moved onto its hilt in `_rig()`. The duel is decided by where that rectangle
 is, so the picture of the sword *is* the rectangle, and HIGH, MID and LOW read
-at a glance. When the blade is held but not up — a roll, a dive, the recovery
+at a glance: the blade is drawn across its rect on a slant, point up at HIGH,
+level at MID and down at the shins at LOW, and each height has a body of its
+own (`FighterArt.GUARDS`), LOW the tallest with the free arm thrown back. A
+duck parries nothing and draws no blade along the guard
+([`duel-combat.md`](duel-combat.md#seeing-the-guard) argues all of it). When the blade is held but not up — a roll, a dive, the recovery
 of a thrust that missed — it is carried on the pose's angle instead, visibly
 lowered, because a fighter who missed has to be seen to be open.
 
@@ -741,7 +745,7 @@ the prince's crimson steps, whatever figure or look either player chose (see the
 heroine, below).
 
 ```bash
-xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1280x720 \
+xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1536x720 \
   --script tests/fighter_poses.gd -- --out docs/fighter-poses.png [--hitboxes]
 ```
 
@@ -842,7 +846,7 @@ xvfb-run -a godot --path . --rendering-driver opengl3 \
 python3 tests/character_contact_sheet.py docs/heroine-poses.png \
   "prince=/tmp/poses/prince" "heroine=/tmp/poses/heroine"
 
-xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1280x720 \
+xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1536x720 \
   --script tests/fighter_poses.gd -- --out docs/heroine-fighter-poses.png \
   --figure heroine [--hitboxes]
 ```

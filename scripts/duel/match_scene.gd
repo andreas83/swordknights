@@ -37,6 +37,13 @@ const FIGHTER_SCENE: PackedScene = preload("res://scenes/fighter.tscn")
 ## The persistent hint while the match is played, and once it is over.
 const PLAY_FOOTER := "PAUSE FOR THE MENU"
 const OVER_FOOTER := "JUMP FOR A REMATCH  ·  SWORD TO LEAVE"
+## How the LOW guard and the duck are held, for the round's plate (MatchHud,
+## THE ROUND): on one keyboard both seats' keys, on the shared actions a
+## phone's stick or a keyboard's. Straight down is the guard and down with
+## WALK the duck (docs/duel-combat.md, "Stance, footwork and the duck").
+const HINT_PAIR := "ONE: S LOW, S+SHIFT DUCK  ·  TWO: DOWN LOW, DOWN+; DUCK"
+const HINT_KEYS := "S OR DOWN: LOW GUARD  ·  WITH SHIFT: DUCK"
+const HINT_STICK := "STICK STRAIGHT DOWN: LOW GUARD  ·  DOWN AND ASIDE: DUCK"
 
 @onready var fight: DuelMatch = $World/Match
 @onready var zones: ZoneView = $World/ZoneView
@@ -113,6 +120,8 @@ func _ready() -> void:
 	if not demo:
 		menu = PauseMenu.install(self)
 		menu.chosen.connect(_on_menu_chosen)
+		hud.stance_hint = stance_hint()
+		hud.announce_round(1)
 
 	fight.fighter_died.connect(_on_fighter_died)
 	fight.death_recorded.connect(_on_death_recorded)
@@ -121,8 +130,18 @@ func _ready() -> void:
 	fight.fighter_respawned.connect(_on_fighter_respawned)
 	fight.leader_consumed.connect(_on_leader_consumed)
 	fight.match_over.connect(_on_match_over)
+	fight.round_started.connect(_on_round_started)
 	fight.blade_caught.connect(_on_blade_caught)
 	fight.stone_fell.connect(_on_stone_fell)
+
+
+## How this screen's player holds the LOW guard and the duck. One keyboard
+## has no touch controls and two seats of keys; every other duel plays on the
+## shared actions, a stick on a phone and the single-player keys elsewhere.
+func stance_hint() -> String:
+	if TouchControls.of(self) == null:
+		return HINT_PAIR
+	return HINT_STICK if UiLayout.handheld() else HINT_KEYS
 
 
 ## Which strip this match is fought on: `--strip=<id>` in the user arguments,
@@ -429,6 +448,7 @@ func _rematch() -> void:
 	gore.clear()
 	camera.setup(fight)
 	hud.footer = PLAY_FOOTER
+	hud.announce_round(1)
 
 
 func _to_menu() -> void:
@@ -480,6 +500,13 @@ func seat_name(slot: int) -> String:
 func _said(slot: int, third: String, second: String) -> String:
 	var who := seat_name(slot)
 	return second if who == "YOU" else third % who
+
+
+## The next round of the series, from the marks: its plate in the band, over
+## the countdown, with the score and the guard's hint. Rung once by the ledger.
+func _on_round_started(number: int) -> void:
+	hud.announce_round(number)
+	camera.shake(0.8, 0.14)
 
 
 func _on_initiative_changed(leader: int) -> void:

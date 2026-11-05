@@ -19,7 +19,8 @@ extends CharacterBody2D
 ##
 ## EVERYTHING IS SNAPSHOT STATE. write_state() carries every field simulate()
 ## reads, including the private commitment counter, the ducked and grounded
-## flags and the input's press-edge memory. A single field hiding outside the
+## flags, the input's press-edge memory and the three jump counters (coyote,
+## buffer, cut lock) packed into the flags word. A single field hiding outside the
 ## snapshot produced the one desync this project has had; see docs/netplay.md.
 ##
 ## THE ORDER OF A DUEL FRAME, which the match owns:
@@ -89,8 +90,15 @@ const OFF_BLADE := 56
 const FLAG_DUCKED := 1 << 0
 const FLAG_GROUNDED := 1 << 1
 const FLAG_STANCE_CHANGED := 1 << 2
-## The input's press-edge memory lives in the high byte of the flags word.
+## The input's press-edge memory lives in the second byte of the flags word.
 const FLAG_INPUT_SHIFT := 8
+## The jump's three frame counters -- coyote, buffer, cut lock -- live above it,
+## four bits each, so the fighter's block stays the 100 bytes docs/netplay.md
+## lays out. DuelTuning holds every window under JUMP_COUNTER_MAX.
+const FLAG_COYOTE_SHIFT := 16
+const FLAG_BUFFER_SHIFT := 20
+const FLAG_CUT_LOCK_SHIFT := 24
+const JUMP_COUNTER_MAX := 15
 
 ## Which seat this fighter is. Set by setup(); reported as victim and killer.
 var id: int = 0
@@ -130,6 +138,16 @@ var _ducked := false
 ## how long this knockdown lasts, which depends on what knocked the fighter
 ## down (DuelTuning.downed_frames for a sweep, kick_downed_frames for a kick).
 var _commit: int = 0
+## The jump's forgiveness, in frames, as the adventure's prince has it and the
+## duel did not (docs/duel-combat.md, "The jump"). `_coyote`: frames left in
+## which a fighter who walked or was knocked off an edge may still jump as if
+## standing. `_buffer`: frames left in which a JUMP pressed too early -- in the
+## air, or in a commitment -- still fires on the first frame it can.
+## `_cut_lock`: frames left before letting go of JUMP may cut the rise, so a
+## thumb's tap is a hop and not a twitch.
+var _coyote: int = 0
+var _buffer: int = 0
+var _cut_lock: int = 0
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 
@@ -167,6 +185,9 @@ func respawn_at(at: Vector2, face: int) -> void:
 	grounded = false
 	_ducked = false
 	_commit = 0
+	_coyote = 0
+	_buffer = 0
+	_cut_lock = 0
 	# A fighter always comes back with its own sword, wherever that sword was
 	# lying. Two records, two swords, never more: see DuelBlade.
 	blade.hold()
@@ -228,7 +249,14 @@ func _flags() -> int:
 		flags |= FLAG_GROUNDED
 	if stance_changed:
 		flags |= FLAG_STANCE_CHANGED
+	flags |= _counter(_coyote) << FLAG_COYOTE_SHIFT
+	flags |= _counter(_buffer) << FLAG_BUFFER_SHIFT
+	flags |= _counter(_cut_lock) << FLAG_CUT_LOCK_SHIFT
 	return flags
+
+
+static func _counter(frames: int) -> int:
+	return clampi(frames, 0, JUMP_COUNTER_MAX)
 
 
 func read_state(from: PackedByteArray, at: int) -> void:
@@ -251,6 +279,9 @@ func read_state(from: PackedByteArray, at: int) -> void:
 	grounded = flags & FLAG_GROUNDED != 0
 	stance_changed = flags & FLAG_STANCE_CHANGED != 0
 	input.restore_previous_bits((flags >> FLAG_INPUT_SHIFT) & 0xff)
+	_coyote = (flags >> FLAG_COYOTE_SHIFT) & JUMP_COUNTER_MAX
+	_buffer = (flags >> FLAG_BUFFER_SHIFT) & JUMP_COUNTER_MAX
+	_cut_lock = (flags >> FLAG_CUT_LOCK_SHIFT) & JUMP_COUNTER_MAX
 	blade.read(from, at + OFF_BLADE)
 	_sync_shape()
 
@@ -274,6 +305,7 @@ func simulate(dt: float) -> void:
 		return
 	_decide()
 	_advance(dt)
+	_count_jump_windows()
 	# What the disarm read is built on: did the blade arrive at a height this
 	# frame? The posture, not the button, because standing up out of a duck
 	# into LOW, or out of a knockdown into MID, moves the blade into that
@@ -308,11 +340,18 @@ func _update_stance() -> void:
 ##                       open for a thrown sword, and nothing below is read
 ##   4. attack         — THRUSTING armed, SWEEP or POUND empty-handed
 ##   5. down + jump    — ROLLING on the ground, DIVEKICK in the air
-##   6. jump           — JUMPING
+##   6. jump           — JUMPING, on the ground or inside the coyote window,
+##                       from this frame's press or one still in the buffer
 ##   7. otherwise the free state follows the feet: DUCKING, RUNNING, IDLE,
 ##      JUMPING, which _advance() settles once the motion is known
 func _decide() -> void:
 	_expire()
+	# A plain JUMP is remembered for `jump_buffer` frames wherever it is
+	# pressed, so one pressed in the air or in the last frames of a commitment
+	# jumps on the first frame it can. Down + JUMP is not: it is a roll or a
+	# dive kick, chosen on the frame, and a commitment is not queued.
+	if input.just_pressed_jump and not input.down:
+		_buffer = tuning.jump_buffer
 	if not is_free():
 		return
 	if input.just_pressed_throw:
@@ -322,11 +361,10 @@ func _decide() -> void:
 		_throw()
 	if input.just_pressed_attack and _begin_attack():
 		return
-	if input.just_pressed_jump:
-		if input.down:
-			_begin_commit_down()
-		elif grounded:
-			_jump()
+	if input.just_pressed_jump and input.down:
+		_begin_commit_down()
+	elif _buffer > 0 and (grounded or _coyote > 0):
+		_jump()
 
 
 ## Committed states end on a frame count, or — for the two dives — when the
@@ -417,9 +455,11 @@ func _advance_free(dt: float) -> void:
 		velocity.x = move_toward(velocity.x, want_x * top, accel * dt)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, friction * dt)
-	# Releasing jump on the way up cuts the arc short.
-	if velocity.y < 0.0 and not input.jump:
+	# Releasing jump on the way up cuts the arc short -- but not before
+	# jump_min_hold frames of rise, so a tap is a hop (DuelTuning.jump_min_hold).
+	if velocity.y < 0.0 and not input.jump and _cut_lock <= 0:
 		velocity.y *= tuning.jump_cut
+	_cut_lock = maxi(0, _cut_lock - 1)
 	_apply_gravity(dt)
 
 
@@ -494,6 +534,9 @@ func _begin_commit_down() -> void:
 func _jump() -> void:
 	velocity.y = -tuning.jump_speed
 	grounded = false
+	_buffer = 0
+	_coyote = 0
+	_cut_lock = tuning.jump_min_hold
 	_ducked = false
 	_enter(State.JUMPING)
 	_sync_shape()
@@ -750,6 +793,17 @@ func _can_stand() -> bool:
 		tuning.body_width, tuning.body_height
 	)
 	return not world.rect_hits_solid(rect)
+
+
+## After the frame's motion: a fighter on the floor may jump for coyote_frames
+## more once it leaves it, and a buffered press has one frame less to wait. A
+## jump spends both (_jump()), so the coyote window is only ever an edge's.
+func _count_jump_windows() -> void:
+	if grounded and is_free():
+		_coyote = tuning.coyote_frames
+	else:
+		_coyote = maxi(0, _coyote - 1)
+	_buffer = maxi(0, _buffer - 1)
 
 
 func _apply_gravity(dt: float) -> void:

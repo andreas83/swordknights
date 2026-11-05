@@ -43,6 +43,7 @@ script = ExtResource("7_hud")
 
 [node name="TouchControls" parent="." instance=ExtResource("8_touch")]
 throw_button = true
+stance_stick = true
 
 [node name="LobbyLayer" type="CanvasLayer" parent="."]
 layer = 60

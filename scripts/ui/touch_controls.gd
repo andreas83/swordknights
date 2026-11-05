@@ -33,10 +33,44 @@ extends CanvasLayer
 ## complete screen's button says NEXT where its hint says CONTINUE. A word
 ## that does not fit is never drawn over the ring; a label none of whose
 ## phrasings fits says nothing, and tests/unit/test_touch_labels.gd fails it.
+##
+## ## The duel's stick
+##
+## The adventure's stick is a dead zone and two thresholds. The duel reads more
+## out of the same thumb -- straight down is the LOW guard, down and a little
+## sideways the duck (down with WALK), and down with JUMP a roll -- and on the
+## adventure's mapping those three sat seven units apart: a thumb holding LOW
+## that drifted 3 mm sideways pressed a direction and WALK, and the guard
+## became a duck, which every LOW thrust kills. So a scene that duels sets
+## `stance_stick`, and below the stick's middle the push is read by its ANGLE
+## (stance_actions()):
+##
+## - within STANCE_CONE either side of straight down: down alone, the LOW
+##   guard. The lane widens with the push, so the further a thumb pulls, the
+##   more it may wander;
+## - between that and 45 degrees below the horizontal, or any sideways push
+##   short of a run: down, the direction and WALK -- the duck, which plants,
+##   so the lean it is made with costs nothing;
+## - flatter than 45 degrees at a run's push: a run, and no down at all. A
+##   running thumb that sags does not hold LOW, and so does not turn the next
+##   JUMP into a roll.
+##
+## Above the middle the cone is the same (straight up is HIGH and stands
+## still) and otherwise the adventure's rule holds. The adventure keeps its
+## mapping untouched: a crawl there is down and a direction, and a crouch that
+## needed a 26-degree lean to crawl would be a change to a game that was not
+## broken. docs/duel-combat.md, "The stick", argues the numbers.
 
 const STICK_RADIUS := 30.0
 const STICK_DEADZONE := 7.0
 const VERTICAL_DEADZONE := 14.0
+## --- the duel's stick --- tan(22.5 degrees): the half-width of the lane round
+## straight up and straight down that holds a guard, as a share of the push.
+## The eight-way stick's own sector, so the guard is "straight down" in the
+## sense every pad already means.
+const STANCE_CONE := 0.4142
+## A sideways push below this is a walk, above it a run: the adventure's rule.
+const WALK_LIMIT := STICK_RADIUS * 0.55
 const HIT_PADDING := 8.0
 ## --- the duel's moves --- where THROW sits, from the safe area's bottom
 ## right: straight above JUMP, in the column the right thumb already works.
@@ -65,6 +99,9 @@ const LABELLED: Array[String] = ["jump", "attack"]
 ## pressed JUMP and THROW together: every thumb button is in this one list
 ## now, so one hit test decides every touch (button_at()).
 @export var throw_button := false
+## --- the duel's stick --- whether the stick is read for a duel's stances
+## (see "The duel's stick" above). Set by the scenes that duel on a phone.
+@export var stance_stick := false
 
 var _buttons: Array[Dictionary] = []
 var _held: Dictionary = {} # touch index -> action name
@@ -236,7 +273,22 @@ func _on_drag(event: InputEventScreenDrag) -> void:
 
 
 func _apply_stick() -> void:
-	var delta := _stick_point - _stick_origin
+	var wanted := stick_actions(_stick_point - _stick_origin, stance_stick)
+
+	for action: String in _active_directions:
+		if not wanted.has(action):
+			_release(action)
+	for action: String in wanted:
+		if not _active_directions.has(action):
+			_press(action)
+	_active_directions = wanted
+
+
+## The actions a stick pushed by `delta` from where the thumb landed holds:
+## the adventure's mapping, or with `stance` the duel's (stance_actions()).
+static func stick_actions(delta: Vector2, stance: bool = false) -> Array[String]:
+	if stance:
+		return stance_actions(delta)
 	var wanted: Array[String] = []
 	if delta.x < -STICK_DEADZONE:
 		wanted.append("move_left")
@@ -248,16 +300,43 @@ func _apply_stick() -> void:
 	elif delta.y > VERTICAL_DEADZONE:
 		wanted.append("move_down")
 	# A small push walks, a full push runs.
-	if absf(delta.x) > STICK_DEADZONE and absf(delta.x) < STICK_RADIUS * 0.55:
+	if absf(delta.x) > STICK_DEADZONE and absf(delta.x) < WALK_LIMIT:
 		wanted.append("walk")
+	return wanted
 
-	for action: String in _active_directions:
-		if not wanted.has(action):
-			_release(action)
-	for action: String in wanted:
-		if not _active_directions.has(action):
-			_press(action)
-	_active_directions = wanted
+
+## The duel's stick: the guard lanes straight up and straight down, the duck
+## on the low diagonals, and no down on a sagging run. See "The duel's stick".
+static func stance_actions(delta: Vector2) -> Array[String]:
+	var wanted: Array[String] = []
+	var side := absf(delta.x)
+	var high := delta.y < -VERTICAL_DEADZONE
+	var low := delta.y > VERTICAL_DEADZONE
+	var lane := maxf(STICK_DEADZONE, absf(delta.y) * STANCE_CONE)
+	var sideways := side > (lane if high or low else STICK_DEADZONE)
+	# A run that sags below the horizontal is still a run, and holds no down.
+	if low and sideways and side >= WALK_LIMIT and delta.y < side:
+		low = false
+	if sideways:
+		wanted.append("move_left" if delta.x < 0.0 else "move_right")
+	if high:
+		wanted.append("move_up")
+	elif low:
+		wanted.append("move_down")
+	if sideways and (side < WALK_LIMIT or low):
+		wanted.append("walk")
+	return wanted
+
+
+## What the stick says about the guard, for the word by the stick: HIGH, LOW,
+## DUCK, or MID with no vertical in it. Read off what the stick is holding, so
+## the word and the fighter cannot disagree about the buttons.
+static func stance_word(actions: Array[String]) -> String:
+	if actions.has("move_down"):
+		return "DUCK" if actions.has("walk") else "LOW"
+	if actions.has("move_up"):
+		return "HIGH"
+	return "MID"
 
 
 func _release_directions() -> void:
@@ -370,6 +449,27 @@ func draw_surface() -> void:
 		var knob := _stick_origin + delta.limit_length(STICK_RADIUS)
 		_surface.draw_circle(_stick_origin, STICK_RADIUS, Palette.with_alpha(Palette.INK, 0.18))
 		_surface.draw_circle(knob, 11.0, Palette.with_alpha(Palette.LIGHT_SOFT, 0.55))
+		if stance_stick and is_play():
+			_draw_stance(_stick_origin)
+
+
+## --- the duel's stick --- the two lanes that hold a guard, scored on the
+## base, and the guard the stick holds now, in a word over it: where the eye
+## can find it, above a thumb that covers the knob and everything under it.
+func _draw_stance(origin: Vector2) -> void:
+	var ink := Palette.with_alpha(Palette.LIGHT_SOFT, 0.5)
+	var spread := atan(STANCE_CONE)
+	for way: float in [-1.0, 1.0]:
+		for edge: float in [-spread, spread]:
+			var dir := Vector2(sin(edge), way * cos(edge))
+			_surface.draw_line(origin + dir * (STICK_RADIUS - 6.0), origin + dir * STICK_RADIUS,
+				ink, 1.0)
+	var word := stance_word(_active_directions)
+	var lit := word != "MID"
+	UiFont.draw_text(_surface, word,
+		Vector2(origin.x, origin.y - STICK_RADIUS - 4.0 - UiFont.cap(UiFont.Cut.MICRO)),
+		UiFont.Cut.MICRO, Palette.with_alpha(Palette.PAPER, 0.95 if lit else 0.5),
+		UiFont.Align.CENTER, 0.6)
 
 
 ## A sword flying point-first with two speed lines behind it: the throw,

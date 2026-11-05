@@ -43,6 +43,16 @@ extends Control
 ## what to press. The score is read from the match's `series`, which is
 ## simulation state: on a client it is the host's, corrected like everything
 ## else, so the HUD keeps no count of its own that could disagree.
+##
+## THE ROUND
+## Every round opens with its own beat in the band (announce_round()): ROUND 2,
+## or FINAL ROUND when the next gate decides the duel, the score cut into the
+## rule under it, and under that `stance_hint` -- how this screen's player holds
+## the LOW guard and how the duck differs from it, which is the one control
+## people do not find on their own. It shows through the countdown, when the
+## fighters are held on their marks and nobody needs the band for anything
+## else, and fades as the fight starts. The match's `round_started` rings it;
+## the scene rings round one itself, since no round starts a match.
 
 ## Each seat's mark on the rope, the arrow, the tags and the rings: the bright
 ## step of the colour it is dressed in (FighterArt.SEAT_CLOTH). These were the
@@ -57,6 +67,9 @@ const ARROW := 13.0
 const TAG_OFFSET := ARROW + 14.0
 ## Seconds a flashed word stays up.
 const FLASH_TIME := 1.1
+## Seconds a round's plate stays up: the countdown (DuelRules.COUNTDOWN_TIME)
+## and a little of the fight, fading over the last of it.
+const ROUND_TIME := 2.4
 ## A hint wider than the safe area is broken at its separators instead of
 ## running off both edges of a 4:3 screen.
 const HINT_BREAK := "  ·  "
@@ -70,10 +83,16 @@ var your_slot := -1
 ## or empty for seats known only as ONE and TWO. See WHO IS WHO above.
 var seat_tags: Array[PackedStringArray] = []
 var footer := ""
+## How the LOW guard and the duck are held on this screen's controls, for the
+## round's plate. Set by the scene, which knows whether it is a stick or keys.
+var stance_hint := ""
 
 var _time := 0.0
 var _flash := 0.0
 var _flash_options := PackedStringArray()
+## The round on the plate, and seconds left on it; 0 for none.
+var _round := 0
+var _round_left := 0.0
 
 ## "YOU 2 - 1 CPU": seat one's name and rounds, then seat two's, in strip order.
 func series_text() -> String:
@@ -98,6 +117,26 @@ func flash(text: String, terse: String = "") -> void:
 	_flash = FLASH_TIME
 
 
+## Opens round `number` with its plate in the band; 0 takes any plate down.
+func announce_round(number: int) -> void:
+	_round = number
+	_round_left = ROUND_TIME if number > 0 else 0.0
+
+
+## The plate's title: ROUND n, or FINAL ROUND when either gate now ends it.
+func round_title() -> String:
+	if fight != null and _round > 1 and fight.series_wins > 1 \
+			and fight.series[0] == fight.series_wins - 1 \
+			and fight.series[1] == fight.series_wins - 1:
+		return "FINAL ROUND"
+	return "ROUND %d" % _round
+
+
+## Whether a round's plate is up.
+func is_announcing() -> bool:
+	return _round > 0 and _round_left > 0.0
+
+
 ## Takes `text` off the band if it is still showing. For a word that a network
 ## correction has made untrue -- "ONE DOWN" over a fighter the host says is
 ## standing -- and only for that one: a newer flash is left alone.
@@ -109,6 +148,7 @@ func withdraw(text: String) -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_flash = maxf(0.0, _flash - delta)
+	_round_left = maxf(0.0, _round_left - delta)
 	queue_redraw()
 
 
@@ -128,6 +168,8 @@ func _draw() -> void:
 	_draw_hint(content, y)
 	if session != null and session.desync_count > 0:
 		_draw_desync(band)
+	elif is_announcing():
+		_draw_round(band)
 	else:
 		_draw_flash(band)
 
@@ -335,6 +377,34 @@ func _draw_result(band: Rect2) -> void:
 		UiFont.draw_text(self, hint, Vector2(cx, band.position.y + 39.0),
 			UiFont.Cut.MICRO, Palette.with_alpha(Palette.PAPER, 0.8),
 			UiFont.Align.CENTER, 0.6)
+
+
+## The round's plate: its number, the score once there is one, and how the
+## guard is held, on the band the result is set on. Lighter than the result's:
+## the fight is about to start under it.
+func _draw_round(band: Rect2) -> void:
+	var alpha := clampf(_round_left / 0.35, 0.0, 1.0)
+	var cx := band.position.x + band.size.x * 0.5
+	var room := band.size.x - UiLayout.GUTTER * 2.0
+	_band_plate(band, 0.45 * alpha)
+	UiFont.draw_text(self, round_title(), Vector2(cx, band.position.y + 3.0),
+		UiFont.Cut.DISPLAY, Palette.with_alpha(Palette.PAPER, alpha), UiFont.Align.CENTER,
+		0.8 * alpha)
+	var y := band.position.y + 22.0
+	if _round > 1:
+		var leader := 0 if fight.series[0] >= fight.series[1] else 1
+		_draw_score_rule(Vector2(cx, y), room,
+			Palette.with_alpha(SEAT[leader], 0.9 * alpha))
+		y += 8.0
+	if stance_hint == "":
+		return
+	var lines := PackedStringArray([stance_hint])
+	if UiFont.width(stance_hint, UiFont.Cut.MICRO) > room:
+		lines = stance_hint.split(HINT_BREAK, false)
+	for line: String in lines:
+		UiFont.draw_text(self, line, Vector2(cx, y), UiFont.Cut.MICRO,
+			Palette.with_alpha(Palette.LIGHT_SOFT, alpha), UiFont.Align.CENTER, 0.6 * alpha)
+		y += UiFont.line(UiFont.Cut.MICRO)
 
 
 ## The rule under the winner, cut in two by the series score: a rule each side

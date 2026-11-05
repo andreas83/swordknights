@@ -42,6 +42,9 @@ var seat := 0:
 		cloak_shade = SEAT_CLOAK[which]
 
 var _fighter: Fighter
+## The spark of the last clash: where, in this node's space, and seconds left.
+var _spark_at := Vector2.ZERO
+var _spark := 0.0
 
 
 ## Attaches the art to a fighter, in `look` if one is given (the prince in the
@@ -76,7 +79,7 @@ func _bind() -> bool:
 		if not _fighter.replaying:
 			_on_died())
 	_fighter.disarmed.connect(func(_v: int, _b: int) -> void: _on_hurt(0))
-	_fighter.clashed.connect(func(_at: Vector2) -> void: _kick(0.16))
+	_fighter.clashed.connect(func(_at: Vector2) -> void: _on_clashed())
 	_fighter.knocked_down.connect(func(_v: int) -> void: _kick(-0.3))
 	_fighter.caught.connect(func(_by: int, _from: int) -> void: _kick(-0.22))
 	return true
@@ -125,6 +128,15 @@ func _kick(amount: float) -> void:
 	_impulse_t = 0.0
 
 
+## Blades met: a parry or a clash. The figure rocks, and the spark is struck
+## where this fighter's blade is -- at the shins for a LOW parry -- so the height
+## that turned the thrust is the height that lights up.
+func _on_clashed() -> void:
+	_kick(0.16)
+	_spark_at = blade_tip
+	_spark = SPARK_TIME
+
+
 ## --- poses ------------------------------------------------------------------
 
 func _posture() -> Dictionary:
@@ -166,21 +178,81 @@ func _is_ducked() -> bool:
 	return _fighter.is_free() and _fighter.posture() == DuelTuning.DUCKED
 
 
-## Planted and square to the opponent, weight forward. The front hand is moved
-## onto the hilt in _rig(); the pose only has to make room for it.
-func _guard() -> Dictionary:
-	var breath := sin(_time * 2.4)
-	return _pose({
-		"squash": 0.98 + breath * 0.012,
-		"bob": breath * 0.2,
+## The guard at each height, as a pose. The stance is the whole game, so each
+## height has a body of its own and not only a blade at another height: a
+## player has to know which guard they are in from the corner of an eye, on a
+## phone, while the other fighter is the thing being watched.
+##
+## MID is the square stance the guard always had. HIGH stands the fighter back
+## on the heels with the free hand in front of the chest. LOW is the one that
+## had to be unmistakable, and the one that was not: the old LOW was MID with
+## the blade seven pixels lower, which at phone scale is a blade at the knee of
+## the same figure, and the duck -- folded, with the same blade at the same
+## knee -- was the only other picture with a low blade in it. So LOW stands
+## taller than either (no squash at all), plants the feet wide, looks down the
+## blade, and throws the free arm up and back, the fencer's counterweight: a
+## silhouette no other state has. The blade itself is drawn pointing down at
+## the other's shins (_blade_line()), the duck carries none (_ducked_pose()),
+## and docs/fighter-poses.png shows the three heights and the duck side by
+## side. A table, so a pose viewer can read the heights as data.
+const GUARDS := {
+	DuelTuning.Stance.HIGH: {
+		"squash": 0.99,
+		"lean": 0.3,
+		"stance": 1.3,
+		"knee": -0.4,
+		"hem_spread": 0.6,
+		"hood_tilt": -0.1,
+		"arm_b": 0.5, "arm_b_len": 4.6,
+		"cloak_sweep": 0.6,
+	},
+	DuelTuning.Stance.MID: {
+		"squash": 0.98,
 		"lean": 0.9,
 		"stance": 1.5,
 		"knee": -0.6,
 		"hem_spread": 0.8,
 		"hood_tilt": 0.1,
 		"arm_b": 1.65, "arm_b_len": 5.4,
-		"cloak_sweep": 0.7 - breath * 0.2,
-	})
+		"cloak_sweep": 0.7,
+	},
+	DuelTuning.Stance.LOW: {
+		"squash": 1.0,
+		"lean": 0.2,
+		"stance": 2.6,
+		"knee": -1.0,
+		"hem_spread": 1.6,
+		"hood_tilt": 0.35,
+		"arm_b": -2.7, "arm_b_len": 6.8,
+		"cloak_sweep": 1.0, "cloak_flare": 1.15,
+	},
+}
+
+## How far the blade's point drops (positive) or climbs from its hilt, as a
+## share of the band's height, at each stance: HIGH points up, MID is level,
+## LOW points down. The line stays inside the simulation's blade rect at every
+## height, so what is drawn is still what parries.
+const BLADE_SLOPE := {
+	DuelTuning.Stance.HIGH: -0.75,
+	DuelTuning.Stance.MID: 0.0,
+	DuelTuning.Stance.LOW: 0.75,
+}
+
+## How long the spark of two blades meeting burns, in seconds, and how wide
+## it bursts, in px. Presentation: a clock of this node's, never the match's.
+const SPARK_TIME := 0.22
+const SPARK_SIZE := 5.0
+
+
+## The fighter's guard at the stance it holds (GUARDS), breathing.
+func _guard() -> Dictionary:
+	var breath := sin(_time * 2.4)
+	var guard: Dictionary = GUARDS.get(_fighter.stance, GUARDS[DuelTuning.Stance.MID])
+	var pose := guard.duplicate()
+	pose["squash"] = float(guard["squash"]) + breath * 0.012
+	pose["bob"] = breath * 0.2
+	pose["cloak_sweep"] = float(guard["cloak_sweep"]) - breath * 0.2
+	return _pose(pose)
 
 
 ## Up out of a roll: unfolding from the crouch to the guard over the recovery
@@ -199,11 +271,20 @@ func _rising(t: float) -> Dictionary:
 		"hood_tilt": 0.25,
 		"arm_b": 1.1, "arm_b_len": 4.8,
 		"cloak_sweep": 0.9, "cloak_flare": 0.8,
+		# Carried, point trailing on the floor behind: a sword that is not up.
+		"arm_a": 1.5, "arm_a_len": 5.4,
+		"blade": 2.5, "blade_len": 8.0,
 	})
 
 
 ## The fighter's duck folds the body down to its duck height, hood and all
 ## intact, which is the prince's crouch at the fighter's own numbers.
+##
+## The sword is pulled in, point up behind the shoulder, and not drawn along
+## the blade rect: a duck parries nothing (it is the matrix's fourth column,
+## which every LOW thrust kills), and a blade drawn low and forward from a
+## crouch was the LOW guard's picture on a smaller body -- the two read as one
+## state at phone scale. _blade_local() hides the rect while ducked.
 func _ducked_pose() -> Dictionary:
 	var tuning := _fighter.tuning
 	return _pose({
@@ -213,9 +294,11 @@ func _ducked_pose() -> Dictionary:
 		"knee": -1.2,
 		"hem_lift": -0.8,
 		"hem_spread": 2.0,
-		"hood_tilt": 0.3,
+		"hood_tilt": 0.5,
+		"arm_a": 0.6, "arm_a_len": 4.0,
 		"arm_b": 1.3, "arm_b_len": 4.8,
 		"cloak_sweep": 0.8, "cloak_rise": -0.4, "cloak_flare": 1.2,
+		"blade": -2.2, "blade_len": 8.0,
 	})
 
 
@@ -446,6 +529,8 @@ func _catch() -> Dictionary:
 
 ## The simulation's blade rect in this node's space, or an empty rect.
 func _blade_local() -> Rect2:
+	if _is_ducked():
+		return Rect2()
 	var rect := _fighter.blade_rect()
 	if rect.size == Vector2.ZERO:
 		return rect
@@ -466,8 +551,20 @@ func _rig(pose: Dictionary) -> void:
 
 
 func _hilt(blade: Rect2) -> Vector2:
+	return _blade_line(blade)[0]
+
+
+## Hilt and point of the held blade, inside its rect: from the body's edge to
+## the reach, level at MID, climbing at HIGH and dropping at LOW by
+## BLADE_SLOPE of the band. A pixel in from the rect's top and bottom, so the
+## slant never pokes out of what the simulation parries with.
+func _blade_line(blade: Rect2) -> PackedVector2Array:
 	var near := blade.position.x if _fighter.facing > 0 else blade.end.x
-	return Vector2(near, blade.position.y + blade.size.y * 0.5)
+	var far := blade.end.x if _fighter.facing > 0 else blade.position.x
+	var mid := blade.position.y + blade.size.y * 0.5
+	var slope := float(BLADE_SLOPE.get(_fighter.stance, 0.0))
+	var drop := maxf(0.0, blade.size.y * 0.5 - 1.0) * slope
+	return PackedVector2Array([Vector2(near, mid - drop), Vector2(far, mid + drop)])
 
 
 ## The sword the simulation is holding up, drawn along its own rect: from the
@@ -484,26 +581,35 @@ func _draw_weapon(pose: Dictionary) -> void:
 			blade_hot = 0.0
 		return
 
-	var hilt := _hilt(blade)
-	var along := float(_fighter.facing)
-	var tip := Vector2(hilt.x + along * blade.size.x, hilt.y)
+	var line := _blade_line(blade)
+	var hilt := line[0]
+	var tip := line[1]
+	var dir := (tip - hilt).normalized()
+	var side := Vector2(-dir.y, dir.x)
 	var thick := clampf(blade.size.y * 0.5, 1.0, 1.8)
 	var hot := _fighter.is_attacking()
 	blade_tip = tip
 	blade_hot = 1.0 if hot else 0.0
 
-	var point := tip
-	var shoulder := Vector2(tip.x - along * 2.4, hilt.y)
+	var shoulder := tip - dir * 2.4
 	draw_colored_polygon(PackedVector2Array([
-		Vector2(hilt.x, hilt.y - thick * 0.5), Vector2(shoulder.x, hilt.y - thick * 0.5),
-		point, Vector2(shoulder.x, hilt.y + thick * 0.5),
-		Vector2(hilt.x, hilt.y + thick * 0.5),
+		hilt - side * thick * 0.5, shoulder - side * thick * 0.5, tip,
+		shoulder + side * thick * 0.5, hilt + side * thick * 0.5,
 	]), Palette.STEEL)
-	# The edge the sun catches: the top of the blade, gold on a live thrust.
-	draw_rect(Rect2(minf(hilt.x, shoulder.x), hilt.y - thick * 0.5,
-		absf(shoulder.x - hilt.x), 0.6), Palette.LIGHT_SOFT if hot else Palette.STEEL_DARK)
-	# Crossguard, upright, so the stance's height reads even at rest.
-	draw_rect(Rect2(hilt.x - 0.7, hilt.y - 2.2, 1.4, 4.4), Palette.LIGHT_WARM)
+	# The edge the sun catches: the top of the blade, gold on a live thrust,
+	# and pale on a held guard, so the line reads against a night sky too.
+	var edge := -side if side.y > 0.0 else side
+	var lit := Palette.LIGHT_SOFT if hot else Palette.with_alpha(Palette.PAPER, 0.55)
+	draw_colored_polygon(PackedVector2Array([
+		hilt + edge * thick * 0.5, shoulder + edge * thick * 0.5,
+		shoulder + edge * (thick * 0.5 - 0.6), hilt + edge * (thick * 0.5 - 0.6),
+	]), lit)
+	# Crossguard, square to the blade, so the stance's height reads even at rest.
+	var cross := side * 2.2
+	draw_colored_polygon(PackedVector2Array([
+		hilt + cross - dir * 0.7, hilt + cross + dir * 0.7,
+		hilt - cross + dir * 0.7, hilt - cross - dir * 0.7,
+	]), Palette.LIGHT_WARM)
 
 
 ## --- drawing ----------------------------------------------------------------
@@ -512,10 +618,33 @@ func _draw() -> void:
 	if not _has_body():
 		return
 	super._draw()
+	_draw_spark()
 	_draw_open_hands()
 	_draw_loose()
 	if show_hitboxes:
 		_draw_hitboxes()
+
+
+func _process(delta: float) -> void:
+	super._process(delta)
+	_spark = maxf(0.0, _spark - delta)
+
+
+## A four-pointed star of light where the blades met, bursting and fading over
+## SPARK_TIME. Drawn over the figure: it is the read, not scenery.
+func _draw_spark() -> void:
+	if _spark <= 0.0:
+		return
+	var age := 1.0 - _spark / SPARK_TIME
+	var size := SPARK_SIZE * (0.5 + age * 0.7)
+	var alpha := clampf(1.2 - age, 0.0, 1.0)
+	var hot := Palette.with_alpha(Palette.LIGHT_SOFT, alpha)
+	var core := Palette.with_alpha(Palette.PAPER, alpha)
+	for ray: Vector2 in [Vector2(1, 0), Vector2(0, 1), Vector2(0.7, 0.7), Vector2(0.7, -0.7)]:
+		var straight := absf(ray.x) < 0.01 or absf(ray.y) < 0.01
+		var length := size if straight else size * 0.6
+		draw_line(_spark_at - ray * length, _spark_at + ray * length, hot, 1.0)
+	draw_circle(_spark_at, 1.3 * (1.0 - age * 0.5), core)
 
 
 ## Two open palms on the live frames of a snatch, fingers up: the read that the
