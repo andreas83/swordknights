@@ -81,6 +81,10 @@ var opener := Callable(OS, "shell_open")
 ## Test seam, set before _ready: whether the benches -- the feel lab -- are
 ## listed (ModeRegistry.shows_benches(): never in an exported build).
 var benches := ModeRegistry.shows_benches()
+## Test seam, set before _ready: whether the dev tools -- the pose lab -- are
+## listed (ModeRegistry.shows_dev_tools(): a dev build or the editor, never a
+## release).
+var dev_tools := ModeRegistry.shows_dev_tools()
 ## Test seam: what Android's Back does on this screen, which is the root and
 ## has nothing behind it: the app closes. A test must never quit its runner.
 var quit_app := Callable()
@@ -133,7 +137,7 @@ func offer_rect() -> Rect2:
 ## of this menu, not something ModeRegistry should have to know about.
 func _build_rows() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	for mode: Dictionary in ModeRegistry.modes(benches):
+	for mode: Dictionary in ModeRegistry.modes(benches, dev_tools):
 		out.append({
 			"id": String(mode["id"]),
 			"title": String(mode["title"]).to_upper(),

@@ -51,6 +51,13 @@ screen shows **UPDATE AVAILABLE · BUILD n** at the top. Tap it, open the
 download, tap **Update**. The settings page (SOUND) shows which build is
 running.
 
+A development build also lists **POSE LAB** on the title screen: every pose
+of the duel fighter and of the prince, as either figure or in your saved look,
+on a real strip at each strip's hour, at play scale with an enlarged inset --
+and a TRY page to fence a training dummy with the duel's touch controls and
+see which guard your thumb made and whether it parried. See
+[`docs/character.md`](docs/character.md#the-pose-lab).
+
 Only development builds check for updates; release builds never do. How the
 channel, the build numbers and the signing key work, and the one thing the
 repository owner should set up (the `DEBUG_KEYSTORE_B64` secret), is in
@@ -357,7 +364,7 @@ without editing the file.
 | [`docs/architecture.md`](docs/architecture.md) | layers, fixed timestep, collision, the input seam |
 | [`docs/art-direction.md`](docs/art-direction.md) | the look-and-feel thesis: one low sun, cast shadows, hard edges |
 | [`docs/world.md`](docs/world.md) | cast shadows, shade twins, architecture dressed onto terrain |
-| [`docs/character.md`](docs/character.md) | pose vocabulary, secondary motion, the heroine's costume, the feel lab |
+| [`docs/character.md`](docs/character.md) | pose vocabulary, secondary motion, the heroine's costume, the feel lab, the pose lab |
 | [`docs/feel.md`](docs/feel.md) | camera beats, hitstop, the wipe, haptics |
 | [`docs/ui.md`](docs/ui.md) | the Alcazar typeface, safe areas, variable width |
 | [`docs/duel-spec.md`](docs/duel-spec.md) | the Nidhogg duel specification, with three engineering objections |

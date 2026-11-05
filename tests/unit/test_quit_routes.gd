@@ -26,6 +26,7 @@ const ROUTES := {
 	"res://scenes/chapter_select.tscn": "test_the_pages_go_back_on_sword",
 	"res://scenes/duel_select.tscn": "test_the_pages_go_back_on_sword",
 	"res://scenes/wardrobe.tscn": "test_the_pages_go_back_on_sword",
+	"res://scenes/pose_lab.tscn": "test_the_pose_lab_is_left_on_sword_and_try_on_pause",
 	"res://scenes/duel_match.tscn": "test_a_duel_is_left_from_its_menu",
 	"res://scenes/duel_match_cpu.tscn": "test_a_duel_is_left_from_its_menu",
 	"res://scenes/duel_match_online.tscn": "test_the_online_duel_leaves_cleanly",
@@ -183,6 +184,28 @@ func test_the_pages_go_back_on_sword() -> void:
 		await wait_frames(1)
 		assert_eq(_left, 1, "%s goes back on SWORD" % path)
 		page.free()
+
+
+## The pose lab is a page with a page inside it: SWORD leaves the poses, and on
+## TRY, where SWORD is the fighter's, PAUSE is the way back to them.
+func test_the_pose_lab_is_left_on_sword_and_try_on_pause() -> void:
+	var lab := (load("res://scenes/pose_lab.tscn") as PackedScene).instantiate() as PoseLab
+	lab.wardrobe_path = _store
+	lab.leave = func() -> void: _left += 1
+	add_child_autofree(lab)
+	await wait_process_frames(2)
+	lab.open_try()
+	await wait_process_frames(2)
+	await _press("attack")
+	assert_eq(lab.page, PoseLab.Page.TRY, "on TRY, SWORD is a thrust, not a way out")
+	assert_eq(_left, 0)
+	await _press("pause")
+	await wait_process_frames(2)
+	assert_eq(lab.page, PoseLab.Page.BROWSE, "PAUSE goes back to the poses")
+	await _press("attack")
+	await wait_process_frames(2)
+	assert_eq(_left, 1, "and SWORD there leaves the lab")
+	lab.free()
 
 
 ## --- the duels ----------------------------------------------------------------
