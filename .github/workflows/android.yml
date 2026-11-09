@@ -165,7 +165,7 @@ jobs:
       - name: Restore the debug keystore from the cache
         id: cache
         if: steps.keystore.outputs.source == 'cache'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.android/swordknights-debug.keystore
           key: android-debug-keystore-v1
