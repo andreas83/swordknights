@@ -36,6 +36,7 @@ const VISITED := {
 	"res://scenes/chapter_select.tscn": "test_the_pages",
 	"res://scenes/duel_select.tscn": "test_the_pages",
 	"res://scenes/wardrobe.tscn": "test_the_pages",
+	"res://scenes/pose_lab.tscn": "test_the_pose_lab_letters_both_pages",
 	"res://scenes/duel_match_cpu.tscn": "test_the_duel_letters_its_menu_and_its_end",
 	"res://scenes/duel_match_online.tscn": "test_the_lobby_letters_its_pages",
 }
@@ -169,6 +170,25 @@ func test_the_pages() -> void:
 	_says(TouchControls.of(chapters), "", "BACK", "on a locked row JUMP does nothing")
 	_says(TouchControls.of(await _page(DUELS)), "PLAY", "BACK", "the duel page")
 	_says(TouchControls.of(await _page(WARDROBE)), "NEXT", "BACK", "the wardrobe")
+
+
+## BROWSE is a page: JUMP changes the row, SWORD goes back. TRY is the duel:
+## the play words, and THROW up as it is in a match.
+func test_the_pose_lab_letters_both_pages() -> void:
+	var lab := (load("res://scenes/pose_lab.tscn") as PackedScene).instantiate() as PoseLab
+	lab.wardrobe_path = _store
+	lab.leave = func() -> void: pass
+	add_child_autofree(lab)
+	await wait_frames(2)
+	_says(TouchControls.of(lab), "CHANGE", "BACK", "the pose lab's poses")
+	lab.open_try()
+	await wait_frames(2)
+	var controls := TouchControls.of(lab)
+	assert_true(controls.is_play(), "TRY: JUMP and SWORD, the fighter's")
+	assert_true(controls.throw_button, "and THROW, as in a duel")
+	lab.close_try()
+	await wait_frames(2)
+	_says(TouchControls.of(lab), "CHANGE", "BACK", "and the page's words again")
 
 
 func test_the_dawn_letters_its_way_back() -> void:

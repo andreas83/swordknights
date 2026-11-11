@@ -12,14 +12,25 @@ extends RefCounted
 ##
 ## `bench` marks a tool rather than a mode -- the feel lab, a tuning bench --
 ## which is listed only where the game is being worked on (shows_benches()).
+##
+## `dev` marks a tool the owner uses on the phone: the pose lab, which judges
+## readability on the screen it is for. It is listed in a development build as
+## well as in the editor, and never in a release (shows_dev_tools()).
+
+const BuildStamp := preload("res://scripts/core/build_stamp.gd")
 
 
-## The modes, benches included only when `benches` is true.
-static func modes(benches: bool = shows_benches()) -> Array[Dictionary]:
+## The modes, benches included only when `benches` is true and dev tools only
+## when `dev` is.
+static func modes(benches: bool = shows_benches(),
+		dev: bool = shows_dev_tools()) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for mode: Dictionary in _catalogue():
-		if benches or not bool(mode.get("bench", false)):
-			out.append(mode)
+		if bool(mode.get("bench", false)) and not benches:
+			continue
+		if bool(mode.get("dev", false)) and not dev:
+			continue
+		out.append(mode)
 	return out
 
 
@@ -31,6 +42,20 @@ static func modes(benches: bool = shows_benches()) -> Array[Dictionary]:
 ## the `editor` feature whatever they are stamped with.
 static func shows_benches() -> bool:
 	return OS.has_feature("editor")
+
+
+## Whether the dev tools are listed: on the editor's binary, and on a build
+## stamped for the dev channel -- the APK on the owner's phone -- by exactly
+## the test that turns the in-app update check on (DevUpdate.is_dev_build). A
+## release is stamped otherwise and is not a debug build, so a store build
+## never lists them, whichever of the two a mistake left standing.
+static func shows_dev_tools() -> bool:
+	return dev_tools_for(OS.has_feature("editor"), OS.is_debug_build(), BuildStamp.CHANNEL)
+
+
+## shows_dev_tools() for a build described rather than run: for a test.
+static func dev_tools_for(editor: bool, debug: bool, channel: String) -> bool:
+	return editor or DevUpdate.is_dev_build(debug, channel)
 
 
 static func _catalogue() -> Array[Dictionary]:
@@ -66,6 +91,14 @@ static func _catalogue() -> Array[Dictionary]:
 			"scene": "res://scenes/feel_lab.tscn",
 			"available": true,
 			"bench": true,
+		},
+		{
+			"id": "pose_lab",
+			"title": "Pose Lab",
+			"subtitle": "Every pose, and the guard to try",
+			"scene": "res://scenes/pose_lab.tscn",
+			"available": true,
+			"dev": true,
 		},
 	]
 

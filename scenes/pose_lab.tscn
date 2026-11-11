@@ -1,0 +1,56 @@
+[gd_scene load_steps=8 format=3]
+
+; The pose lab, reached from the title screen's POSE LAB row in a development
+; build (ModeRegistry, `dev`). The stage, the figures and the sparring floor
+; are in the world; the rows, the name and the enlarged inset on a layer over
+; it, with the same touch controls the duel uses. See scripts/ui/pose_lab.gd.
+
+[ext_resource type="Script" path="res://scripts/ui/pose_lab.gd" id="1_lab"]
+[ext_resource type="Script" path="res://scripts/render/parallax_sky.gd" id="2_sky"]
+[ext_resource type="Script" path="res://scripts/ui/pose_lab_stage.gd" id="3_stage"]
+[ext_resource type="Script" path="res://scripts/ui/pose_lab_figure.gd" id="4_figure"]
+[ext_resource type="Script" path="res://scripts/ui/pose_lab_spar.gd" id="5_spar"]
+[ext_resource type="Script" path="res://scripts/ui/pose_lab_ui.gd" id="6_ui"]
+[ext_resource type="PackedScene" path="res://scenes/touch_controls.tscn" id="7_touch"]
+
+[node name="PoseLab" type="Node2D"]
+script = ExtResource("1_lab")
+
+[node name="Sky" type="CanvasLayer" parent="."]
+layer = -10
+
+[node name="ParallaxSky" type="Node2D" parent="Sky"]
+script = ExtResource("2_sky")
+
+[node name="Stage" type="Node2D" parent="."]
+script = ExtResource("3_stage")
+
+[node name="Figure" type="Node2D" parent="."]
+script = ExtResource("4_figure")
+
+[node name="Spar" type="Node2D" parent="."]
+script = ExtResource("5_spar")
+
+[node name="Camera" type="Camera2D" parent="."]
+
+[node name="Ui" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="Page" type="Control" parent="Ui"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("6_ui")
+
+[node name="Inset" type="Control" parent="Ui"]
+clip_contents = true
+mouse_filter = 2
+
+[node name="Holder" type="Node2D" parent="Ui/Inset"]
+
+[node name="Figure" type="Node2D" parent="Ui/Inset/Holder"]
+script = ExtResource("4_figure")
+
+[node name="TouchControls" parent="." instance=ExtResource("7_touch")]
+throw_button = true

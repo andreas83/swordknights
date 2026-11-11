@@ -29,6 +29,7 @@ const ROUTES := {
 	"res://scenes/chapter_select.tscn": "test_the_pages_go_back_one_page",
 	"res://scenes/duel_select.tscn": "test_the_pages_go_back_one_page",
 	"res://scenes/wardrobe.tscn": "test_the_pages_go_back_one_page",
+	"res://scenes/pose_lab.tscn": "test_the_pose_lab_steps_back_from_try_then_leaves",
 	"res://scenes/duel_match.tscn": "test_back_is_pause_in_a_duel_on_one_device",
 	"res://scenes/duel_match_cpu.tscn": "test_back_is_pause_in_a_duel_on_one_device",
 	"res://scenes/duel_match_online.tscn": "test_the_lobby_and_the_online_match_answer_back",
@@ -110,6 +111,24 @@ func test_the_pages_go_back_one_page() -> void:
 		_send(NOTIFICATION_WM_GO_BACK_REQUEST)
 		assert_eq(_left, 1, "%s goes back one page on Back, once" % path)
 		page.free()
+
+
+func test_the_pose_lab_steps_back_from_try_then_leaves() -> void:
+	var lab := (load("res://scenes/pose_lab.tscn") as PackedScene).instantiate() as PoseLab
+	lab.wardrobe_path = _store
+	lab.leave = func() -> void: _left += 1
+	add_child_autofree(lab)
+	await wait_process_frames(2)
+	lab.open_try()
+	await wait_process_frames(2)
+	_send(NOTIFICATION_WM_GO_BACK_REQUEST)
+	await wait_process_frames(2)
+	assert_eq(lab.page, PoseLab.Page.BROWSE, "Back on TRY is back to the poses")
+	assert_eq(_left, 0, "and only that: one press, one step back")
+	_send(NOTIFICATION_WM_GO_BACK_REQUEST)
+	await wait_process_frames(2)
+	assert_eq(_left, 1, "Back on the poses goes back to the title screen, once")
+	lab.free()
 
 
 ## --- the levels ---------------------------------------------------------------

@@ -33,7 +33,15 @@ const SHORT_SHA := 7
 
 ## True when this build should fetch the manifest at all.
 static func should_check(debug: bool, channel: String, feed: String) -> bool:
-	return debug and channel == CHANNEL_DEV and feed.begins_with("http")
+	return is_dev_build(debug, channel) and feed.begins_with("http")
+
+
+## True for a development build: a debug export stamped for the dev channel.
+## The update check asks it, and so does the title screen before listing the
+## dev tools (ModeRegistry.shows_dev_tools), so the two cannot disagree about
+## which build is the owner's.
+static func is_dev_build(debug: bool, channel: String) -> bool:
+	return debug and channel == CHANNEL_DEV
 
 
 ## The manifest as a normalised Dictionary, or {} if it is not one.

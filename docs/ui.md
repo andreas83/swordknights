@@ -246,9 +246,18 @@ and that no row lies under a thumb button.
 (`docs/character.md`, *The feel lab*), and it sat between DUEL and WARDROBE
 on the phone. `ModeRegistry` marks it `bench` and lists benches only on the
 editor's own binary (`OS.has_feature("editor")`), not on a debug build: the
-APK the owner plays is CI's debug export. So the title screen has six rows on
-a phone and seven where the game is being worked on, and screenshots taken
-with the editor binary show seven.
+APK the owner plays is CI's debug export. So FEEL LAB is not on the phone,
+and screenshots taken with the editor binary show it.
+
+**POSE LAB is on it in a development build, and in no release.** It is the
+other way round from FEEL LAB on purpose: the pose lab (`docs/character.md`,
+*The pose lab*) judges whether a pose reads on the phone, so it has to be on
+the phone. `ModeRegistry` marks it `dev` and lists it on the editor's binary
+and on a build `DevUpdate.is_dev_build()` calls one -- a debug export stamped
+for the dev channel, the same test that turns the update check on -- so a
+store build, which is neither, never shows it
+(`tests/unit/test_pose_lab.gd`). The title screen has six rows in a release,
+seven on the dev APK and eight in the editor.
 
 The hint line is cut into the rail (`UiLayout.rail(view)`, shared with the
 settings page). When the on-screen stick is up, a sword button covers the right
@@ -761,7 +770,8 @@ answers as the button it already has for going back:
 | Play: a level, a chapter, Endless, the feel lab, a duel on one device | PAUSE: opens the pause menu, and closes it again |
 | The complete screen, a finished duel | its SWORD / PAUSE: leaves |
 | An online match | opens and closes the menu that does not stop the match |
-| A page: chapter select, duel page, wardrobe, settings | SWORD: one page back |
+| A page: chapter select, duel page, wardrobe, settings, the pose lab's poses | SWORD: one page back |
+| The pose lab's TRY page | PAUSE: back to the poses (SWORD is the fighter's there) |
 | The lobby | a text page to the list, the list to the duel page |
 | The dawn, a ruin that would not generate | its buttons: back |
 | The title screen | closes the app |

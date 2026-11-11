@@ -477,9 +477,11 @@ recall is not a death's window. So none of it reads `warn()`, by the rule in
    `_pose()`'s defaults and consume it in `_rig()` or a `_draw_*` helper. Do
    not special-case a state inside a drawing helper: the helpers must stay
    state-blind, or the next pose has to fight them.
-3. Add a row to `_pose_table()` in `tests/character_poses.gd` and re-render the
-   contact sheet (below). If it does not read at 1:1 in the inset, it does not
-   read.
+3. Add a row to `prince_table()` in `scripts/ui/pose_catalogue.gd` — the
+   table `tests/character_poses.gd` renders and the pose lab browses — and
+   re-render the contact sheet (below). If it does not read at 1:1 in the
+   inset, it does not read. A new state is in the pose lab even without a
+   row, as a default moment; the row is what names the moment worth seeing.
 4. Render it as the heroine too (`--figure heroine`, below). The pose is hers
    already; what to look at is whether her braid, ribbons and short hem read
    in it, and whether a new field you added means something to her costume.
@@ -683,6 +685,60 @@ exported build, the phone's APK included (`ModeRegistry.shows_benches()`).
 
 Change a number in `tuning.gd`, play the lab, and you can see in one screen
 which distances still work.
+
+## The pose lab
+
+`scenes/pose_lab.tscn` is every pose of both figures, on the phone. The
+owner could not tell the duel's LOW guard from its duck there, and no screen
+could show either on demand: a match reaches a pose when it reaches it, and
+the contact sheets below are pictures on a desk. **POSE LAB** is on the title
+screen of a development build — the dev APK, and the editor — and of no
+release (`ModeRegistry`, `dev`; it asks `DevUpdate.is_dev_build()`, the test
+that turns the update check on).
+
+**BROWSE** steps through `PoseCatalogue` (`scripts/ui/pose_catalogue.gd`):
+for the duel fighter a guard at every `DuelTuning.Stance`, the duck, a run at
+every height, a thrust and its recovery at every height, and a moment of
+every other `Fighter.State`; for the prince the contact sheet's table, a
+moment of any `Player.State` it does not cover, and every idle bit. Both
+lists are built from the enums, so a state or a stance added later is in the
+lab the day it exists; `tests/unit/test_pose_lab.gd` fails if one is not. The
+real body is posed — a `Fighter` or a `Player`, never stepped
+(`PoseLabFigure`) — so what is shown is what play draws, sword on the
+simulation's blade rect included. The pose's name is set in Alcazar over it,
+with its state, stance and the posture the combat matrix sees.
+
+The figure stands on a duel strip's middle zone, dressed and lit at the
+strip's hour as a match lights it (`PoseLabStage`, MatchDusk's rule held
+still), at the scale play draws it, with the same figure three times larger
+in an inset beside it. The rows on the left:
+
+| Row | Steps through |
+| --- | --- |
+| BODY | the duel fighter, the adventure's prince |
+| FIGURE | the prince, the heroine, the player's saved look (the wardrobe's) |
+| SEAT | crimson or sea-green (the duel's) |
+| MOTION | playing — the state's clock round its length — or frozen on the moment |
+| LIGHT | the five strips, brightest hour first: Tug of War's late afternoon to the Clockwork Well at night |
+| SCALE | 1:1 (the 180-unit view), and the duel camera's close and far framings on this screen (`MatchFraming`) |
+| HITBOX | the hurtbox and blade rect over the fighter (`FighterArt.show_hitboxes`) |
+| TRY | the sparring page |
+
+Left and right step the pose, up and down a row, JUMP changes it, SWORD or
+Back leave; the arrows beside the name and every row can be tapped (the left
+third of a value steps it back).
+
+**TRY** is the duel's own frame on the same ground (`PoseLabSpar`): the
+player's fighter on the duel's touch controls, against a dummy holding a
+stance — NONE (no sword), HIGH, MID, LOW or DUCK — that can be told to thrust
+at that height every second and a quarter. A readout says what the player's
+fighter is, the posture the matrix sees (LOW or DUCKED is the question), what
+the thumb is holding, for how many frames, and the last outcome: PARRY,
+PARRIED, CLASH, DISARM, KILL, KILLED, MISS. The words come from
+`DuelCombat.resolve()`'s events, so a parry it reports is one a match would
+have had. There is no match around it — no window, initiative or netplay —
+and a death puts both back on their marks after a second. Back or PAUSE
+return to BROWSE.
 
 ## Looking at it
 
