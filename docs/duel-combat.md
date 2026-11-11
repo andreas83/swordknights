@@ -146,6 +146,39 @@ the guard still up (and a run turning the back), the duck planted under HIGH,
 and the thrust from a duck as designed. Each was seen to fail with the old
 rule put back.
 
+### Seeing the guard
+
+**The picture.** The LOW guard was the MID figure with its level blade seven
+pixels lower: at phone scale, a blade at the knee of the same figure. The duck
+was a folded figure holding the *same* level blade at the *same* height, since
+the duck is down with WALK and down is LOW. Two pictures with a low blade in
+them, one a guard and one the posture LOW kills. Now each height has a body of
+its own (`FighterArt.GUARDS`, a table) and the blade a slant (`BLADE_SLOPE`):
+
+| | Body | Blade |
+|---|---|---|
+| HIGH | back on the heels, free hand before the chest | point up |
+| MID | the square stance it always had | level |
+| LOW | the tallest of the three, feet planted wide, hood down the blade, the free arm thrown up and back | point down at the other's shins |
+| duck | folded to 13 px | none along the guard: the sword is pulled up behind the shoulder |
+
+The slant is drawn inside the simulation's blade rect, a pixel in from its top
+and bottom, so the rule that the picture of the sword *is* what parries still
+holds. A duck parries nothing, so it no longer draws a blade where a guard
+would be. A thrust keeps its height's slant, so a LOW thrust is seen aimed at
+the shins, and the rise out of a roll carries the sword trailing behind.
+
+**The parry.** When blades meet, each fighter's blade strikes a spark where it
+is (`FighterArt._on_clashed()`): at the shins for a LOW parry. The height that
+turned the thrust is the height that lights up.
+
+Judged on rendered pixels, at a phone's scale, on both figures and in the
+Well's night as well as the Tug's afternoon: `docs/fighter-poses.png` and
+`docs/heroine-fighter-poses.png` set HIGH, MID, LOW, the duck and a LOW parry
+side by side. `tests/unit/test_duel_guard_poses.gd` holds the slants, LOW's
+height and arm, the duck's empty guard and the spark on the rig's own points,
+and was seen to fail against the art as it was.
+
 ## The disarm window
 
 This is the most important number in the combat system, because it decides

@@ -824,6 +824,9 @@ What moved, and why:
   one is asked for.
 - `tests/unit/test_match_hud_series.gd` — the plate's score is the match's.
 - `tests/unit/test_net_fairness_version.gd` — protocol 4 refuses protocol 3.
+- `tests/unit/test_duel_guard_poses.gd` — HIGH, MID, LOW and the duck as four
+  pictures: the blade's slant, LOW's height and free arm, the duck's empty
+  guard, the parry's spark.
 - `tests/unit/test_duel_cpu_mode.gd` — the scene at the level the duel page
   saved, stepping both seats.
 - `tests/unit/test_duel_select.gd` — the one DUEL row, the page's three ways,
