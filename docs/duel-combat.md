@@ -494,6 +494,82 @@ snapshot, so no bytes were added. `tests/unit/test_duel_fair_fencing.gd` plays a
 kick and the LOW thrust after it, and was seen to fail with the sweep's 45
 frames put back.
 
+## The jump
+
+The owner, on a phone: jumping felt better in the adventure than in the duel.
+Measured frame by frame on the real bodies (the prince in `scenes/game.tscn`,
+the fighter on a ledge of tiles, stepped one 60 Hz frame at a time):
+
+| | Adventure (prince) | Duel, before | Duel, now |
+|---|---|---|---|
+| Held jump: apex | 38.1 px, frame 19 | 33.4 px, frame 10 | 33.4 px, frame 10 |
+| Held jump: airtime | 39 frames | 21 frames | 21 frames |
+| Running jump: reach | 57.2 px at 88 px/s | 42.0 px at 120 px/s | 42.0 px |
+| Gravity | 900 px/s², 0.62 of it while \|vy\| < 52 | 2400 px/s², no float | unchanged |
+| Terminal fall | 360 px/s | 660 px/s | unchanged |
+| Air accel / friction | 480 / 260 px/s² | 2400 / 900 px/s² | unchanged |
+| Jump cut on release | ×0.38 a frame, from frame 6 | ×0.35 a frame, from frame 1 | ×0.35 a frame, from frame 4 |
+| Tap of 1 / 2 / 3 / 4 frames | 25.5 px each | 8.0 / 13.4 / 18.2 / 22.3 px | 22.3 px each |
+| Coyote: presses off an edge that jump | 6 | 0 | 6 |
+| Buffer: presses before landing that jump on it | 8 | 0 | 8 |
+| Landing | no lockout below 265 px/s; a flat jump lands at 252 | none | none |
+| Press to feet off the ground | the press frame | the press frame | the press frame |
+| Input delay added locally | none | none: VS CPU and one keyboard step the press on the frame it is read, and an online client predicts its own with none | none |
+| What a thumb's down does to JUMP | down + JUMP rolls only standing, not at a run | down + JUMP rolls; a run sagging 14 units down held down | the duel's stick: a sagging run holds no down (*The stick*) |
+
+The held arcs were not the difference. The duel's is the spec's: high gravity,
+two tiles in 21 frames, no float, and `tests/fighter_profile_test.gd` holds it
+there. Its reach and height are what every strip's moat, alley and bench was
+cut for. What differed was everything at the edges of a press, which is where a
+thumb lives:
+
+- **A tap was a twitch.** The cut multiplied the rise by 0.35 on every frame
+  JUMP was up, from the first, and a tap on glass is one to four frames. Most
+  phone jumps were 8 to 22 px hops. Now the cut waits `jump_min_hold` (4)
+  frames, so a tap of one to four frames is the four-frame hop, 22 px: two
+  thirds of a held jump, the same share the prince's tap gets. Holding is still
+  the only way up two tiles.
+- **A late press was eaten.** No coyote time: a press on the first frame after
+  the feet left an edge did nothing. Now `coyote_frames` (7) lets a press on
+  any of the first six frames off an edge jump, as many as the prince's 0.1 s.
+  Six frames of fall is 14 px, so the jump still clears the ledge it left by
+  19. Down + JUMP in the air is the dive kick, coyote or not.
+- **An early press was eaten.** No buffer: a press a frame before landing, or
+  in the last frames of a thrust, a roll's rise or a dive kick's landing, did
+  nothing. Now a plain JUMP is kept `jump_buffer` (9) frames, the press's own
+  frame included, and fires on the first frame a jump can: a press up to seven
+  frames before the feet land jumps on landing, as the prince's does. Down +
+  JUMP is never kept: a roll or a dive kick is a commitment chosen on its
+  frame, and one queued from the air or from a recovery would be a roll the
+  player did not choose.
+- **A run's thumb rolled.** See *The stick*.
+
+**Why the arc was not matched.** The prince's arc is longer (39 frames against
+21) and floats at the apex; the duel's is quick on purpose, and a longer jump
+would stretch every gap on every strip -- a three-tile moat would become a
+jump, and the alley under a clash's knock-back a step -- and slow the fighting.
+`tests/fighter_profile_test.gd` still asserts a jump under 0.4 s, about two
+tiles high, shorter than the adventure's. The forgiveness changes no held arc,
+so no strip needed re-proving; `tests/unit/test_duel_cpu_feet.gd` still crosses
+every hazard from a run and a standstill, and `tests/match_fighter_test.gd`
+still crosses the moat and dies walking into it.
+
+**Snapshot and wire.** The three windows are frame counters, four bits each, in
+the fighter's flags word above the input's press-edge memory, so the block is
+still 100 bytes and the checksum covers them. `DuelFeet.leap()` flies a hold
+shorter than the minimum as the minimum, as the fighter does, so the computer
+plans the hop it will get. The inputs now do something on frames they did not,
+so the protocol is version 5 and a version-4 build is refused in the lobby
+(`tests/unit/test_net_jump_version.gd`).
+
+`tests/unit/test_duel_jump_feel.gd` measures the coyote and buffer windows on
+both characters the same way and holds them equal, holds the tap, the held arc,
+the feet's prediction, a press kept through a roll's rise, down + JUMP never
+queued, and a restore from a snapshot taken with a press in the buffer. With
+the three windows set to nothing -- the old fighter exactly -- six of its
+eight tests fail, and with the buffer left out of the flags word the snapshot
+test does.
+
 ## Where else the duel is decided
 
 Not covered here, and documented in the code:

@@ -721,14 +721,15 @@ here is per **round** (*The series*, above), as the suites measure it.
 
 | Against | Result |
 | --- | --- |
-| the closing bot of `tests/match_net_test.gd`, made to run for its gate when it leads, in the suite, 10 seeds a level | EASY won 5, MEDIUM 10, HARD 10 |
+| the closing bot of `tests/match_net_test.gd`, made to run for its gate when it leads, in the suite, 10 seeds a level | EASY won 4, MEDIUM 10, HARD 9 (5, 10, 10 before the jump's forgiveness; over thirty seeds MEDIUM 30, HARD 29, both 30 before) |
 | itself, in the suite, two seeds a pairing | every round finished, the longest in 2,151 frames; HARD beat EASY 3 times in 4 and MEDIUM 2 in 2 |
 | the ground, across the suite's rounds on the Tug of War | 1 death in 21 against the bot, none in 31 between computers |
 
 The suite holds HARD to eight wins in ten against the bot, EASY to losing some
-and winning some, MEDIUM between them, every computer-against-computer round to
-an end, and hazard deaths to one in twenty; each of those was seen to fail with
-the behaviour behind it broken.
+and winning some, MEDIUM between them (to within one round: the bot cannot
+separate two levels at its ceiling, and HARD's one loss is a first exchange),
+every computer-against-computer round to an end, and hazard deaths to one in
+twenty; each of those was seen to fail with the behaviour behind it broken.
 
 **Against scripted strategies**, measured for the fairness work: a scratch
 harness put one simple bot in seat one against each level, 12 seeds a cell, on
@@ -829,7 +830,12 @@ What moved, and why:
   turn between rounds replayed from a snapshot, a rematch, and one round when
   one is asked for.
 - `tests/unit/test_match_hud_series.gd` — the plate's score is the match's.
-- `tests/unit/test_net_fairness_version.gd` — protocol 4 refuses protocol 3.
+- `tests/unit/test_net_fairness_version.gd` — protocol 4 and on refuse protocol 3.
+- `tests/unit/test_net_jump_version.gd` — protocol 5 (the jump's forgiveness)
+  refuses protocol 4.
+- `tests/unit/test_duel_jump_feel.gd` — the tap, the coyote and buffer windows
+  measured on the prince and the fighter alike, the held arc unchanged, the
+  feet's prediction, and the windows through a snapshot.
 - `tests/unit/test_duel_stick.gd` — the phone stick's guard lanes, the duck's
   lean, a sagging run holding no down, and the adventure's stick untouched.
 - `tests/unit/test_duel_guard_poses.gd` — HIGH, MID, LOW and the duck as four

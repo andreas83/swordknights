@@ -212,8 +212,9 @@ host's was.
 The snapshot is *exact*. A 52-byte match header (frame, phase, initiative,
 zone, kills, the series, the two trailing-edge counters, and the timers and
 scroll as doubles) and a 100-byte block per fighter: position and velocity as doubles, then the discrete state — state,
-frame count, facing, stance, the input's press-edge memory — as 32-bit
-integers, then the fighter's sword. A replayed frame cannot re-fire a jump that
+frame count, facing, stance, the input's press-edge memory and the jump's three
+frame counters (coyote, buffer, cut lock, four bits each in the flags word) —
+as 32-bit integers, then the fighter's sword. A replayed frame cannot re-fire a jump that
 was already held, and nothing the simulation compares against a threshold is
 rounded on the way: rounding a timer to 32 bits moves a transition by a whole
 frame often enough to matter, and in a duel that is a sword landing or missing.

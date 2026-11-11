@@ -7,8 +7,9 @@ extends Resource
 ## a jump buffer so a late tap on a touchscreen is forgiven, and a level
 ## grammar (2-tile hop, 3-tile step, 4-tile grab, 3-tile gap) derived from
 ## those numbers and pinned by tests. A duellist is the opposite animal. It
-## reaches top speed in two frames, stops in three, falls like a brick, and is
-## never forgiven anything. Putting both sets of numbers in one file would
+## reaches top speed in two frames, stops in three and falls like a brick. It
+## is forgiven exactly what a thumb on glass needs and nothing that changes the
+## arc: the jump's three frame windows below. Putting both sets of numbers in one file would
 ## mean every duel retune threatened the levels, so the duel carries its own
 ## profile and the fighter reads it through `Fighter.setup(id, profile)`.
 ##
@@ -91,9 +92,42 @@ const DUCKED := 3
 @export var gravity: float = 2400.0
 @export var max_fall_speed: float = 660.0
 @export var jump_speed: float = 420.0
-## Releasing jump on the way up cuts the arc. No apex float, no coyote time and
-## no jump buffer: a duel does not forgive a late press, it punishes it.
+## Releasing jump on the way up cuts the arc, every frame it is let go. No apex
+## float: the arc is the spec's, quick and two tiles high.
 @export var jump_cut: float = 0.35
+
+# --- the jump's forgiveness, in frames ---------------------------------------
+#
+# This used to say "no coyote time and no jump buffer: a duel does not forgive
+# a late press, it punishes it". On a phone that punished the glass, not the
+# player: a thumb's tap is one to four frames, and with the cut live from the
+# first frame a one-frame tap rose 8 px and a four-frame one 22, against 33 for
+# a held jump; a press a frame after the feet left an edge, or a frame before
+# they landed, did nothing at all. The owner's verdict was that jumping felt
+# better in the adventure than in the duel, and these three are the difference
+# docs/duel-combat.md ("The jump") measured. None of them moves the arc of a
+# held jump -- its apex, airtime and reach are unchanged -- so no strip's gap or
+# ledge changes. Each is under Fighter.JUMP_COUNTER_MAX (15), which is what
+# lets the three ride in the snapshot's flags word.
+
+## Frames of rise before letting go of JUMP may cut it. A tap of one frame
+## jumps as a four-frame hold did: 22 px, two thirds of a full jump -- the same
+## share the adventure's tap gets (its MIN_JUMP_HOLD) -- so a tap is a hop
+## that clears a body and a held press is still the only way up two tiles.
+@export var jump_min_hold: int = 4
+## Frames after the feet leave an edge in which JUMP still jumps as if from it:
+## a press on any of the first six frames off the lip jumps, exactly as many as
+## the adventure's 0.1 s gives the prince (measured the same way for both,
+## tests/unit/test_duel_jump_feel.gd). Six frames of fall at 2400 px/s^2 is
+## 14 px, so the jump still clears the ledge it was taken from by 19.
+@export var coyote_frames: int = 7
+## Frames a JUMP pressed too early -- in the air, or in the last of a thrust, a
+## rise or a landing -- is kept, and fired on the first frame a jump can be,
+## the frame it was pressed on included: a press up to seven frames before the
+## feet land jumps on landing, as the adventure's 0.14 s does for the prince.
+## Only a plain JUMP is kept: down + JUMP is a roll or a dive kick, and a
+## commitment is chosen on its frame, not queued.
+@export var jump_buffer: int = 9
 
 # --- the moveset, in frames ------------------------------------------------
 

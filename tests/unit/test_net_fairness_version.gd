@@ -9,13 +9,15 @@ extends GutTest
 ## (scripts/net/protocol.gd, VERSION).
 ##
 ## Seen to fail with VERSION left at 3: the first test, and every version-3
-## message below decoding as if it were current.
+## message below decoding as if it were current. Protocol 5 (the jump's
+## forgiveness) kept every refusal here and has its own pin,
+## tests/unit/test_net_jump_version.gd.
 
 const POLLS := 60
 
 
 func test_duel_fairness_is_protocol_four() -> void:
-	assert_eq(NetProtocol.VERSION, 4, "duel fairness bumped the protocol to 4")
+	assert_gte(NetProtocol.VERSION, 4, "duel fairness bumped the protocol to 4, or past it")
 	assert_eq(DuelMatch.HEADER_BYTES, 52, "and the match header to 52 bytes")
 
 
@@ -56,5 +58,6 @@ func test_a_version_three_guest_is_told_it_is_a_different_build() -> void:
 		if session.stage == NetSession.Stage.ENDED:
 			break
 	assert_eq(session.stage, NetSession.Stage.ENDED, "the host does not seat it")
-	assert_string_contains(session.status_detail, "protocol 3, ours 4", "and says why")
+	assert_string_contains(session.status_detail,
+		"protocol 3, ours %d" % NetProtocol.VERSION, "and says why")
 	session.shutdown()
