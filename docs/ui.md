@@ -163,8 +163,9 @@ Consequences:
 
 `UiLayout.banner(view)` is a 48-unit band across the middle of the safe area.
 **It is the only place an overlay may put words.** Level title cards,
-ESCAPED, round results, match results, the desync warning and the duel's hit
-flashes all live there and nowhere else.
+ESCAPED, round results, match results, the duel's round openings (with the
+guard's hint under them), the desync warning and the duel's hit flashes all
+live there and nowhere else.
 
 This is a promise to the level art: nothing will be written outside that band,
 so the floor can be a row of spikes. `PAUSE TO QUIT` used to be printed across

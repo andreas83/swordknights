@@ -39,6 +39,8 @@ var _their_look: CharacterLook = null
 func _ready() -> void:
 	super._ready()
 	hud.footer = "WAITING FOR A SECOND PLAYER"
+	# Round one is announced when there is a second player to fight it.
+	hud.announce_round(0)
 	lobby.host_room_requested.connect(_host_room)
 	lobby.join_room_requested.connect(_join_room)
 	lobby.host_direct_requested.connect(_host_direct)
@@ -261,6 +263,7 @@ func _on_seated(slot: int) -> void:
 	dress_fighters()
 	hud.your_slot = slot
 	hud.footer = "YOU ARE %s  ·  %s" % ["CRIMSON" if slot == 0 else "SEA-GREEN", PLAY_FOOTER]
+	hud.announce_round(1)
 	camera.setup(fight)
 
 

@@ -100,10 +100,11 @@ of a clash.
 
 ### Why down is the guard and down + WALK the duck, not the other way round
 
-The choice is made for the phone stick. The stick
+The choice is made for the phone stick. The adventure's stick
 (`scripts/ui/touch_controls.gd`) presses a direction past a 7-unit dead zone,
 up or down past 14, and WALK when the push is sideways and small (between 7
-and 16.5 units of a 30-unit stick).
+and 16.5 units of a 30-unit stick). The duel's now reads the same push by its
+angle; see *The stick*, below, for why and for the numbers.
 
 - **The guard is held; the duck is a moment.** A fencer holds a stance for
   seconds at the edge of reach. The duck is a dodge for the frames a HIGH blade
@@ -145,6 +146,60 @@ parry, the LOW disarm from a standstill and from a duck, WALK backing off with
 the guard still up (and a run turning the back), the duck planted under HIGH,
 and the thrust from a duck as designed. Each was seen to fail with the old
 rule put back.
+
+### The stick
+
+The owner, after the build above: *ducking works well; the LOW guard is not
+quite clear*. Asked whether he could tell he was in a LOW guard, and tell it
+from the duck, he said no. Two things were wrong, one in the thumb and one in
+the picture.
+
+**The thumb.** On the adventure's stick, straight down was the guard only while
+the thumb stayed within the 7-unit dead zone of the vertical: under 3 mm on a
+phone. A thumb pulled down to hold a guard wanders more than that, and past it
+the stick pressed a direction and WALK as well, which is the duck, which every
+LOW thrust kills. The guard flickered into ducks, and every flicker moved the
+posture. So the scenes that duel on a phone set `TouchControls.stance_stick`,
+and below the stick's middle the push is read by its angle
+(`TouchControls.stance_actions()`):
+
+| Push, below the middle | Pressed | The fighter |
+|---|---|---|
+| within 22.5° of straight down (`STANCE_CONE`, the eight-way stick's own sector) | down | **LOW guard**, standing still |
+| leaning further, or any sideways push short of a run | down, the direction, WALK | **duck**, planted |
+| flatter than 45° with a run's push (16.5 units or more aside) | the direction | **run**, no down |
+
+- **The lane widens with the push.** It is an angle, not a width: at a 30-unit
+  push the thumb may wander 12 units either side and still hold LOW. The
+  further a player pulls to say "guard", the more room the guard gets.
+- **The duck stays a lean away.** It is still down and a little sideways, as
+  the owner liked it; it now starts at 22.5° rather than at 7 units, which at a
+  20-unit push is 8 units instead of 7, and a full diagonal push -- which used
+  to be a run at LOW -- is a duck too. The duck plants, so which way it leans
+  costs nothing.
+- **A sagging run holds no down.** A running thumb that drifts below the
+  horizontal used to press down past 14 units, which held LOW and turned the
+  next JUMP into a roll. Flatter than 45° at a run's push, the stick is a run
+  and nothing else. Down + JUMP is still the roll, from straight down or a
+  lean, standing or running.
+- **Up is the same lane.** Straight up holds HIGH standing still; a lean up
+  shuffles at HIGH and a run up runs at HIGH, as before.
+- **The adventure keeps its stick.** The prince crawls on down and a direction,
+  and a crouch that needed a 22.5° lean to crawl would change a game that was
+  not broken. `tests/unit/test_duel_stick.gd` holds the adventure's mapping push
+  for push.
+
+On the stick's base the two guard lanes are scored, and over it -- above the
+thumb, which covers the knob -- the stick says what it holds: **HIGH**, **LOW**,
+**DUCK**, or a dim **MID**. Read off the actions the stick is pressing, so the
+word and the fighter cannot disagree about the buttons.
+
+**Where it is said.** Every round opens with a plate in the band (MatchHud,
+THE ROUND): ROUND n, or FINAL ROUND, the score, and how the guard and the duck
+are held on this screen -- *STICK STRAIGHT DOWN: LOW GUARD · DOWN AND ASIDE:
+DUCK* on a phone, *S OR DOWN: LOW GUARD · WITH SHIFT: DUCK* on a keyboard,
+both seats' keys on one keyboard. It shows over the countdown, when the
+fighters are held on their marks and the band is free.
 
 ### Seeing the guard
 
