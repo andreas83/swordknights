@@ -53,8 +53,9 @@ five beats bend it.
 | **a hard landing** | settles with the weight of it, then recovers | `SETTLE_MAX`, 4 px |
 | **a backstep** | holds the lead where it was; dips one pixel | 0.3 of `SETTLE_MAX` |
 
-All the vertical reframing added together is 44 px of a 180 px frame, and
-`tests/feel_camera_test.gd` fails if that grows past 48.
+All the vertical reframing added together is 44 px of the 120 px of world
+the camera shows (below), and `tests/feel_camera_test.gd` fails if that grows
+past 40% of it.
 
 ### How each one is decided
 
@@ -94,18 +95,65 @@ display's rate (`tests/unit/test_camera_view.gd`).
   the world is drawn with nearest filtering and half a pixel of shake is a
   shimmer rather than a movement.
 
-### No zoom
+### A fixed 1.5x, and no zoom beats
 
-Widening on a fall and tightening on a grab are the obvious reach for
-`Camera2D.zoom`. Both were tried and both are wrong here: at 320x180 with
-nearest filtering, a non-integer zoom resamples the tilemap and puts a soft,
-uneven edge on every shadow in the frame — the one thing the art direction
-does not allow. Integer zoom steps are far too coarse to be subtle.
+The camera stands at `GameCamera.ZOOM`, 1.5, in every scene that plays a level
+— the Adventure, the campaign's chapters, Endless and the feel lab, which all
+frame through `GameCamera` — and never moves off it. The owner's call: at 1:1
+the 22-unit figure filled an eighth of the screen's height; at 1.5x it fills
+nearly a fifth. The viewport is still 180 units tall, so the HUD, the touch
+controls and the sky, which live on CanvasLayers, are drawn exactly as before:
+only the world comes closer, and the camera shows 120 units of it (about 213
+across on a 16:9 screen, 160 on 4:3).
 
-So both beats are framed with offsets instead, which turns out to be what the
-player actually needed: seeing further down a drop is a question of where the
-frame sits, not how wide it is. `tests/feel_camera_test.gd` reads the source
-and fails if anyone writes `zoom`.
+This section used to argue for no zoom at all: at 320x180 with nearest
+filtering, a non-integer zoom resamples the tilemap and puts a soft, uneven
+edge on every shadow. That is true of a zoom against the texels, and 1.5 is
+not one. The 2D is stretched with `canvas_items`/`keep_height`, so the tilemap
+is already drawn at window_height / 180 screen pixels a unit, and the camera's
+1.5 multiplies that: 720 → 6, 1080 → 9, 1440 → 12, whole numbers on the
+common desktop heights. On a phone where window_height / 180 is already
+fractional, it is no worse in kind than 1:1 was.
+
+What still holds is the rest: widening on a fall and tightening on a grab are
+the obvious reach for `Camera2D.zoom`, and both are wrong, because a scale in
+motion passes through every fraction on the way and the frame shimmers as it
+breathes. Integer zoom steps are far too coarse to be subtle. So both beats
+are framed with offsets instead, which turns out to be what the player
+actually needed: seeing further down a drop is a question of where the frame
+sits, not how wide it is. `tests/feel_camera_test.gd` reads the source and
+fails on any write to `zoom` but the one, and
+`tests/unit/test_adventure_zoom.gd` pins the scale on the scenes, the frame a
+foe reads (`CameraView`), the HUD, and the duel's camera, which keeps its own.
+
+Every beat in the table above is in world units and zooms with the world: the
+lead, the lift, the fall lead, the settle and the shake are sized against the
+body and the tile, and a closer camera shows the same film larger. None was
+retuned. The look-ahead was checked on the narrowest screen the game runs on,
+4:3 landscape: a full lead plus the dead zone puts the prince 48 units off
+centre, 32 inside the trailing edge of a 160-unit frame.
+
+What did change is how much of a room is in shot. Centred on the feet, the
+frame shows 60 units above them and 60 below, where it showed 90 and 90: the
+head at a full jump's apex (58 above the feet) is still in, but a four-tile
+ledge's lip (64) is just out of shot from the floor below it, and the bottom
+of a drop deeper than three tiles is out of frame at take-off. That is a
+change to the campaign's *No blind jumps* margin (`docs/campaign.md`, which
+still states the 1:1 figures), and is an open item rather than something this
+camera quietly solves.
+
+Because a foe acts only while the camera shows it, a smaller frame is a
+change of play, and three places felt it. Chapter III's frozen clear run takes
+a step past the torch before it waits for the deck cat, which is off the
+frame from the torch itself. The Glassbearer asked an estimate of the frame
+(half the viewport round the prince, less the look-ahead), which at 1.5x left
+him 62 units of reach and closed Chapter IV's R5 encounter for good; he now
+asks `CameraView` like the owl and the blades, and needs all of himself in
+the frame. And Chapter V's first owl, perched 120 units over the scythe's
+door, is never in the frame from the door, so the twist that draws its stoop
+through the blade does not happen: an open item, pinned in
+`tests/unit/test_sun_well.gd` so that it shows the day the owl is back in
+shot.
 
 ### The duel's camera breathes, and why that is not a contradiction
 
@@ -530,9 +578,10 @@ direction, the caps, the respawn and the restart.
 
 Each of these was considered, and some were built and then taken out again.
 
-- **Camera zoom** on falls and ledge grabs. Argued above: it softens every
-  edge in the frame. (The duel's two-fighter framing does zoom, in whole
-  pixels per texel at rest; see *The duel's camera breathes*.)
+- **Camera zoom** on falls and ledge grabs. Argued above: a scale in motion
+  shimmers every edge in the frame, so the Adventure's 1.5x is fixed. (The
+  duel's two-fighter framing does zoom, in whole pixels per texel at rest; see
+  *The duel's camera breathes*.)
 - **Hitstop on relic pickup, on landing, and on the exit door.** Hitstop is
   for things that resist you. A relic that stops time is a relic that feels
   like a mistake.

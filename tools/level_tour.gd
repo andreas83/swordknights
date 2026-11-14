@@ -22,6 +22,10 @@ extends SceneTree
 ## centre, the prince is parked out of the way, and the frames are written
 ## with their grid position in the name. Nothing is stepped but the clock, so
 ## the blades and the owls are at rest as the level was authored.
+##
+## The camera is set back to 1:1 from the Adventure's GameCamera.ZOOM: a tour
+## is a map of the level rather than a frame of play, and at 1:1 a frame is
+## the viewport's own size, which is what tools/level_tour.py stitches by.
 
 const GAME_SCENE := "res://scenes/game.tscn"
 ## Frames to let the wipe lift and the title card pass before the first shot.
@@ -82,6 +86,7 @@ func _process(_delta: float) -> bool:
 func _plan() -> void:
 	_view = root.get_visible_rect().size
 	_game.camera.set_physics_process(false)
+	_game.camera.zoom = Vector2.ONE
 	_game.camera.position_smoothing_enabled = false
 	_game.player.set_physics_process(false)
 	_game.player.visible = false

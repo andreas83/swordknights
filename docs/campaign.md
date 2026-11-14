@@ -70,19 +70,21 @@ and clear run to this table, and fails when a run moves without it):
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | I | The Sun Terrace | late afternoon | 1:00 | 14.37 s | 0 | 1 | the sentinel; the ledge grab, the ladder, the secrets |
 | II | The Long Arcade | golden hour | 1:45 | 32.85 s | 0 | 6 | the Bastion; plates, gates, lifts, the grate |
-| III | The Aqueduct | sunset | 2:15 | 32.15 s | 0 | 5 | the Caracal; crumbling stone (and the doves) |
-| IV | The Mirror Tower | dusk | 3:00 | 55.93 s | 1 | 7 | the Glassbearer; mirrors, sun-seals |
-| V | The Sun Well | night | 2:15 | 34.82 s | 0 | 44 | the owl; scythes and spike slots |
+| III | The Aqueduct | sunset | 2:15 | 32.13 s | 0 | 5 | the Caracal; crumbling stone (and the doves) |
+| IV | The Mirror Tower | dusk | 3:00 | 56.02 s | 0 | 5 | the Glassbearer; mirrors, sun-seals |
+| V | The Sun Well | night | 2:15 | 34.82 s | 0 | 27 | the owl; scythes and spike slots |
 | — | The Eclipse | night | 1:45 | 79.07 s | 0 | 9 | the King; the kept sun |
 
-Four minutes nine seconds on the game's clocks, 4:20 from the first frame to
+Four minutes nine seconds on the game's clocks, 4:19 from the first frame to
 the last door with the cards and the complete screens between; the pars add
 to 12:00. *Threats on screen* counts each live window that opened where the
 camera showed it -- a foe's strike, a blade's cut -- and each shot loosed; by
 the foe contract every one was told 27 frames ahead. The clear runs are
 steady lines, not tours: they take no secret, and they read every threat
-they meet, which is why only Chapter IV's, which walks into one bolt, loses
-a heart.
+they meet. Chapter IV's used to walk into one bolt and lose a heart; since
+the Adventure's camera went to 1.5x (`GameCamera.ZOOM`) that Glassbearer is
+off the frame when the run passes and holds his fire, and the smaller frame
+is also why Chapter V counts 27 threats on screen where it counted 44.
 
 What it says about the curve (*A difficulty curve*, below):
 
@@ -732,7 +734,7 @@ the beat or the off-beat (`docs/audio.md`).
 | --- | --- | --- |
 | introduce | the square, over the mouth's ladder (x 21) | on the rungs you are off the stone and it spreads its wings — you are down before it stoops, and it folds |
 | develop | the sump (x 57, y 12) | climb out by a hop and a hang while it pulls up, or jump and slash it |
-| twist | the antechamber's first owl (x 72) | draw its stoop through the scythe's cut on the beat: the machine kills it |
+| twist | the antechamber's first owl (x 72) | draw its stoop through the scythe's cut on the beat: the machine kills it. *Open at the 1.5x camera:* its perch is out of the frame from the door, so it never stoops (`tests/unit/test_sun_well.gd`) |
 | master | the antechamber's second owl (x 83) | it takes anything that jumps, so run the slots on the beat instead of hopping them |
 
 **Beat sheet** (10 beats, top left to bottom right):
@@ -1121,8 +1123,10 @@ kept sun, it is an eclipse: a black circle ringed with fire — the one
 silhouette in the game that is a ring of light.
 
 **The arena: the Vault of the kept sun** (columns 86–111, rows 41–52 of the
-draft). A floor 26 tiles wide — it fits a 440-unit screen, and a 320-unit
-screen pans a little — with a gallery slab five tiles long at each end, four
+draft). A floor 26 tiles wide — at 1:1 it fit a 440-unit screen and a
+320-unit screen panned a little; at the Adventure's fixed 1.5x
+(`GameCamera.ZOOM`) every screen pans across it, an open item for the fight's
+framing — with a gallery slab five tiles long at each end, four
 tiles up: high enough to plunge from, low enough to grab back onto. Under the
 dome hangs the kept sun on its chains: the arena's only light, the last light
 of the day the player sent down in Chapter IV. You enter by dropping five
@@ -1716,6 +1720,13 @@ feet), and every drop lands on something that was visible from its lip. A
 running jump reaches 54 px and the frame shows at least 126 px either side of
 the prince, so across is never the problem; down is. A level may hide
 secrets, never floors.
+
+*Open, since the Adventure's camera went to a fixed 1.5x (`GameCamera.ZOOM`,
+`docs/feel.md`):* the figures above are the 1:1 frame's. At 1.5x the camera
+shows 120 units of world, 60 under the feet -- 3.75 tiles -- and at least 80
+px either side on a 4:3 screen. Across is still never the problem; a drop of
+four or five tiles now lands out of frame at take-off, so this rule and the
+five-tile limit need deciding again.
 
 **Every death is readable.** One cause per death, on screen, told 27 frames
 ahead by a pose, a glint and a sound. Spikes and blades are steel and nothing

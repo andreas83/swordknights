@@ -26,18 +26,54 @@ extends Camera2D
 ## The rules are static functions below so they can be reasoned about and
 ## tested without a physics world: `_physics_process` only composes them.
 ##
-## ## What is deliberately not here
+## ## A fixed 1.5x
 ##
-## **No zoom.** Widening on a fall and tightening on a grab are the obvious
-## reach for `Camera2D.zoom`, and on a 320x180 nearest-filtered pixel game they
-## are both wrong: a non-integer zoom resamples the tilemap and puts a soft,
-## uneven edge on every shadow in the frame, which is the one thing
-## `docs/art-direction.md` does not allow. Both beats are framed with offsets
-## instead — which is what the player actually needed anyway. Seeing further
-## down is a matter of where the frame sits, not how wide it is.
+## The camera stands at `ZOOM` and never moves off it. The owner's call: at
+## 1:1 the 22-unit figure filled an eighth of the screen's height, which on a
+## phone at arm's length is a figure you squint at; at 1.5x it fills nearly a
+## fifth, and the view is 120 world units tall instead of the viewport's 180.
+## The viewport itself stays 180 units (`tools/configure_project.gd`), so the
+## HUD, the touch controls and the sky, which live on CanvasLayers, are drawn
+## exactly as before: only the world comes closer.
+##
+## This used to argue for no zoom at all, on the grounds that a non-integer
+## zoom resamples the nearest-filtered tilemap and softens every shadow edge
+## (`docs/art-direction.md`). That holds for a zoom against the texels, and
+## 1.5 is not one: the 2D is stretched with `canvas_items`/`keep_height`, so
+## the tilemap is already drawn at window_height / 180 screen pixels a unit,
+## and 1.5x takes that product -- not the 1.5 -- to the screen. It stays a
+## whole number on the common desktop heights (720 -> 6, 1080 -> 9,
+## 1440 -> 12), and on a phone where window_height / 180 is already
+## fractional it is no worse in kind than 1:1 was.
+##
+## What still holds is the rest of that argument: **no dynamic zoom.**
+## Widening on a fall and tightening on a grab are the obvious reach for
+## `Camera2D.zoom`, and both are wrong: a scale that moves passes through
+## every fraction on the way, and the frame would shimmer as it breathed.
+## Both beats are framed with offsets instead -- which is what the player
+## actually needed anyway. Seeing further down is a matter of where the frame
+## sits, not how wide it is. `tests/feel_camera_test.gd` reads the source and
+## fails on any second write to `zoom`.
+##
+## Every number below is in world units and zooms with the world, on purpose:
+## the lead, the lift, the fall lead, the settle and the shake are each sized
+## against the body and the tile they frame, and a closer camera shows the
+## same film larger rather than a different one. The look-ahead was checked
+## against the narrowest screen the game runs on, 4:3 landscape: 160 x 120
+## world units at 1.5x, so a full lead plus the dead zone puts the prince 48
+## units off centre, still 32 inside the trailing edge. What 1.5x costs is
+## height: centred on the feet, the frame shows 60 units above and below them
+## where it showed 90, so a four-tile ledge's lip is out of shot from the
+## floor and a drop past three tiles lands out of frame at take-off -- an open
+## item against the campaign's "No blind jumps" (docs/feel.md).
+##
+## ## What is deliberately not here
 ##
 ## **No rotation, no kick on the roll, no spring overshoot.** If a player
 ## notices the camera, it is too much.
+
+## The camera's one and only scale (see "A fixed 1.5x" above).
+const ZOOM := 1.5
 
 @export var look_ahead: float = 34.0
 @export var look_ahead_smoothing: float = 6.0
@@ -78,6 +114,14 @@ var _settle: float = 0.0
 var _shake_time: float = 0.0
 var _shake_magnitude: float = 0.0
 var _shake_offset := Vector2.ZERO
+
+
+## Set once, at construction, and never again: the scale is a fact of the
+## Adventure, not a beat of the frame, and a camera that exists is already at
+## it -- before it enters a tree, which a test building one by hand may never
+## let it finish doing.
+func _init() -> void:
+	zoom = Vector2.ONE * ZOOM
 
 
 func _ready() -> void:

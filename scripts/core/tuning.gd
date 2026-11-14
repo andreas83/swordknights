@@ -278,9 +278,10 @@ const LAND_RECOVER_TIME := 0.12
 #
 # The owner's rule (docs/campaign.md, "Decided by the owner"): a fall of ten
 # tiles or more kills. That is twice the deepest drop a level may ask for --
-# five, because the camera shows about 5.6 tiles under the feet and no
-# landing may be out of frame at take-off ("No blind jumps") -- so the rule
-# never ends a route, only a mistake.
+# five, because the camera showed about 5.6 tiles under the feet at 1:1 and
+# no landing may be out of frame at take-off ("No blind jumps"; at the fixed
+# 1.5x of GameCamera.ZOOM it shows 3.75, an open item in docs/campaign.md) --
+# so the rule never ends a route, only a mistake.
 #
 # It is a HEIGHT, and it cannot be a landing speed. A fall from rest reaches
 # MAX_FALL_SPEED terminal_fall_height() below where it started, which at 60 Hz

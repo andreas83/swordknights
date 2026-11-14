@@ -90,8 +90,9 @@ const SAME_FLOOR := 16.0
 const CROWDED := 3.0 * 16.0
 ## How far from his post his beat runs, either way: a tile and a half.
 const BEAT := 24.0
-## How much of the frame's half-width is kept back from the edge before he
-## counts as on screen: the camera leads the prince by up to its look-ahead.
+## The test seam's frame (frame_half_width) is centred on the prince, so this
+## much of it is kept back from the edge before he counts as on screen: the
+## camera leads the prince by up to its look-ahead.
 const FRAME_MARGIN := 34.0 + 10.0
 
 var facing: int = -1
@@ -99,8 +100,8 @@ var state: State = State.WALK
 var state_time: float = 0.0
 ## The glass is lit this frame.
 var glass := false
-## Test seam: the half-width of the frame he must be inside to act, or 0 for
-## the viewport's own.
+## Test seam: the half-width of a frame centred on the prince that he must be
+## inside to act, or 0 for the frame the camera really shows (CameraView).
 var frame_half_width := 0.0
 
 ## Where the level posted him: the middle of his beat.
@@ -243,7 +244,7 @@ func _sees_prince() -> bool:
 		return false
 	var centre := target_rect.get_center().x
 	var gap := absf(centre - global_position.x)
-	if gap > RANGE or gap > _frame_half_width():
+	if gap > RANGE or not _in_frame(gap):
 		return false
 	return _clear_line(centre)
 
@@ -294,11 +295,20 @@ func _backing_off() -> int:
 	return 1 if dx >= 0.0 else -1
 
 
-func _frame_half_width() -> float:
-	var half := frame_half_width
-	if half <= 0.0:
-		half = (get_viewport_rect().size.x if is_inside_tree() else 320.0) * 0.5
-	return maxf(0.0, half - FRAME_MARGIN)
+## Whether he is in the frame, `gap` from the prince: all of him inside the
+## rectangle the camera shows (CameraView), as the owl and the blades ask.
+##
+## It used to be an estimate -- the viewport's half-width round the prince,
+## less the look-ahead the camera might lead him by -- which was safe at 1:1
+## and, once the Adventure's camera went to 1.5x (GameCamera.ZOOM), left him
+## 62 units of reach on a 320-unit screen and 36 on a 4:3 one: R5's slot in
+## Chapter IV is 69 from the wall the prince stands at, so the encounter could
+## never open. The real frame is what the rule is about, and it is cheaper
+## to ask than to bound.
+func _in_frame(gap: float) -> bool:
+	if frame_half_width > 0.0:
+		return gap <= maxf(0.0, frame_half_width - FRAME_MARGIN)
+	return CameraView.rect_for(self).encloses(bounds())
 
 
 ## Whether his glass is lit now: the sun on it, or a beam through it.

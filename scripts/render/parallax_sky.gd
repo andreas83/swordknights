@@ -6,6 +6,13 @@ extends Node2D
 ## background images in the build and a level can re-roll its silhouette by
 ## changing the seed. Drawn in screen space inside a CanvasLayer, with each
 ## layer offset by the camera position times its depth.
+##
+## The camera's zoom does not enter, deliberately. The sky is a backdrop at
+## its own scale on its own layer, so it fills the viewport whatever the world
+## in front of it is scaled by; the duel's camera has always zoomed in front of
+## it, and the Adventure's 1.5x (GameCamera.ZOOM) is the same case. The
+## parallax reads the camera's travel in world units, so a closer camera only
+## makes the near world slide faster past a sky that moves as it did.
 
 @export var seed_value: int = 1:
 	set(value):
