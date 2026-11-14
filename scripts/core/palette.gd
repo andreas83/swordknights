@@ -55,6 +55,25 @@ const BLOOD_DRIED := Color("3a0406")
 ## pool. A highlight only -- never a fill.
 const BLOOD_WET := Color("ff6a55")
 
+## The princess's concept colours: royal blue for cloth and umber for hair and
+## leather, the sixth and seventh rationed accents (docs/art-direction.md,
+## "Colour discipline"). The owner's concept sheet for the 3D princess wears
+## both and the duotone has neither. Each is a ramp of three in the same
+## lit/shade/back relationship as CLOTH, CLOTH_DARK and SHADOW_DEEP, and each
+## is for what a figure wears, never for stone and never for a team: blue sits
+## fifty degrees of hue from player two's teal, and a duel re-dresses every
+## robe in its seat's colour whatever was chosen (FighterArt.dress).
+const ROYAL := Color("3a6ccc")
+const ROYAL_DARK := Color("244a99")
+const ROYAL_DEEP := Color("16306a")
+const UMBER := Color("8a5532")
+const UMBER_DARK := Color("5a341f")
+const UMBER_DEEP := Color("33200f")
+## The princess's blade: a blue-white steel and the glow round it. The blade
+## keeps steel's lightness, so a sword still reads as a sword first.
+const ROYAL_STEEL := Color("a9c4f5")
+const ROYAL_GLOW := Color("6fa2ff")
+
 ## Surfaces, named by how they face the sun.
 const SURFACE_LIT := LIGHT
 const SURFACE_LIT_SOFT := LIGHT_SOFT

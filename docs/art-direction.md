@@ -63,6 +63,20 @@ The duotone is the rule; accents are the exception and they are rationed:
 - **Paper white** — reserved for the brightest specular and for text. If
   white appears anywhere else it steals the eye.
 - **Blood red** — blood, and nothing else. See below.
+- **Royal blue and umber** — what a figure wears: an outfit, hair, leather.
+  Never stone, never a team. See below.
+
+### The sixth and seventh accents: royal blue and umber
+
+The owner's concept sheet for the 3D princess wears a royal-blue tunic and
+cape, brown hair and brown leather, and asked for her to be close to it. The
+duotone has no blue and its "browns" are crimsons, so `Palette.ROYAL*` and
+`Palette.UMBER*` were added, each a ramp of three standing in the same
+lit / shade / back relationship as the cloth ramp. They are rationed by use:
+the wardrobe's ROYAL outfit and BROWN hair, and the princess's leather. They
+never colour stone, and never a team: a duel re-dresses every robe in its
+seat's crimson or sea-green, and the blue sits about fifty degrees of hue away
+from player two's teal.
 
 ### The fifth accent: blood
 

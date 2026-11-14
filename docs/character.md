@@ -953,14 +953,25 @@ with nothing trailing reads as stopped mid-run.
 ![the 3D princess in every duel state](princess-fighter-poses.png)
 
 **The 3D princess** (`scripts/player/princess_costume.gd`) is a stylised
-young swordswoman after the owner's concept sheet: a head a little large for
-her body and big eyes, a braid down her back, a jewelled band across her brow,
-a belted tunic with a trim and a crest, a cape, steel pauldrons, leather
-bracers and tall boots. Built from spheres, tapered cylinders, rings and boxes,
-all made in code. The tunic and cape are the outfit (the seat's team colour in
-a duel, the leggings its darkest step), the trim, crest, buckle and band the
-accent, the hair and skin the look's. The concept's shield and glowing blade
-are not there: the sword is the shared 2D one, and the game has no shield.
+young swordswoman after the owner's concept sheet, which the owner asked her to
+match as closely as the game allows: a head a little large for her body and
+big eyes, a braid down her back, a jewelled band across her brow, a belted
+royal-blue tunic with gold trim and a rampant lion, a lined cape, steel
+pauldrons, brown leather bracers and tall boots, a glowing blue-white sword and
+a shield. Built from spheres, tapered cylinders, rings and boxes, all made in
+code.
+
+Choosing her puts on the concept's look -- the ROYAL outfit, BROWN hair, SAND
+skin (`CharacterLook.wear_defaults()`), from the two ramps the palette gained
+for her (`Palette.ROYAL*`, `Palette.UMBER*`, docs/art-direction.md). In a duel
+the tunic, cape, lining and shield face are the seat's team colour like every
+robe; the leather and leggings are umber, which belongs to neither team. Under
+the world's gold key and crimson ambient blue goes to mud, so her light is
+paler and her shade cooler (`_sun()`, `_ambient()`): still a warm sun from the
+left. Her sword is the shared 2D one, coloured hers through
+`Costume.blade_colours()` -- the shape and reach stay the pose's and, in the
+duel, the simulation's. The shield is slung on her back as decoration: the game
+has no shield, and one on her arm would promise a block.
 
 Her hair is parted in the middle and drawn back, so the forehead is bare
 under the brow band: a cap set back on the skull, a swept lock either side of

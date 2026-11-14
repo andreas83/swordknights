@@ -455,19 +455,35 @@ func _draw_weapon(pose: Dictionary) -> void:
 	var hilt := _hand_front + dir * 1.2
 	var tip := hilt + dir * length
 	blade_tip = tip
+	var tones := costume.blade_colours()
+	_draw_glow(tones, hilt, tip, side)
 
 	draw_colored_polygon(PackedVector2Array([
 		hilt + side * 0.9, tip + side * 0.25, tip - side * 0.25, hilt - side * 0.9,
-	]), Palette.STEEL)
+	]), tones.get("steel", Palette.STEEL))
 	draw_colored_polygon(PackedVector2Array([
 		hilt + side * 0.9, tip + side * 0.25,
 		tip, hilt + side * 0.1,
-	]), Palette.LIGHT_SOFT if blade_hot > 0.0 else Palette.STEEL_DARK)
+	]), tones.get("edge_hot", Palette.LIGHT_SOFT) if blade_hot > 0.0
+		else tones.get("edge", Palette.STEEL_DARK))
 	# Crossguard.
 	draw_colored_polygon(PackedVector2Array([
 		hilt + side * 2.0 - dir * 0.5, hilt + side * 2.0 + dir * 0.5,
 		hilt - side * 2.0 + dir * 0.5, hilt - side * 2.0 - dir * 0.5,
-	]), Palette.LIGHT_WARM)
+	]), tones.get("guard", Palette.LIGHT_WARM))
+
+
+## A halo round the blade from hilt to tip, for a costume whose sword glows:
+## two widths, the outer fainter, so it reads as light rather than as a fatter
+## blade.
+func _draw_glow(tones: Dictionary, hilt: Vector2, tip: Vector2, side: Vector2) -> void:
+	if not tones.has("glow"):
+		return
+	var glow: Color = tones["glow"]
+	for ring: Vector2 in [Vector2(2.4, 1.3), Vector2(1.6, 0.8)]:
+		draw_colored_polygon(PackedVector2Array([
+			hilt + side * ring.x, tip + side * ring.y, tip - side * ring.y, hilt - side * ring.x,
+		]), Palette.with_alpha(glow, 0.22 if ring.x > 2.0 else 0.35))
 
 
 ## Knuckles on the ledge. Two hard blocks above the hood are the whole read

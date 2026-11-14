@@ -23,16 +23,21 @@ extends ModelCostume
 ##
 ## ## Where the colours come from
 ##
-## The tunic is the look's outfit and the cape its shade step; in the duel both
-## are the seat's team colour (FighterArt.dress), and the leggings take the
-## seat's darkest step, so a seat's whole silhouette is its team. The trim,
-## the crest, the buckle and the brow band are the accent. The hair and the
-## skin are the look's. Steel, leather and the eyes are fixed: they belong to
-## neither team.
+## The tunic is the look's outfit, the cape its shade step, the lining and the
+## shield's face the tunic again; in the duel they are the seat's team colour
+## (FighterArt.dress), so a seat reads as its team from the chest out. Her own
+## look is the concept's -- ROYAL blue, BROWN hair, SAND skin -- put on by
+## `CharacterLook.wear_defaults()` when she is chosen. The trim, the lion, the
+## buckles, the band and the shield's boss are the accent. Leather, leggings,
+## steel and the eyes are fixed browns, greys and whites that belong to neither
+## team (Palette.UMBER*, docs/art-direction.md).
 ##
-## The shield and the glowing blade of the concept art are not here. The sword
-## is the shared 2D one (ModelCostume explains why), and there is no shield in
-## the game for her to carry.
+## ## What is not the concept's
+##
+## Her sword is the shared 2D one (ModelCostume explains why), coloured hers
+## through `blade_colours()`: blue-white steel in a blue glow. The shield is
+## slung on her back as decoration, because the game has no shield to block
+## with and a shield on the arm would promise one.
 
 const HEAD_R := Vector3(2.15, 2.3, 2.1)
 ## How far her face turns from the run toward the viewer, in radians.
@@ -57,11 +62,32 @@ var _spin := 0.0
 var _seen_kick := INF
 
 
+## A paler sun and a cooler shade than the base's. Under the gold key and the
+## crimson ambient a royal-blue tunic goes to mud -- blue times gold is grey --
+## and the concept is lit near white with a cool shade. The sun is still warm
+## and still from the left; only its saturation comes down.
+func _sun() -> Color:
+	return Palette.PAPER
+
+
+func _ambient() -> Color:
+	return Palette.STEEL_DARK.lerp(Palette.SHADOW_DEEP, 0.35)
+
+
 ## Turned well toward the viewer, as the concept sheet draws her: the crest,
 ## both pauldrons and the trim down the front show, where a profile would hide
 ## them behind the sword arm.
 func _yaw() -> float:
 	return 0.62
+
+
+## The concept's sword: blue-white steel in a blue glow, with the trim's gold
+## on the guard.
+func blade_colours() -> Dictionary:
+	return {
+		"steel": Palette.ROYAL_STEEL, "edge": Palette.PAPER, "edge_hot": Palette.PAPER,
+		"glow": Palette.ROYAL_GLOW,
+	}
 
 
 func tick(art: PlayerArt, delta: float) -> void:
@@ -80,22 +106,22 @@ func tick(art: PlayerArt, delta: float) -> void:
 func _tones(art: PlayerArt) -> Dictionary:
 	var cloth := Palette.CLOTH if art == null else art.cloth
 	var cape := Palette.CLOTH_DARK if art == null else art.cloth_dark
-	var legs := Palette.SHADOW_DEEP if art == null else art.cloak_shade
 	var trim := Palette.LIGHT_WARM if art == null else art.accent
 	return {
-		"cloth": cloth, "cape": cape, "legs": legs, "trim": trim,
+		"cloth": cloth, "cape": cape, "trim": trim, "legs": Palette.UMBER_DEEP,
 		# The cape's lining is the tunic's colour: the lighter plane the
 		# concept shows inside the cape, kept in the seat's team.
 		"lining": cloth,
-		"leather": Palette.SHADOW_PIT, "sole": Palette.INK,
+		"leather": Palette.UMBER_DARK, "boot": Palette.UMBER, "sole": Palette.UMBER_DEEP,
 		"steel": Palette.STEEL, "steel_dark": Palette.STEEL_DARK, "gem": Palette.LIGHT_SOFT,
 		"skin": skin, "hair": hair, "hair_dark": hair_dark,
 		"white": Palette.PAPER, "iris": Palette.SHADOW_PIT, "shine": Palette.PAPER,
 		"lid": Palette.INK, "brow": hair_dark,
 		"mouth": skin.lerp(Palette.SHADOW, 0.6),
-		# The cheeks are the skin warmed toward the blood ramp's lightest step:
-		# a blush lit by the same sun as the face, whatever the skin tone.
-		"blush": skin.lerp(Palette.BLOOD_WET, 0.45),
+		# The cheeks are the skin warmed toward the fire step: a blush lit by
+		# the same sun as the face, whatever the skin tone. Not the blood
+		# ramp's glint, which is blood's alone (docs/art-direction.md).
+		"blush": skin.lerp(Palette.SHADOW_WARM, 0.45),
 	}
 
 
@@ -107,7 +133,7 @@ func _make() -> void:
 	_make_tunic()
 	_make_limbs(Vector2(0.82, 0.62), Vector2(0.66, 0.52), Vector2(0.52, 0.46),
 		Vector2(0.5, 0.44), 0.55, {
-			"leg": "legs", "shin": "leather", "foot": "leather",
+			"leg": "legs", "shin": "boot", "foot": "boot",
 			"arm": "cloth", "fore": "leather", "hand": "leather",
 		})
 	for side: String in ["front", "back"]:
@@ -141,8 +167,13 @@ func _make_tunic() -> void:
 	_add("v_near", _box(), "trim")
 	_add("v_far", _box(), "trim")
 	_add("front_trim", _box(), "trim")
-	_add("crest", _box(), "trim")
-	_add("crest_top", _sphere(), "trim")
+	for id: String in ["lion_body", "lion_mane", "lion_head"]:
+		_add(id, _sphere(), "trim")
+	for id: String in ["lion_paw", "lion_hind", "lion_tail"]:
+		_add(id, _cylinder(1.0, 1.0), "trim")
+	_add("shield", _sphere(), "cloth")
+	_add("shield_rim", _ring(0.9), "steel")
+	_add("shield_boss", _sphere(), "trim")
 	_add("belt", _cylinder(1.0, 1.0), "leather")
 	_add("buckle", _box(), "trim")
 	_add("sword_belt", _ring(0.86), "leather")
@@ -181,6 +212,28 @@ func _pose_parts(art: PlayerArt, pose: Dictionary, up: Vector3, forward: Vector3
 	_pose_head(art, pose, up)
 
 
+## The rampant lion of the concept's crest, in gold relief on the chest: a
+## body, a mane and a head, a raised forepaw, a hind leg and a tail, laid flat
+## on the tunic in the plane across the chest (`across` toward the camera,
+## `up`). At play size it is a gold mark with a ragged edge; in the wardrobe
+## it is a lion.
+func _pose_lion(art: PlayerArt, at: Vector3, up: Vector3, forward: Vector3) -> void:
+	var across := Vector3.BACK
+	var flat := 0.1
+	var lean := _axes(up.rotated(forward, 0.45 * art._f), forward)
+	_put("lion_body", lean, at + up * -0.1, Vector3(flat, 0.55, 0.32))
+	_put("lion_mane", _axes(up, forward), at + up * 0.38 + across * 0.12,
+		Vector3(flat, 0.34, 0.34))
+	_put("lion_head", _axes(up, forward), at + up * 0.45 + across * 0.3,
+		Vector3(flat * 1.4, 0.18, 0.2))
+	_segment(art, "lion_paw", at + up * 0.18 + across * 0.12, at + up * 0.5 + across * 0.5,
+		Vector2(flat * 0.6, 0.09))
+	_segment(art, "lion_hind", at - up * 0.45, at - up * 0.8 + across * 0.22,
+		Vector2(flat * 0.6, 0.1))
+	_segment(art, "lion_tail", at - up * 0.3 - across * 0.2, at + up * 0.15 - across * 0.45,
+		Vector2(flat * 0.5, 0.06))
+
+
 ## The tunic: a chest, a waist, a short flared skirt to mid-thigh with a
 ## double trim round its hem, a V of trim at the neck and a band of it down
 ## the front, the crest on the chest, a belt with a buckle, a slanted sword
@@ -208,9 +261,16 @@ func _pose_body(art: PlayerArt, up: Vector3, forward: Vector3) -> void:
 		_segment(art, "v_near" if i == 0 else "v_far",
 			shoulder + forward * 0.75 + across + up * 0.15, sternum, Vector2(0.16, 0.2))
 	_segment(art, "front_trim", sternum, hem + front * 0.9 + up * 0.4, Vector2(0.14, 0.32))
-	var crest := shoulder.lerp(chest, 0.95) + forward * 1.5 * width + Vector3.BACK * 0.55
-	_put("crest", frame, crest, Vector3(0.14, 0.9, 0.62))
-	_put("crest_top", frame, crest + up * 0.5, Vector3(0.12, 0.2, 0.36))
+	# Toward the far side of the chest: the near half is behind the sword arm.
+	_pose_lion(art, shoulder.lerp(chest, 0.95) + forward * 1.5 * width
+		- Vector3.BACK * 0.35, up, forward)
+	# The shield, slung on the back: a face in the tunic's colour, a steel rim,
+	# a gold boss. Decoration -- there is no shield in the game to block with.
+	var slung := _axes(-forward, up)
+	var shield := shoulder.lerp(waist, 0.45) - forward * 2.4 + Vector3.BACK * 0.3
+	_put("shield", slung, shield, Vector3(0.3, 1.65, 1.35))
+	_put("shield_rim", _axes(-forward, up), shield, Vector3(1.38, 0.5, 1.68))
+	_put("shield_boss", slung, shield - forward * 0.3, Vector3.ONE * 0.38)
 	_segment(art, "belt", waist + up * 0.3, waist - up * 0.3, Vector2(1.28 * width, 1.75))
 	_put("buckle", frame, waist + forward * 1.3 * width, Vector3(0.25, 0.55, 0.6))
 	# The sword belt slants from the waist at the back to the hip at the front.

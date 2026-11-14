@@ -43,7 +43,8 @@ const FIGURES: Array[Dictionary] = [
 	{"id": "prince", "name": "PRINCE"},
 	{"id": "heroine", "name": "HEROINE"},
 	{"id": "stick", "name": "STICK"},
-	{"id": "princess", "name": "PRINCESS"},
+	{"id": "princess", "name": "PRINCESS",
+		"defaults": {"outfit": "royal", "hair": "brown", "skin": "sand"}},
 ]
 
 ## The robe or tunic: lit plane, shade plane, and the darker plane behind (the
@@ -58,6 +59,8 @@ const OUTFITS: Array[Dictionary] = [
 		"cloth": Palette.MID, "dark": Palette.SHADOW_WARM, "back": Palette.SHADOW_PIT},
 	{"id": "wine", "name": "WINE",
 		"cloth": Palette.SHADOW, "dark": Palette.SHADOW_PIT, "back": Palette.INK},
+	{"id": "royal", "name": "ROYAL",
+		"cloth": Palette.ROYAL, "dark": Palette.ROYAL_DARK, "back": Palette.ROYAL_DEEP},
 ]
 
 ## The sash, the hood's crest, the headband and the ribbons. One flat colour.
@@ -74,6 +77,7 @@ const HAIRS: Array[Dictionary] = [
 	{"id": "chestnut", "name": "CHESTNUT", "lit": Palette.SHADOW, "shade": Palette.SHADOW_PIT},
 	{"id": "henna", "name": "HENNA", "lit": Palette.SHADOW_WARM, "shade": Palette.SHADOW},
 	{"id": "gold", "name": "GOLD", "lit": Palette.LIGHT_WARM, "shade": Palette.MID},
+	{"id": "brown", "name": "BROWN", "lit": Palette.UMBER, "shade": Palette.UMBER_DARK},
 ]
 
 ## Skin, lit and shaded. The prince's face is a void under the hood.
@@ -183,6 +187,8 @@ func to_ids() -> Dictionary:
 ## the whole look. Returns how many fields were taken from `ids`.
 func take_ids(ids: Dictionary) -> int:
 	var taken := 0
+	# FIELDS starts with the figure, so a figure's own defaults go on first and
+	# every field the ids do name is taken over them.
 	for field: String in FIELDS:
 		var value: Variant = ids.get(field)
 		if typeof(value) != TYPE_STRING and typeof(value) != TYPE_STRING_NAME:
@@ -192,8 +198,23 @@ func take_ids(ids: Dictionary) -> int:
 			if String(table[i]["id"]) == String(value):
 				set_index(field, i)
 				taken += 1
+				if field == "figure":
+					wear_defaults()
 				break
 	return taken
+
+
+## Puts on the figure's own defaults, if it has any: the princess comes in the
+## royal blue, brown hair and fair skin of her concept sheet. Only the colours
+## change; the figure stays. The wardrobe calls this when a player steps onto
+## a figure, take_ids() when a set of ids names one.
+func wear_defaults() -> void:
+	var defaults: Dictionary = FIGURES[figure].get("defaults", {})
+	for field: String in defaults:
+		var table := options(field)
+		for i: int in table.size():
+			if String(table[i]["id"]) == String(defaults[field]):
+				set_index(field, i)
 
 
 ## A new look read from ids by take_ids(): the default, with each field that

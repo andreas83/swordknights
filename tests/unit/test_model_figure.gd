@@ -118,3 +118,23 @@ func test_the_stick_avatar_draws_its_own_limbs() -> void:
 	var box := stick.drawn
 	for joint: Vector2 in [art._foot_front, art._foot_back, art._hand_front, art._hand_back]:
 		assert_true(box.grow(0.01).has_point(joint), "the stroke reaches %s" % joint)
+
+
+func test_choosing_the_princess_puts_on_her_concept() -> void:
+	var look := CharacterLook.from_ids({"figure": "princess"})
+	assert_eq(look.to_ids(), {"figure": "princess", "outfit": "royal", "accent": "gold",
+		"hair": "brown", "skin": "sand"}, "the concept's blue, brown hair and fair skin")
+	var chosen := CharacterLook.from_ids({"figure": "princess", "outfit": "wine"})
+	assert_eq(String(chosen.option("outfit")["id"]), "wine", "but a named field wins")
+	var prince := CharacterLook.from_ids({"figure": "prince"})
+	assert_eq(String(prince.option("outfit")["id"]), "crimson", "and the prince has none")
+
+
+func test_the_princess_blade_glows_and_the_rest_do_not() -> void:
+	var player := _dressed_player()
+	var tones := _art(player).costume.blade_colours()
+	assert_true(tones.has("glow"), "her sword glows")
+	for figure: String in ["prince", "heroine", "stick"]:
+		var look := CharacterLook.from_ids({"figure": figure})
+		look.dress(_art(player))
+		assert_eq(_art(player).costume.blade_colours(), {}, "%s keeps steel" % figure)

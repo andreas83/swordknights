@@ -91,6 +91,15 @@ func take_off(_art: PlayerArt) -> void:
 	pass
 
 
+## What the sword is drawn in, for a figure whose blade is its own: any of
+## "steel", "edge", "edge_hot", "guard" and "glow". Missing keys are the
+## shared sword's colours; "glow", when given, is a halo drawn round the blade.
+## Only colours: the blade's shape and reach are the pose's and, in the duel,
+## the simulation's.
+func blade_colours() -> Dictionary:
+	return {}
+
+
 ## The colours a player chose for this costume beyond the accent, so the duel
 ## can hold every one of them clear of both teams' colours
 ## (tests/unit/test_duel_seats_distinct.gd).

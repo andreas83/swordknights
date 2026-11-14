@@ -147,6 +147,16 @@ func _tones(_art: PlayerArt) -> Dictionary:
 	return {}
 
 
+## The key light's colour: the world's low gold sun.
+func _sun() -> Color:
+	return Palette.LIGHT_SOFT
+
+
+## The ambient, which is the whole of the shade side: a dark of the world.
+func _ambient() -> Color:
+	return Palette.SHADOW_DEEP
+
+
 ## How far the camera turns toward the facing. More shows more of the front
 ## and less of the profile; the shear in `_lift()` keeps every joint on its rig
 ## point at any turn.
@@ -210,15 +220,15 @@ func _ensure(art: PlayerArt) -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_CLEAR_COLOR
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Palette.SHADOW_DEEP
-	env.ambient_light_energy = 0.75
+	env.ambient_light_color = _ambient()
+	env.ambient_light_energy = 0.8
 	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	world.environment = env
 	_viewport.add_child(world)
 
 	var sun := DirectionalLight3D.new()
-	sun.light_color = Palette.LIGHT_SOFT
-	sun.light_energy = 1.4
+	sun.light_color = _sun()
+	sun.light_energy = 1.45
 	sun.shadow_enabled = true
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	sun.directional_shadow_max_distance = CAMERA_DISTANCE * 2.0

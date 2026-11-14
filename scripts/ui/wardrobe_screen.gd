@@ -163,6 +163,8 @@ func adjust(by: int) -> void:
 		_look = _wardrobe.look(_player)
 	else:
 		_look.set_index(id, _look.index_of(id) + by)
+		if id == "figure":
+			_look.wear_defaults()
 		_wardrobe.set_look(_player, _look)
 		var err := _wardrobe.save()
 		if err != OK:

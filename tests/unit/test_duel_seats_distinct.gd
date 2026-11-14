@@ -30,7 +30,7 @@ func _team(seat: int) -> Array[Color]:
 		FighterArt.SEAT_CLOAK[seat]]
 
 
-## Every combination of every option: figures x 4 x 4 x 4 x 4.
+## Every combination of every option.
 func _every_look() -> Array[CharacterLook]:
 	var looks: Array[CharacterLook] = [CharacterLook.new()]
 	for field: String in CharacterLook.FIELDS:
@@ -58,7 +58,7 @@ func test_the_two_teams_share_no_colour() -> void:
 
 func test_every_look_keeps_each_seat_in_its_colour() -> void:
 	var looks := _every_look()
-	assert_eq(looks.size(), CharacterLook.FIGURES.size() * 4 * 4 * 4 * 4, "walked every look")
+	assert_eq(looks.size(), _every_count(), "walked every look")
 	var fighter := FIGHTER_SCENE.instantiate() as Fighter
 	add_child_autofree(fighter)
 	fighter.setup(0, null)
@@ -173,3 +173,11 @@ func test_online_shows_my_look_on_my_seat_and_theirs_on_theirs() -> void:
 	assert_eq(their_art.cloth_dark, FighterArt.SEAT_CLOTH_DARK[1], "all of it")
 	assert_eq(their_art.cloak_shade, FighterArt.SEAT_CLOAK[1], "every plane")
 	scene.set("_online", false)
+
+
+## How many looks there are: the product of every field's option count.
+func _every_count() -> int:
+	var count := 1
+	for field: String in CharacterLook.FIELDS:
+		count *= CharacterLook.options(field).size()
+	return count

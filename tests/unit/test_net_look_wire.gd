@@ -32,7 +32,7 @@ func _v1_hello() -> PackedByteArray:
 	return bytes
 
 
-## Every combination of every option: 2 x 4 x 4 x 4 x 4.
+## Every combination of every option.
 func _every_look() -> Array[CharacterLook]:
 	var looks: Array[CharacterLook] = [CharacterLook.new()]
 	for field: String in CharacterLook.FIELDS:
@@ -70,7 +70,7 @@ func _field(tag: int, id: String) -> Array:
 
 func test_every_look_crosses_hello_and_welcome_intact() -> void:
 	var looks := _every_look()
-	assert_eq(looks.size(), CharacterLook.FIGURES.size() * 4 * 4 * 4 * 4, "walked every look")
+	assert_eq(looks.size(), _every_count(), "walked every look")
 	var lost: Array[String] = []
 	for look: CharacterLook in looks:
 		var hello := NetProtocol.decode(NetProtocol.hello(BUILD, NAME, look.to_ids()))
@@ -295,3 +295,11 @@ func test_noise_after_a_hello_never_fails_it_or_escapes_the_rules() -> void:
 			if not NetProtocol.LOOK_TAGS.has(field) or not NetProtocol.is_look_id(raw):
 				broken.append("trial %d: %s=%s" % [trial, field, look[field]])
 	assert_eq(broken, [] as Array[String], "\n".join(broken.slice(0, 6)))
+
+
+## How many looks there are: the product of every field's option count.
+func _every_count() -> int:
+	var count := 1
+	for field: String in CharacterLook.FIELDS:
+		count *= CharacterLook.options(field).size()
+	return count
