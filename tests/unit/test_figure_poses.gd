@@ -26,10 +26,11 @@ const FIGHTER_SCENE := preload("res://scenes/fighter.tscn")
 ## widest pose -- a lunge with the cloth streaming -- reaches about 20 either
 ## side; a plane outside this box has come loose from the rig.
 const ENVELOPE := Rect2(-30.0, -34.0, 60.0, 40.0)
-## The costume class each figure id is dressed in.
+## The costume class each figure id is dressed in. The princess is the owner's
+## rigged model once its file is in the project (CharacterLook.princess()).
 var costumes := {
 	"prince": Costume, "heroine": HeroineCostume, "stick": StickCostume,
-	"princess": PrincessCostume,
+	"princess": RiggedCostume if RiggedCostume.available() else PrincessCostume,
 }
 
 

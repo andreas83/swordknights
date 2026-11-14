@@ -38,7 +38,9 @@ enum Figure { PRINCE, HEROINE, STICK, PRINCESS }
 
 ## The prince and the heroine are drawn in flat planes; STICK is the pose with
 ## the clothes taken off (StickCostume); PRINCESS is a 3D warrior princess
-## rendered onto the same rig (PrincessCostume). All four stand on one skeleton.
+## rendered onto the same rig -- the owner's rigged model once it is in the
+## project (RiggedCostume), primitives built in code until then
+## (PrincessCostume; see `princess()`). All four stand on one skeleton.
 const FIGURES: Array[Dictionary] = [
 	{"id": "prince", "name": "PRINCE"},
 	{"id": "heroine", "name": "HEROINE"},
@@ -246,7 +248,20 @@ func dress(art: PlayerArt) -> void:
 		Figure.STICK:
 			art.costume = StickCostume.new()
 		Figure.PRINCESS:
-			art.costume = PrincessCostume.new(locks["lit"], locks["shade"], face["lit"])
+			art.costume = princess(locks, face)
 		_:
 			art.costume = Costume.new()
 	art.queue_redraw()
+
+
+## The princess's body: the owner's rigged model when the file is there
+## (RiggedCostume), the primitives built in code while it is not
+## (PrincessCostume). Her sword is hers either way. `model` is the file to
+## look for; a test names one of its own.
+static func princess(locks: Dictionary, face: Dictionary,
+		model: String = RiggedCostume.PRINCESS) -> ModelCostume:
+	if RiggedCostume.available(model):
+		var rigged := RiggedCostume.new(model)
+		rigged.blade = PrincessCostume.BLADE
+		return rigged
+	return PrincessCostume.new(locks["lit"], locks["shade"], face["lit"])

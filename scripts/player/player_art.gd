@@ -452,7 +452,8 @@ func _draw_weapon(pose: Dictionary) -> void:
 	var length: float = float(pose["blade_len"])
 	var dir := Vector2(cos(angle) * _f, sin(angle))
 	var side := Vector2(-dir.y, dir.x)
-	var hilt := _hand_front + dir * 1.2
+	var held := costume.sword_hand(self)
+	var hilt := (_hand_front if is_nan(held.x) else held) + dir * 1.2
 	var tip := hilt + dir * length
 	blade_tip = tip
 	var tones := costume.blade_colours()

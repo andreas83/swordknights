@@ -91,6 +91,17 @@ func take_off(_art: PlayerArt) -> void:
 	pass
 
 
+## Where this costume's sword hand is on the frame being drawn, in the art's
+## space, or NAN for "where the rig put it" (`PlayerArt._hand_front`). A
+## figure that animates its own arm -- a rigged model playing a clip -- moves
+## the hand off the rig, and PlayerArt._draw_weapon() starts the adventure's
+## blade at the hand it reports. The duel's blade does not move: it is the
+## rect the simulation parries with (FighterArt._draw_weapon), and nothing
+## drawn may move it. Asked after `draw_back()` on the same frame.
+func sword_hand(_art: PlayerArt) -> Vector2:
+	return Vector2(NAN, NAN)
+
+
 ## What the sword is drawn in, for a figure whose blade is its own: any of
 ## "steel", "edge", "edge_hot", "guard" and "glow". Missing keys are the
 ## shared sword's colours; "glow", when given, is a halo drawn round the blade.

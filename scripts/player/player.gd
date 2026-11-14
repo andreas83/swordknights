@@ -778,7 +778,7 @@ func damage(amount: int = 1, from_x: float = NAN) -> bool:
 		_enter(State.DEAD)
 		died.emit()
 	else:
-		_hurt_timer = 0.32
+		_hurt_timer = Tuning.HURT_TIME
 		_enter(State.HURT)
 		hurt.emit(health)
 	return true

@@ -18,7 +18,9 @@ extends SceneTree
 ## dresses every fighter as the heroine (CharacterLook), in the seat colours as
 ## always; that sheet is docs/heroine-fighter-poses.png. `--figure stick` and
 ## `--figure princess` are docs/stick-fighter-poses.png and
-## docs/princess-fighter-poses.png.
+## docs/princess-fighter-poses.png. `--stand-in` wears every fighter in the
+## rigged stand-in (tests/rigged_support.gd) through RiggedCostume, the way
+## the owner's model will be worn once it is in the project.
 
 ## Six across and four down: the viewport is 180 units tall, which is exactly
 ## four rows, so the twenty-first pose had to go sideways rather than below,
@@ -31,9 +33,12 @@ const CELL := Vector2(64.0, 45.0)
 const FEET_Y := 34.0
 const SETTLE_FRAMES := 20
 const FIGHTER_SCENE: PackedScene = preload("res://scenes/fighter.tscn")
+const RiggedSupport := preload("res://tests/rigged_support.gd")
 
 var _out := UserData.at("user://fighter-poses.png")
 var _look := CharacterLook.new()
+## The rigged stand-in every fighter wears, or null for the look's own figure.
+var _stand_in: PackedScene
 var _frames := 0
 var _labels: Array[Dictionary] = []
 var _fighters: Array[Fighter] = []
@@ -49,6 +54,8 @@ func _initialize() -> void:
 	var figure := args.find("--figure")
 	if figure >= 0 and figure + 1 < args.size():
 		_look.take_ids({"figure": args[figure + 1]})
+	if args.has("--stand-in"):
+		_stand_in = RiggedSupport.build()
 
 	var backdrop := Sheet.new()
 	backdrop.labels = _labels
@@ -91,7 +98,11 @@ func _place(pose: Dictionary, feet: Vector2, index: int) -> void:
 	root.add_child(fighter)
 	_fighters.append(fighter)
 	fighter.setup(index % 2, null)
-	FighterArt.dress(fighter, index % 2, _look)
+	var art := FighterArt.dress(fighter, index % 2, _look)
+	if _stand_in != null:
+		var rigged := RiggedCostume.new()
+		rigged.scene = _stand_in
+		art.costume = rigged
 	fighter.respawn_at(feet, 1)
 	fighter.grounded = true
 	fighter.state = pose.get("state", Fighter.State.IDLE)

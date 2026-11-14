@@ -20,6 +20,10 @@ extends SceneTree
 ## (scripts/ui/pose_catalogue.gd), which the pose lab browses on the phone, and
 ## the pinning is PoseCatalogue.pin_player(), so the sheet and the lab cannot
 ## pose a moment two different ways.
+##
+## `--stand-in` wears the rigged stand-in (tests/rigged_support.gd) through
+## RiggedCostume, the way the owner's model will be worn once it is in the
+## project, so the bone posing is judged on rendered pixels before it is.
 
 const FEET := Vector2(160.0, 124.0)
 ## Long enough for the cloth lag and the squash spring to settle on the pose.
@@ -27,9 +31,11 @@ const SETTLE_FRAMES := 14
 ## Effects are fired this many frames before the shutter, so the dust is still
 ## in the air when the frame is taken.
 const EFFECT_LEAD := 3
+const RiggedSupport := preload("res://tests/rigged_support.gd")
 
 var _out_dir := UserData.at("user://poses")
 var _figure := "prince"
+var _stand_in := false
 var _poses: Array[Dictionary] = []
 var _index := 0
 var _settle := 0
@@ -133,6 +139,9 @@ func _parse_args() -> void:
 		elif args[i] == "--figure" and i + 1 < args.size():
 			_figure = args[i + 1]
 			i += 2
+		elif args[i] == "--stand-in":
+			_stand_in = true
+			i += 1
 		else:
 			i += 1
 
@@ -142,7 +151,12 @@ func _parse_args() -> void:
 func _dress() -> void:
 	var look := CharacterLook.new()
 	look.take_ids({"figure": _figure})
-	look.dress(_player.get_node(^"PlayerArt") as PlayerArt)
+	var art := _player.get_node(^"PlayerArt") as PlayerArt
+	look.dress(art)
+	if _stand_in:
+		var rigged := RiggedCostume.new()
+		rigged.scene = RiggedSupport.build()
+		art.costume = rigged
 
 
 ## A stand-in for terrain: flat bands in the game's palette plus a few niches,

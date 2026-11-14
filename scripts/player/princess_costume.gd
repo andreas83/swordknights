@@ -39,6 +39,12 @@ extends ModelCostume
 ## slung on her back as decoration, because the game has no shield to block
 ## with and a shield on the arm would promise one.
 
+## The concept's sword: blue-white steel in a blue glow. Hers whichever body
+## she wears, these primitives or the owner's model (RiggedCostume).
+const BLADE := {
+	"steel": Palette.ROYAL_STEEL, "edge": Palette.PAPER, "edge_hot": Palette.PAPER,
+	"glow": Palette.ROYAL_GLOW,
+}
 const HEAD_R := Vector3(2.3, 2.45, 2.25)
 ## How far her face turns from the run toward the viewer, in radians.
 const FACE_TURN := 0.45
@@ -87,13 +93,8 @@ func _yaw() -> float:
 	return 0.62
 
 
-## The concept's sword: blue-white steel in a blue glow, with the trim's gold
-## on the guard.
 func blade_colours() -> Dictionary:
-	return {
-		"steel": Palette.ROYAL_STEEL, "edge": Palette.PAPER, "edge_hot": Palette.PAPER,
-		"glow": Palette.ROYAL_GLOW,
-	}
+	return BLADE
 
 
 func tick(art: PlayerArt, delta: float) -> void:

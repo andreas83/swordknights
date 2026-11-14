@@ -27,7 +27,15 @@ func _dressed_player(figure: String = "princess") -> Player:
 	player.position = Vector2(160.0, 120.0)
 	var look := CharacterLook.new()
 	look.take_ids({"figure": figure})
-	look.dress(player.get_node(^"PlayerArt") as PlayerArt)
+	var art := player.get_node(^"PlayerArt") as PlayerArt
+	look.dress(art)
+	if figure == "princess":
+		# The primitives, whether or not the owner's rigged model is in the
+		# project: they are what this file pins (test_rigged_figure.gd pins
+		# the model), and dropping the .glb in must not turn it red.
+		var locks := look.option("hair")
+		art.costume = PrincessCostume.new(locks["lit"], locks["shade"],
+			look.option("skin")["lit"])
 	return player
 
 

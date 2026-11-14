@@ -4,7 +4,7 @@ extends SceneTree
 ##
 ##     xvfb-run -a godot --path . --rendering-driver opengl3 \
 ##       --resolution 3840x2160 --script tools/model_portrait.gd -- \
-##       --figure princess --out /tmp/princess.png [--yaw 1.15]
+##       --figure princess --out /tmp/princess.png [--yaw 1.15] [--stand-in]
 ##
 ## The game never draws a model this way. In play a model is sheared onto the
 ## 2D rig so every joint lands on its rig point (ModelCostume._lift()); a
@@ -12,13 +12,18 @@ extends SceneTree
 ## stands and turns the camera round to it. The figure stands in its idle pose
 ## with its feet at FEET, so a fixed crop lands on it every time. The 2D sword
 ## is still drawn where the side view puts it, and is not part of the portrait.
+##
+## `--stand-in` portrays the rigged stand-in (tests/rigged_support.gd) through
+## RiggedCostume, as the owner's model will be once it is in the project.
 
 const FEET := Vector2(160.0, 150.0)
 const SETTLE_FRAMES := 20
+const RiggedSupport := preload("res://tests/rigged_support.gd")
 
 var _out := "user://portrait.png"
 var _figure := "princess"
 var _yaw := 1.15
+var _stand_in := false
 var _player: Player
 var _pose := {}
 var _settle := SETTLE_FRAMES
@@ -34,6 +39,7 @@ func _initialize() -> void:
 				_figure = args[i + 1]
 			"--yaw":
 				_yaw = float(args[i + 1])
+	_stand_in = args.has("--stand-in")
 	var backdrop := ColorRect.new()
 	backdrop.color = Palette.PAPER
 	backdrop.size = Vector2(320.0, 180.0)
@@ -44,6 +50,10 @@ func _initialize() -> void:
 	_player.position = FEET
 	var art := _player.get_node(^"PlayerArt") as PlayerArt
 	CharacterLook.from_ids({"figure": _figure}).dress(art)
+	if _stand_in:
+		var rigged := RiggedCostume.new()
+		rigged.scene = RiggedSupport.build()
+		art.costume = rigged
 	var model := art.costume as ModelCostume
 	if model == null:
 		push_error("%s is not a 3D figure" % _figure)

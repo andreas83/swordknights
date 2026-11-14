@@ -102,6 +102,8 @@ const MAX_HEALTH := 3
 const INVULNERABLE_TIME := 0.9
 const KNOCKBACK_X := 90.0
 const KNOCKBACK_Y := 150.0
+## How long a hit staggers before the body is its own again (Player.damage()).
+const HURT_TIME := 0.32
 const ATTACK_TIME := 0.24
 const ATTACK_REACH := 14.0
 const ATTACK_HEIGHT := 14.0
