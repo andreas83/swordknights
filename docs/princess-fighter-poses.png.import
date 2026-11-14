@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c7tllamj683vr"
-path="res://.godot/imported/model-fighter-poses.png-314cfb47d230836cc891758864083db2.ctex"
+uid="uid://c7k5q42ru6bxw"
+path="res://.godot/imported/princess-fighter-poses.png-96ae38f5ff491651971585e994754e51.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://docs/model-fighter-poses.png"
-dest_files=["res://.godot/imported/model-fighter-poses.png-314cfb47d230836cc891758864083db2.ctex"]
+source_file="res://docs/princess-fighter-poses.png"
+dest_files=["res://.godot/imported/princess-fighter-poses.png-96ae38f5ff491651971585e994754e51.ctex"]
 
 [params]
 

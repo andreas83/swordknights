@@ -1,6 +1,6 @@
 extends GutTest
 ## Every pose renders as every figure: every Player state and every Fighter
-## state, the prince, the heroine, the stick avatar and the 3D model, with no
+## state, the prince, the heroine, the stick avatar and the 3D princess, with no
 ## engine error and inside the box a figure of that size can occupy
 ## (scripts/player/costume.gd).
 ##
@@ -28,7 +28,8 @@ const FIGHTER_SCENE := preload("res://scenes/fighter.tscn")
 const ENVELOPE := Rect2(-30.0, -34.0, 60.0, 40.0)
 ## The costume class each figure id is dressed in.
 var costumes := {
-	"prince": Costume, "heroine": HeroineCostume, "stick": StickCostume, "model": ModelCostume,
+	"prince": Costume, "heroine": HeroineCostume, "stick": StickCostume,
+	"princess": PrincessCostume,
 }
 
 

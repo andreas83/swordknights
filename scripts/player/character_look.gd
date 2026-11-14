@@ -34,16 +34,16 @@ extends RefCounted
 ## On disk a look is a set of ids rather than indices (see Wardrobe), so the
 ## lists below may be reordered or extended without changing anyone's choice.
 
-enum Figure { PRINCE, HEROINE, STICK, MODEL }
+enum Figure { PRINCE, HEROINE, STICK, PRINCESS }
 
 ## The prince and the heroine are drawn in flat planes; STICK is the pose with
-## the clothes taken off (StickCostume); MODEL is a lit 3D body rendered onto
-## the same rig (ModelCostume). All four stand on one skeleton.
+## the clothes taken off (StickCostume); PRINCESS is a 3D warrior princess
+## rendered onto the same rig (PrincessCostume). All four stand on one skeleton.
 const FIGURES: Array[Dictionary] = [
 	{"id": "prince", "name": "PRINCE"},
 	{"id": "heroine", "name": "HEROINE"},
 	{"id": "stick", "name": "STICK"},
-	{"id": "model", "name": "3D MODEL"},
+	{"id": "princess", "name": "PRINCESS"},
 ]
 
 ## The robe or tunic: lit plane, shade plane, and the darker plane behind (the
@@ -163,7 +163,7 @@ func is_heroine() -> bool:
 ## Whether the figure shows a face and hair, so the hair and skin rows mean
 ## something: the prince's are under his hood and the stick avatar has none.
 func shows_face() -> bool:
-	return figure == Figure.HEROINE or figure == Figure.MODEL
+	return figure == Figure.HEROINE or figure == Figure.PRINCESS
 
 
 func equals(other: CharacterLook) -> bool:
@@ -223,8 +223,8 @@ func dress(art: PlayerArt) -> void:
 				locks["lit"], locks["shade"], face["lit"], face["shade"])
 		Figure.STICK:
 			art.costume = StickCostume.new()
-		Figure.MODEL:
-			art.costume = ModelCostume.new(locks["lit"], locks["shade"], face["lit"])
+		Figure.PRINCESS:
+			art.costume = PrincessCostume.new(locks["lit"], locks["shade"], face["lit"])
 		_:
 			art.costume = Costume.new()
 	art.queue_redraw()

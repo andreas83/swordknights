@@ -1,6 +1,6 @@
 # The character
 
-How the prince, the heroine, the stick avatar and the 3D model are drawn, how they are posed, and what the
+How the prince, the heroine, the stick avatar and the 3D princess are drawn, how they are posed, and what the
 tuning numbers behind them are for.
 
 ![every state](character-states.png)
@@ -716,7 +716,7 @@ in an inset beside it. The rows on the left:
 | Row | Steps through |
 | --- | --- |
 | BODY | the duel fighter, the adventure's prince |
-| FIGURE | the prince, the heroine, the stick avatar, the 3D model, the player's saved look (the wardrobe's) |
+| FIGURE | the prince, the heroine, the stick avatar, the 3D princess, the player's saved look (the wardrobe's) |
 | SEAT | crimson or sea-green (the duel's) |
 | MOTION | playing — the state's clock round its length — or frozen on the moment |
 | LIGHT | the five strips, brightest hour first: Tug of War's late afternoon to the Clockwork Well at night |
@@ -923,12 +923,12 @@ xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 3072x720 \
   --script tools/idle_poses.gd -- --out docs/heroine-idle-poses.png --figure heroine
 ```
 
-## The stick avatar and the 3D model
+## The stick avatar and the 3D princess
 
 Two more figures on the same skeleton, chosen on the wardrobe's FIGURE row
-like the heroine (`CharacterLook.Figure.STICK`, `.MODEL`). Neither touches the
+like the heroine (`CharacterLook.Figure.STICK`, `.PRINCESS`). Neither touches the
 body, the hitbox, the tuning or the netplay snapshot: an old client that is
-sent `stick` or `model` in the handshake does not know the id and draws the
+sent `stick` or `princess` in the handshake does not know the id and draws the
 prince, which is how `CharacterLook.take_ids()` treats any unknown id.
 
 Both differ from the robed figures in *build*, not in clothes, so the costume
@@ -950,17 +950,34 @@ far limbs in the shade cloth, the head split down the world's vertical. The
 accent is a short scarf on the cloak's pose fields and lag, because a figure
 with nothing trailing reads as stopped mid-run.
 
-![the 3D model in every duel state](model-fighter-poses.png)
+![the 3D princess in every duel state](princess-fighter-poses.png)
 
-**The 3D model** (`scripts/player/model_costume.gd`) is a lit human body built
-from meshes — spheres, tapered cylinders, boxes, all made in code — and
-rendered into a `SubViewport` that the body layer draws back as one texture.
-It has no animation of its own: each frame it lifts the rig's joints into 3D
-at a fixed depth per side and hangs a limb between each pair, so every pose
-`player_art.gd` knows is the model's on the same frame. The camera is
-orthographic and turned a little toward the facing, so the chest shows its
+**The 3D princess** (`scripts/player/princess_costume.gd`) is a stylised
+young swordswoman after the owner's concept sheet: a head a little large for
+her body and big eyes, a braid down her back, a jewelled band across her brow,
+a belted tunic with a trim and a crest, a cape, steel pauldrons, leather
+bracers and tall boots. Built from spheres, tapered cylinders, rings and boxes,
+all made in code. The tunic and cape are the outfit (the seat's team colour in
+a duel, the leggings its darkest step), the trim, crest, buckle and band the
+accent, the hair and skin the look's. The concept's shield and glowing blade
+are not there: the sword is the shared 2D one, and the game has no shield.
+
+The cape trails on the prince's cloak fields and lag, the braid is the
+heroine's pendulum, and she blinks; a hit, a doze or a death closes her eyes
+and a hit opens her mouth. The cape is two flared slabs with real depth: the
+first version was a sheet, and from the side a sheet is seen edge on, as a
+stick.
+
+**The 3D machinery** (`scripts/player/model_costume.gd`, `ModelCostume`) is
+what every 3D figure shares, so a second one is a file of parts, colours and
+placements. It renders into a `SubViewport` that the body layer draws back as
+one texture. It has no animation of its own: each frame it lifts the rig's
+joints into 3D at a fixed depth per side and hangs a limb between each pair, so
+every pose `player_art.gd` knows is the model's on the same frame. The camera
+is orthographic and turned a little toward the facing, so the chest shows its
 breadth; `_lift()` pre-shears x by depth so each joint still projects onto the
-2D point it came from, and the hand ends on the 2D sword's hilt. The light is
+2D point it came from, and the hand ends on the 2D sword's hilt. A head turns
+its face further toward the viewer, so both eyes show either way. The light is
 the world's: a key from the left, a warm rim from behind the far side, a
 palette dark for the ambient. An ink silhouette (an inverted hull, grown by
 `OUTLINE`) does the job of the flat figures' rim, without which a crimson body
@@ -977,20 +994,21 @@ Its costs and the ways it could go wrong, each pinned by
   flipped.
 - **Changing clothes.** Assigning `PlayerArt.costume` calls `take_off()` on the
   old costume, which frees the viewport and gives back the texture filter.
-- **The hit flash.** Materials take the art's colours through `PlayerArt._c()`
+- **The hit flash.** Materials take their colours through `PlayerArt._c()`
   every frame, so a hit burns the model white as it burns a flat figure, and a
-  duel seat's team colour reaches the tunic the frame it is set.
+  duel seat's team colour reaches the clothes the frame it is set.
 
 The viewport is created on the first frame drawn and sized to the figure's
 real screen size (`_fit()`: 3 to 12 pixels per art unit), so it is sharp in the
 wardrobe's arch and cheap on a phone's play screen. The skin's shade step is
-the light's to make, so the model takes only a look's lit skin tone.
+the light's to make, so a model takes only a look's lit skin tone.
 
 ```bash
 xvfb-run -a godot --path . --rendering-driver opengl3 \
-  --script tests/character_poses.gd -- --out /tmp/poses/model --figure model
+  --script tests/character_poses.gd -- --out /tmp/poses/princess --figure princess
 xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1536x720 \
-  --script tests/fighter_poses.gd -- --out docs/model-fighter-poses.png --figure model
+  --script tests/fighter_poses.gd -- --out docs/princess-fighter-poses.png \
+  --figure princess
 ```
 
 ## The sentinel

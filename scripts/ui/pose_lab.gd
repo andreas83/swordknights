@@ -41,7 +41,7 @@ extends Node2D
 
 enum Page { BROWSE, TRY }
 enum Kind { DUEL, ADVENTURE }
-enum Figure { PRINCE, HEROINE, STICK, MODEL, SAVED }
+enum Figure { PRINCE, HEROINE, STICK, PRINCESS, SAVED }
 enum Scale { PLAY, DUEL_CLOSE, DUEL_FAR }
 
 const MENU_SCENE := "res://scenes/menu.tscn"
@@ -52,9 +52,9 @@ const ROWS: Array[String] = [
 ## TRY's rows, tapped only: the stick and the buttons are the fighter's.
 const TRY_ROWS: Array[String] = ["back", "dummy", "thrusts", "light", "scale", "reset"]
 const KIND_NAMES: Array[String] = ["DUEL FIGHTER", "ADVENTURE PRINCE"]
-const FIGURE_NAMES: Array[String] = ["PRINCE", "HEROINE", "STICK", "3D MODEL", "SAVED LOOK"]
+const FIGURE_NAMES: Array[String] = ["PRINCE", "HEROINE", "STICK", "PRINCESS", "SAVED LOOK"]
 ## The CharacterLook figure id behind each entry but the saved look.
-const FIGURE_IDS: Array[String] = ["prince", "heroine", "stick", "model"]
+const FIGURE_IDS: Array[String] = ["prince", "heroine", "stick", "princess"]
 const SCALE_NAMES: Array[String] = ["1:1 PLAY", "DUEL CLOSE", "DUEL FAR"]
 ## The enlarged inset's scale: a whole multiple, so edges stay hard.
 const INSET_SCALE := 3.0

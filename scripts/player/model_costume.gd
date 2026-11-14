@@ -1,7 +1,10 @@
 class_name ModelCostume
 extends Costume
-## The 3D figure: a lit, shaded human body built from meshes, rendered into a
-## SubViewport and drawn back onto the 2D rig as one texture.
+## What every 3D figure shares: a body built from meshes in code, rendered into
+## a SubViewport and drawn back onto the 2D rig as one texture. A figure
+## (PrincessCostume) extends this and says only what its parts are
+## (`_make()`), what colour each takes (`_tones()`) and where each goes on the
+## rig (`_pose_parts()`).
 ##
 ## ## Why a costume, and why the rig still drives it
 ##
@@ -9,11 +12,11 @@ extends Costume
 ## duel's blade rect, the netplay snapshot. A 3D figure that animated itself --
 ## a skeleton with its own clips -- would be a second source of truth for where
 ## a hand or a foot is, and the first pose added to player_art.gd would be a
-## pose the model did not have. So the model has no animation of its own. Each
+## pose the model did not have. So a model has no animation of its own. Each
 ## frame it reads the joints PlayerArt has just placed -- hip, knee, foot,
 ## shoulder, elbow, hand, the torso points and the head -- lifts them into 3D
 ## at a fixed depth per side, and hangs a limb between each pair. Every pose
-## the robed figures know is the model's, on the same frame, and the hand ends
+## the flat figures know is the model's, on the same frame, and the hand ends
 ## exactly where the 2D sword's hilt starts.
 ##
 ## The sword stays the shared 2D one. In the duel it is drawn along the rect
@@ -31,7 +34,8 @@ extends Costume
 ## than showing its back. A turned camera would shift every point by its depth;
 ## `_lift()` pre-shears x by exactly that, so on screen each joint lands on the
 ## 2D point it came from whatever its depth. (tests/unit/test_model_figure.gd
-## projects them back to check.)
+## projects them back to check.) A head turns its face further, toward the
+## viewer (`_head()`), so both eyes show whichever way the figure runs.
 ##
 ## ## The light
 ##
@@ -40,17 +44,19 @@ extends Costume
 ## the world-left half whichever way the figure faces -- the same split the
 ## flat figures draw by hand, here falling out of the normals. A weak warm
 ## light from behind the far side gives the edge the ink rim gives the flat
-## figures. The ambient is a dark from the palette, so the shade side of the
-## body is a colour of the world rather than a grey.
+## figures, and every part is drawn a second time as an inverted hull in ink:
+## without that silhouette a crimson body vanishes into crimson stone however
+## well it is lit. The ambient is a dark from the palette, so the shade side of
+## the body is a colour of the world rather than a grey.
 ##
 ## ## What it costs
 ##
 ## One small SubViewport per figure, created on the first frame drawn and
-## sized to the figure's real screen size (`_density()`), so it is sharp in
-## the wardrobe's arch and cheap on a phone's play screen. It has a World3D of
-## its own: without it every model would render every other model, since a
+## sized to the figure's real screen size (`_fit()`), so it is sharp in the
+## wardrobe's arch and cheap on a phone's play screen. It has a World3D of its
+## own: without it every model would render every other model, since a
 ## SubViewport otherwise draws the world of the viewport it sits in. Meshes are
-## built once; a frame only moves transforms and, during a hit, recolours.
+## built once; a frame only moves transforms and recolours.
 
 ## The region of the art's space the texture covers. The widest pose without
 ## the sword -- a lunge, a topple -- stays inside it.
@@ -61,32 +67,11 @@ const CAMERA_DISTANCE := 120.0
 ## Screen pixels per art unit the texture is rendered at, at most and at least.
 const DENSITY_MIN := 3
 const DENSITY_MAX := 12
-
-## Depth of each side from the body's centre plane; + is toward the camera.
-const HIP_DEPTH := 0.85
-const SHOULDER_DEPTH := 1.75
-
-## Radii, in art units. The figure is 21 tall to the crown: about seven and a
-## half heads, an adult's proportion rather than the hooded figure's.
-const HEAD_R := Vector3(1.22, 1.42, 1.15)
-const NECK_R := 0.52
-const THIGH_R := Vector2(0.86, 0.6)
-const SHIN_R := Vector2(0.6, 0.42)
-const UPPER_ARM_R := Vector2(0.58, 0.46)
-const FOREARM_R := Vector2(0.46, 0.36)
-const HAND_R := 0.46
 ## How far the ink silhouette stands proud of the body, in art units.
 const OUTLINE := 0.22
-## The ankle sits above the rig's foot point, which is on the floor.
-const ANKLE := 0.75
-
-## The rig's head is the hood's centre; a head sits a little lower on a neck.
-const HEAD_DROP := 0.35
-
-## The materials, one per thing a colour of the look or the seat lands on.
-const MATERIALS: Array[String] = [
-	"cloth", "sleeve", "trousers", "boot", "skin", "hair", "hair_dark", "belt", "eye",
-]
+## Materials that take no ink edge: an outline round a highlight or a cheek is
+## a hole, not a feature. "shine" is also unlit, so it reads as a reflection.
+const FLAT: Array[String] = ["shine", "blush", "mouth", "iris", "white"]
 
 var hair: Color
 var hair_dark: Color
@@ -132,6 +117,12 @@ func camera() -> Camera3D:
 	return _camera
 
 
+## The colour a material was given on the last frame drawn, for a test.
+func material_colour(id: String) -> Color:
+	var material := _materials.get(id) as StandardMaterial3D
+	return material.albedo_color if material != null else Color(0, 0, 0, 0)
+
+
 func take_off(art: PlayerArt) -> void:
 	if _viewport != null and is_instance_valid(_viewport):
 		_viewport.queue_free()
@@ -140,6 +131,25 @@ func take_off(art: PlayerArt) -> void:
 	_materials.clear()
 	if is_instance_valid(art):
 		art.texture_filter = _art_filter
+
+
+## --- what a figure says ---------------------------------------------------------
+
+## Adds the figure's parts with `_add()`. Called once.
+func _make() -> void:
+	pass
+
+
+## Material id -> colour, read every frame. Called with null once, before the
+## first frame, to learn the ids.
+func _tones(_art: PlayerArt) -> Dictionary:
+	return {}
+
+
+## Puts the parts on the rig: `up` is the body's axis, hip to shoulder, and
+## `forward` the way it faces.
+func _pose_parts(_art: PlayerArt, _pose: Dictionary, _up: Vector3, _forward: Vector3) -> void:
+	pass
 
 
 ## --- layers -----------------------------------------------------------------
@@ -221,86 +231,23 @@ func _ensure(art: PlayerArt) -> void:
 	_viewport.add_child(_camera)
 	_camera.current = true
 
-	_build_body()
-
-
-## Every part, built once. A limb is a tapered cylinder of unit length scaled
-## along its axis, with a sphere at the far joint, so a frame never rebuilds a
-## mesh -- a capsule stretched along its axis would stretch its caps too.
-func _build_body() -> void:
-	# The ink edge: every part drawn a second time, grown and turned inside out,
-	# in flat ink. It is the flat figures' rim, as a silhouette -- without it a
-	# crimson body vanishes into crimson stone however well it is lit.
 	_outline = StandardMaterial3D.new()
 	_outline.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_outline.cull_mode = BaseMaterial3D.CULL_FRONT
 	_outline.grow = true
 	_outline.grow_amount = OUTLINE
-	for id: String in MATERIALS:
+	for id: String in _tones(null):
 		var material := StandardMaterial3D.new()
-		material.roughness = 0.55 if id in ["skin", "hair", "hair_dark", "eye"] else 0.85
-		material.next_pass = _outline
+		material.roughness = 0.55
+		if id == "steel":
+			material.metallic = 0.7
+			material.roughness = 0.3
+		if id == "shine":
+			material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		if not id in FLAT and id != "shine":
+			material.next_pass = _outline
 		_materials[id] = material
-
-	_add("head", _sphere(1.0), "skin")
-	_add("hair_cap", _sphere(1.0, true), "hair")
-	_add("hair_back", _sphere(1.0), "hair_dark")
-	_add("nose", _sphere(0.24), "skin")
-	_add("eye", _sphere(0.17), "eye")
-	_add("neck", _cylinder(NECK_R, NECK_R), "skin")
-	_add("chest", _sphere(1.0), "cloth")
-	_add("belly", _cylinder(1.0, 1.0), "cloth")
-	_add("pelvis", _sphere(1.0), "trousers")
-	_add("skirt", _cylinder(1.0, 1.32), "cloth")
-	_add("belt", _cylinder(1.0, 1.0), "belt")
-	for side: String in ["front", "back"]:
-		_add("thigh_" + side, _cylinder(THIGH_R.x, THIGH_R.y), "trousers")
-		_add("knee_" + side, _sphere(THIGH_R.y), "trousers")
-		_add("shin_" + side, _cylinder(SHIN_R.x, SHIN_R.y), "boot")
-		_add("foot_" + side, _box(Vector3(2.1, 0.75, 0.9)), "boot")
-		_add("shoulder_" + side, _sphere(UPPER_ARM_R.x * 1.12), "cloth")
-		_add("upper_arm_" + side, _cylinder(UPPER_ARM_R.x, UPPER_ARM_R.y), "sleeve")
-		_add("elbow_" + side, _sphere(UPPER_ARM_R.y), "sleeve")
-		_add("forearm_" + side, _cylinder(FOREARM_R.x, FOREARM_R.y), "sleeve")
-		_add("hand_" + side, _sphere(HAND_R), "skin")
-
-
-func _add(id: String, mesh: Mesh, material: String) -> void:
-	var node := MeshInstance3D.new()
-	node.name = id
-	node.mesh = mesh
-	node.material_override = _materials[material]
-	_viewport.add_child(node)
-	_parts[id] = node
-
-
-func _sphere(radius: float, dome: bool = false) -> SphereMesh:
-	var mesh := SphereMesh.new()
-	mesh.radius = radius
-	mesh.height = radius * (1.0 if dome else 2.0)
-	mesh.is_hemisphere = dome
-	mesh.radial_segments = 16
-	mesh.rings = 8
-	return mesh
-
-
-## Unit height, centred: a limb scales it along its own axis to its length.
-func _cylinder(top: float, bottom: float) -> CylinderMesh:
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = top
-	mesh.bottom_radius = bottom
-	mesh.height = 1.0
-	mesh.radial_segments = 12
-	mesh.rings = 1
-	mesh.cap_top = true
-	mesh.cap_bottom = true
-	return mesh
-
-
-func _box(size: Vector3) -> BoxMesh:
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	return mesh
+	_make()
 
 
 ## Renders at the figure's real size on screen, so the texture is neither
@@ -316,30 +263,81 @@ func _fit(art: PlayerArt) -> void:
 	_viewport.size = Vector2i(roundi(BOX.size.x * density), roundi(BOX.size.y * density))
 
 
-## The materials take the art's colours every frame, through the art's hit
-## flash, so a hit burns the model white exactly as it burns a flat figure and
-## a duel seat's team colour reaches the tunic the frame it is set.
+## The materials take their colours every frame through the art's hit flash,
+## so a hit burns the model white exactly as it burns a flat figure and a duel
+## seat's team colour reaches the clothes the frame it is set.
 func _colour(art: PlayerArt) -> void:
-	var bases := {
-		"cloth": art.cloth,
-		"sleeve": art.cloth_dark,
-		"trousers": art.cloak_shade,
-		"boot": art.ink,
-		"skin": skin,
-		"hair": hair,
-		"hair_dark": hair_dark,
-		"belt": art.accent,
-		"eye": art.ink,
-	}
-	for id: String in bases:
-		(_materials[id] as StandardMaterial3D).albedo_color = art._c(bases[id] as Color)
+	var tones := _tones(art)
+	for id: String in tones:
+		(_materials[id] as StandardMaterial3D).albedo_color = art._c(tones[id] as Color)
 	_outline.albedo_color = art._c(art.ink)
 
 
-## The colour a material was given on the last frame drawn, for a test.
-func material_colour(id: String) -> Color:
-	var material := _materials.get(id) as StandardMaterial3D
-	return material.albedo_color if material != null else Color(0, 0, 0, 0)
+## --- building -------------------------------------------------------------------
+
+func _add(id: String, mesh: Mesh, material: String) -> void:
+	var node := MeshInstance3D.new()
+	node.name = id
+	node.mesh = mesh
+	node.material_override = _materials[material]
+	_viewport.add_child(node)
+	_parts[id] = node
+
+
+func _sphere(radius: float = 1.0, dome: bool = false) -> SphereMesh:
+	var mesh := SphereMesh.new()
+	mesh.radius = radius
+	mesh.height = radius * (1.0 if dome else 2.0)
+	mesh.is_hemisphere = dome
+	mesh.radial_segments = 16
+	mesh.rings = 8
+	return mesh
+
+
+## Unit height, centred: a limb scales it along its own axis to its length,
+## so a frame never rebuilds a mesh -- a capsule stretched along its axis would
+## stretch its caps too. A top radius of 0 is a cone.
+func _cylinder(top: float, bottom: float) -> CylinderMesh:
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = top
+	mesh.bottom_radius = bottom
+	mesh.height = 1.0
+	mesh.radial_segments = 12
+	mesh.rings = 1
+	return mesh
+
+
+## A ring about its own y axis, unit outer radius.
+func _ring(inner: float) -> TorusMesh:
+	var mesh := TorusMesh.new()
+	mesh.inner_radius = inner
+	mesh.outer_radius = 1.0
+	mesh.rings = 16
+	mesh.ring_segments = 8
+	return mesh
+
+
+func _box(size: Vector3 = Vector3.ONE) -> BoxMesh:
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	return mesh
+
+
+## Both legs and both arms, front and back: thigh, knee, shin, foot, shoulder,
+## upper arm, elbow, forearm, hand. `mats` names the material of each of
+## "leg", "shin", "foot", "arm", "fore" and "hand".
+func _make_limbs(thigh: Vector2, shin: Vector2, upper: Vector2, fore: Vector2,
+		hand: float, mats: Dictionary) -> void:
+	for side: String in ["front", "back"]:
+		_add("thigh_" + side, _cylinder(thigh.x, thigh.y), mats["leg"])
+		_add("knee_" + side, _sphere(thigh.y), mats["leg"])
+		_add("shin_" + side, _cylinder(shin.x, shin.y), mats["shin"])
+		_add("foot_" + side, _sphere(), mats["foot"])
+		_add("shoulder_" + side, _sphere(upper.x * 1.05), mats["arm"])
+		_add("upper_arm_" + side, _cylinder(upper.x, upper.y), mats["arm"])
+		_add("elbow_" + side, _sphere(upper.y), mats["fore"])
+		_add("forearm_" + side, _cylinder(fore.x, fore.y), mats["fore"])
+		_add("hand_" + side, _sphere(hand), mats["hand"])
 
 
 ## --- posing -----------------------------------------------------------------
@@ -358,89 +356,66 @@ func _place(art: PlayerArt, pose: Dictionary) -> void:
 	var target := _lift(BOX.get_center(), 0.0)
 	_camera.look_at_from_position(
 		target + Vector3(_sin, 0.0, _cos) * CAMERA_DISTANCE, target, Vector3.UP)
-
 	var up := (_lift(art._shoulder, 0.0) - _lift(art._hip, 0.0)).normalized()
-	var forward := Vector3(f, 0.0, 0.0)
-	_place_torso(art, up, forward)
-	_place_head(art, pose, up)
-	_place_leg(art, "back", art._knee_back, art._foot_back, -HIP_DEPTH)
-	_place_leg(art, "front", art._knee_front, art._foot_front, HIP_DEPTH)
-	_place_arm(art, "back", art._hand_back, -SHOULDER_DEPTH)
-	_place_arm(art, "front", art._hand_front, SHOULDER_DEPTH)
+	_pose_parts(art, pose, up, Vector3(f, 0.0, 0.0))
 
 
-func _place_torso(art: PlayerArt, up: Vector3, forward: Vector3) -> void:
-	# Depth front to back follows the rig's chest width, which the pose
-	# squashes and twists; breadth across is the shoulders'.
-	var chest_x := float(art._hw["chest"]) * 0.5
-	var shoulder := _lift(art._shoulder, 0.0)
-	var chest := _lift(art._chest, 0.0)
-	var waist := _lift(art._waist, 0.0)
-	var hip := _lift(art._hip, 0.0)
-	var frame := _axes(up, forward)
-	_put("chest", frame, shoulder.lerp(chest, 0.75) - up * 0.15,
-		Vector3(chest_x, 2.05, SHOULDER_DEPTH * 0.98))
-	_segment(art, "belly", chest, waist, Vector2(chest_x * 0.85, SHOULDER_DEPTH * 0.72))
-	_put("pelvis", frame, hip, Vector3(1.2, 1.2, HIP_DEPTH * 1.75))
-	_segment(art, "belt", waist + up * 0.35, waist - up * 0.35,
-		Vector2(chest_x * 0.88, SHOULDER_DEPTH * 0.76))
-	_segment(art, "skirt", waist, hip - up * 2.2,
-		Vector2(chest_x * 0.86, SHOULDER_DEPTH * 0.78))
+## The limbs on the rig's joints: hips and shoulders at a depth either side,
+## the shoulder joint `shoulder_drop` below the rig's shoulder line, the ankle
+## `ankle` above the rig's foot point, a foot of radii `foot` square to the
+## shin, toe forward -- so a pointed toe on a jump and a flat one on the floor
+## both come from the leg's own angle.
+func _pose_limbs(art: PlayerArt, hip_depth: float, shoulder_depth: float,
+		shoulder_drop: float, ankle: float, foot: Vector3) -> void:
+	for leg: Array in [["back", art._knee_back, art._foot_back, -hip_depth],
+			["front", art._knee_front, art._foot_front, hip_depth]]:
+		var side: String = leg[0]
+		var depth: float = leg[3]
+		var foot2: Vector2 = leg[2]
+		var hip := _lift(art._hip, depth)
+		var knee := _lift(leg[1] as Vector2, depth)
+		var ankle_at := _lift(foot2 + Vector2(0.0, -ankle), depth)
+		_segment(art, "thigh_" + side, hip, knee, Vector2.ONE)
+		_put("knee_" + side, Basis.IDENTITY, knee, Vector3.ONE)
+		_segment(art, "shin_" + side, knee, ankle_at, Vector2.ONE)
+		var toe := _axes((knee - ankle_at).normalized(), Vector3(art._f, 0.0, 0.0))
+		_put("foot_" + side, toe,
+			_lift(foot2 + Vector2(0.45 * art._f, -foot.y + 0.05), depth), foot)
+	for arm: Array in [["back", art._hand_back, -shoulder_depth],
+			["front", art._hand_front, shoulder_depth]]:
+		var side: String = arm[0]
+		var depth: float = arm[2]
+		var hand2: Vector2 = arm[1]
+		var shoulder := _lift(art._shoulder + Vector2(0.0, shoulder_drop), depth)
+		var elbow := _lift(art._elbow(hand2), depth)
+		var hand := _lift(hand2, depth)
+		_put("shoulder_" + side, Basis.IDENTITY, shoulder, Vector3.ONE)
+		_segment(art, "upper_arm_" + side, shoulder, elbow, Vector2.ONE)
+		_put("elbow_" + side, Basis.IDENTITY, elbow, Vector3.ONE)
+		_segment(art, "forearm_" + side, elbow, hand, Vector2.ONE)
+		_put("hand_" + side, Basis.IDENTITY, hand, Vector3.ONE)
 
 
-func _place_head(art: PlayerArt, pose: Dictionary, up: Vector3) -> void:
+## A head on `base`, `rise` up its own axis: [centre, frame, side]. The frame's
+## x is the face, turned `turn` from the run toward the viewer and backwards
+## when the pose looks back; y leans with the body and pitches with the hood's
+## tilt; `side` points across the face toward the camera.
+func _head(art: PlayerArt, pose: Dictionary, up: Vector3, base: Vector3, rise: float,
+		turn: float) -> Array:
 	var look: float = float(pose["hood_face"])
 	var fdir: float = art._f * (1.0 if look >= 0.0 else -1.0)
 	var tilt: float = float(pose["hood_tilt"])
-	var centre := _lift(art._head + Vector2(0.0, HEAD_DROP), 0.0)
-	# The head's up leans with the body and pitches forward with the hood's
-	# tilt; the face looks the way the hood does, backwards included.
 	var head_up := up.rotated(Vector3.BACK, -tilt * fdir * 0.6).normalized()
-	var frame := _axes(head_up, Vector3(fdir, 0.0, 0.0))
-	var face := frame.x
-	_put("head", frame, centre, HEAD_R)
-	_put("hair_cap", frame, centre + head_up * 0.12 - face * 0.12,
-		HEAD_R * Vector3(1.1, 1.0, 1.1))
-	_put("hair_back", frame, centre - face * 0.45 - head_up * 0.15,
-		HEAD_R * Vector3(0.82, 0.95, 0.98))
-	_put("nose", frame, centre + face * HEAD_R.x * 0.98 - head_up * 0.18, Vector3.ONE)
-	# On the near side of the face, on its surface rather than inside it.
-	_put("eye", frame, centre + face * HEAD_R.x * 0.9 + head_up * 0.12
-		+ Vector3.BACK * 0.5, Vector3.ONE)
-	(_parts["eye"] as MeshInstance3D).visible = float(pose["glint"]) > 0.0
-	_segment(art, "neck", _lift(art._shoulder, 0.0), centre - head_up * HEAD_R.y * 0.6,
-		Vector2.ONE)
+	var centre := base + head_up * rise
+	var frame := _axes(head_up, Vector3(fdir * cos(turn), 0.0, sin(turn)))
+	var side := frame.x.cross(head_up).normalized()
+	if side.z < 0.0:
+		side = -side
+	return [centre, frame, side]
 
 
-func _place_leg(art: PlayerArt, side: String, knee2: Vector2, foot2: Vector2,
-		depth: float) -> void:
-	var hip := _lift(art._hip, depth)
-	var knee := _lift(knee2, depth)
-	var ankle := _lift(foot2 + Vector2(0.0, -ANKLE), depth)
-	_segment(art, "thigh_" + side, hip, knee, Vector2.ONE)
-	_put("knee_" + side, Basis.IDENTITY, knee, Vector3.ONE)
-	_segment(art, "shin_" + side, knee, ankle, Vector2.ONE)
-	# The foot square to the shin, toe forward, so a pointed toe on a jump and
-	# a flat one on the floor both come from the leg's own angle.
-	var shin_up := (knee - ankle).normalized()
-	var toe := _axes(shin_up, Vector3(art._f, 0.0, 0.0))
-	var foot := _lift(foot2 + Vector2(0.55 * art._f, -0.37), depth)
-	_put("foot_" + side, toe, foot, Vector3.ONE)
-
-
-func _place_arm(art: PlayerArt, side: String, hand2: Vector2, depth: float) -> void:
-	var shoulder := _lift(art._shoulder + Vector2(0.0, 0.55), depth)
-	var elbow := _lift(art._elbow(hand2), depth)
-	var hand := _lift(hand2, depth)
-	_put("shoulder_" + side, Basis.IDENTITY, shoulder, Vector3.ONE)
-	_segment(art, "upper_arm_" + side, shoulder, elbow, Vector2.ONE)
-	_put("elbow_" + side, Basis.IDENTITY, elbow, Vector3.ONE)
-	_segment(art, "forearm_" + side, elbow, hand, Vector2.ONE)
-	_put("hand_" + side, Basis.IDENTITY, hand, Vector3.ONE)
-
-
-## A unit cylinder from `a` to `b`, its top radius at `a`, scaled across by
-## `across` (forward, sideways).
+## A unit mesh from `a` to `b` along its y axis, its top at `a`, scaled across
+## by `across` (forward, sideways).
 func _segment(art: PlayerArt, id: String, a: Vector3, b: Vector3, across: Vector2) -> void:
 	var along := a - b
 	var length := along.length()
@@ -468,6 +443,6 @@ func _put(id: String, frame: Basis, at: Vector3, scale: Vector3) -> void:
 	node.transform = Transform3D(frame * Basis.from_scale(scale), at)
 	var flat := Vector2(at.x * _cos - at.z * _sin, -at.y)
 	var reach := maxf(scale.x, maxf(scale.y, scale.z)) * 0.5
-	if id in ["head", "hair_cap", "hair_back"]:
-		reach = HEAD_R.y
+	if node.mesh is SphereMesh or node.mesh is TorusMesh:
+		reach *= 2.0
 	drawn = drawn.expand(flat - Vector2(reach, reach)).expand(flat + Vector2(reach, reach))

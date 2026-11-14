@@ -393,12 +393,10 @@ func _caption() -> PackedStringArray:
 					return PackedStringArray(["HEADBAND, BELT AND RIBBON", "HEADBAND AND BELT"])
 				CharacterLook.Figure.STICK:
 					return PackedStringArray(["THE SCARF AT THE NECK", "THE SCARF"])
-				CharacterLook.Figure.MODEL:
-					return PackedStringArray(["THE BELT", "BELT"])
+				CharacterLook.Figure.PRINCESS:
+					return PackedStringArray(["BROW BAND, TRIM AND CREST", "BAND AND TRIM"])
 			return PackedStringArray(["THE SASH AND THE CREST OF THE HOOD", "SASH AND CREST"])
 		"hair":
-			if _look.figure == CharacterLook.Figure.MODEL:
-				return PackedStringArray(["THE HAIR, LIT BY THE LOW SUN", "THE HAIR"])
 			return PackedStringArray(["THE BRAID", "BRAID"])
 	return PackedStringArray(["THE FACE, LIT BY THE LOW SUN", "THE FACE"])
 

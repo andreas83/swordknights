@@ -1,5 +1,6 @@
 extends GutTest
-## The 3D model stands on the 2D rig and nowhere else (scripts/player/model_costume.gd).
+## The 3D figure stands on the 2D rig and nowhere else (scripts/player/model_costume.gd,
+## scripts/player/princess_costume.gd).
 ##
 ## Its whole claim is that a 3D body can be drawn without becoming a second
 ## source of truth for where a hand or a foot is. So this projects the model's
@@ -19,7 +20,7 @@ const PLAYER_SCENE := preload("res://scenes/player.tscn")
 const TOLERANCE := 0.05
 
 
-func _dressed_player(figure: String = "model") -> Player:
+func _dressed_player(figure: String = "princess") -> Player:
 	var player := PLAYER_SCENE.instantiate() as Player
 	add_child_autofree(player)
 	player.set_physics_process(false)

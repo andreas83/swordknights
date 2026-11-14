@@ -180,7 +180,7 @@ func test_the_figure_and_the_light_change() -> void:
 	assert_true(lab.lab_figure.art().costume is StickCostume, "the stick avatar")
 	lab.change("figure")
 	await wait_process_frames(1)
-	assert_true(lab.lab_figure.art().costume is ModelCostume, "the 3D model")
+	assert_true(lab.lab_figure.art().costume is PrincessCostume, "the 3D princess")
 	lab.change("figure")
 	await wait_process_frames(1)
 	assert_eq(lab.lab_figure.art().costume.get_script(), Costume,
