@@ -962,6 +962,19 @@ a duel, the leggings its darkest step), the trim, crest, buckle and band the
 accent, the hair and skin the look's. The concept's shield and glowing blade
 are not there: the sword is the shared 2D one, and the game has no shield.
 
+Her hair is parted in the middle and drawn back, so the forehead is bare
+under the brow band: a cap set back on the skull, a swept lock either side of
+the parting, fullness over the ears and at the nape. The first version wore
+the hair as a cap over the whole crown, and at any size it read as a helmet.
+The details are the concept's, each one a shape: a V of trim at the neck and
+a band of it down the front, a crest, a double trim at the hem, a belt and a
+slanted sword belt with buckles, a pouch, a cape lined in the tunic's colour
+with a clasp, pauldrons of a dome and a plate with a rim and a rivet, a gold
+band at each wrist, boots with a folded cuff, an ankle strap and a sole, and
+liner, brows and lips on the face. The camera turns further toward her than
+the base does (`_yaw()`), as the concept draws her, so the front shows rather
+than hiding behind the sword arm.
+
 The cape trails on the prince's cloak fields and lag, the braid is the
 heroine's pendulum, and she blinks; a hit, a doze or a death closes her eyes
 and a hit opens her mouth. The cape is two flared slabs with real depth: the

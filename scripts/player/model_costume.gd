@@ -61,7 +61,8 @@ extends Costume
 ## The region of the art's space the texture covers. The widest pose without
 ## the sword -- a lunge, a topple -- stays inside it.
 const BOX := Rect2(-24.0, -36.0, 48.0, 44.0)
-## How far the camera is turned toward the facing, in radians.
+## How far the camera is turned toward the facing, in radians, unless a figure
+## says otherwise (`_yaw()`).
 const YAW := 0.32
 const CAMERA_DISTANCE := 120.0
 ## Screen pixels per art unit the texture is rendered at, at most and at least.
@@ -144,6 +145,13 @@ func _make() -> void:
 ## first frame, to learn the ids.
 func _tones(_art: PlayerArt) -> Dictionary:
 	return {}
+
+
+## How far the camera turns toward the facing. More shows more of the front
+## and less of the profile; the shear in `_lift()` keeps every joint on its rig
+## point at any turn.
+func _yaw() -> float:
+	return YAW
 
 
 ## Puts the parts on the rig: `up` is the body's axis, hip to shoulder, and
@@ -351,8 +359,8 @@ func _lift(p: Vector2, depth: float) -> Vector3:
 
 func _place(art: PlayerArt, pose: Dictionary) -> void:
 	var f := art._f
-	_sin = sin(YAW * f)
-	_cos = cos(YAW)
+	_sin = sin(_yaw() * f)
+	_cos = cos(_yaw())
 	var target := _lift(BOX.get_center(), 0.0)
 	_camera.look_at_from_position(
 		target + Vector3(_sin, 0.0, _cos) * CAMERA_DISTANCE, target, Vector3.UP)
