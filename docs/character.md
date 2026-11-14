@@ -961,7 +961,7 @@ pauldrons, brown leather bracers and tall boots, a glowing blue-white sword and
 a shield. Built from spheres, tapered cylinders, rings and boxes, all made in
 code.
 
-Choosing her puts on the concept's look -- the ROYAL outfit, BROWN hair, SAND
+Choosing her puts on the concept's look -- the ROYAL outfit, BROWN hair, FAIR
 skin (`CharacterLook.wear_defaults()`), from the two ramps the palette gained
 for her (`Palette.ROYAL*`, `Palette.UMBER*`, docs/art-direction.md). In a duel
 the tunic, cape, lining and shield face are the seat's team colour like every
@@ -985,6 +985,36 @@ band at each wrist, boots with a folded cuff, an ankle strap and a sole, and
 liner, brows and lips on the face. The camera turns further toward her than
 the base does (`_yaw()`), as the concept draws her, so the front shows rather
 than hiding behind the sword arm.
+
+![the princess's portrait, as tools/model_portrait.gd renders it](princess-portrait.png)
+
+She was tuned against the owner's concept side by side, from the front
+(`tools/model_portrait.gd`, which sets `ModelCostume.view_yaw`: the body
+placed as it really stands, unsheared, the camera turned round to it and the
+light turned with it, as a character sheet is lit). What that pass changed, and
+why each was wrong before:
+
+- **The hair** is a dome tipped back off the crown, so its rim is the
+  hairline; a whole sphere set back covered the face from the front. Side
+  locks frame the face, the braid falls from behind the near ear over the
+  shoulder (`_pose_braid()` drapes it forward), and the brow band sits at the
+  hairline with a tiara point and a blue jewel.
+- **The face** is set on the head's own surface (`_on_head()`): features
+  placed a fixed distance along the face sank into the skull where the
+  ellipsoid narrows. The eyes are mostly iris -- a sliver of white, a pupil, a
+  highlight -- under a level liner and brows raised at the outer end (tipped
+  the other way, the first ones frowned), with a nose, a smile and cheeks.
+- **The body** is broader across -- shoulders, chest, pauldrons in three
+  plates, a wider cape -- with the belt riding above the rig's waist, since the
+  rig's torso is a robe's and long, and the concept's is short over a flared
+  skirt. Two gold edges mark the tabard's front panels, and the lion is 1.7
+  times its first size.
+- **Fair skin** (`Palette.FAIR`): the gold ramp's lightest step made her face
+  yellow.
+
+Two differences are the game's, not the model's: she stands in the game's
+idle pose rather than the concept's hands-on-hips, and her sword is the shared
+2D one, drawn where the side view puts it.
 
 The cape trails on the prince's cloak fields and lag, the braid is the
 heroine's pendulum, and she blinks; a hit, a doze or a death closes her eyes

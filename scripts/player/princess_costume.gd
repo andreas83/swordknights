@@ -26,7 +26,7 @@ extends ModelCostume
 ## The tunic is the look's outfit, the cape its shade step, the lining and the
 ## shield's face the tunic again; in the duel they are the seat's team colour
 ## (FighterArt.dress), so a seat reads as its team from the chest out. Her own
-## look is the concept's -- ROYAL blue, BROWN hair, SAND skin -- put on by
+## look is the concept's -- ROYAL blue, BROWN hair, FAIR skin -- put on by
 ## `CharacterLook.wear_defaults()` when she is chosen. The trim, the lion, the
 ## buckles, the band and the shield's boss are the accent. Leather, leggings,
 ## steel and the eyes are fixed browns, greys and whites that belong to neither
@@ -39,13 +39,19 @@ extends ModelCostume
 ## slung on her back as decoration, because the game has no shield to block
 ## with and a shield on the arm would promise one.
 
-const HEAD_R := Vector3(2.15, 2.3, 2.1)
+const HEAD_R := Vector3(2.3, 2.45, 2.25)
 ## How far her face turns from the run toward the viewer, in radians.
 const FACE_TURN := 0.45
 ## Where the eyes sit round the face from its centre line, in radians.
-const EYE_SPREAD := 0.38
-const BRAID_BEADS := 5
-const BRAID_STEP := 1.0
+const EYE_SPREAD := 0.36
+## How far back the hair's dome is tipped off the crown, in radians: where the
+## hairline crosses the forehead.
+const HAIRLINE := 0.75
+## How much larger the chest's lion is than its first, palm-sized cut: the
+## concept's fills the chest between the trims.
+const LION_SIZE := 1.7
+const BRAID_BEADS := 7
+const BRAID_STEP := 0.85
 ## The braid's spring, the heroine's numbers: back in under a second, past
 ## its rest twice on the way.
 const BRAID_STIFF := 55.0
@@ -114,14 +120,15 @@ func _tones(art: PlayerArt) -> Dictionary:
 		"lining": cloth,
 		"leather": Palette.UMBER_DARK, "boot": Palette.UMBER, "sole": Palette.UMBER_DEEP,
 		"steel": Palette.STEEL, "steel_dark": Palette.STEEL_DARK, "gem": Palette.LIGHT_SOFT,
+		"jewel": Palette.ROYAL_GLOW,
 		"skin": skin, "hair": hair, "hair_dark": hair_dark,
-		"white": Palette.PAPER, "iris": Palette.SHADOW_PIT, "shine": Palette.PAPER,
-		"lid": Palette.INK, "brow": hair_dark,
-		"mouth": skin.lerp(Palette.SHADOW, 0.6),
+		"white": Palette.PAPER, "iris": Palette.UMBER, "shine": Palette.PAPER,
+		"lid": Palette.INK, "brow": hair_dark, "pupil": Palette.INK,
+		"mouth": skin.lerp(Palette.CLOTH, 0.6),
 		# The cheeks are the skin warmed toward the fire step: a blush lit by
 		# the same sun as the face, whatever the skin tone. Not the blood
 		# ramp's glint, which is blood's alone (docs/art-direction.md).
-		"blush": skin.lerp(Palette.SHADOW_WARM, 0.45),
+		"blush": skin.lerp(Palette.SHADOW_WARM, 0.22),
 	}
 
 
@@ -131,7 +138,7 @@ func _make() -> void:
 		_add("braid_%d" % i, _sphere(), "hair" if i % 2 == 0 else "hair_dark")
 	_add("braid_tie", _sphere(), "trim")
 	_make_tunic()
-	_make_limbs(Vector2(0.82, 0.62), Vector2(0.66, 0.52), Vector2(0.52, 0.46),
+	_make_limbs(Vector2(0.92, 0.68), Vector2(0.72, 0.56), Vector2(0.52, 0.46),
 		Vector2(0.5, 0.44), 0.55, {
 			"leg": "legs", "shin": "boot", "foot": "boot",
 			"arm": "cloth", "fore": "leather", "hand": "leather",
@@ -139,6 +146,7 @@ func _make() -> void:
 	for side: String in ["front", "back"]:
 		_add("pauldron_" + side, _sphere(), "steel")
 		_add("plate_" + side, _sphere(), "steel_dark")
+		_add("plate_low_" + side, _sphere(), "steel")
 		_add("pauldron_rim_" + side, _ring(0.82), "trim")
 		_add("rivet_" + side, _sphere(), "trim")
 		_add("cuff_" + side, _ring(0.7), "leather")
@@ -163,10 +171,11 @@ func _make_tunic() -> void:
 	_add("skirt", _cylinder(1.0, 1.4), "cloth")
 	_add("hem_trim", _ring(0.86), "trim")
 	_add("hem_trim_2", _ring(0.92), "trim")
-	_add("collar", _ring(0.7), "trim")
+	_add("collar", _ring(0.62), "steel")
 	_add("v_near", _box(), "trim")
 	_add("v_far", _box(), "trim")
-	_add("front_trim", _box(), "trim")
+	_add("panel_near", _box(), "trim")
+	_add("panel_far", _box(), "trim")
 	for id: String in ["lion_body", "lion_mane", "lion_head"]:
 		_add(id, _sphere(), "trim")
 	for id: String in ["lion_paw", "lion_hind", "lion_tail"]:
@@ -185,18 +194,24 @@ func _make_tunic() -> void:
 func _make_head() -> void:
 	_add("neck", _cylinder(0.5, 0.55), "skin")
 	_add("head", _sphere(), "skin")
-	_add("hair_cap", _sphere(), "hair")
+	var cap := _sphere(1.0, true)
+	cap.radial_segments = 28
+	cap.rings = 14
+	_add("hair_cap", cap, "hair")
 	_add("hair_back", _sphere(), "hair_dark")
-	_add("band", _ring(0.86), "trim")
-	_add("band_gem", _sphere(), "gem")
+	_add("band", _ring(0.84), "steel")
+	_add("band_gem", _sphere(), "jewel")
+	_add("band_peak", _box(), "steel")
 	_add("nose", _sphere(), "skin")
 	_add("mouth", _sphere(), "mouth")
+	_add("smile_near", _sphere(), "mouth")
+	_add("smile_far", _sphere(), "mouth")
 	for side: String in ["near", "far"]:
 		_add("hair_side_" + side, _sphere(), "hair")
-		_add("sweep_" + side, _sphere(), "hair")
 		_add("band_stud_" + side, _sphere(), "gem")
 		_add("white_" + side, _sphere(), "white")
 		_add("iris_" + side, _sphere(), "iris")
+		_add("pupil_" + side, _sphere(), "pupil")
 		_add("shine_" + side, _sphere(), "shine")
 		_add("liner_" + side, _box(), "lid")
 		_add("lid_" + side, _box(), "lid")
@@ -207,7 +222,7 @@ func _make_head() -> void:
 func _pose_parts(art: PlayerArt, pose: Dictionary, up: Vector3, forward: Vector3) -> void:
 	_pose_body(art, up, forward)
 	_pose_cape(art, pose, up, forward)
-	_pose_limbs(art, 0.8, 1.85, 0.75, 0.9, Vector3(1.3, 0.62, 0.68))
+	_pose_limbs(art, 1.25, 2.35, 0.75, 0.9, Vector3(1.3, 0.62, 0.72))
 	_pose_armour(up, forward)
 	_pose_head(art, pose, up)
 
@@ -218,20 +233,23 @@ func _pose_parts(art: PlayerArt, pose: Dictionary, up: Vector3, forward: Vector3
 ## `up`). At play size it is a gold mark with a ragged edge; in the wardrobe
 ## it is a lion.
 func _pose_lion(art: PlayerArt, at: Vector3, up: Vector3, forward: Vector3) -> void:
-	var across := Vector3.BACK
 	var flat := 0.1
+	var k := LION_SIZE
+	# Offsets in the chest's plane, already at the lion's size.
+	var u := up * k
+	var a := Vector3.BACK * k
 	var lean := _axes(up.rotated(forward, 0.45 * art._f), forward)
-	_put("lion_body", lean, at + up * -0.1, Vector3(flat, 0.55, 0.32))
-	_put("lion_mane", _axes(up, forward), at + up * 0.38 + across * 0.12,
-		Vector3(flat, 0.34, 0.34))
-	_put("lion_head", _axes(up, forward), at + up * 0.45 + across * 0.3,
-		Vector3(flat * 1.4, 0.18, 0.2))
-	_segment(art, "lion_paw", at + up * 0.18 + across * 0.12, at + up * 0.5 + across * 0.5,
-		Vector2(flat * 0.6, 0.09))
-	_segment(art, "lion_hind", at - up * 0.45, at - up * 0.8 + across * 0.22,
-		Vector2(flat * 0.6, 0.1))
-	_segment(art, "lion_tail", at - up * 0.3 - across * 0.2, at + up * 0.15 - across * 0.45,
-		Vector2(flat * 0.5, 0.06))
+	_put("lion_body", lean, at - u * 0.1, Vector3(flat, 0.55 * k, 0.32 * k))
+	_put("lion_mane", _axes(up, forward), at + u * 0.38 + a * 0.12,
+		Vector3(flat, 0.34 * k, 0.34 * k))
+	_put("lion_head", _axes(up, forward), at + u * 0.45 + a * 0.3,
+		Vector3(flat * 1.4, 0.18 * k, 0.2 * k))
+	_segment(art, "lion_paw", at + u * 0.18 + a * 0.12, at + u * 0.5 + a * 0.5,
+		Vector2(flat * 0.6, 0.09 * k))
+	_segment(art, "lion_hind", at - u * 0.45, at - u * 0.8 + a * 0.22,
+		Vector2(flat * 0.6, 0.1 * k))
+	_segment(art, "lion_tail", at - u * 0.3 - a * 0.2, at + u * 0.15 - a * 0.45,
+		Vector2(flat * 0.5, 0.06 * k))
 
 
 ## The tunic: a chest, a waist, a short flared skirt to mid-thigh with a
@@ -246,24 +264,30 @@ func _pose_body(art: PlayerArt, up: Vector3, forward: Vector3) -> void:
 	var waist := _lift(art._waist, 0.0)
 	var hip := _lift(art._hip, 0.0)
 	var frame := _axes(up, forward)
-	var front := forward * 1.48 * width
+	# The belt rides above the rig's waist: the rig's torso is a robe's,
+	# long, and the concept's is short over a skirt that flares from the belt.
+	waist = chest.lerp(waist, 0.55)
 	_put("chest", frame, shoulder.lerp(chest, 0.7) - up * 0.2,
-		Vector3(1.5 * width, 2.3, 1.95))
-	_segment(art, "waist", chest, waist, Vector2(1.15 * width, 1.6))
+		Vector3(1.5 * width, 2.2, 2.3))
+	_segment(art, "waist", chest, waist, Vector2(1.08 * width, 1.62))
 	var hem := hip - up * 1.7
-	_segment(art, "skirt", waist, hem, Vector2(1.25 * width, 1.75))
-	_put("hem_trim", frame, hem + up * 0.1, Vector3(1.78 * width, 0.9, 2.45))
-	_put("hem_trim_2", frame, hem + up * 0.55, Vector3(1.7 * width, 0.5, 2.36))
+	_segment(art, "skirt", waist, hem, Vector2(1.18 * width, 1.85))
+	_put("hem_trim", frame, hem + up * 0.1, Vector3(1.78 * width, 0.9, 2.68))
+	_put("hem_trim_2", frame, hem + up * 0.55, Vector3(1.7 * width, 0.5, 2.58))
 	_put("collar", frame, shoulder + up * 0.25, Vector3(0.9, 0.7, 0.9))
 	var sternum := shoulder.lerp(chest, 0.75) + forward * 1.38 * width
 	for i: int in 2:
 		var across := Vector3.BACK * (0.85 if i == 0 else -0.85)
 		_segment(art, "v_near" if i == 0 else "v_far",
 			shoulder + forward * 0.75 + across + up * 0.15, sternum, Vector2(0.16, 0.2))
-	_segment(art, "front_trim", sternum, hem + front * 0.9 + up * 0.4, Vector2(0.14, 0.32))
-	# Toward the far side of the chest: the near half is behind the sword arm.
-	_pose_lion(art, shoulder.lerp(chest, 0.95) + forward * 1.5 * width
-		- Vector3.BACK * 0.35, up, forward)
+	# The front panels' edges, gold from the belt to the hem, as the concept's
+	# tabard is cut.
+	for i: int in 2:
+		var across := Vector3.BACK * (0.5 if i == 0 else -0.5)
+		_segment(art, "panel_near" if i == 0 else "panel_far",
+			waist + forward * 1.22 * width + across, hem + forward * 1.85 * width
+			+ across * 1.3 + up * 0.35, Vector2(0.14, 0.2))
+	_pose_lion(art, shoulder.lerp(chest, 0.85) + forward * 1.5 * width, up, forward)
 	# The shield, slung on the back: a face in the tunic's colour, a steel rim,
 	# a gold boss. Decoration -- there is no shield in the game to block with.
 	var slung := _axes(-forward, up)
@@ -271,14 +295,14 @@ func _pose_body(art: PlayerArt, up: Vector3, forward: Vector3) -> void:
 	_put("shield", slung, shield, Vector3(0.3, 1.65, 1.35))
 	_put("shield_rim", _axes(-forward, up), shield, Vector3(1.38, 0.5, 1.68))
 	_put("shield_boss", slung, shield - forward * 0.3, Vector3.ONE * 0.38)
-	_segment(art, "belt", waist + up * 0.3, waist - up * 0.3, Vector2(1.28 * width, 1.75))
+	_segment(art, "belt", waist + up * 0.35, waist - up * 0.35, Vector2(1.28 * width, 1.9))
 	_put("buckle", frame, waist + forward * 1.3 * width, Vector3(0.25, 0.55, 0.6))
 	# The sword belt slants from the waist at the back to the hip at the front.
 	var slant := _axes(up.rotated(Vector3.BACK, 0.32 * art._f), forward)
-	_put("sword_belt", slant, waist.lerp(hip, 0.55), Vector3(1.48 * width, 0.7, 1.98))
+	_put("sword_belt", slant, waist.lerp(hip, 0.55), Vector3(1.48 * width, 0.7, 2.15))
 	_put("sword_buckle", frame, waist.lerp(hip, 0.75) + forward * 1.35 * width,
 		Vector3.ONE * 0.28)
-	var pouch := waist - up * 0.8 + Vector3.BACK * 1.6 - forward * 0.35
+	var pouch := waist - up * 0.8 + Vector3.BACK * 1.85 - forward * 0.35
 	_put("pouch", frame, pouch, Vector3(0.9, 1.0, 0.42))
 	_put("pouch_flap", frame, pouch + up * 0.42 + Vector3.BACK * 0.12,
 		Vector3(0.92, 0.22, 0.3))
@@ -298,14 +322,14 @@ func _pose_cape(art: PlayerArt, pose: Dictionary, up: Vector3, forward: Vector3)
 	if art._grounded():
 		mid.y = maxf(mid.y, 0.5)
 		tail.y = maxf(tail.y, 0.4)
-	_segment(art, "cape_top", top, mid, Vector2(1.1, 2.3))
+	_segment(art, "cape_top", top, mid, Vector2(1.1, 3.3))
 	_put("cape_joint", _axes((top - mid).normalized(), forward), mid,
-		Vector3(1.1, 0.5, 2.3))
-	_segment(art, "cape_tail", mid, tail, Vector2(1.1, 2.3))
+		Vector3(1.1, 0.5, 3.3))
+	_segment(art, "cape_tail", mid, tail, Vector2(1.1, 3.8))
 	# The lining sits on the body's side of the cape and shows at its edge.
 	var inward := forward * 0.35
-	_segment(art, "lining_top", top + inward, mid + inward, Vector2(0.85, 2.35))
-	_segment(art, "lining_tail", mid + inward, tail + inward, Vector2(0.85, 2.35))
+	_segment(art, "lining_top", top + inward, mid + inward, Vector2(0.85, 3.35))
+	_segment(art, "lining_tail", mid + inward, tail + inward, Vector2(0.85, 3.85))
 	_put("clasp", Basis.IDENTITY, _lift(art._shoulder, 0.0) + up * 0.35
 		+ Vector3.BACK * 1.1 + forward * 0.4, Vector3.ONE * 0.36)
 
@@ -319,12 +343,14 @@ func _pose_armour(up: Vector3, forward: Vector3) -> void:
 		var joint := (_parts["shoulder_" + side] as MeshInstance3D).position
 		var out := (up + outward * 0.5).normalized()
 		var dome := _axes(out, forward)
-		_put("pauldron_" + side, dome, joint + up * 0.25, Vector3(0.95, 0.62, 0.9))
-		_put("plate_" + side, dome, joint - up * 0.25 + outward * 0.18,
-			Vector3(1.0, 0.42, 0.95))
-		_put("pauldron_rim_" + side, dome, joint + up * 0.05, Vector3(0.98, 0.7, 0.93))
-		_put("rivet_" + side, dome, joint + up * 0.55 + outward * 0.6 + forward * 0.2,
-			Vector3.ONE * 0.13)
+		_put("pauldron_" + side, dome, joint + up * 0.3, Vector3(1.2, 0.78, 1.15))
+		_put("plate_" + side, dome, joint - up * 0.3 + outward * 0.25,
+			Vector3(1.2, 0.5, 1.15))
+		_put("plate_low_" + side, dome, joint - up * 0.8 + outward * 0.4,
+			Vector3(1.05, 0.4, 1.0))
+		_put("pauldron_rim_" + side, dome, joint + up * 0.05, Vector3(1.24, 0.8, 1.19))
+		_put("rivet_" + side, dome, joint + up * 0.75 + outward * 0.75 + forward * 0.25,
+			Vector3.ONE * 0.15)
 		var elbow := (_parts["elbow_" + side] as MeshInstance3D).position
 		var hand := (_parts["hand_" + side] as MeshInstance3D).position
 		var arm := (elbow - hand).normalized()
@@ -357,49 +383,59 @@ func _pose_head(art: PlayerArt, pose: Dictionary, up: Vector3) -> void:
 	# under the brow band -- a cap set back on the skull, a swept lock either
 	# side of the parting, fullness over the ears and at the nape, and the
 	# braid from there.
-	_put("hair_cap", frame, c - face * 0.48 + hu * 0.2, HEAD_R * Vector3(1.0, 1.03, 1.05))
+	# The cap is a dome tipped back off the crown, so its rim is the hairline:
+	# high on the forehead, down past the temples to behind the ears. A cap
+	# that is a whole sphere set back covers the face from the front.
+	var tipped := _axes((hu * cos(HAIRLINE) - face * sin(HAIRLINE)).normalized(), face)
+	_put("hair_cap", tipped, c, HEAD_R * Vector3(1.06, 1.06, 1.06))
 	_put("hair_back", frame, c - face * 1.05 - hu * 0.55, Vector3(1.55, 1.85, 1.75))
 	for i: int in 2:
 		var which := "near" if i == 0 else "far"
 		var sign := 1.0 if i == 0 else -1.0
-		_put("hair_side_" + which, frame, c - face * 0.5 + side * 1.35 * sign - hu * 0.3,
-			Vector3(1.15, 1.7, 0.85))
-		var sweep := _axes(hu.rotated(face, -0.35 * sign), face)
-		_put("sweep_" + which, sweep, c + hu * 1.75 + face * 0.55 + side * 0.85 * sign,
-			Vector3(1.0, 0.55, 0.95))
+		_put("hair_side_" + which, frame, c + face * 0.05 + side * 1.78 * sign - hu * 0.55,
+			Vector3(1.0, 1.95, 0.52))
 	# The brow band across the bare forehead, lower at the front than behind,
 	# with a gem in the middle and a stone either side of it.
-	var band := _axes(hu.rotated(side, -0.28), face)
-	var band_at := c + hu * 1.0
-	_put("band", band, band_at, Vector3(2.12, 0.75, 2.07))
-	var gem := band_at + band.x * 2.08 - band.y * 0.02
-	_put("band_gem", frame, gem, Vector3.ONE * 0.34)
+	var band := _axes(hu.rotated(side, -0.12), face)
+	var band_at := c + hu * 1.3
+	_put("band", band, band_at, Vector3(1.9, 2.2, 1.86))
+	var gem := band_at + band.x * 1.85 + band.y * 0.05
+	_put("band_gem", frame, gem, Vector3.ONE * 0.3)
+	# The tiara's point: a diamond of steel standing up behind the gem.
+	_put("band_peak", _axes(hu.rotated(face, PI * 0.25), face), gem - face * 0.08 + hu * 0.22,
+		Vector3(0.12, 0.42, 0.42))
 	for i: int in 2:
 		var sign := 1.0 if i == 0 else -1.0
 		var aim := (band.x * cos(0.6) + side * sin(0.6) * sign).normalized()
 		_put("band_stud_" + ("near" if i == 0 else "far"), frame,
 			band_at + aim * 2.03 + band.y * 0.02, Vector3.ONE * 0.18)
-	_pose_braid(c - face * 1.6 - hu * 1.3 + side * 0.4)
+	# The braid falls from behind the near ear over the shoulder, as the
+	# concept wears it, so it is in front of the cape rather than lost behind.
+	_pose_braid(c - face * 0.85 - hu * 1.55 + side * 1.9, face, side)
 	_pose_face(art, pose, frame, c, side)
 
 
 ## The braid: beads from the nape, each leaning a little further than the one
 ## above it, so a swing reads as a curve rather than a stick.
-func _pose_braid(root: Vector3) -> void:
+func _pose_braid(root: Vector3, face: Vector3, side: Vector3) -> void:
 	var at := root
 	for i: int in BRAID_BEADS:
 		var bend := lerpf(0.6, 1.0, float(i) / float(BRAID_BEADS - 1))
 		var a := _swing * bend
-		at += Vector3(sin(a), -cos(a), 0.0) * BRAID_STEP
+		# Draped forward and out, over the pauldron and down the front.
+		var drape := face * (0.4 if i in [1, 2, 3] else 0.0) + side * 0.15
+		at += (Vector3(sin(a), -cos(a), 0.0) + drape).normalized() * BRAID_STEP
 		var size := lerpf(0.62, 0.42, float(i) / float(BRAID_BEADS - 1))
 		_put("braid_%d" % i, Basis.IDENTITY, at, Vector3(size, size * 1.2, size))
 	_put("braid_tie", Basis.IDENTITY, at + Vector3(sin(_swing), -cos(_swing), 0.0) * 0.55,
 		Vector3.ONE * 0.32)
 
 
-## Two eyes -- white, a dark iris, an unlit highlight, a line of liner over
-## each -- under two short brows, a nose, lips, two cheeks. A blink, a doze, a
-## hit and a death close them.
+## Two eyes -- a sliver of white round a large brown iris, a pupil, an unlit
+## highlight, a line of liner over each -- under two brows, a nose, lips, two
+## cheeks. A blink, a doze, a hit and a death close them. Every feature is set
+## on the head's own surface (`_on_head()`), so none sinks into the skull at
+## the side of the face, where the ellipsoid is narrower than in front.
 func _pose_face(art: PlayerArt, pose: Dictionary, frame: Basis, c: Vector3,
 		side: Vector3) -> void:
 	var face := frame.x
@@ -409,26 +445,48 @@ func _pose_face(art: PlayerArt, pose: Dictionary, frame: Basis, c: Vector3,
 	for i: int in 2:
 		var which := "near" if i == 0 else "far"
 		var sign := 1.0 if i == 0 else -1.0
-		var aim := (face * cos(EYE_SPREAD) + side * sin(EYE_SPREAD) * sign).normalized()
+		var round := Vector3(cos(EYE_SPREAD), -0.12, sin(EYE_SPREAD) * sign)
+		var eye := _on_head(c, face, hu, side, round)
+		var aim := (eye - c).normalized()
 		var eye_frame := _axes(hu, aim)
-		var eye := c + aim * HEAD_R.x * 0.9 - hu * 0.1
-		for id: String in ["white_", "iris_", "shine_", "liner_"]:
+		for id: String in ["white_", "iris_", "pupil_", "shine_", "liner_"]:
 			(_parts[id + which] as MeshInstance3D).visible = not shut
 		(_parts["lid_" + which] as MeshInstance3D).visible = shut
-		_put("white_" + which, eye_frame, eye, Vector3(0.3, 0.52, 0.42))
-		_put("iris_" + which, eye_frame, eye + aim * 0.16 - hu * 0.05, Vector3(0.24, 0.42, 0.3))
-		_put("shine_" + which, eye_frame, eye + aim * 0.3 + hu * 0.12 - side * 0.08,
-			Vector3.ONE * 0.11)
-		var liner := _axes(hu.rotated(aim, -0.15 * sign), aim)
-		_put("liner_" + which, liner, eye + hu * 0.48 + aim * 0.1, Vector3(0.12, 0.12, 0.85))
-		_put("lid_" + which, eye_frame, eye + aim * 0.12, Vector3(0.12, 0.12, 0.75))
-		_put("brow_" + which, _axes(hu.rotated(aim, 0.2 * sign), aim),
-			eye + hu * 0.82 + aim * 0.02, Vector3(0.14, 0.13, 0.72))
-		var cheek_aim := (face * cos(0.75) + side * sin(0.75) * sign).normalized()
-		_put("cheek_" + which, _axes(hu, cheek_aim), c + cheek_aim * HEAD_R.x * 0.92
-			- hu * 0.8, Vector3(0.12, 0.28, 0.42))
-	_put("nose", frame, c + face * HEAD_R.x * 0.98 - hu * 0.45, Vector3(0.28, 0.32, 0.26))
-	var lips := Vector3(0.16, 0.16, 0.5)
-	if art._flash > 0.0:
-		lips = Vector3(0.24, 0.34, 0.32)
-	_put("mouth", frame, c + face * HEAD_R.x * 0.9 - hu * 1.15, lips)
+		_put("white_" + which, eye_frame, eye, Vector3(0.26, 0.56, 0.52))
+		_put("iris_" + which, eye_frame, eye + aim * 0.1 - hu * 0.02, Vector3(0.22, 0.5, 0.44))
+		_put("pupil_" + which, eye_frame, eye + aim * 0.2 - hu * 0.02, Vector3(0.12, 0.26, 0.22))
+		_put("shine_" + which, eye_frame, eye + aim * 0.26 + hu * 0.17 - side * 0.12,
+			Vector3.ONE * 0.12)
+		var liner := _axes(hu, aim)
+		_put("liner_" + which, liner, eye + hu * 0.5 + aim * 0.06, Vector3(0.12, 0.16, 1.05))
+		_put("lid_" + which, eye_frame, eye + aim * 0.1, Vector3(0.12, 0.14, 0.8))
+		var brow := _on_head(c, face, hu, side, Vector3(cos(EYE_SPREAD), 0.42,
+			sin(EYE_SPREAD) * sign))
+		# Raised at the outer end, a soft arch: tipped the other way they frown.
+		_put("brow_" + which, _axes(hu.rotated(aim, 0.14 * sign), aim), brow,
+			Vector3(0.14, 0.16, 0.8))
+		var cheek := _on_head(c, face, hu, side, Vector3(cos(0.72), -0.42, sin(0.72) * sign))
+		_put("cheek_" + which, _axes(hu, (cheek - c).normalized()), cheek,
+			Vector3(0.1, 0.3, 0.42))
+	_put("nose", frame, _on_head(c, face, hu, side, Vector3(1.0, -0.3, 0.0)) + face * 0.06,
+		Vector3(0.18, 0.26, 0.2))
+	# A smile: the mouth, and a corner either side turned up off it.
+	var hurt := art._flash > 0.0
+	var mouth := _on_head(c, face, hu, side, Vector3(1.0, -0.6, 0.0))
+	_put("mouth", frame, mouth, Vector3(0.22, 0.34, 0.32) if hurt else Vector3(0.12, 0.12, 0.4))
+	for i: int in 2:
+		var sign := 1.0 if i == 0 else -1.0
+		var corner := _on_head(c, face, hu, side, Vector3(1.0, -0.56, 0.24 * sign))
+		var node := _parts["smile_near" if i == 0 else "smile_far"] as MeshInstance3D
+		node.visible = not hurt
+		_put(node.name, _axes(hu.rotated(face, 0.55 * sign), (corner - c).normalized()),
+			corner, Vector3(0.1, 0.08, 0.16))
+
+
+## The point on the head's surface in a direction given in head space -- x
+## toward the face, y up the head, z toward `side` -- so a feature can sit on
+## the skin wherever the ellipsoid curves.
+func _on_head(c: Vector3, face: Vector3, hu: Vector3, side: Vector3, dir: Vector3) -> Vector3:
+	var scaled := Vector3(dir.x / HEAD_R.x, dir.y / HEAD_R.y, dir.z / HEAD_R.z)
+	var local := dir / scaled.length()
+	return c + face * local.x + hu * local.y + side * local.z

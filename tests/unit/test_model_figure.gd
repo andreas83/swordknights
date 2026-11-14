@@ -123,7 +123,7 @@ func test_the_stick_avatar_draws_its_own_limbs() -> void:
 func test_choosing_the_princess_puts_on_her_concept() -> void:
 	var look := CharacterLook.from_ids({"figure": "princess"})
 	assert_eq(look.to_ids(), {"figure": "princess", "outfit": "royal", "accent": "gold",
-		"hair": "brown", "skin": "sand"}, "the concept's blue, brown hair and fair skin")
+		"hair": "brown", "skin": "fair"}, "the concept's blue, brown hair and fair skin")
 	var chosen := CharacterLook.from_ids({"figure": "princess", "outfit": "wine"})
 	assert_eq(String(chosen.option("outfit")["id"]), "wine", "but a named field wins")
 	var prince := CharacterLook.from_ids({"figure": "prince"})
@@ -138,3 +138,29 @@ func test_the_princess_blade_glows_and_the_rest_do_not() -> void:
 		var look := CharacterLook.from_ids({"figure": figure})
 		look.dress(_art(player))
 		assert_eq(_art(player).costume.blade_colours(), {}, "%s keeps steel" % figure)
+
+
+## A portrait (ModelCostume.view_yaw) is unsheared, so its joints leave the
+## rig: nothing that plays may set it. Only the costume that defines it and
+## the portrait tool name it.
+func test_only_the_portrait_tool_turns_the_camera_round() -> void:
+	var allowed: Array[String] = [
+		"res://scripts/player/model_costume.gd", "res://tools/model_portrait.gd",
+	]
+	var found: Array[String] = []
+	for dir: String in ["res://scripts", "res://tools"]:
+		found.append_array(_naming(dir, "view_yaw"))
+	for path: String in found:
+		assert_has(allowed, path, "%s sets a portrait camera" % path)
+	assert_has(found, "res://tools/model_portrait.gd", "the scan reads the files")
+
+
+func _naming(dir: String, word: String) -> Array[String]:
+	var out: Array[String] = []
+	for name: String in DirAccess.get_files_at(dir):
+		var path := dir.path_join(name)
+		if name.ends_with(".gd") and FileAccess.get_file_as_string(path).contains(word):
+			out.append(path)
+	for sub: String in DirAccess.get_directories_at(dir):
+		out.append_array(_naming(dir.path_join(sub), word))
+	return out

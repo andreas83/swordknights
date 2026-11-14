@@ -72,17 +72,27 @@ const DENSITY_MAX := 12
 const OUTLINE := 0.22
 ## Materials that take no ink edge: an outline round a highlight or a cheek is
 ## a hole, not a feature. "shine" is also unlit, so it reads as a reflection.
-const FLAT: Array[String] = ["shine", "blush", "mouth", "iris", "white"]
+const FLAT: Array[String] = [
+	"shine", "blush", "mouth", "iris", "white", "pupil", "lid", "brow",
+]
 
 var hair: Color
 var hair_dark: Color
 var skin: Color
+## A portrait camera, in radians from the side view toward the face: NAN for
+## the game's view. A portrait places the body unsheared, as it really stands,
+## and turns the camera round to it -- so it no longer lands on the 2D rig
+## point for point, and nothing that plays may use it. For the wardrobe and
+## for comparing the model with its concept art.
+var view_yaw := NAN
 
 var _viewport: SubViewport
 var _camera: Camera3D
 var _parts := {}
 var _materials := {}
 var _outline: StandardMaterial3D
+var _lights: Array[DirectionalLight3D] = []
+var _light_bases: Array[Basis] = []
 var _density := 0
 var _sin := 0.0
 var _cos := 1.0
@@ -128,6 +138,8 @@ func take_off(art: PlayerArt) -> void:
 	if _viewport != null and is_instance_valid(_viewport):
 		_viewport.queue_free()
 	_viewport = null
+	_lights.clear()
+	_light_bases.clear()
 	_parts.clear()
 	_materials.clear()
 	if is_instance_valid(art):
@@ -234,11 +246,15 @@ func _ensure(art: PlayerArt) -> void:
 	sun.directional_shadow_max_distance = CAMERA_DISTANCE * 2.0
 	sun.transform.basis = Basis.looking_at(Vector3(1.0, -0.45, -0.7).normalized())
 	_viewport.add_child(sun)
+	_lights.append(sun)
 	var rim := DirectionalLight3D.new()
 	rim.light_color = Palette.LIGHT_WARM
 	rim.light_energy = 0.6
 	rim.transform.basis = Basis.looking_at(Vector3(-0.9, -0.1, 0.35).normalized())
 	_viewport.add_child(rim)
+	_lights.append(rim)
+	for light: DirectionalLight3D in _lights:
+		_light_bases.append(light.transform.basis)
 
 	_camera = Camera3D.new()
 	_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
@@ -258,8 +274,10 @@ func _ensure(art: PlayerArt) -> void:
 		var material := StandardMaterial3D.new()
 		material.roughness = 0.55
 		if id == "steel":
-			material.metallic = 0.7
-			material.roughness = 0.3
+			# A little metal and a tight highlight: fully metallic, steel shows
+			# only what it reflects, and there is no world here to reflect.
+			material.metallic = 0.15
+			material.roughness = 0.28
 		if id == "shine":
 			material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		if not id in FLAT and id != "shine":
@@ -369,11 +387,21 @@ func _lift(p: Vector2, depth: float) -> Vector3:
 
 func _place(art: PlayerArt, pose: Dictionary) -> void:
 	var f := art._f
-	_sin = sin(_yaw() * f)
-	_cos = cos(_yaw())
+	var yaw := _yaw() if is_nan(view_yaw) else view_yaw
+	_sin = sin(yaw * f)
+	_cos = cos(yaw)
 	var target := _lift(BOX.get_center(), 0.0)
 	_camera.look_at_from_position(
 		target + Vector3(_sin, 0.0, _cos) * CAMERA_DISTANCE, target, Vector3.UP)
+	# The world's sun stays where the world has it, except in a portrait,
+	# which is lit as a character sheet is: the light turns with the camera,
+	# so the face it looks at is lit from the upper left, not from behind.
+	var turn := 0.0 if is_nan(view_yaw) else view_yaw * f
+	for i: int in _lights.size():
+		_lights[i].transform.basis = Basis(Vector3.UP, turn) * _light_bases[i]
+	if not is_nan(view_yaw):
+		_sin = 0.0
+		_cos = 1.0
 	var up := (_lift(art._shoulder, 0.0) - _lift(art._hip, 0.0)).normalized()
 	_pose_parts(art, pose, up, Vector3(f, 0.0, 0.0))
 
@@ -425,6 +453,11 @@ func _head(art: PlayerArt, pose: Dictionary, up: Vector3, base: Vector3, rise: f
 	var tilt: float = float(pose["hood_tilt"])
 	var head_up := up.rotated(Vector3.BACK, -tilt * fdir * 0.6).normalized()
 	var centre := base + head_up * rise
+	if not is_nan(view_yaw):
+		# A portrait looks into the camera, as a character sheet does. `turn`
+		# is measured from the run toward the near side, the camera's yaw from
+		# the near side toward the run: looking at it is their complement.
+		turn = PI * 0.5 - view_yaw
 	var frame := _axes(head_up, Vector3(fdir * cos(turn), 0.0, sin(turn)))
 	var side := frame.x.cross(head_up).normalized()
 	if side.z < 0.0:

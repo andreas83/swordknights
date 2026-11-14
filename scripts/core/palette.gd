@@ -69,6 +69,10 @@ const ROYAL_DEEP := Color("16306a")
 const UMBER := Color("8a5532")
 const UMBER_DARK := Color("5a341f")
 const UMBER_DEEP := Color("33200f")
+## A fair skin, lit and in shade: a peach the gold ramp has no step for, so a
+## fair face no longer has to be the yellow of LIGHT_SOFT.
+const FAIR := Color("f4c6a2")
+const FAIR_SHADE := Color("d99878")
 ## The princess's blade: a blue-white steel and the glow round it. The blade
 ## keeps steel's lightness, so a sword still reads as a sword first.
 const ROYAL_STEEL := Color("a9c4f5")

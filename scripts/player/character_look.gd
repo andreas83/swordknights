@@ -44,7 +44,7 @@ const FIGURES: Array[Dictionary] = [
 	{"id": "heroine", "name": "HEROINE"},
 	{"id": "stick", "name": "STICK"},
 	{"id": "princess", "name": "PRINCESS",
-		"defaults": {"outfit": "royal", "hair": "brown", "skin": "sand"}},
+		"defaults": {"outfit": "royal", "hair": "brown", "skin": "fair"}},
 ]
 
 ## The robe or tunic: lit plane, shade plane, and the darker plane behind (the
@@ -86,6 +86,7 @@ const SKINS: Array[Dictionary] = [
 	{"id": "amber", "name": "AMBER", "lit": Palette.LIGHT_WARM, "shade": Palette.MID},
 	{"id": "copper", "name": "COPPER", "lit": Palette.MID, "shade": Palette.SHADOW_WARM},
 	{"id": "umber", "name": "UMBER", "lit": Palette.SHADOW_WARM, "shade": Palette.SHADOW},
+	{"id": "fair", "name": "FAIR", "lit": Palette.FAIR, "shade": Palette.FAIR_SHADE},
 ]
 
 ## The keys a look is saved under, in the order the editor lists them.
