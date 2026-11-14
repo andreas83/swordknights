@@ -20,7 +20,7 @@ func _initialize() -> void:
 	_check_fall_lead()
 	_check_anchor()
 	_check_budget()
-	_check_no_zoom()
+	_check_fixed_zoom()
 	_check_held_frame()
 
 	if _failures > 0:
@@ -116,11 +116,14 @@ func _check_anchor() -> void:
 
 
 ## "Subtle" is a number or it is nothing. Everything the camera is allowed to
-## move the frame by, added up, is under half the height of the viewport.
+## move the frame by, added up, stays well under half of what it shows: the
+## viewport's 180 units over GameCamera.ZOOM, 120 units of world.
 func _check_budget() -> void:
+	var shown := 180.0 / GameCamera.ZOOM
 	var vertical := GameCamera.FALL_LEAD_MAX + GameCamera.GRAB_LIFT + GameCamera.SETTLE_MAX
-	_true(vertical <= 48.0,
-		"all vertical reframing together is %.0f px of a 180 px frame (<= 48)" % vertical)
+	_true(vertical <= 0.4 * shown,
+		"all vertical reframing together is %.0f px of a %.0f px frame (<= 40%%)" % [
+			vertical, shown])
 	_true(GameCamera.SETTLE_MAX <= 6.0,
 		"the hardest landing dips the frame %.0f px (<= 6)" % GameCamera.SETTLE_MAX)
 	_true(GameCamera.FALL_LEAD_MAX <= 2.5 * Tuning.TILE,
@@ -131,21 +134,32 @@ func _check_budget() -> void:
 		"the lead retracts slower than it extends, so stopping settles")
 
 
-## No zoom, deliberately: see the class docs on game_camera.gd. A non-integer
-## zoom resamples the tilemap and softens every shadow edge in the frame, which
-## is the one thing docs/art-direction.md does not allow. Checked in the source
-## because the point is that nobody adds one later.
-func _check_no_zoom() -> void:
+## One zoom, fixed, deliberately: see "A fixed 1.5x" in game_camera.gd. The
+## scale is set once and never moved, because a scale in motion passes through
+## every fraction and shimmers the nearest-filtered frame; and it keeps a
+## whole number of screen pixels a unit on the common desktop heights, which
+## is what made 1.5 acceptable at all. Checked in the source because the point
+## is that nobody adds a zoom beat later.
+func _check_fixed_zoom() -> void:
+	_true(is_equal_approx(GameCamera.ZOOM, 1.5), "the Adventure stands at 1.5x")
+	for height: int in [720, 1080, 1440]:
+		var per_unit := float(height) / 180.0 * GameCamera.ZOOM
+		_true(is_equal_approx(per_unit, roundf(per_unit)),
+			"%d px tall draws a whole %.2f px a unit" % [height, per_unit])
 	var file := FileAccess.open("res://scripts/render/game_camera.gd", FileAccess.READ)
 	if file == null:
 		_fail("cannot read game_camera.gd")
 		return
+	var writes: Array[String] = []
 	for line: String in file.get_as_text().split("\n"):
 		var code := line.strip_edges()
-		if code.begins_with("#") or code.begins_with("##"):
+		if code.begins_with("#"):
 			continue
-		_true(not code.begins_with("zoom") and not code.contains(" zoom ="),
-			"the camera never writes zoom: %s" % code)
+		if code.begins_with("zoom") or code.contains(" zoom =") or code.contains("zoom *=") \
+				or code.contains("zoom +=") or code.contains("zoom -="):
+			writes.append(code)
+	_true(writes == ["zoom = Vector2.ONE * ZOOM"],
+		"the camera writes zoom once, to ZOOM, and never again: %s" % [writes])
 
 
 ## A held frame is held. During a hitstop the camera must not move, must not
@@ -170,7 +184,8 @@ func _check_held_frame() -> void:
 	camera.setup(player, Vector2(640.0, 360.0))
 	for i: int in 40:
 		camera._physics_process(DT)
-	_true(camera.zoom == Vector2.ONE, "the camera is at 1:1 and stays there")
+	_true(camera.zoom == Vector2.ONE * GameCamera.ZOOM,
+		"the camera is at its fixed zoom and stays there")
 
 	var settled := camera.global_position
 	var flow := Flow.install(host)

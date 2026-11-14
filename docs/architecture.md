@@ -15,7 +15,7 @@ scenes/boot.tscn
                  ├─ player/player.gd ..... state machine on a CharacterBody2D
                  ├─ entities/* ........... placed through entities/entity_registry.gd
                  ├─ mechanisms/* ......... plates, gates: own collision, wired by channel
-                 ├─ render/game_camera.gd  dead-zone follow
+                 ├─ render/game_camera.gd  dead-zone follow, fixed 1.5x
                  ├─ ui/hud.gd, ui/touch_controls.gd
                  └─ audio/player_audio.gd  maps the character to sound
 ```
@@ -51,6 +51,16 @@ The viewport is **180 units tall with an aspect-derived width**
 keeps the character the same apparent size on every device; flexible width
 means a 20:9 phone sees more of the room instead of black bars. One tile is
 16 px, so the whole game is authored in the same units the tuning uses.
+
+The viewport is not the visible world. Every scene that plays a level frames
+it through `GameCamera`, which stands at a fixed 1.5x (`GameCamera.ZOOM`,
+`docs/feel.md`): the Adventure shows 120 units of world, about 213 across at
+16:9, with the figure at nearly a fifth of the screen's height. The duel's
+`MatchCamera` scales by its own framing. What lives on a CanvasLayer -- the
+HUD, the touch controls, the sky -- is drawn in the viewport's own 180 units
+and is not zoomed. Anything that asks what the screen shows of the world asks
+`CameraView`, which divides the viewport by the camera's zoom; reading
+`get_viewport_rect()` as world units is right only on a CanvasLayer.
 
 ## Collision
 

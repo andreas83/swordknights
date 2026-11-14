@@ -43,6 +43,14 @@ func test_a_shake_does_not_move_the_frame_play_reads() -> void:
 	await _play()
 	var still := CameraView.rect_for(_game.player)
 	_game.camera.shake(6.0, 1.0)
-	await wait_physics_frames(2)
-	assert_ne(_game.camera.offset, Vector2.ZERO, "the image shakes")
-	assert_eq(CameraView.rect_for(_game.player), still, "the frame a foe asks about does not")
+	# Watched over several frames, not one: a shake is randf() rounded to whole
+	# pixels, and both axes of a single frame land on zero about one time in
+	# 144 -- which once turned the whole suite red for no reason in the code.
+	var shaken := false
+	var moved := false
+	for _frame: int in 8:
+		await wait_physics_frames(1)
+		shaken = shaken or _game.camera.offset != Vector2.ZERO
+		moved = moved or CameraView.rect_for(_game.player) != still
+	assert_true(shaken, "the image shakes")
+	assert_false(moved, "the frame a foe asks about does not")

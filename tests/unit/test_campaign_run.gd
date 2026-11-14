@@ -177,9 +177,10 @@ func _read_threats() -> void:
 			record["shots"] = int(record["shots"]) + 1
 
 
+## The frame as play reads it (CameraView): the camera's zoom taken out of the
+## viewport's size, so a threat is counted only once it is really on screen.
 func _view() -> Rect2:
-	var size := _game.get_viewport().get_visible_rect().size
-	return Rect2(_game.camera.get_screen_center_position() - size * 0.5, size)
+	return CameraView.rect_for(_game.player)
 
 
 ## What a level is built from: its mechanisms and its foes, by kind.

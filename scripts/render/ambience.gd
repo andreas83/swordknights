@@ -150,6 +150,7 @@ func _in_shadow(at: Vector2) -> bool:
 ## What the camera can see, in this node's space, with a margin: motes off
 ## screen are skipped before the mask is read.
 func _view_rect() -> Rect2:
+	# The whole inverse, not only its origin: the camera zooms (GameCamera.ZOOM),
+	# so the screen's rectangle is a smaller one in the world.
 	var canvas := get_canvas_transform().affine_inverse()
-	var size := get_viewport_rect().size
-	return Rect2(canvas.origin - Vector2(4.0, 4.0), size + Vector2(8.0, 8.0))
+	return (canvas * get_viewport_rect()).grow(4.0)
