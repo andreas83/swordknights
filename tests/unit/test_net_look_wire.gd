@@ -70,7 +70,7 @@ func _field(tag: int, id: String) -> Array:
 
 func test_every_look_crosses_hello_and_welcome_intact() -> void:
 	var looks := _every_look()
-	assert_eq(looks.size(), 2 * 4 * 4 * 4 * 4, "walked every look")
+	assert_eq(looks.size(), CharacterLook.FIGURES.size() * 4 * 4 * 4 * 4, "walked every look")
 	var lost: Array[String] = []
 	for look: CharacterLook in looks:
 		var hello := NetProtocol.decode(NetProtocol.hello(BUILD, NAME, look.to_ids()))
