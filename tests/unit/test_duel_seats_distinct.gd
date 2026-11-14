@@ -3,7 +3,7 @@ extends GutTest
 ## (scripts/duel/fighter_art.gd, scripts/player/character_look.gd).
 ##
 ## The guarantee has two halves, and each is checked over every look there is
-## -- both figures, every outfit, sash, hair and skin -- rather than over a few
+## -- every figure, every outfit, sash, hair and skin -- rather than over a few
 ## picked by hand, because the case that breaks it is the one nobody picked:
 ##
 ## 1. A seat's robe planes are its team colour, after any look is put on.
@@ -30,7 +30,7 @@ func _team(seat: int) -> Array[Color]:
 		FighterArt.SEAT_CLOAK[seat]]
 
 
-## Every combination of every option: 2 x 4 x 4 x 4 x 4.
+## Every combination of every option: figures x 4 x 4 x 4 x 4.
 func _every_look() -> Array[CharacterLook]:
 	var looks: Array[CharacterLook] = [CharacterLook.new()]
 	for field: String in CharacterLook.FIELDS:
@@ -47,9 +47,7 @@ func _every_look() -> Array[CharacterLook]:
 ## The colours on a dressed figure that a player chose rather than the seat.
 func _chosen(art: PlayerArt) -> Array[Color]:
 	var out: Array[Color] = [art.accent]
-	var heroine := art.costume as HeroineCostume
-	if heroine != null:
-		out.append_array([heroine.hair, heroine.hair_dark, heroine.skin, heroine.skin_dark])
+	out.append_array(art.costume.worn_colours())
 	return out
 
 
@@ -60,7 +58,7 @@ func test_the_two_teams_share_no_colour() -> void:
 
 func test_every_look_keeps_each_seat_in_its_colour() -> void:
 	var looks := _every_look()
-	assert_eq(looks.size(), 2 * 4 * 4 * 4 * 4, "walked every look")
+	assert_eq(looks.size(), CharacterLook.FIGURES.size() * 4 * 4 * 4 * 4, "walked every look")
 	var fighter := FIGHTER_SCENE.instantiate() as Fighter
 	add_child_autofree(fighter)
 	fighter.setup(0, null)

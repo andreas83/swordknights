@@ -56,7 +56,13 @@ extends Node2D
 ## What the figure wears over the rig. The base Costume is the prince and draws
 ## nothing of its own, so a bare PlayerArt draws exactly what it always has; see
 ## costume.gd for why the second figure is a costume and not a second PlayerArt.
-var costume := Costume.new()
+## Assigning one takes the old one off first, so a costume that hung nodes on
+## this figure (the 3D model's viewport) does not leave them rendering behind.
+var costume: Costume = Costume.new():
+	set(value):
+		if costume != null and costume != value:
+			costume.take_off(self)
+		costume = value if value != null else Costume.new()
 
 ## --- proportions -----------------------------------------------------------
 ##
@@ -271,9 +277,12 @@ func _draw() -> void:
 		_draw_cloak(pose)
 	# Both legs go behind the robe: a hem that reaches the floor has to be able
 	# to hide them, and a hem that rides up has to be what reveals them.
-	_draw_leg(_knee_back, _foot_back, _c(cloak_shade))
-	_draw_leg(_knee_front, _foot_front, _c(ink))
-	_draw_arm(_hand_back, _c(cloth_dark))
+	if not costume.draw_leg(self, _knee_back, _foot_back, true):
+		_draw_leg(_knee_back, _foot_back, _c(cloak_shade))
+	if not costume.draw_leg(self, _knee_front, _foot_front, false):
+		_draw_leg(_knee_front, _foot_front, _c(ink))
+	if not costume.draw_arm(self, _hand_back, true):
+		_draw_arm(_hand_back, _c(cloth_dark))
 	# At rest the blade hangs behind the robe and only its point shows past the
 	# hem; during a swing it comes round in front of everything.
 	var swinging := _blade_in_front()
@@ -282,7 +291,8 @@ func _draw() -> void:
 	if not costume.draw_body(self, pose):
 		_draw_robe(pose)
 		_draw_sash()
-	_draw_arm(_hand_front, _c(cloth))
+	if not costume.draw_arm(self, _hand_front, false):
+		_draw_arm(_hand_front, _c(cloth))
 	if swinging:
 		_draw_weapon(pose)
 	if not costume.draw_head(self, pose):
@@ -368,10 +378,17 @@ func _draw_leg(knee: Vector2, foot: Vector2, color: Color) -> void:
 ## Sleeve, then forearm, then a dark hand. The hand matters: without it a
 ## forward-swung arm is a bar of robe-coloured nothing poking out of the body.
 func _draw_arm(hand: Vector2, color: Color) -> void:
-	var elbow := _shoulder.lerp(hand, 0.5) + Vector2(0.0, 0.8)
+	var elbow := _elbow(hand)
 	_limb(_shoulder, elbow, 2.4, 1.8, color)
 	_limb(elbow, hand, 1.8, 1.4, color)
 	draw_rect(Rect2(hand.x - 0.85, hand.y - 0.85, 1.7, 1.7), _c(ink))
+
+
+## Where the elbow of the arm ending at `hand` bends: half way, and dropped a
+## little, so a raised arm still reads as jointed. Every costume that draws its
+## own arms bends them here, so a pose bends every figure's arm the same way.
+func _elbow(hand: Vector2) -> Vector2:
+	return _shoulder.lerp(hand, 0.5) + Vector2(0.0, 0.8)
 
 
 ## The hood is the whole silhouette read: a narrow peak that leans the way the

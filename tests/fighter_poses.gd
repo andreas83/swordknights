@@ -16,7 +16,9 @@ extends SceneTree
 ## `--hitboxes` overlays the hurtbox and blade rect, to check that the figure
 ## and the sword sit where the simulation says they are. `--figure heroine`
 ## dresses every fighter as the heroine (CharacterLook), in the seat colours as
-## always; that sheet is docs/heroine-fighter-poses.png.
+## always; that sheet is docs/heroine-fighter-poses.png. `--figure stick` and
+## `--figure model` are docs/stick-fighter-poses.png and
+## docs/model-fighter-poses.png.
 
 ## Six across and four down: the viewport is 180 units tall, which is exactly
 ## four rows, so the twenty-first pose had to go sideways rather than below,

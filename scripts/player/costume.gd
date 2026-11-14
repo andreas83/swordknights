@@ -21,11 +21,20 @@ extends RefCounted
 ##     body   over the legs and arm  the prince's robe and sash
 ##     head   over everything        the prince's hood
 ##
-## Legs, arms, hands, the sword, the ledge grip and the contact shadow stay
-## shared, because they are where the pose is legible and they do not change
-## with the clothes. Each `draw_*` returns true when it has drawn that layer
-## and false to leave it to PlayerArt -- which is how this base class is the
-## prince without a line of drawing.
+## and two more for the limbs, one call per leg and per arm:
+##
+##     leg    behind the robe        the prince's tapered legs and boots
+##     arm    back one behind, front one over the body
+##
+## The robed figures leave the limbs to PlayerArt, because the limbs are where
+## the pose is legible and they do not change with the clothes. A figure whose
+## *build* differs -- the stick avatar's lines, the 3D model's volumes -- has
+## to replace them too, and it still bends them at PlayerArt's own joints. The
+## sword, the ledge grip and the contact shadow stay shared by every figure:
+## the duel's sword is drawn along the rect the simulation fights with, and no
+## costume may move that. Each `draw_*` returns true when it has drawn that
+## layer and false to leave it to PlayerArt -- which is how this base class is
+## the prince without a line of drawing.
 ##
 ## A costume reads the rig PlayerArt has just built, through PlayerArt's own
 ## underscore fields and helpers. They are underscore-named because nothing
@@ -64,3 +73,26 @@ func draw_body(_art: PlayerArt, _pose: Dictionary) -> bool:
 
 func draw_head(_art: PlayerArt, _pose: Dictionary) -> bool:
 	return false
+
+
+## One leg, hip to `knee` to `foot`; `back` is the far one.
+func draw_leg(_art: PlayerArt, _knee: Vector2, _foot: Vector2, _back: bool) -> bool:
+	return false
+
+
+## One arm, shoulder to `hand`; `back` is the far one.
+func draw_arm(_art: PlayerArt, _hand: Vector2, _back: bool) -> bool:
+	return false
+
+
+## Called when the figure changes into another costume, so one that hung
+## nodes on the art takes them away with it.
+func take_off(_art: PlayerArt) -> void:
+	pass
+
+
+## The colours a player chose for this costume beyond the accent, so the duel
+## can hold every one of them clear of both teams' colours
+## (tests/unit/test_duel_seats_distinct.gd).
+func worn_colours() -> Array[Color]:
+	return []

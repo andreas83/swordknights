@@ -126,7 +126,7 @@ func is_open(row: int) -> bool:
 		"outfit":
 			return _player == Wardrobe.PLAYER_ONE
 		"hair", "skin":
-			return _look.is_heroine()
+			return _look.shows_face()
 	return true
 
 
@@ -136,7 +136,9 @@ func value_text(row: int) -> String:
 	if id == "player":
 		return PLAYER_NAMES[_player]
 	if not is_open(row):
-		return "SEA-GREEN" if id == "outfit" else "HOODED"
+		if id == "outfit":
+			return "SEA-GREEN"
+		return "HOODED" if _look.figure == CharacterLook.Figure.PRINCE else "NONE"
 	return String(_look.option(id)["name"])
 
 
@@ -386,10 +388,17 @@ func _caption() -> PackedStringArray:
 				"THE ADVENTURE'S ROBE · CRIMSON IN A DUEL", "CRIMSON IN A DUEL",
 			])
 		"accent":
-			if _look.is_heroine():
-				return PackedStringArray(["HEADBAND, BELT AND RIBBON", "HEADBAND AND BELT"])
+			match _look.figure:
+				CharacterLook.Figure.HEROINE:
+					return PackedStringArray(["HEADBAND, BELT AND RIBBON", "HEADBAND AND BELT"])
+				CharacterLook.Figure.STICK:
+					return PackedStringArray(["THE SCARF AT THE NECK", "THE SCARF"])
+				CharacterLook.Figure.MODEL:
+					return PackedStringArray(["THE BELT", "BELT"])
 			return PackedStringArray(["THE SASH AND THE CREST OF THE HOOD", "SASH AND CREST"])
 		"hair":
+			if _look.figure == CharacterLook.Figure.MODEL:
+				return PackedStringArray(["THE HAIR, LIT BY THE LOW SUN", "THE HAIR"])
 			return PackedStringArray(["THE BRAID", "BRAID"])
 	return PackedStringArray(["THE FACE, LIT BY THE LOW SUN", "THE FACE"])
 

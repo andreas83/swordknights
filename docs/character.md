@@ -1,6 +1,6 @@
 # The character
 
-How the prince and the heroine are drawn, how they are posed, and what the
+How the prince, the heroine, the stick avatar and the 3D model are drawn, how they are posed, and what the
 tuning numbers behind them are for.
 
 ![every state](character-states.png)
@@ -716,7 +716,7 @@ in an inset beside it. The rows on the left:
 | Row | Steps through |
 | --- | --- |
 | BODY | the duel fighter, the adventure's prince |
-| FIGURE | the prince, the heroine, the player's saved look (the wardrobe's) |
+| FIGURE | the prince, the heroine, the stick avatar, the 3D model, the player's saved look (the wardrobe's) |
 | SEAT | crimson or sea-green (the duel's) |
 | MOTION | playing — the state's clock round its length — or frozen on the moment |
 | LIGHT | the five strips, brightest hour first: Tug of War's late afternoon to the Clockwork Well at night |
@@ -921,6 +921,76 @@ to the far side and the back of her head, dark hair, is what shows.
 ```bash
 xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 3072x720 \
   --script tools/idle_poses.gd -- --out docs/heroine-idle-poses.png --figure heroine
+```
+
+## The stick avatar and the 3D model
+
+Two more figures on the same skeleton, chosen on the wardrobe's FIGURE row
+like the heroine (`CharacterLook.Figure.STICK`, `.MODEL`). Neither touches the
+body, the hitbox, the tuning or the netplay snapshot: an old client that is
+sent `stick` or `model` in the handshake does not know the id and draws the
+prince, which is how `CharacterLook.take_ids()` treats any unknown id.
+
+Both differ from the robed figures in *build*, not in clothes, so the costume
+layer grew two hooks: `draw_leg()` and `draw_arm()`, one call per limb, with
+the far limb first. The prince and the heroine leave them to `PlayerArt`.
+Every costume that draws its own arms bends them at `PlayerArt._elbow()`, so
+a pose bends every figure's arm in one place. The sword, the ledge grip and the
+contact shadow stay shared by all four: the duel's sword is drawn along the
+rect the simulation parries with, and no costume may move that.
+
+![the stick avatar in every duel state](stick-fighter-poses.png)
+
+**The stick avatar** (`scripts/player/stick_costume.gd`) is the pose with the
+clothes taken off. It strokes the joints `PlayerArt` placed — hip, knee, foot,
+shoulder, elbow, hand, the torso points — so it is also the most honest view
+of a pose in the pose lab. A one-pixel line vanishes on lit terrain, so every
+stroke is a core of cloth inside an ink casing: near limbs in the lit cloth,
+far limbs in the shade cloth, the head split down the world's vertical. The
+accent is a short scarf on the cloak's pose fields and lag, because a figure
+with nothing trailing reads as stopped mid-run.
+
+![the 3D model in every duel state](model-fighter-poses.png)
+
+**The 3D model** (`scripts/player/model_costume.gd`) is a lit human body built
+from meshes — spheres, tapered cylinders, boxes, all made in code — and
+rendered into a `SubViewport` that the body layer draws back as one texture.
+It has no animation of its own: each frame it lifts the rig's joints into 3D
+at a fixed depth per side and hangs a limb between each pair, so every pose
+`player_art.gd` knows is the model's on the same frame. The camera is
+orthographic and turned a little toward the facing, so the chest shows its
+breadth; `_lift()` pre-shears x by depth so each joint still projects onto the
+2D point it came from, and the hand ends on the 2D sword's hilt. The light is
+the world's: a key from the left, a warm rim from behind the far side, a
+palette dark for the ambient. An ink silhouette (an inverted hull, grown by
+`OUTLINE`) does the job of the flat figures' rim, without which a crimson body
+vanishes into crimson stone.
+
+Its costs and the ways it could go wrong, each pinned by
+`tests/unit/test_model_figure.gd`:
+
+- **One world per model.** A `SubViewport` otherwise renders the world of the
+  viewport it sits in, so two models would each draw the other.
+  `own_world_3d` is on, and the test fails with it off.
+- **Joints on the rig.** The test projects the hands, knees and elbow back
+  through the model's camera, facing both ways, and fails with the shear's sign
+  flipped.
+- **Changing clothes.** Assigning `PlayerArt.costume` calls `take_off()` on the
+  old costume, which frees the viewport and gives back the texture filter.
+- **The hit flash.** Materials take the art's colours through `PlayerArt._c()`
+  every frame, so a hit burns the model white as it burns a flat figure, and a
+  duel seat's team colour reaches the tunic the frame it is set.
+
+The viewport is created on the first frame drawn and sized to the figure's
+real screen size (`_fit()`: 3 to 12 pixels per art unit), so it is sharp in the
+wardrobe's arch and cheap on a phone's play screen. The skin's shade step is
+the light's to make, so the model takes only a look's lit skin tone.
+
+```bash
+xvfb-run -a godot --path . --rendering-driver opengl3 \
+  --script tests/character_poses.gd -- --out /tmp/poses/model --figure model
+xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1536x720 \
+  --script tests/fighter_poses.gd -- --out docs/model-fighter-poses.png --figure model
 ```
 
 ## The sentinel
