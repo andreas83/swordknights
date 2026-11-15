@@ -137,10 +137,30 @@ What did change is how much of a room is in shot. Centred on the feet, the
 frame shows 60 units above them and 60 below, where it showed 90 and 90: the
 head at a full jump's apex (58 above the feet) is still in, but a four-tile
 ledge's lip (64) is just out of shot from the floor below it, and the bottom
-of a drop deeper than three tiles is out of frame at take-off. That is a
-change to the campaign's *No blind jumps* margin (`docs/campaign.md`, which
-still states the 1:1 figures), and is an open item rather than something this
-camera quietly solves.
+of a drop deeper than three tiles is out of frame at take-off. A static frame
+cannot hold both inside 120 units, and does not need to: a player only needs
+the one in front of them. So two beats look where the jump goes, reading the
+level's real tiles up to two steps ahead of the feet, and only while the feet
+are on the floor:
+
+| Beat | What the frame does | Most |
+| --- | --- | --- |
+| at a lip | lowers until the bottom of the drop -- floor, one-way floor, spikes or water -- is in shot | 34 px, what leaves the head in shot; a five-tile drop needs 26 |
+| under a ledge a jump can grab | rises until its lip is in shot | 10 px, for the four-tile ledge (`Tuning.grab_tiles()`) |
+
+Both ease in on the simulation's clock and drop away the moment the feet
+leave the floor, where the fall lead and the grab lift take over. They never
+overlap with those, so the camera's budget is the largest beat plus a settle,
+not the sum (`tests/feel_camera_test.gd`). `tests/unit/test_camera_looks.gd`
+plays them in a real Game: from the lip of a five-tile drop its floor is in
+shot, under a four-tile ledge its lip is, and on open floor the frame rests
+on the feet. That test's first draft passed with the beats switched off,
+because its levels were so short that the world's edge held the frame where
+the drop was visible anyway; its levels now stand in open air over deep rock.
+
+Because the frame decides what a foe sees (`CameraView`), looking down a lip
+also shows the foes at the bottom of it a moment sooner -- which is what
+"no blind jumps" means for a guard standing on the landing.
 
 Because a foe acts only while the camera shows it, a smaller frame is a
 change of play, and three places felt it. Chapter III's frozen clear run takes

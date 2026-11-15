@@ -10,8 +10,9 @@ extends Camera2D
 ##
 ## ## Framing the beat
 ##
-## The base behaviour above is the resting state. Five beats bend it, and the
-## whole budget for all five is about thirty pixels:
+## The base behaviour above is the resting state. Seven beats bend it; they
+## never overlap in time except a settle on top of one other, so the budget is
+## the largest of them plus the settle, not their sum:
 ##
 ## | Beat | What the frame does | Budget |
 ## | --- | --- | --- |
@@ -22,6 +23,10 @@ extends Camera2D
 ## | a ledge grab | stops leading, lifts onto the ledge taken | `GRAB_LIFT` |
 ## | a hard landing | settles with the weight of it, recovers | `SETTLE_MAX` |
 ## | a backstep | holds the lead where it was; dips a pixel | 0.3 x `SETTLE_MAX` |
+## | at a lip | standing or walking up to a drop, looks down at the floor | `peek_max()` |
+## |   | it lands on, so the landing is in shot before the jump | |
+## | under a ledge | facing a wall a jump can grab the top of, looks up | `lift_max()` |
+## |   | until its lip is in shot | |
 ##
 ## The rules are static functions below so they can be reasoned about and
 ## tested without a physics world: `_physics_process` only composes them.
@@ -63,9 +68,33 @@ extends Camera2D
 ## world units at 1.5x, so a full lead plus the dead zone puts the prince 48
 ## units off centre, still 32 inside the trailing edge. What 1.5x costs is
 ## height: centred on the feet, the frame shows 60 units above and below them
-## where it showed 90, so a four-tile ledge's lip is out of shot from the
-## floor and a drop past three tiles lands out of frame at take-off -- an open
-## item against the campaign's "No blind jumps" (docs/feel.md).
+## where it showed 90, so a four-tile ledge's lip was out of shot from the
+## floor and a drop past three tiles landed out of frame at take-off. The two
+## beats below answer that, which is what keeps the campaign's "No blind
+## jumps" true at 1.5x.
+##
+## ## Looking where the jump goes
+##
+## A static frame cannot show both a four-tile ledge above and a five-tile
+## drop below inside 120 units, and it does not need to: a player only needs
+## the one in front of them. So the frame reads the level a step or two ahead
+## of the feet (`LOOK_TILES`), and only while the character stands or walks:
+##
+## - **At a lip**, it measures the drop to whatever stops a fall -- floor,
+##   one-way floor, spikes or water, since a pit is a landing too -- and
+##   lowers the frame just far enough to put that surface in shot
+##   (`peek_for_drop()`). Never further than leaves the head in shot
+##   (`peek_max()`): the deepest the rule allows, five tiles, needs 26 of the
+##   34 that leaves.
+## - **Under a ledge** -- a wall in front whose top a jump can still grab,
+##   `Tuning.grab_tiles()` -- it raises the frame until the lip is in shot
+##   (`lift_for_rise()`); a three-tile ledge already is.
+##
+## Both read the level's real tiles, so a level is framed by what it is and
+## not by a tag an author has to remember. Both ease in and out on the
+## simulation's clock like the rest of the frame, and both stop the moment the
+## feet leave the floor: in the air the fall lead and the grab lift take over,
+## and a frame that kept peeking under a jump would fight them.
 ##
 ## ## What is deliberately not here
 ##
@@ -105,12 +134,30 @@ const FALL_SLACK := 8.0
 const SETTLE_MAX := 4.0
 const SETTLE_DECAY := 13.0
 
+## How far ahead of the feet, in tiles, the frame looks for a lip or a ledge:
+## two, the stride at which a running player decides to jump.
+const LOOK_TILES := 2
+## How far down a drop is measured before it counts as bottomless, in tiles.
+const DROP_DEPTH_MAX := 8
+## How much of a landing surface, or a ledge's lip, the frame wants in shot
+## beyond the line itself: a sliver of the tile, so a floor reads as a floor.
+const SURFACE_MARGIN := 6.0
+## Room left over the head when the frame looks down.
+const HEAD_ROOM := 4.0
+const LOOK_SMOOTHING := 4.0
+## What stops a fall, and so is the bottom of a drop.
+const DROP_BOTTOMS: Array[int] = [
+	Tiles.Kind.SOLID, Tiles.Kind.PLATFORM, Tiles.Kind.SPIKES, Tiles.Kind.WATER,
+]
+
 var target: Player
 
 var _look_ahead_current: float = 0.0
 var _anchor_y: float = 0.0
 var _fall_lead: float = 0.0
 var _settle: float = 0.0
+## The look at a lip (+, down) or under a ledge (-, up), eased.
+var _look_y: float = 0.0
 var _shake_time: float = 0.0
 var _shake_magnitude: float = 0.0
 var _shake_offset := Vector2.ZERO
@@ -154,6 +201,7 @@ func setup(player: Player, world_size: Vector2) -> void:
 	_look_ahead_current = player.facing * look_ahead
 	_fall_lead = 0.0
 	_settle = 0.0
+	_look_y = 0.0
 	_shake_time = 0.0
 	_shake_magnitude = 0.0
 	_shake_offset = Vector2.ZERO
@@ -216,6 +264,73 @@ static func anchor_for(previous: float, foot_y: float, fall_speed: float,
 	return previous
 
 
+## Half of what the frame shows, top to bottom, in world units.
+static func half_shown() -> float:
+	return 180.0 / ZOOM * 0.5
+
+
+## The furthest the frame may look down: what leaves the head in shot.
+static func peek_max() -> float:
+	return half_shown() - Tuning.BODY_HEIGHT - HEAD_ROOM
+
+
+## The furthest the frame may look up: what puts the lip of the tallest ledge
+## a jump can grab in shot. Derived from the jump, like the ledge itself.
+static func lift_max() -> float:
+	return maxf(0.0, Tuning.grab_tiles() * Tuning.TILE + SURFACE_MARGIN - half_shown())
+
+
+## How far down to look for a drop of `tiles`: just enough to put its bottom
+## in shot, never past `peek_max()`. Zero for no drop.
+static func peek_for_drop(tiles: int) -> float:
+	if tiles <= 0:
+		return 0.0
+	var wanted := tiles * Tuning.TILE + SURFACE_MARGIN - half_shown()
+	return clampf(wanted, 0.0, peek_max())
+
+
+## How far up to look at a ledge `tiles` tall: just enough to put its lip in
+## shot. Zero for a wall too tall to grab, which is a wall, not a ledge.
+static func lift_for_rise(tiles: int) -> float:
+	if tiles <= 0 or tiles > Tuning.grab_tiles():
+		return 0.0
+	return clampf(tiles * Tuning.TILE + SURFACE_MARGIN - half_shown(), 0.0, lift_max())
+
+
+## What lies ahead of feet standing in `foot_cell`, facing `facing`, read
+## through `kind_at` (cell -> Tiles.Kind): a drop as a positive depth in
+## tiles, a grabbable-or-taller wall as a negative height, or 0 for neither
+## within `LOOK_TILES`. The first thing met decides: a wall in front of a lip
+## hides the lip.
+static func ahead(kind_at: Callable, foot_cell: Vector2i, facing: int) -> int:
+	var floor_row := foot_cell.y + 1
+	for step: int in range(1, LOOK_TILES + 1):
+		var x := foot_cell.x + facing * step
+		if int(kind_at.call(Vector2i(x, foot_cell.y))) == Tiles.Kind.SOLID:
+			var height := 1
+			while height < DROP_DEPTH_MAX \
+					and int(kind_at.call(Vector2i(x, foot_cell.y - height))) == Tiles.Kind.SOLID:
+				height += 1
+			return -height
+		for depth: int in DROP_DEPTH_MAX:
+			if int(kind_at.call(Vector2i(x, floor_row + depth))) in DROP_BOTTOMS:
+				if depth > 0:
+					return depth
+				break
+			if depth == DROP_DEPTH_MAX - 1:
+				return DROP_DEPTH_MAX
+	return 0
+
+
+## The look for what `ahead()` found: down for a drop, up for a ledge.
+static func look_for(found: int) -> float:
+	if found > 0:
+		return peek_for_drop(found)
+	if found < 0:
+		return -lift_for_rise(-found)
+	return 0.0
+
+
 ## The centre of the frame as play reads it (CameraView): where the camera
 ## holds, without the shake or the settle laid over the image. A shake is
 ## random and a settle is a beat of feel; neither may decide whether a foe
@@ -265,8 +380,11 @@ func _physics_process(delta: float) -> void:
 	)
 	_anchor_y = anchor_for(_anchor_y, target.position.y, fall_speed, grounded, hanging,
 		target.is_climbing())
+	_look_y = lerpf(_look_y, _look_goal(grounded and not hanging),
+		1.0 - exp(-LOOK_SMOOTHING * delta))
 
-	var desired := Vector2(target.position.x + _look_ahead_current, _anchor_y + _fall_lead)
+	var desired := Vector2(target.position.x + _look_ahead_current,
+		_anchor_y + _fall_lead + _look_y)
 	global_position.x = desired.x
 	global_position.y = lerpf(
 		global_position.y, desired.y, 1.0 - exp(-vertical_smoothing * delta)
@@ -277,6 +395,16 @@ func _physics_process(delta: float) -> void:
 	# Whole pixels: the world is drawn with nearest filtering, so a shake or a
 	# settle on a fraction of a pixel is a shimmer rather than a movement.
 	offset = (_shake_offset + Vector2(0.0, _settle)).round()
+
+
+## Where the frame wants to look this step: at a lip or under a ledge while
+## the feet are on the floor, nowhere otherwise.
+func _look_goal(standing: bool) -> float:
+	if not standing or target.level == null:
+		return 0.0
+	var level := target.level
+	var feet := level.cell_of(target.position + Vector2(0.0, -1.0))
+	return look_for(ahead(level.kind_at_cell, feet, target.facing))
 
 
 func _step_shake(delta: float) -> void:

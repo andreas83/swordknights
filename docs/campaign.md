@@ -1655,8 +1655,9 @@ warns about.
 
 A **blind-drop lint** listed every proved move landing six or more rows below
 its start — outside the frame the camera shows at take-off, which is about
-5.6 tiles under the feet (`GameCamera` centres the feet; the view is 180 units
-tall). None is on an intended route. They are falls off optional perches
+5.6 tiles under the feet (`GameCamera` centres the feet; the view was 180 units
+tall at 1:1; at 1.5x the camera looks down a lip to show five tiles, the same
+limit). None is on an intended route. They are falls off optional perches
 (Chapter III's ruined tower), back down a climb (Chapter IV's balconies), and
 Chapter V's throat, which the lift covers except while it travels.
 
@@ -1721,12 +1722,14 @@ running jump reaches 54 px and the frame shows at least 126 px either side of
 the prince, so across is never the problem; down is. A level may hide
 secrets, never floors.
 
-*Open, since the Adventure's camera went to a fixed 1.5x (`GameCamera.ZOOM`,
-`docs/feel.md`):* the figures above are the 1:1 frame's. At 1.5x the camera
-shows 120 units of world, 60 under the feet -- 3.75 tiles -- and at least 80
-px either side on a 4:3 screen. Across is still never the problem; a drop of
-four or five tiles now lands out of frame at take-off, so this rule and the
-five-tile limit need deciding again.
+*Since the Adventure's camera went to a fixed 1.5x (`GameCamera.ZOOM`,
+`docs/feel.md`):* the frame shows 120 units of world, 60 under the feet --
+3.75 tiles -- and at least 80 px either side on a 4:3 screen. Across is still
+never the problem. Down, the rule holds because the camera looks where the
+jump goes: standing at a lip, it lowers until the bottom of the drop is in
+shot, up to five tiles with the head still in frame; under a ledge a jump can
+grab, it rises until the lip is in shot. The five-tile limit stands
+(`tests/unit/test_camera_looks.gd`).
 
 **Every death is readable.** One cause per death, on screen, told 27 frames
 ahead by a pose, a glint and a sound. Spikes and blades are steel and nothing
