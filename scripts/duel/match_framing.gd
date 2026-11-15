@@ -2,6 +2,10 @@ class_name MatchFraming
 extends RefCounted
 ## How close the duel's camera stands, as a model with no screen and no match.
 ##
+## *Now fixed:* the frame no longer comes in past the far level (see
+## `close_level()`); what is left below of the breathing is the step out, and
+## back, when the two stand further apart than the far level shows.
+##
 ## The owner played the duel on a phone and liked the adventure's framing
 ## better: a fighter 8.5% of the screen's height reads, but it reads small --
 ## and then asked for it larger again once the adventure went to a fixed 1.5x
@@ -139,11 +143,18 @@ func far_level() -> int:
 	return maxi(1, roundi(screen.y * FIGHTER_SHARE / body))
 
 
-## The closest level: the adventure's scale -- the canvas stretch times its
-## fixed GameCamera.ZOOM -- rounded down, and never wider than the far level
-## on a screen too small to tell the two apart.
+## The closest level: the far level. The frame no longer comes in.
+##
+## It used to breathe up to the adventure's 1.5x as the two closed, a level at
+## a time; the owner played it and found the zoom annoying -- in a duel the
+## two close and part every few seconds, and a frame that keeps changing size
+## under a read is noise however smoothly it eases. So the scale is fixed at
+## the far level, a fighter an eighth of the screen, and the only zoom left is
+## the one the mode cannot do without: when the two stand further apart than
+## the far level shows, it steps out as far as it must to keep both, and back
+## when they close (`update()`'s hard ceiling, its hysteresis and cooldown).
 func close_level() -> int:
-	return maxi(far_level(), floori(per_unit * GameCamera.ZOOM + 0.001))
+	return far_level()
 
 
 ## The world the screen shows at `pixels` per texel, in world pixels.

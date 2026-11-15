@@ -79,8 +79,9 @@ func test_every_fighter_in_the_window_is_always_on_screen() -> void:
 			assert_eq(first, "", "%s, seed %d: nobody framed out" % [screen[0], stream_seed])
 			assert_gt(kills, 0, "%s, seed %d: the play had kills in it" % [screen[0],
 				stream_seed])
-			assert_gt(closest, camera.framing.far_level(),
-				"%s, seed %d: and came in closer than far" % [screen[0], stream_seed])
+			assert_lte(closest, camera.framing.far_level(),
+				"%s, seed %d: and never came in closer than far: the scale is fixed"
+					% [screen[0], stream_seed])
 			fight.queue_free()
 			camera.queue_free()
 

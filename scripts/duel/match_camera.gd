@@ -22,10 +22,11 @@ extends Camera2D
 ## camera follows a float. The seam is a thing in the level files and nowhere
 ## else.
 ##
-## FRAMED ON TWO FIGHTERS, AS CLOSE AS THEY ALLOW
-## The scale breathes: as close as the adventure's while the two are near each
-## other, out to the old fixed framing (a fighter FIGHTER_SHARE of the screen)
-## as they separate, a whole screen pixel per texel at rest. How far, when and
+## FRAMED ON TWO FIGHTERS, AT ONE SCALE
+## The scale is fixed: a fighter FIGHTER_SHARE of the screen, a whole screen
+## pixel per texel. It used to breathe in toward the adventure's scale as the
+## two closed, and the owner found that annoying; now it only steps out when
+## the two stand further apart than that scale shows, and back. How far, when and
 ## how fast is MatchFraming's, which argues each number; this file hands it the
 ## fighters and draws what it answers. The far level is still the one the
 ## strip was cut for -- a zone fits across a phone at it -- so a match that

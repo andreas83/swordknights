@@ -453,14 +453,21 @@ Neither touches the match: the camera reads `scroll`, the fighters and the
 respawn timers, and nothing it holds is in the snapshot, so DUEL VS CPU and the
 online duel use it unchanged and two peers may frame one frame differently.
 
-**The frame breathes.** The owner played on a phone and liked the adventure's
-framing better. So the scale is a *level* — a whole number of screen pixels
-per texel — between two ends:
+**The frame is fixed.** It breathed for a while -- in toward the adventure's
+scale as the two closed, out as they parted -- and the owner played it and
+found the zoom annoying: in a duel the two close and part every few seconds,
+and a frame that keeps changing size under a read is noise however smoothly
+it eases. So the scale is now the far level below, always, and the close
+level equals it (`MatchFraming.close_level()`). The only zoom left is the one
+the mode cannot do without: when the two stand further apart than the far
+level shows, the frame steps out as far as it must to keep both, and back when
+they close, with the hysteresis and cooldown below so a chase does not pump
+it. What the levels were while it breathed:
 
 | | Level | At 1080 px tall | Fighter on screen |
 | --- | --- | --- | --- |
 | far | `round(height × 0.125 / 22)`, a fighter an eighth of the screen | 6 px/texel, 320 × 180 world px at 320 units | 12.2% |
-| close | `floor(stretch × 1.5)`, the adventure's fixed 1.5x (`GameCamera.ZOOM`), never closer | 9 px/texel, 213 × 120 at 320 units, 293 × 120 at 440 | 18.3% |
+| close | was `floor(stretch × 1.5)`, the adventure's 1.5x; now the far level | 6 px/texel | 12.2% |
 
 Other screens: 1170 px tall is 7 to 9 (the adventure there is a fractional
 9.75, and the duel stays at 9); 1440 is 8 to 12; a 720 px desktop is 4 to 6.
