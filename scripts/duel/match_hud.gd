@@ -75,6 +75,10 @@ const ROUND_TIME := 2.4
 const HINT_BREAK := "  ·  "
 
 var fight: DuelMatch
+## The view and the respawn columns, for pointing at a column the view does
+## not show. Either null leaves the rings in the corners, as they were.
+var camera: MatchCamera
+var beacon: RespawnBeacon
 ## Optional. Set for an online match; left null for a local one.
 var session: NetSession
 ## Which seat this screen is driving, or -1 for a local match with both.
@@ -302,11 +306,17 @@ func _draw_hint(content: Rect2, y: float) -> void:
 
 
 ## A ring closing on each fighter who is down, so the leader can see how long
-## they have before the other one is standing in front of them.
+## they have before the other one is standing in front of them -- and, when
+## the spot they will stand on is off the screen, where: the ring moves to the
+## edge nearest the spot with an arrow pointing out at it. On screen the spot
+## is its own column of light (RespawnBeacon), and the ring there is enough.
+## A fighter who is back but not yet in the view -- respawned a screen and a
+## half ahead, by the spec -- keeps an arrow at the edge until they are in it.
 func _draw_respawns(content: Rect2) -> void:
 	for slot: int in 2:
 		var left := fight.respawn_left(slot)
 		if left <= 0.0:
+			_draw_offscreen(slot, content)
 			continue
 		var done := 1.0 - clampf(left / DuelMatch.RESPAWN_DELAY, 0.0, 1.0)
 		var at := Vector2(
@@ -314,10 +324,67 @@ func _draw_respawns(content: Rect2) -> void:
 			content.end.y - 8.0
 		)
 		var colour := SEAT[slot]
-		draw_arc(at, 8.0, 0.0, TAU, 24, Palette.with_alpha(colour, 0.25), 1.0)
-		draw_arc(at, 8.0, -PI * 0.5, -PI * 0.5 + TAU * done, 24, colour, 2.0)
+		var radius := 8.0
+		if camera != null and beacon != null:
+			var pointer := pointer_for(beacon.spot(slot), content)
+			if pointer.is_empty():
+				continue
+			at = pointer["at"]
+			radius = 10.0
+			_draw_arrow(at, pointer["direction"], colour)
+		draw_circle(at, radius + 1.5, Palette.with_alpha(Palette.INK, 0.55))
+		draw_arc(at, radius, 0.0, TAU, 24, Palette.with_alpha(colour, 0.35), 1.5)
+		draw_arc(at, radius, -PI * 0.5, -PI * 0.5 + TAU * done, 24, colour, 2.5)
 		if slot == your_slot:
 			draw_circle(at, 2.0, Palette.PAPER)
+
+
+## A living fighter outside the view: an arrow at the edge and a dot of their
+## colour, so a fighter who came back off screen is never nowhere.
+func _draw_offscreen(slot: int, content: Rect2) -> void:
+	if camera == null or not fight.is_fighter_alive(slot):
+		return
+	var pointer := pointer_for(fight.fighter_position(slot), content)
+	if pointer.is_empty():
+		return
+	var at: Vector2 = pointer["at"]
+	draw_circle(at, 5.5, Palette.with_alpha(Palette.INK, 0.55))
+	draw_circle(at, 4.0, SEAT[slot])
+	_draw_arrow(at, pointer["direction"], SEAT[slot])
+
+
+## Where the HUD points at a spot in the world -- a respawn's, or a fighter's
+## feet: {at, direction} on the edge of the screen nearest it, or empty when it
+## is on screen. The point aimed at is the chest, not the feet.
+##
+## Measured against the whole screen, not `content`: content is the column the
+## words are set in, narrower than the screen, and the first cut measured
+## against it put an arrow beside a fighter standing in plain view. The spot is
+## carried from the world's canvas into this Control's own space, so a HUD
+## laid out with a transform of its own still points true. `content` only
+## keeps the arrow off the band's height at the top.
+func pointer_for(spot: Vector2, content: Rect2) -> Dictionary:
+	spot += Vector2(0.0, -14.0)
+	var on_canvas := camera.get_viewport().get_canvas_transform() * spot
+	var on_screen := get_global_transform_with_canvas().affine_inverse() * on_canvas
+	var inner := Rect2(Vector2(0.0, content.position.y), Vector2(size.x, content.end.y
+		- content.position.y)).grow(-12.0)
+	if inner.has_point(on_screen):
+		return {}
+	var at := Vector2(
+		clampf(on_screen.x, inner.position.x, inner.end.x),
+		clampf(on_screen.y, inner.position.y, inner.end.y))
+	return {"at": at, "direction": (on_screen - at).normalized()}
+
+
+## A filled arrowhead just outside a ring, pointing `direction`.
+func _draw_arrow(at: Vector2, direction: Vector2, colour: Color) -> void:
+	if direction == Vector2.ZERO:
+		return
+	var tip := at + direction * 18.0
+	var base := at + direction * 11.0
+	var side := Vector2(-direction.y, direction.x) * 5.0
+	draw_colored_polygon(PackedVector2Array([tip, base + side, base - side]), colour)
 
 
 ## A struck word in the reserved band, where nothing of the fight is.

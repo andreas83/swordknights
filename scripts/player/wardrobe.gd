@@ -23,8 +23,8 @@ extends RefCounted
 ## field: a missing file, a file that does not parse, a section that is not
 ## there or an id that names nothing all fall back to the default for exactly
 ## what is missing, and never to an error a player would see. The default is
-## the prince in crimson and gold, which is what the game drew before there was
-## a wardrobe.
+## the stick avatar in crimson and gold: the owner's choice, over the hooded
+## prince the game drew before there was a wardrobe.
 ##
 ## Kept apart from the editor, like AudioSettings is from the settings page, so
 ## a test can round-trip it against its own path without touching the real one.

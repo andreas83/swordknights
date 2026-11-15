@@ -1,6 +1,6 @@
 extends GutTest
 ## Every pose renders as every figure: every Player state and every Fighter
-## state, the prince, the heroine, the stick avatar and the 3D princess, with no
+## state, the prince, the heroine and the stick avatar, with no
 ## engine error and inside the box a figure of that size can occupy
 ## (scripts/player/costume.gd).
 ##
@@ -26,11 +26,9 @@ const FIGHTER_SCENE := preload("res://scenes/fighter.tscn")
 ## widest pose -- a lunge with the cloth streaming -- reaches about 20 either
 ## side; a plane outside this box has come loose from the rig.
 const ENVELOPE := Rect2(-30.0, -34.0, 60.0, 40.0)
-## The costume class each figure id is dressed in. The princess is the owner's
-## rigged model once its file is in the project (CharacterLook.princess()).
+## The costume class each figure id is dressed in.
 var costumes := {
 	"prince": Costume, "heroine": HeroineCostume, "stick": StickCostume,
-	"princess": RiggedCostume if RiggedCostume.available() else PrincessCostume,
 }
 
 

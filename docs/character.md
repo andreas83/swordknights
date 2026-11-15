@@ -1,6 +1,6 @@
 # The character
 
-How the prince, the heroine, the stick avatar and the 3D princess are drawn, how they are posed, and what the
+How the stick avatar, the heroine and the prince are drawn, how they are posed, and what the
 tuning numbers behind them are for.
 
 ![every state](character-states.png)
@@ -716,7 +716,7 @@ in an inset beside it. The rows on the left:
 | Row | Steps through |
 | --- | --- |
 | BODY | the duel fighter, the adventure's prince |
-| FIGURE | the prince, the heroine, the stick avatar, the 3D princess, the player's saved look (the wardrobe's) |
+| FIGURE | the prince, the heroine, the stick avatar, the player's saved look (the wardrobe's) |
 | SEAT | crimson or sea-green (the duel's) |
 | MOTION | playing — the state's clock round its length — or frozen on the moment |
 | LIGHT | the five strips, brightest hour first: Tug of War's late afternoon to the Clockwork Well at night |
@@ -923,21 +923,24 @@ xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 3072x720 \
   --script tools/idle_poses.gd -- --out docs/heroine-idle-poses.png --figure heroine
 ```
 
-## The stick avatar and the 3D princess
+## The stick avatar: the default figure
 
-Two more figures on the same skeleton, chosen on the wardrobe's FIGURE row
-like the heroine (`CharacterLook.Figure.STICK`, `.PRINCESS`). Neither touches the
-body, the hitbox, the tuning or the netplay snapshot: an old client that is
-sent `stick` or `princess` in the handshake does not know the id and draws the
-prince, which is how `CharacterLook.take_ids()` treats any unknown id.
+A third figure on the same skeleton, and since the owner's call the one a new
+look wears (`CharacterLook.Figure.STICK`, the wardrobe's first entry; the
+heroine and the prince are a step and two away). It never touches the body, the
+hitbox, the tuning or the netplay snapshot: an old client that is sent `stick`
+in the handshake does not know the id and draws its own default, which is how
+`CharacterLook.take_ids()` treats any unknown id. A 3D figure was tried in its
+place and taken out again; nothing of it is left but the costume hooks it
+shared with this one.
 
-Both differ from the robed figures in *build*, not in clothes, so the costume
-layer grew two hooks: `draw_leg()` and `draw_arm()`, one call per limb, with
-the far limb first. The prince and the heroine leave them to `PlayerArt`.
+It differs from the robed figures in *build*, not in clothes, so the costume
+layer has two hooks for it: `draw_leg()` and `draw_arm()`, one call per limb,
+with the far limb first. The prince and the heroine leave them to `PlayerArt`.
 Every costume that draws its own arms bends them at `PlayerArt._elbow()`, so
 a pose bends every figure's arm in one place. The sword, the ledge grip and the
-contact shadow stay shared by all four: the duel's sword is drawn along the
-rect the simulation parries with, and no costume may move that.
+contact shadow stay shared: the duel's sword is drawn along the rect the
+simulation parries with, and no costume may move that.
 
 ![the stick avatar in every duel state](stick-fighter-poses.png)
 
@@ -950,311 +953,32 @@ far limbs in the shade cloth, the head split down the world's vertical. The
 accent is a short scarf on the cloak's pose fields and lag, because a figure
 with nothing trailing reads as stopped mid-run.
 
-![the 3D princess in every duel state](princess-fighter-poses.png)
+### Flips
 
-**The 3D princess** (`scripts/player/princess_costume.gd`) is a stylised
-young swordswoman after the owner's concept sheet, which the owner asked her to
-match as closely as the game allows: a head a little large for her body and
-big eyes, a braid down her back, a jewelled band across her brow, a belted
-royal-blue tunic with gold trim and a rampant lion, a lined cape, steel
-pauldrons, brown leather bracers and tall boots, a glowing blue-white sword and
-a shield. Built from spheres, tapered cylinders, rings and boxes, all made in
-code.
+A body of lines turns over as well as it stands, so the stick avatar does
+what a robe cannot (`scripts/player/acrobatics.gd`, opted into by
+`Costume.acrobatic()`):
 
-Choosing her puts on the concept's look -- the ROYAL outfit, BROWN hair, FAIR
-skin (`CharacterLook.wear_defaults()`), from the two ramps the palette gained
-for her (`Palette.ROYAL*`, `Palette.UMBER*`, docs/art-direction.md). In a duel
-the tunic, cape, lining and shield face are the seat's team colour like every
-robe; the leather and leggings are umber, which belongs to neither team. Under
-the world's gold key and crimson ambient blue goes to mud, so her light is
-paler and her shade cooler (`_sun()`, `_ambient()`): still a warm sun from the
-left. Her sword is the shared 2D one, coloured hers through
-`Costume.blade_colours()` -- the shape and reach stay the pose's and, in the
-duel, the simulation's. The shield is slung on her back as decoration: the game
-has no shield, and one on her arm would promise a block.
+| Move | Flourish | Timing |
+| --- | --- | --- |
+| a running jump (`FLIP_FROM`, 70% of run speed, at take-off) | a front flip, tucked | from the vertical speed: take-off upright, done `FLIP_DONE` of the way from rising to falling at jump speed, so upright before any landing a jump can make |
+| the backstep | a backflip | over `BACKFLIP_TIME`, inside the backstep |
+| the dive kick | a front flip into the heel-first kick | over `KICK_FLIP_TIME` |
+| the air slash | one turn, the blade sweeping round with the body | over `ATTACK_TIME` |
 
-Her hair is parted in the middle and drawn back, so the forehead is bare
-under the brow band: a cap set back on the skull, a swept lock either side of
-the parting, fullness over the ears and at the nape. The first version wore
-the hair as a cap over the whole crown, and at any size it read as a helmet.
-The details are the concept's, each one a shape: a V of trim at the neck and
-a band of it down the front, a crest, a double trim at the hem, a belt and a
-slanted sword belt with buckles, a pouch, a cape lined in the tunic's colour
-with a clasp, pauldrons of a dome and a plate with a rim and a rivet, a gold
-band at each wrist, boots with a folded cuff, an ankle strap and a sole, and
-liner, brows and lips on the face. The camera turns further toward her than
-the base does (`_yaw()`), as the concept draws her, so the front shows rather
-than hiding behind the sword arm.
-
-![the princess's portrait, as tools/model_portrait.gd renders it](princess-portrait.png)
-
-She was tuned against the owner's concept side by side, from the front
-(`tools/model_portrait.gd`, which sets `ModelCostume.view_yaw`: the body
-placed as it really stands, unsheared, the camera turned round to it and the
-light turned with it, as a character sheet is lit). What that pass changed, and
-why each was wrong before:
-
-- **The hair** is a dome tipped back off the crown, so its rim is the
-  hairline; a whole sphere set back covered the face from the front. Side
-  locks frame the face, the braid falls from behind the near ear over the
-  shoulder (`_pose_braid()` drapes it forward), and the brow band sits at the
-  hairline with a tiara point and a blue jewel.
-- **The face** is set on the head's own surface (`_on_head()`): features
-  placed a fixed distance along the face sank into the skull where the
-  ellipsoid narrows. The eyes are mostly iris -- a sliver of white, a pupil, a
-  highlight -- under a level liner and brows raised at the outer end (tipped
-  the other way, the first ones frowned), with a nose, a smile and cheeks.
-- **The body** is broader across -- shoulders, chest, pauldrons in three
-  plates, a wider cape -- with the belt riding above the rig's waist, since the
-  rig's torso is a robe's and long, and the concept's is short over a flared
-  skirt. Two gold edges mark the tabard's front panels, and the lion is 1.7
-  times its first size.
-- **Fair skin** (`Palette.FAIR`): the gold ramp's lightest step made her face
-  yellow.
-
-Two differences are the game's, not the model's: she stands in the game's
-idle pose rather than the concept's hands-on-hips, and her sword is the shared
-2D one, drawn where the side view puts it.
-
-The cape trails on the prince's cloak fields and lag, the braid is the
-heroine's pendulum, and she blinks; a hit, a doze or a death closes her eyes
-and a hit opens her mouth. The cape is two flared slabs with real depth: the
-first version was a sheet, and from the side a sheet is seen edge on, as a
-stick.
-
-**The 3D machinery** (`scripts/player/model_costume.gd`, `ModelCostume`) is
-what every 3D figure shares, so a second one is a file of parts, colours and
-placements. It renders into a `SubViewport` that the body layer draws back as
-one texture. It has no animation of its own: each frame it lifts the rig's
-joints into 3D at a fixed depth per side and hangs a limb between each pair, so
-every pose `player_art.gd` knows is the model's on the same frame. The camera
-is orthographic and turned a little toward the facing, so the chest shows its
-breadth; `_lift()` pre-shears x by depth so each joint still projects onto the
-2D point it came from, and the hand ends on the 2D sword's hilt. A head turns
-its face further toward the viewer, so both eyes show either way. The light is
-the world's: a key from the left, a warm rim from behind the far side, a
-palette dark for the ambient. An ink silhouette (an inverted hull, grown by
-`OUTLINE`) does the job of the flat figures' rim, without which a crimson body
-vanishes into crimson stone.
-
-Its costs and the ways it could go wrong, each pinned by
-`tests/unit/test_model_figure.gd`:
-
-- **One world per model.** A `SubViewport` otherwise renders the world of the
-  viewport it sits in, so two models would each draw the other.
-  `own_world_3d` is on, and the test fails with it off.
-- **Joints on the rig.** The test projects the hands, knees and elbow back
-  through the model's camera, facing both ways, and fails with the shear's sign
-  flipped.
-- **Changing clothes.** Assigning `PlayerArt.costume` calls `take_off()` on the
-  old costume, which frees the viewport and gives back the texture filter.
-- **The hit flash.** Materials take their colours through `PlayerArt._c()`
-  every frame, so a hit burns the model white as it burns a flat figure, and a
-  duel seat's team colour reaches the clothes the frame it is set.
-
-The viewport is created on the first frame drawn and sized to the figure's
-real screen size (`_fit()`: 3 to 12 pixels per art unit), so it is sharp in the
-wardrobe's arch and cheap on a phone's play screen. The skin's shade step is
-the light's to make, so a model takes only a look's lit skin tone.
-
-```bash
-xvfb-run -a godot --path . --rendering-driver opengl3 \
-  --script tests/character_poses.gd -- --out /tmp/poses/princess --figure princess
-xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1536x720 \
-  --script tests/fighter_poses.gd -- --out docs/princess-fighter-poses.png \
-  --figure princess
-```
-
-### The owner's rigged model
-
-The primitives stood in for a professionally made princess, and she has
-arrived: a textured, rigged `.glb` the owner generated from the concept with
-Tripo, with clips of its own, at `assets/characters/princess.glb`.
-`scripts/player/rigged_costume.gd` (`RiggedCostume`, a `ModelCostume`) wears
-it on the same rig. **The file is the whole switch**: `CharacterLook.princess()`
-dresses PRINCESS in it when `ResourceLoader.exists()` finds it, and in the
-primitives above when it does not -- delete the file and she is the primitives
-again. It is the one imported asset in the game (docs/art-direction.md). The
-sheets above (princess-fighter-poses.png, princess-portrait.png) are the
-fallback's.
-
-Tripo rigs and animates in one job and textures in another, and the two came
-back as two files: one that moves and is grey, one that is coloured and cannot
-move, cut into the same parts with the same UVs. `tools/merge_glb.py` grafts
-the second's base-colour images onto the first's materials by name -- copying
-the image bytes, checking each part's UV set matches -- and the file in the
-project is that graft. The next export is merged the same way:
-
-```bash
-python3 -I tools/merge_glb.py animated.glb textured.glb assets/characters/princess.glb
-godot --headless --path . --import
-```
-
-then rendered with the commands at the end of this section before it is
-trusted. Nothing in the costume depends on her colours: a grey export draws,
-and wears its team on its edge.
-
-![the owner's princess in every adventure state](princess-rigged-poses.png)
-
-![the owner's princess in every duel state](princess-rigged-fighter-poses.png)
-
-![the owner's princess, as tools/model_portrait.gd renders her](princess-rigged-portrait.png)
-
-**What the file must be.** One humanoid `Skeleton3D` with skinned meshes,
-standing upright in its rest pose -- a T, an A, or the hands-on-hips of her
-first export -- at any scale, facing and up axis: all are read from the bones
-and the skinned mesh. The bones are found by name, lower-cased with
-`_ . - :` and spaces dropped and Mixamo's `mixamorig:` prefix (imported as
-`mixamorig_`) stripped:
-
-| Role | Mixamo (her file) | Tripo's own | Godot humanoid | Required |
-| --- | --- | --- | --- | --- |
-| hips | `Hips` | `Hip` | `Hips` | yes |
-| spine | every bone between hips and neck | | | by hierarchy |
-| neck | `Neck` | `NeckTwist01` | `Neck` | yes |
-| head | `Head` | `Head` | `Head` | yes |
-| clavicle | `LeftShoulder` | `L_Clavicle` | `LeftShoulder` | no |
-| upper arm | `LeftArm` | `L_Upperarm` | `LeftUpperArm` | yes |
-| forearm | `LeftForeArm` | `L_Forearm` | `LeftLowerArm` | yes |
-| hand | `LeftHand` | `L_Hand` | `LeftHand` | yes |
-| thigh | `LeftUpLeg` | `L_Thigh` | `LeftUpperLeg` | yes |
-| shin | `LeftLeg` | `L_Calf` | `LeftLowerLeg` | yes |
-| foot | `LeftFoot` | `L_Foot` | `LeftFoot` | yes |
-
-and the right side likewise. Twist, share, finger, toe and end bones are not
-driven by the rig: they keep their rest pose under the bone they hang from. A
-missing bone is an engine error naming the roles. A part named for a sword,
-blade or weapon is hidden: the sword on screen is the shared 2D one.
-
-**Her clips first, the rig second** (`scripts/player/model_clips.gd`). Where
-she has a clip for what the body is doing, the clip is drawn; where she has
-none, the rig poses her. In the adventure: IDLE, WALK, RUN, CROUCH, JUMP, FALL,
-CLIMB_UP, ATTACK, HURT and DEAD have clips; TURN, LAND, HANG, LADDER, PARRY,
-the roll, the kicks, the plunge, the crawl and the rest are the rig's. In the
-duel only DEAD is a clip: every other duel state holds the sword, the duel's
-sword is the blade rect the simulation parries with, and only the rig's arm
-is guaranteed to hold it.
-
-- *Which clip.* `ModelClips.NAMES` maps an id to the names a clip may carry:
-  the start of the prompt Tripo named it by ("Relaxed heroic stance_ sword
-  lowered in right hand_ ..." is idle, "mit dem schwert zustechen_" the
-  attack), then the clean id, so a re-export named `idle`, `run`, ... works
-  unchanged. Her `fall`, `flip`, `frustrated_01` and `springen` are not used:
-  the prompted falling clip reaches up for a ledge as FALL must.
-- *Which frame.* A clip is never played: the AnimationPlayer is switched to
-  manual processing and sampled at a time worked out from the state and what
-  the simulation says about it (`ModelClips.pick()`), so a replay, a rollback
-  and the other phone draw the same frame.
-- *Timed by the game, never by the clip.* Tripo cannot make a clip shorter
-  than a second and the game's moves are shorter than that, so every clip is
-  fitted to a duration read from Tuning, in one table next to the clip map
-  (`ModelClips.PLAYER`). Loops (idle, crouch, fall) play at their own length;
-  walk and run are paced by the body's speed over WALK_SPEED and RUN_SPEED, so
-  the feet do not skate. One-shots are stretched over the state's duration:
-  the stab over ATTACK_TIME (a quarter of a second), the climb over
-  CLIMB_UP_TIME, the stagger over HURT_TIME (named in Tuning for this; it was
-  a bare number in player.gd), a landing over LAND_RECOVER_TIME. The jump
-  follows the velocity: its progress is how much of JUMP_SPEED the rise has
-  spent, and once it falls the JUMP state draws the fall clip. A death plays
-  at its own speed and stays down. A long clip that is mostly standing still
-  -- her five-second stab, her jump, her flip -- uses only the second in
-  `ModelClips.WINDOWS` where the hand and hips move.
-- *Where.* A clip is authored in place, facing the model's front. It is turned
-  to face the way the body faces (a real turn, as on the rig), scaled to the
-  rig's height (22 units, feet to crown), its soles set on the art's floor, its
-  hips slid over the rig's hip so the picture never leaves the hitbox, at the
-  clip's own hip height so a crouch goes down, and lifted back out of the floor
-  if a grounded clip pushes a foot through it.
-- *The sword.* The clips hold the sword in her right hand. The costume
-  projects that hand's bone through its camera (`Costume.sword_hand()`) and
-  `PlayerArt._draw_weapon()` starts the adventure's blade there instead of at
-  the rig's hand. The duel's blade does not move.
-
-The rig keeps her proportions on a clip and stretches her on the rig (below),
-so she is drawn a little differently on the two: her short legs are longer on
-a clip, her torso longer on the rig. A frame that moves from one to the other
--- idle into a turn -- shows it.
-
-**How the rig poses her.** Every joint the rig names lands exactly on its
-lifted rig point, through the same sheared camera as the primitives, so the
-hand still ends where the 2D sword's hilt starts. A bone is turned rather than
-dragged: the body turns as a whole from the model's rest frame onto the rig's
-(facing left is a real turn, so the sword changes hands as the flat figures'
-does); a limb swings from its own rest direction to hanging down the body,
-turns with it, then hinges about the body's left-right axis onto the rig's
-direction, which is always well defined because the rig keeps each limb at one
-depth; a hand or foot keeps its rest angle to the bone above. Because each
-limb starts from its own rest direction, any rest poses as well as a T-pose.
-The rig's limbs change length from pose to pose and a model's do not, so the
-bones stay rigid and the *skin* stretches: each skin bind is scaled along its
-bone before it carries a vertex into the bone's space. A bone scaled instead
-would shear its children off their points or, scaled uniformly, swell a
-forearm to twice its width. The whole model is scaled so its hip joints stand
-nine units up, as the rig's do, and the spine is spaced out between the rig's
-hip and shoulder with its skin stretched to match. Every frame on the rig
-starts from her rest pose, so what a clip left in a finger is not carried into
-the rig's frames.
-
-**Light and colour.** Her stage is lit by PrincessCostume's paler sun and
-cooler shade and exposed brighter (`EXPOSURE`): a texture is an albedo, not a
-painted lit colour, and her first export's dark blue went black at play size
-under the primitives' light. For the duel, her clothes are dyed by
-`assets/cloth_tint.gdshader`: a pixel of the cloth's own hue takes the team
-colour's hue, with its saturation and value scaled by the team colour's over
-the cloth's mean, so folds, gold trim, emblem and leather keep their own
-colours. A part is cloth when its material or surface is named for cloth
-(`cloth`, `tunic`, `cape`) or when a fifth of its texture is the model's own
-cloth colour, Palette.ROYAL's blue: her cape (`tripo_part_0`), tunic
-(`tripo_part_1`), sleeves (`tripo_part_9`, `tripo_part_10`) and skirt
-(`tripo_part_11`), between two-fifths and two-thirds blue each, where every
-other part is under a fifth. In her own ROYAL outfit she is not dyed. A model
-with no cloth -- a grey export -- wears its team colour as its ink edge
-instead, so two seats are still told apart. The hit flash is an unshaded overlay on every
-surface, the same paper mix as `PlayerArt._c()`.
-
-**The tests and the stand-in.** `tests/unit/test_rigged_figure.gd` holds her
-to the rig where she has no clip -- every joint's bone projected back through
-the camera onto its rig point facing both ways, and her elbows, knees, wrists
-and ankles skinned through the bones onto the joints below, each limb on its
-own side of the body, in a turn, a landing, a hang and a parry -- and to her
-clips where she has them: every table clip found in her file; each clip state
-drawing its clip facing both ways, hips over the rig's hip, facing the body's
-way, toes out of the floor, and the reported sword hand on her right hand's
-bone; the blade starting at that hand, and at the rig's on the rig's frames;
-the same moment drawing the same frame however it was reached; a loop wrapping
-on its own length, the stab windowed and stretched over ATTACK_TIME, the climb
-over CLIMB_UP_TIME, the stagger over HURT_TIME, the jump by its rise and into
-the fall past the top, and a walk's phase paced by its speed; and in the duel,
-the rig standing and her death on its clip, with the team colour on her cloth
-or her edge. The
-same rig claims are made on a stand-in built in code by
-`tests/rigged_support.gd`, in the shape a Mixamo import arrives in -- prefixed
-names, a Z-up armature in centimetres turned a quarter and scaled by 0.01,
-rolled bones, a T-pose, a blended torso, a named, textured cloth material, an
-empty AnimationPlayer -- so the pipeline is held for the next model too, and so
-the fallback is tested with a file that can be there or not. Each check was
-seen to fail: a hand a fifth of a unit off, the limb hinge negated, the skin
-stretch removed, the near side always the model's right, the tint and the
-flash left off; the clip's hips not slid over the rig's, the clip not turned
-with the facing, the left hand reported, PlayerArt ignoring the report, and
-the engine's clock in place of the state's; the pacing, the windows, the
-strike's duration and the jump's rise each taken out.
-
-```bash
-xvfb-run -a godot --path . --rendering-driver opengl3 \
-  --script tests/character_poses.gd -- --out /tmp/poses/princess --figure princess
-python3 tests/character_contact_sheet.py docs/princess-rigged-poses.png \
-  princess=/tmp/poses/princess
-xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1536x720 \
-  --script tests/fighter_poses.gd -- --out docs/princess-rigged-fighter-poses.png \
-  --figure princess
-xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 3840x2160 \
-  --script tools/model_portrait.gd -- --figure princess --out /tmp/princess.png
-```
-
-Each takes `--stand-in` to render the stand-in instead.
-
-![the stand-in in every duel state](rigged-standin-fighter-poses.png)
+Each is a layer over the state's own pose, not a new pose: the backstep still
+leans away and the kick still leads with the heel, and the body only turns
+about the waist while it happens -- one pose field, `spin`, applied once in
+`PlayerArt._rig()` (`Acrobatics.turn()`), with the knees drawn to the chest and
+the feet up under the hips most at the half turn and not at all at either end.
+The blade turns with the hand that holds it. Nothing of play moves: the
+hitbox, the timings, the grab probe and the sword's reach are the same with or
+without a flip. The robed figures do not flip: their cloth is drawn on
+horizontal rungs and comes apart upside down. The duel's fighter does not
+either -- a stance has to stay readable mid-fight.
+`tests/unit/test_acrobatics.gd` holds who flips, that every flip starts and
+lands upright, that a running jump's is done before it can land, that a turn
+keeps limbs and blade whole, and that only a running jump flips.
 
 ## The sentinel
 

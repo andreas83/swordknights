@@ -126,6 +126,9 @@ var _sway := Vector2.ZERO
 var _impulse: float = 0.0 ## Signed: negative squashes, positive stretches.
 var _impulse_t: float = 1.0
 var _flash: float = 0.0 ## How white the figure burns after a hit.
+## Whether this airborne spell began as a running jump, so an acrobatic figure
+## flips through it (Acrobatics). Cosmetic, like the squash spring.
+var _flipping := false
 
 # Scratch, filled by _rig() and read by the _draw_* helpers.
 var _f: float = 1.0 ## facing as a float, the mirror multiplier
@@ -221,6 +224,9 @@ func _process(delta: float) -> void:
 		var target := Vector2(clampf(motion.x, -1.5, 1.5), clampf(motion.y, -1.2, 1.2))
 		_sway = _sway.lerp(target, 1.0 - exp(-delta * CLOTH_CHASE))
 		costume.tick(self, delta)
+		if _player != null and _player.state != Player.State.JUMP \
+				and _player.state != Player.State.FALL:
+			_flipping = false
 	queue_redraw()
 
 
@@ -234,6 +240,7 @@ func _on_landed(impact_speed: float) -> void:
 func _on_jumped() -> void:
 	_impulse = 0.18
 	_impulse_t = 0.0
+	_flipping = costume.acrobatic() and _speed_share() >= Acrobatics.FLIP_FROM
 
 
 func _on_hurt(_remaining_health: int) -> void:
@@ -444,7 +451,8 @@ func _draw_hood(pose: Dictionary) -> void:
 ## The sword lives in the front hand the whole time — held low along the
 ## forearm, swung on an arc during ATTACK.
 func _draw_weapon(pose: Dictionary) -> void:
-	var angle: float = float(pose["blade"])
+	# The blade turns with a flipping body, or the hand would leave it behind.
+	var angle: float = float(pose["blade"]) + float(pose["spin"])
 	blade_hot = float(pose["blade_hot"])
 	if is_inf(angle):
 		blade_hot = 0.0
@@ -452,39 +460,22 @@ func _draw_weapon(pose: Dictionary) -> void:
 	var length: float = float(pose["blade_len"])
 	var dir := Vector2(cos(angle) * _f, sin(angle))
 	var side := Vector2(-dir.y, dir.x)
-	var held := costume.sword_hand(self)
-	var hilt := (_hand_front if is_nan(held.x) else held) + dir * 1.2
+	var hilt := _hand_front + dir * 1.2
 	var tip := hilt + dir * length
 	blade_tip = tip
-	var tones := costume.blade_colours()
-	_draw_glow(tones, hilt, tip, side)
 
 	draw_colored_polygon(PackedVector2Array([
 		hilt + side * 0.9, tip + side * 0.25, tip - side * 0.25, hilt - side * 0.9,
-	]), tones.get("steel", Palette.STEEL))
+	]), Palette.STEEL)
 	draw_colored_polygon(PackedVector2Array([
 		hilt + side * 0.9, tip + side * 0.25,
 		tip, hilt + side * 0.1,
-	]), tones.get("edge_hot", Palette.LIGHT_SOFT) if blade_hot > 0.0
-		else tones.get("edge", Palette.STEEL_DARK))
+	]), Palette.LIGHT_SOFT if blade_hot > 0.0 else Palette.STEEL_DARK)
 	# Crossguard.
 	draw_colored_polygon(PackedVector2Array([
 		hilt + side * 2.0 - dir * 0.5, hilt + side * 2.0 + dir * 0.5,
 		hilt - side * 2.0 + dir * 0.5, hilt - side * 2.0 - dir * 0.5,
-	]), tones.get("guard", Palette.LIGHT_WARM))
-
-
-## A halo round the blade from hilt to tip, for a costume whose sword glows:
-## two widths, the outer fainter, so it reads as light rather than as a fatter
-## blade.
-func _draw_glow(tones: Dictionary, hilt: Vector2, tip: Vector2, side: Vector2) -> void:
-	if not tones.has("glow"):
-		return
-	var glow: Color = tones["glow"]
-	for ring: Vector2 in [Vector2(2.4, 1.3), Vector2(1.6, 0.8)]:
-		draw_colored_polygon(PackedVector2Array([
-			hilt + side * ring.x, tip + side * ring.y, tip - side * ring.y, hilt - side * ring.x,
-		]), Palette.with_alpha(glow, 0.22 if ring.x > 2.0 else 0.35))
+	]), Palette.LIGHT_WARM)
 
 
 ## Knuckles on the ledge. Two hard blocks above the hood are the whole read
@@ -579,6 +570,7 @@ func _rig(pose: Dictionary) -> void:
 	_head = _place(float(pose["hood_push"]), shoulder_y - HOOD_HH * 0.85, lean, 1.15, tilt)
 
 	_rig_limbs(pose, squash, tilt, lean)
+	Acrobatics.turn(self, float(pose["spin"]))
 
 
 func _rig_limbs(pose: Dictionary, squash: float, tilt: float, lean: float) -> void:
@@ -656,6 +648,7 @@ func _pose(over: Dictionary) -> Dictionary:
 		"blade": INF,       # sword angle; INF hides it
 		"blade_len": 9.0,
 		"blade_hot": 0.0,   # the gleam along the edge, during a swing
+		"spin": 0.0,        # a flip: the whole body turned about the waist
 	}
 	for key: String in over:
 		p[key] = over[key]
@@ -665,7 +658,12 @@ func _pose(over: Dictionary) -> Dictionary:
 func _posture() -> Dictionary:
 	var pose := _state_pose()
 	# --- the duel's moves --- an empty hand: no blade, the hand open.
-	return pose if _player.moves.armed() else MovePoses.unarmed(pose)
+	if not _player.moves.armed():
+		pose = MovePoses.unarmed(pose)
+	if costume.acrobatic():
+		pose = Acrobatics.flourish(pose, _player.state, _player.state_time,
+			_player.velocity.y, _flipping)
+	return pose
 
 
 func _state_pose() -> Dictionary:

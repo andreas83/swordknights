@@ -39,6 +39,12 @@ const NECK := 0.6
 const SCARF_LEN := 5.0
 
 
+## A body of lines turns over as well as it stands: the stick avatar flips
+## (Acrobatics), which the robed figures cannot.
+func acrobatic() -> bool:
+	return true
+
+
 func draw_back(art: PlayerArt, pose: Dictionary) -> bool:
 	frames_drawn += 1
 	drawn = Rect2(art._hip, Vector2.ZERO)

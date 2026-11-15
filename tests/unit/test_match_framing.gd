@@ -2,8 +2,8 @@ extends GutTest
 ## How close the duel's camera stands (scripts/duel/match_framing.gd), as a
 ## model: no window, no match, a display frame at a time.
 ##
-## Held here: the levels on the screens that matter -- far is the old fixed
-## framing, close the adventure's scale; the frame comes in as the two close
+## Held here: the levels on the screens that matter -- far is a fighter an
+## eighth of the screen, close the adventure's 1.5x; the frame comes in as the two close
 ## and goes out as they part, and rests on a whole pixel per texel; a fencing
 ## exchange at the edge of a threshold does not pump it; a kill holds it; and,
 ## over a minute of two fighters running about the window at full speed, it
@@ -15,6 +15,11 @@ const PHONE := Vector2(2400.0, 1080.0)
 ## Where the window is, for the walks: one zone, 480 wide.
 const WINDOW := Vector2(960.0, 1440.0)
 const FLOOR := 300.0
+## Far enough apart to stand at the far level on the phone, close enough to
+## fit it: the far level shows 400 of world across, less SIDE either side.
+## (440, the gap these tests used before the levels rose, no longer fits the
+## far level at all, and the hard ceiling rightly stands a level further out.)
+const APART := 300.0
 
 
 func _framing(screen: Vector2 = PHONE, per_unit: float = 6.0) -> MatchFraming:
@@ -36,14 +41,14 @@ func _run(framing: MatchFraming, subjects: PackedVector2Array, seconds: float,
 		framing.update(DT, subjects, together)
 
 
-func test_far_is_the_old_framing_and_close_is_the_adventures() -> void:
+func test_far_is_an_eighth_of_the_screen_and_close_is_the_adventures() -> void:
 	# [screen, pixels per unit, far, close]
 	var screens: Array = [
-		[Vector2(1920, 1080), 6.0, 4, 6],
-		[PHONE, 6.0, 4, 6],
-		[Vector2(2532, 1170), 6.5, 5, 6],
-		[Vector2(3200, 1440), 8.0, 6, 8],
-		[Vector2(1280, 720), 4.0, 3, 4],
+		[Vector2(1920, 1080), 6.0, 6, 9],
+		[PHONE, 6.0, 6, 9],
+		[Vector2(2532, 1170), 6.5, 7, 9],
+		[Vector2(3200, 1440), 8.0, 8, 12],
+		[Vector2(1280, 720), 4.0, 4, 6],
 	]
 	for screen: Array in screens:
 		var framing := _framing(screen[0], screen[1])
@@ -51,30 +56,30 @@ func test_far_is_the_old_framing_and_close_is_the_adventures() -> void:
 		assert_eq(framing.close_level(), int(screen[3]), "close at %s" % screen[0])
 		var body_share := framing.body * framing.far_level() / (screen[0] as Vector2).y
 		assert_almost_eq(body_share, MatchFraming.FIGHTER_SHARE, 0.013,
-			"a fighter is 8-9%% of the screen at the far level, %s" % screen[0])
-		assert_lte(float(framing.close_level()), float(screen[1]) + 0.001,
-			"never closer than the adventure, %s" % screen[0])
+			"a fighter is an eighth of the screen at the far level, %s" % screen[0])
+		assert_lte(float(framing.close_level()), float(screen[1]) * GameCamera.ZOOM + 0.001,
+			"never closer than the adventure's 1.5x, %s" % screen[0])
 
 
 func test_it_comes_in_as_they_close_and_goes_out_as_they_part() -> void:
 	var framing := _framing()
-	framing.reset(_pair(440.0), true)
+	framing.reset(_pair(APART), true)
 	assert_eq(framing.level, framing.far_level(), "apart: the far level")
-	_run(framing, _pair(60.0), 4.0)
+	_run(framing, _pair(60.0), 5.0)
 	assert_eq(framing.level, framing.close_level(), "together: the adventure's scale")
 	assert_true(framing.at_rest(), "and at rest on it")
 	assert_eq(framing.shown, float(framing.close_level()), "a whole pixel per texel")
-	_run(framing, _pair(440.0), 2.0)
+	_run(framing, _pair(APART), 2.0)
 	assert_eq(framing.level, framing.far_level(), "apart again: out")
 	assert_eq(framing.shown, float(framing.far_level()), "and at rest there too")
 
 
 func test_a_step_is_eased_never_cut() -> void:
 	var framing := _framing()
-	framing.reset(_pair(440.0), true)
+	framing.reset(_pair(APART), true)
 	var last := framing.shown
 	var biggest := 0.0
-	for _frame: int in 240:
+	for _frame: int in 300:
 		framing.update(DT, _pair(60.0), true)
 		biggest = maxf(biggest, absf(framing.shown - last))
 		last = framing.shown
@@ -148,13 +153,16 @@ func test_both_fighters_are_always_in_frame() -> void:
 
 
 ## A 16:9 desktop is narrower than a zone at the far level: with the two at
-## opposite walls the floor drops below it, a whole level, rather than lose one.
+## opposite walls the floor drops below it, whole levels at a time, to the
+## closest level that holds them, rather than lose one. (Two levels on a 720p
+## screen since the far level rose to an eighth of the screen; one before.)
 func test_a_narrow_screen_drops_below_far_rather_than_lose_one() -> void:
 	var framing := _framing(Vector2(1280, 720), 4.0)
 	var walls := _pair(466.0)
 	framing.reset(_pair(100.0), true)
 	_run(framing, walls, 1.0)
-	assert_eq(framing.level, framing.far_level() - 1, "a level below far")
+	assert_lt(framing.level, framing.far_level(), "below far")
+	assert_eq(framing.level, framing.hard_level(walls), "at the closest level that holds both")
 	assert_true(framing.fits(framing.shown, walls, MatchFraming.EDGE,
 		MatchFraming.EDGE_UPRIGHT), "and both are on screen")
 	_run(framing, _pair(200.0), 4.0)

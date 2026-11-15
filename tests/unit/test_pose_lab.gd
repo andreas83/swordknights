@@ -180,12 +180,8 @@ func test_the_figure_and_the_light_change() -> void:
 	assert_true(lab.lab_figure.art().costume is StickCostume, "the stick avatar")
 	lab.change("figure")
 	await wait_process_frames(1)
-	# Primitives, or the owner's rigged model once it is in the project.
-	assert_true(lab.lab_figure.art().costume is ModelCostume, "the 3D princess")
-	lab.change("figure")
-	await wait_process_frames(1)
-	assert_eq(lab.lab_figure.art().costume.get_script(), Costume,
-		"the saved look, which with no save is the prince")
+	assert_true(lab.lab_figure.art().costume is StickCostume,
+		"the saved look, which with no save is the default: the stick avatar")
 	assert_eq(art, lab.lab_figure.art(), "one body, dressed again")
 
 	var first := lab.stage.strip_id

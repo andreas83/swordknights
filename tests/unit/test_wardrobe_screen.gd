@@ -43,13 +43,15 @@ func _saved(player: int) -> CharacterLook:
 func test_it_opens_on_player_one_and_the_saved_look() -> void:
 	assert_eq(_screen.index(), 0)
 	assert_eq(_screen.player(), Wardrobe.PLAYER_ONE)
-	assert_eq(_screen.value_text(_row("figure")), "PRINCE")
+	assert_eq(_screen.value_text(_row("figure")), "STICK", "the default is the stick avatar")
 
 
-func test_the_princes_hood_closes_hair_and_skin() -> void:
+## The stick avatar has no hair or face to colour, as the prince's are under
+## his hood: both rows are closed.
+func test_the_stick_avatar_closes_hair_and_skin() -> void:
 	assert_false(_screen.is_open(_row("hair")))
 	assert_false(_screen.is_open(_row("skin")))
-	assert_eq(_screen.value_text(_row("hair")), "HOODED")
+	assert_eq(_screen.value_text(_row("hair")), "NONE")
 	# Down from SASH goes round to the top, past the two closed rows.
 	for _i: int in _row("accent"):
 		_screen.move(1)
@@ -85,7 +87,7 @@ func test_each_player_has_a_look_and_player_two_wears_the_seat() -> void:
 	_screen.move(-1)
 	_screen.adjust(1) # now editing player two
 	assert_eq(_screen.player(), Wardrobe.PLAYER_TWO)
-	assert_eq(_screen.value_text(_row("figure")), "PRINCE", "player two is still the prince")
+	assert_eq(_screen.value_text(_row("figure")), "STICK", "player two is still the default")
 	assert_false(_screen.is_open(_row("outfit")), "player two's robe is the seat's")
 	assert_eq(_screen.value_text(_row("outfit")), "SEA-GREEN")
 	var preview := _screen.get_node(^"Preview") as FigurePreview

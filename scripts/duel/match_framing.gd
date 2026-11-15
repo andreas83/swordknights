@@ -3,7 +3,11 @@ extends RefCounted
 ## How close the duel's camera stands, as a model with no screen and no match.
 ##
 ## The owner played the duel on a phone and liked the adventure's framing
-## better: a fighter 8.5% of the screen's height reads, but it reads small.
+## better: a fighter 8.5% of the screen's height reads, but it reads small --
+## and then asked for it larger again once the adventure went to a fixed 1.5x
+## (GameCamera.ZOOM). The far level is now a fighter an eighth of the screen,
+## where the close level used to be, and the close level is the adventure's
+## own 1.5x.
 ## The adventure frames 180 world pixels tall, which puts the same body at 12%.
 ## The duel cannot simply adopt that, because the one thing the mode cannot
 ## lose is the other fighter -- a zone is 480 px and the adventure's frame is
@@ -80,9 +84,11 @@ extends RefCounted
 ## view toward them, and has them on screen from the moment they are inside
 ## the window. See MatchCamera._target().
 
-## A standing fighter's share of the screen's height at the far level. The old,
-## fixed framing; see docs/duel-match.md, "Status", item 1.
-const FIGHTER_SHARE := 0.085
+## A standing fighter's share of the screen's height at the far level: an
+## eighth, what the close level was before the adventure went to 1.5x. The
+## old fixed framing was 0.085 (docs/duel-match.md, "Status", item 1), which
+## the owner found too small to read on a phone.
+const FIGHTER_SHARE := 0.125
 
 ## World pixels kept between a fighter's feet and the side of the frame.
 ## EDGE is the hard rule: half a body (4.5) and a pixel and a half, so a fighter
@@ -133,10 +139,11 @@ func far_level() -> int:
 	return maxi(1, roundi(screen.y * FIGHTER_SHARE / body))
 
 
-## The closest level: the adventure's scale, rounded down, and never wider than
-## the far level on a screen too small to tell the two apart.
+## The closest level: the adventure's scale -- the canvas stretch times its
+## fixed GameCamera.ZOOM -- rounded down, and never wider than the far level
+## on a screen too small to tell the two apart.
 func close_level() -> int:
-	return maxi(far_level(), floori(per_unit + 0.001))
+	return maxi(far_level(), floori(per_unit * GameCamera.ZOOM + 0.001))
 
 
 ## The world the screen shows at `pixels` per texel, in world pixels.
