@@ -53,6 +53,8 @@ const HINT_STICK := "STICK STRAIGHT DOWN: LOW GUARD  ·  DOWN AND ASIDE: DUCK"
 @onready var hud: MatchHud = $HudLayer/Hud
 
 var strip: ZoneStrip
+## The column of light where a fighter who is down will come back.
+var beacon: RespawnBeacon
 var demo := false
 ## Where the seats' looks are read from. A seam for a test, which must never
 ## read or write the real save.
@@ -97,6 +99,12 @@ func _ready() -> void:
 	hazards.name = "Hazards"
 	$World.add_child(hazards)
 	$World.move_child(hazards, gore.get_index() + 1)
+	# Where a fighter who is down comes back: over the floor and the hazards,
+	# under the fighters, so the one who arrives stands in front of the light.
+	beacon = RespawnBeacon.new()
+	beacon.name = "RespawnBeacon"
+	$World.add_child(beacon)
+	$World.move_child(beacon, hazards.get_index() + 1)
 
 	fight.fighter_scene = FIGHTER_SCENE
 	fight.arena_switch = use_strip
@@ -116,6 +124,9 @@ func _ready() -> void:
 			_demo_cpus.append(cpu)
 
 	hud.fight = fight
+	hud.camera = camera
+	hud.beacon = beacon
+	beacon.fight = fight
 	hud.footer = PLAY_FOOTER if not demo else strip.name.to_upper()
 	if not demo:
 		menu = PauseMenu.install(self)
@@ -516,8 +527,12 @@ func _on_initiative_changed(leader: int) -> void:
 		_said(leader, "%s LEADS", "YOU LEAD"))
 
 
-func _on_fighter_respawned(_slot: int, _at: Vector2, _facing: int) -> void:
+## A fighter back on their feet: the column at the spot flares, the word goes
+## up in the band -- ONE DOWN had it two seconds ago -- and a small beat.
+func _on_fighter_respawned(slot: int, at: Vector2, _facing: int) -> void:
 	camera.shake(1.0, 0.16)
+	beacon.burst(slot, at)
+	hud.flash(_said(slot, "%s RETURNS", "YOU RETURN"), _said(slot, "%s BACK", "YOU'RE BACK"))
 
 
 func _on_leader_consumed(winner: int, _at: Vector2) -> void:

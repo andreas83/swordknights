@@ -126,6 +126,35 @@ not an event anywhere in the code, and there is nothing at a seam to stutter.
 
 ## Respawn
 
+### Seeing it
+
+The owner found the respawn unclear: the only sign was a ring the size of a
+coin in the bottom corner, and then a fighter appeared from nothing a screen
+and a half ahead. Now it is shown where it happens (`RespawnBeacon`,
+`MatchHud._draw_respawns()`):
+
+- **A column of light** in the seat's colour stands on the spot for the whole
+  of the wait, filling from the floor as `RESPAWN_DELAY` runs out, with the
+  countdown ring at the chest. The spot is `DuelMatch.respawn_plan()`, the
+  match's own, so the column cannot stand somewhere the fighter will not. It is
+  drawn additively and over the foreground arcades: drawn plainly it was a dull
+  slab, and behind a pillar it was hidden.
+- **When the spot is off the screen**, the ring moves to the screen's edge
+  nearest it with an arrow pointing out at it; and a fighter who is back but
+  not yet in the view keeps an arrow and a dot of their colour at the edge.
+  Both are measured against the whole screen: the first cut measured against
+  the column the words are set in and drew an arrow beside a fighter in plain
+  view.
+- **The arrival** flares the column and runs a ring along the floor, and the
+  band says it -- ONE RETURNS, YOU RETURN -- two seconds after ONE DOWN.
+
+All of it reads the match and writes nothing; the flare is started by the
+`fighter_respawned` event, which a rewinding client does not re-fire.
+`tests/unit/test_respawn_marks.gd` holds the column on the plan's spot, the
+wiring, the flare and the word, and the edge pointer.
+
+### The rules
+
 From the spec, with its numbers:
 
 - `RESPAWN_DELAY` — 2.0 s.
@@ -430,11 +459,21 @@ per texel — between two ends:
 
 | | Level | At 1080 px tall | Fighter on screen |
 | --- | --- | --- | --- |
-| far | `round(height × 0.085 / 22)`, the old fixed framing | 4 px/texel, 480 × 270 world px at 320 units | 8.1% |
-| close | `floor(stretch)`, the adventure's scale, never closer | 6 px/texel, 320 × 180 at 320 units, 440 × 180 at 440 | 12.2% |
+| far | `round(height × 0.125 / 22)`, a fighter an eighth of the screen | 6 px/texel, 320 × 180 world px at 320 units | 12.2% |
+| close | `floor(stretch × 1.5)`, the adventure's fixed 1.5x (`GameCamera.ZOOM`), never closer | 9 px/texel, 213 × 120 at 320 units, 293 × 120 at 440 | 18.3% |
 
-Other screens: 1170 px tall is 5 to 6 (the adventure there is a fractional 6.5,
-and the duel stays at 6); 1440 is 6 to 8; a 720 px desktop is 3 to 4.
+Other screens: 1170 px tall is 7 to 9 (the adventure there is a fractional
+9.75, and the duel stays at 9); 1440 is 8 to 12; a 720 px desktop is 4 to 6.
+
+*Raised by the owner.* The levels were 4 to 6 at 1080 px -- the far level
+the old fixed framing, a fighter 8.5% of the screen, and the close level the
+adventure's 1:1. Once the adventure went to 1.5x the owner asked for the duel
+larger too: the far level is now what the close level was, and the close
+level is the adventure's 1.5x. The price is that the far level no longer holds
+a whole zone across (320 to 440 px of a 480 px window): with the two at
+opposite walls the frame drops below it, a whole level at a time, to the
+closest level that holds both -- the hard ceiling below was always there for
+narrow screens, and now it is what every screen falls back on.
 
 **The curve.** A step function of the distance between the two, with a gap
 between its up and down edges: the frame goes out a level when the pair no
@@ -442,14 +481,15 @@ longer fits it with `SIDE` (40 px: a thrust's reach and a step of warning) in
 front of each, and comes in a level when they fit the closer one with `SIDE` +
 `HYSTERESIS` (88 px) each. In world pixels between the two:
 
-| Screen (1080 px tall) | 6 px/texel (adventure) | 5 px/texel | 4 px/texel (far) |
-| --- | --- | --- | --- |
-| 320 units, 16:9 | in at ≤ 144, out at > 240 | in at ≤ 208, out at > 304 | beyond |
-| 400 units, 20:9 phone | in at ≤ 224, out at > 320 | in at ≤ 304, out at > 400 | beyond |
-| 440 units, 22:9 | in at ≤ 264, out at > 360 | in at ≤ 352, out at > 448 | beyond |
+| Screen (1080 px tall) | 9 px/texel (adventure's 1.5x) | 8 px/texel | 7 px/texel | 6 px/texel (far) |
+| --- | --- | --- | --- | --- |
+| 320 units, 16:9 | in at ≤ 37, out at > 133 | in at ≤ 64, out at > 160 | in at ≤ 98, out at > 194 | out at > 240 |
+| 400 units, 20:9 phone | in at ≤ 90, out at > 186 | in at ≤ 124, out at > 220 | in at ≤ 166, out at > 262 | out at > 320 |
+| 440 units, 22:9 | in at ≤ 117, out at > 213 | in at ≤ 154, out at > 250 | in at ≤ 201, out at > 297 | out at > 360 |
 
-The window is 480 px, so on a wide phone a fight is mostly at the adventure's
-scale and reaches the far level only with the two at opposite ends of it.
+Past the far level's "out" the frame keeps both on screen at a level below it
+(the hard ceiling). Fencing distance -- within a lunge and a step, under about
+120 px -- is framed at 8 or 9.
 Vertically the frame also wants their jump's height (24 px) above the higher
 head, which only the gallery and the ladders ever ask for.
 
@@ -904,7 +944,9 @@ the last item in [`netplay.md`](netplay.md#not-handled-yet).
 
 The five items that stood between the match and replacing the round duel:
 
-1. ~~Zone width.~~ **Decided: a fighter stands 8–9% of the screen's height**,
+1. ~~Zone width.~~ **Decided: a fighter stands 8–9% of the screen's height**
+   (since raised: an eighth at the far level and the adventure's 1.5x close,
+   "The frame breathes" above),
    and the strip follows from that. The camera scales by height
    (`MatchCamera.FIGHTER_SHARE`, 0.085) at a whole number of screen pixels per
    texel — 8.1% at 1080 px tall, 9.2–9.4% at 1170–1440 — and snaps to the pixel
