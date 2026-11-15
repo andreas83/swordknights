@@ -34,19 +34,17 @@ extends RefCounted
 ## On disk a look is a set of ids rather than indices (see Wardrobe), so the
 ## lists below may be reordered or extended without changing anyone's choice.
 
-enum Figure { PRINCE, HEROINE, STICK, PRINCESS }
+## The stick avatar first: it is the default, and the wardrobe steps from it
+## to the heroine and on to the prince.
+enum Figure { STICK, HEROINE, PRINCE }
 
 ## The prince and the heroine are drawn in flat planes; STICK is the pose with
-## the clothes taken off (StickCostume); PRINCESS is a 3D warrior princess
-## rendered onto the same rig -- the owner's rigged model once it is in the
-## project (RiggedCostume), primitives built in code until then
-## (PrincessCostume; see `princess()`). All four stand on one skeleton.
+## the clothes taken off (StickCostume), and since the owner chose it, the
+## figure a new look wears. All three stand on one skeleton.
 const FIGURES: Array[Dictionary] = [
-	{"id": "prince", "name": "PRINCE"},
-	{"id": "heroine", "name": "HEROINE"},
 	{"id": "stick", "name": "STICK"},
-	{"id": "princess", "name": "PRINCESS",
-		"defaults": {"outfit": "royal", "hair": "brown", "skin": "fair"}},
+	{"id": "heroine", "name": "HEROINE"},
+	{"id": "prince", "name": "PRINCE"},
 ]
 
 ## The robe or tunic: lit plane, shade plane, and the darker plane behind (the
@@ -61,8 +59,6 @@ const OUTFITS: Array[Dictionary] = [
 		"cloth": Palette.MID, "dark": Palette.SHADOW_WARM, "back": Palette.SHADOW_PIT},
 	{"id": "wine", "name": "WINE",
 		"cloth": Palette.SHADOW, "dark": Palette.SHADOW_PIT, "back": Palette.INK},
-	{"id": "royal", "name": "ROYAL",
-		"cloth": Palette.ROYAL, "dark": Palette.ROYAL_DARK, "back": Palette.ROYAL_DEEP},
 ]
 
 ## The sash, the hood's crest, the headband and the ribbons. One flat colour.
@@ -79,7 +75,6 @@ const HAIRS: Array[Dictionary] = [
 	{"id": "chestnut", "name": "CHESTNUT", "lit": Palette.SHADOW, "shade": Palette.SHADOW_PIT},
 	{"id": "henna", "name": "HENNA", "lit": Palette.SHADOW_WARM, "shade": Palette.SHADOW},
 	{"id": "gold", "name": "GOLD", "lit": Palette.LIGHT_WARM, "shade": Palette.MID},
-	{"id": "brown", "name": "BROWN", "lit": Palette.UMBER, "shade": Palette.UMBER_DARK},
 ]
 
 ## Skin, lit and shaded. The prince's face is a void under the hood.
@@ -88,13 +83,13 @@ const SKINS: Array[Dictionary] = [
 	{"id": "amber", "name": "AMBER", "lit": Palette.LIGHT_WARM, "shade": Palette.MID},
 	{"id": "copper", "name": "COPPER", "lit": Palette.MID, "shade": Palette.SHADOW_WARM},
 	{"id": "umber", "name": "UMBER", "lit": Palette.SHADOW_WARM, "shade": Palette.SHADOW},
-	{"id": "fair", "name": "FAIR", "lit": Palette.FAIR, "shade": Palette.FAIR_SHADE},
 ]
 
 ## The keys a look is saved under, in the order the editor lists them.
 const FIELDS: Array[String] = ["figure", "outfit", "accent", "hair", "skin"]
 
-var figure: int = Figure.PRINCE
+## The stick avatar: the owner's choice of default, over the hooded prince.
+var figure: int = Figure.STICK
 var outfit := 0
 var accent := 0
 var hair := 0
@@ -170,7 +165,7 @@ func is_heroine() -> bool:
 ## Whether the figure shows a face and hair, so the hair and skin rows mean
 ## something: the prince's are under his hood and the stick avatar has none.
 func shows_face() -> bool:
-	return figure == Figure.HEROINE or figure == Figure.PRINCESS
+	return figure == Figure.HEROINE
 
 
 func equals(other: CharacterLook) -> bool:
@@ -190,8 +185,6 @@ func to_ids() -> Dictionary:
 ## the whole look. Returns how many fields were taken from `ids`.
 func take_ids(ids: Dictionary) -> int:
 	var taken := 0
-	# FIELDS starts with the figure, so a figure's own defaults go on first and
-	# every field the ids do name is taken over them.
 	for field: String in FIELDS:
 		var value: Variant = ids.get(field)
 		if typeof(value) != TYPE_STRING and typeof(value) != TYPE_STRING_NAME:
@@ -201,23 +194,8 @@ func take_ids(ids: Dictionary) -> int:
 			if String(table[i]["id"]) == String(value):
 				set_index(field, i)
 				taken += 1
-				if field == "figure":
-					wear_defaults()
 				break
 	return taken
-
-
-## Puts on the figure's own defaults, if it has any: the princess comes in the
-## royal blue, brown hair and fair skin of her concept sheet. Only the colours
-## change; the figure stays. The wardrobe calls this when a player steps onto
-## a figure, take_ids() when a set of ids names one.
-func wear_defaults() -> void:
-	var defaults: Dictionary = FIGURES[figure].get("defaults", {})
-	for field: String in defaults:
-		var table := options(field)
-		for i: int in table.size():
-			if String(table[i]["id"]) == String(defaults[field]):
-				set_index(field, i)
 
 
 ## A new look read from ids by take_ids(): the default, with each field that
@@ -247,21 +225,6 @@ func dress(art: PlayerArt) -> void:
 				locks["lit"], locks["shade"], face["lit"], face["shade"])
 		Figure.STICK:
 			art.costume = StickCostume.new()
-		Figure.PRINCESS:
-			art.costume = princess(locks, face)
 		_:
 			art.costume = Costume.new()
 	art.queue_redraw()
-
-
-## The princess's body: the owner's rigged model when the file is there
-## (RiggedCostume), the primitives built in code while it is not
-## (PrincessCostume). Her sword is hers either way. `model` is the file to
-## look for; a test names one of its own.
-static func princess(locks: Dictionary, face: Dictionary,
-		model: String = RiggedCostume.PRINCESS) -> ModelCostume:
-	if RiggedCostume.available(model):
-		var rigged := RiggedCostume.new(model)
-		rigged.blade = PrincessCostume.BLADE
-		return rigged
-	return PrincessCostume.new(locks["lit"], locks["shade"], face["lit"])
