@@ -100,6 +100,10 @@ func _init(hair_lit: Color = Palette.SHADOW_PIT, hair_shade: Color = Palette.INK
 	skin_dark = skin_shade
 
 
+func worn_colours() -> Array[Color]:
+	return [hair, hair_dark, skin, skin_dark]
+
+
 ## --- secondary motion -------------------------------------------------------
 
 func tick(art: PlayerArt, delta: float) -> void:

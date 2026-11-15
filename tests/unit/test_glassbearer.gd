@@ -173,6 +173,27 @@ func test_he_waits_until_he_is_on_screen() -> void:
 	assert_false(aimed, "a foe off the frame does not act")
 
 
+## The frame he asks about is the one the camera really shows (CameraView),
+## not an estimate round the prince. At the Adventure's 1.5x the estimate --
+## half the viewport less the camera's look-ahead -- left him 62 units of
+## reach, and Chapter IV's R5 bearer, 69 from the wall the prince stands at,
+## could never open his encounter. Here he aims from further than that, and
+## only ever with all of him inside the frame.
+func test_he_aims_from_anywhere_the_frame_shows_him() -> void:
+	await _play(RANGE, 13)
+	var bearer := _bearer()
+	var estimate := _game.get_viewport_rect().size.x / GameCamera.ZOOM * 0.5 \
+		- Glassbearer.FRAME_MARGIN
+	var aimed := await _until(func() -> bool: return bearer.state == Glassbearer.State.AIM, 240)
+	assert_true(aimed, "he aims")
+	if not aimed:
+		return
+	assert_true(CameraView.rect_for(bearer).encloses(bearer.bounds()),
+		"with all of him in the frame the camera shows")
+	var gap := absf(_game.player.body_rect().get_center().x - bearer.global_position.x)
+	assert_gt(gap, estimate, "from %.0f units, past the old estimate's %.0f" % [gap, estimate])
+
+
 func test_a_bolt_lands_on_a_standing_prince() -> void:
 	DeathWatch.expect_deaths(0)
 	await _play(RANGE, 12)

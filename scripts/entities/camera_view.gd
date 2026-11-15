@@ -10,11 +10,14 @@ extends RefCounted
 ## nobody could read. The same rule keeps the Well's machinery quiet when it
 ## is off screen: a blade is heard where it is seen.
 ##
-## The camera never zooms (GameCamera), so the frame is the viewport's size
-## around where the camera holds (GameCamera.frame_centre()). Not the shaken
-## image: the shake is random, and a foe's decision is the simulation's, so it
-## must come out the same on every run and at every frame rate -- which is
-## also why the camera smooths on the physics step. With no camera at all (a
+## The frame is the viewport's size over the camera's zoom, around where the
+## camera holds (GameCamera.frame_centre()). The Adventure's camera stands at
+## a fixed GameCamera.ZOOM, so a 180-unit viewport shows 120 units of world;
+## the zoom is read off the camera rather than assumed, so a foe can never act
+## on a stretch of world the screen does not show. Not the shaken image: the
+## shake is random, and a foe's decision is the simulation's, so it must come
+## out the same on every run and at every frame rate -- which is also why the
+## camera smooths on the physics step. With no camera at all (a
 ## unit test stepping a foe on its own), everything is in view: the rule is
 ## about the screen, and there is none.
 
@@ -30,7 +33,7 @@ static func rect_for(node: Node) -> Rect2:
 	var camera := viewport.get_camera_2d()
 	if camera == null:
 		return everything()
-	var size := viewport.get_visible_rect().size
+	var size := viewport.get_visible_rect().size / camera.zoom
 	var centre := camera.get_screen_center_position()
 	if camera is GameCamera:
 		centre = (camera as GameCamera).frame_centre()

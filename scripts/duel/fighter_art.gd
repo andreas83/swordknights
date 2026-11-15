@@ -590,16 +590,19 @@ func _draw_weapon(pose: Dictionary) -> void:
 	var hot := _fighter.is_attacking()
 	blade_tip = tip
 	blade_hot = 1.0 if hot else 0.0
+	var tones := costume.blade_colours()
+	_draw_glow(tones, hilt, tip, side)
 
 	var shoulder := tip - dir * 2.4
 	draw_colored_polygon(PackedVector2Array([
 		hilt - side * thick * 0.5, shoulder - side * thick * 0.5, tip,
 		shoulder + side * thick * 0.5, hilt + side * thick * 0.5,
-	]), Palette.STEEL)
+	]), tones.get("steel", Palette.STEEL))
 	# The edge the sun catches: the top of the blade, gold on a live thrust,
 	# and pale on a held guard, so the line reads against a night sky too.
 	var edge := -side if side.y > 0.0 else side
-	var lit := Palette.LIGHT_SOFT if hot else Palette.with_alpha(Palette.PAPER, 0.55)
+	var lit: Color = tones.get("edge_hot", Palette.LIGHT_SOFT) if hot \
+		else Palette.with_alpha(tones.get("edge", Palette.PAPER), 0.55)
 	draw_colored_polygon(PackedVector2Array([
 		hilt + edge * thick * 0.5, shoulder + edge * thick * 0.5,
 		shoulder + edge * (thick * 0.5 - 0.6), hilt + edge * (thick * 0.5 - 0.6),
@@ -609,7 +612,7 @@ func _draw_weapon(pose: Dictionary) -> void:
 	draw_colored_polygon(PackedVector2Array([
 		hilt + cross - dir * 0.7, hilt + cross + dir * 0.7,
 		hilt - cross + dir * 0.7, hilt - cross - dir * 0.7,
-	]), Palette.LIGHT_WARM)
+	]), tones.get("guard", Palette.LIGHT_WARM))
 
 
 ## --- drawing ----------------------------------------------------------------

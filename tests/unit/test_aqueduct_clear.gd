@@ -35,10 +35,13 @@ const RUN := [
 	[89, 0], [1, L | A], [27, 0], [3, R], [1, A], [30, 0],
 	# House A by a grab; the bridge at a run; the deck by a hop, to torch 1.
 	[86, R], [16, R | J], [12, R], [20, U], [110, R], [20, R | J], [30, 0], [20, U],
-	# The deck: wait by the torch until the cat falls through the slabs.
-	[204, 0],
+	# The deck: a step past the torch, until the cat beyond the slabs is in the
+	# frame -- from the torch itself it is off the edge of the 1.5x camera,
+	# and a cat off the frame does not hunt -- then wait there until it falls
+	# through the slabs.
+	[18, R], [204, 0],
 	# Leap the broken run from its lip; run to the slabs before the tower.
-	[54, R], [18, R | J], [196, R],
+	[37, R], [18, R | J], [196, R],
 	# Stand on them: the floor is the door.
 	[60, 0],
 	# Through the channel, torch 2, the collapse at a run, onto the stone.

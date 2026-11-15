@@ -56,7 +56,13 @@ extends Node2D
 ## What the figure wears over the rig. The base Costume is the prince and draws
 ## nothing of its own, so a bare PlayerArt draws exactly what it always has; see
 ## costume.gd for why the second figure is a costume and not a second PlayerArt.
-var costume := Costume.new()
+## Assigning one takes the old one off first, so a costume that hung nodes on
+## this figure (the 3D model's viewport) does not leave them rendering behind.
+var costume: Costume = Costume.new():
+	set(value):
+		if costume != null and costume != value:
+			costume.take_off(self)
+		costume = value if value != null else Costume.new()
 
 ## --- proportions -----------------------------------------------------------
 ##
@@ -271,9 +277,12 @@ func _draw() -> void:
 		_draw_cloak(pose)
 	# Both legs go behind the robe: a hem that reaches the floor has to be able
 	# to hide them, and a hem that rides up has to be what reveals them.
-	_draw_leg(_knee_back, _foot_back, _c(cloak_shade))
-	_draw_leg(_knee_front, _foot_front, _c(ink))
-	_draw_arm(_hand_back, _c(cloth_dark))
+	if not costume.draw_leg(self, _knee_back, _foot_back, true):
+		_draw_leg(_knee_back, _foot_back, _c(cloak_shade))
+	if not costume.draw_leg(self, _knee_front, _foot_front, false):
+		_draw_leg(_knee_front, _foot_front, _c(ink))
+	if not costume.draw_arm(self, _hand_back, true):
+		_draw_arm(_hand_back, _c(cloth_dark))
 	# At rest the blade hangs behind the robe and only its point shows past the
 	# hem; during a swing it comes round in front of everything.
 	var swinging := _blade_in_front()
@@ -282,7 +291,8 @@ func _draw() -> void:
 	if not costume.draw_body(self, pose):
 		_draw_robe(pose)
 		_draw_sash()
-	_draw_arm(_hand_front, _c(cloth))
+	if not costume.draw_arm(self, _hand_front, false):
+		_draw_arm(_hand_front, _c(cloth))
 	if swinging:
 		_draw_weapon(pose)
 	if not costume.draw_head(self, pose):
@@ -368,10 +378,17 @@ func _draw_leg(knee: Vector2, foot: Vector2, color: Color) -> void:
 ## Sleeve, then forearm, then a dark hand. The hand matters: without it a
 ## forward-swung arm is a bar of robe-coloured nothing poking out of the body.
 func _draw_arm(hand: Vector2, color: Color) -> void:
-	var elbow := _shoulder.lerp(hand, 0.5) + Vector2(0.0, 0.8)
+	var elbow := _elbow(hand)
 	_limb(_shoulder, elbow, 2.4, 1.8, color)
 	_limb(elbow, hand, 1.8, 1.4, color)
 	draw_rect(Rect2(hand.x - 0.85, hand.y - 0.85, 1.7, 1.7), _c(ink))
+
+
+## Where the elbow of the arm ending at `hand` bends: half way, and dropped a
+## little, so a raised arm still reads as jointed. Every costume that draws its
+## own arms bends them here, so a pose bends every figure's arm the same way.
+func _elbow(hand: Vector2) -> Vector2:
+	return _shoulder.lerp(hand, 0.5) + Vector2(0.0, 0.8)
 
 
 ## The hood is the whole silhouette read: a narrow peak that leans the way the
@@ -435,22 +452,39 @@ func _draw_weapon(pose: Dictionary) -> void:
 	var length: float = float(pose["blade_len"])
 	var dir := Vector2(cos(angle) * _f, sin(angle))
 	var side := Vector2(-dir.y, dir.x)
-	var hilt := _hand_front + dir * 1.2
+	var held := costume.sword_hand(self)
+	var hilt := (_hand_front if is_nan(held.x) else held) + dir * 1.2
 	var tip := hilt + dir * length
 	blade_tip = tip
+	var tones := costume.blade_colours()
+	_draw_glow(tones, hilt, tip, side)
 
 	draw_colored_polygon(PackedVector2Array([
 		hilt + side * 0.9, tip + side * 0.25, tip - side * 0.25, hilt - side * 0.9,
-	]), Palette.STEEL)
+	]), tones.get("steel", Palette.STEEL))
 	draw_colored_polygon(PackedVector2Array([
 		hilt + side * 0.9, tip + side * 0.25,
 		tip, hilt + side * 0.1,
-	]), Palette.LIGHT_SOFT if blade_hot > 0.0 else Palette.STEEL_DARK)
+	]), tones.get("edge_hot", Palette.LIGHT_SOFT) if blade_hot > 0.0
+		else tones.get("edge", Palette.STEEL_DARK))
 	# Crossguard.
 	draw_colored_polygon(PackedVector2Array([
 		hilt + side * 2.0 - dir * 0.5, hilt + side * 2.0 + dir * 0.5,
 		hilt - side * 2.0 + dir * 0.5, hilt - side * 2.0 - dir * 0.5,
-	]), Palette.LIGHT_WARM)
+	]), tones.get("guard", Palette.LIGHT_WARM))
+
+
+## A halo round the blade from hilt to tip, for a costume whose sword glows:
+## two widths, the outer fainter, so it reads as light rather than as a fatter
+## blade.
+func _draw_glow(tones: Dictionary, hilt: Vector2, tip: Vector2, side: Vector2) -> void:
+	if not tones.has("glow"):
+		return
+	var glow: Color = tones["glow"]
+	for ring: Vector2 in [Vector2(2.4, 1.3), Vector2(1.6, 0.8)]:
+		draw_colored_polygon(PackedVector2Array([
+			hilt + side * ring.x, tip + side * ring.y, tip - side * ring.y, hilt - side * ring.x,
+		]), Palette.with_alpha(glow, 0.22 if ring.x > 2.0 else 0.35))
 
 
 ## Knuckles on the ledge. Two hard blocks above the hood are the whole read

@@ -63,6 +63,52 @@ The duotone is the rule; accents are the exception and they are rationed:
 - **Paper white** — reserved for the brightest specular and for text. If
   white appears anywhere else it steals the eye.
 - **Blood red** — blood, and nothing else. See below.
+- **Royal blue, umber and fair** — what a figure wears: an outfit, hair,
+  leather, a fair skin. Never stone, never a team. See below.
+
+### The sixth and seventh accents: royal blue and umber
+
+The owner's concept sheet for the 3D princess wears a royal-blue tunic and
+cape, brown hair and brown leather, and asked for her to be close to it. The
+duotone has no blue and its "browns" are crimsons, so `Palette.ROYAL*` and
+`Palette.UMBER*` were added -- and `Palette.FAIR`, a peach skin, since the
+gold ramp's lightest step made a fair face yellow -- each standing in the same
+lit / shade / back relationship as the cloth ramp. They are rationed by use:
+the wardrobe's ROYAL outfit and BROWN hair, and the princess's leather. They
+never colour stone, and never a team: a duel re-dresses every robe in its
+seat's crimson or sea-green, and the blue sits about fifty degrees of hue away
+from player two's teal.
+
+### The one imported asset: the princess's model
+
+Everything else on screen is generated from the palette and the tuning
+table. The owner's rigged princess (`assets/characters/princess.glb`,
+generated from the concept sheet with Tripo -- its rigged, animated export
+with the colour textures of its textured one grafted on by
+tools/merge_glb.py -- and the textures the importer extracts beside it) is the single exception,
+sanctioned by the owner: a professionally made, animated character is not
+something the primitives can match. It is held to the rest of this document
+as far as a texture can be:
+
+- **Lit by the world's sun**, through the same 3D stage as the primitives:
+  the key from the left, the warm rim, a dark of the palette for the ambient,
+  and the ink silhouette round it. Its texture is its albedo, not its
+  lighting; the stage is exposed brighter for it, since a dark albedo under a
+  light tuned for painted palette steps went black at play size.
+- **The team owns the cloth.** Her blue -- the ROYAL accent her texture is
+  made in -- is dyed per pixel to the seat's crimson or sea-green in a duel
+  (assets/cloth_tint.gdshader), leaving her trim, emblem, leather, steel and
+  skin as made; the rest of her texture keeps clear of both teams' hues. An
+  export without colour textures wears the team on its ink edge instead.
+- **No modelled sword.** The sword on screen is the shared 2D one, coloured
+  hers, because it is the rect the duel fights with; her clips' sword hand
+  is where it starts.
+- **The flash** burns it toward paper white like every figure.
+- **No blood red** in the texture: the blood ramp stays gore's alone.
+
+Without the file the princess is the primitives, and nothing else changes:
+`CharacterLook.princess()` decides, and docs/character.md says what the file
+must be and how it is drawn.
 
 ### The fifth accent: blood
 

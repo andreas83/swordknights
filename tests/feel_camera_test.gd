@@ -20,7 +20,9 @@ func _initialize() -> void:
 	_check_fall_lead()
 	_check_anchor()
 	_check_budget()
-	_check_no_zoom()
+	_check_looks()
+	_check_ahead()
+	_check_fixed_zoom()
 	_check_held_frame()
 
 	if _failures > 0:
@@ -115,12 +117,20 @@ func _check_anchor() -> void:
 	_true(walked >= 120.0, "the frame never climbs back up on its own")
 
 
-## "Subtle" is a number or it is nothing. Everything the camera is allowed to
-## move the frame by, added up, is under half the height of the viewport.
+## "Subtle" is a number or it is nothing. The vertical beats never overlap --
+## the look at a lip or a ledge only on the floor, the fall lead only in the
+## air, the grab lift only hanging -- and a settle lands on top of at most one
+## of them, so the most the frame ever moves vertically is the largest beat
+## plus the settle. That stays well under half of what it shows: the
+## viewport's 180 units over GameCamera.ZOOM, 120 units of world.
 func _check_budget() -> void:
-	var vertical := GameCamera.FALL_LEAD_MAX + GameCamera.GRAB_LIFT + GameCamera.SETTLE_MAX
-	_true(vertical <= 48.0,
-		"all vertical reframing together is %.0f px of a 180 px frame (<= 48)" % vertical)
+	var shown := 180.0 / GameCamera.ZOOM
+	var largest := maxf(maxf(GameCamera.FALL_LEAD_MAX, GameCamera.GRAB_LIFT),
+		maxf(GameCamera.peek_max(), GameCamera.lift_max()))
+	var vertical := largest + GameCamera.SETTLE_MAX
+	_true(vertical <= 0.4 * shown,
+		"the largest vertical beat and a settle are %.0f px of a %.0f px frame (<= 40%%)" % [
+			vertical, shown])
 	_true(GameCamera.SETTLE_MAX <= 6.0,
 		"the hardest landing dips the frame %.0f px (<= 6)" % GameCamera.SETTLE_MAX)
 	_true(GameCamera.FALL_LEAD_MAX <= 2.5 * Tuning.TILE,
@@ -131,21 +141,113 @@ func _check_budget() -> void:
 		"the lead retracts slower than it extends, so stopping settles")
 
 
-## No zoom, deliberately: see the class docs on game_camera.gd. A non-integer
-## zoom resamples the tilemap and softens every shadow edge in the frame, which
-## is the one thing docs/art-direction.md does not allow. Checked in the source
-## because the point is that nobody adds one later.
-func _check_no_zoom() -> void:
+## The two looks keep "No blind jumps" at 1.5x (docs/campaign.md): from the
+## lip of the deepest drop a level may ask for, five tiles, its floor is in
+## shot; from under the tallest ledge a jump can grab, its lip is; and looking
+## down never puts the head out of the top of the frame.
+func _check_looks() -> void:
+	var half := GameCamera.half_shown()
+	_true(is_equal_approx(half, 60.0), "the frame shows 60 units either side of the feet")
+	var deepest := 5
+	var below := half + GameCamera.peek_for_drop(deepest)
+	_true(below >= deepest * Tuning.TILE + 2.0,
+		"from the lip of a %d-tile drop the frame shows %.0f below the feet" % [deepest, below])
+	_true(half - GameCamera.peek_max() >= Tuning.BODY_HEIGHT,
+		"looking down leaves %.0f above the feet, the head in shot"
+			% (half - GameCamera.peek_max()))
+	var grab := Tuning.grab_tiles()
+	var above := half + GameCamera.lift_for_rise(grab)
+	_true(above >= grab * Tuning.TILE + 2.0,
+		"under a %d-tile ledge the frame shows %.0f above the feet" % [grab, above])
+	_true(GameCamera.peek_for_drop(2) == 0.0, "a drop the frame already shows is not looked at")
+	_true(GameCamera.lift_for_rise(grab + 1) == 0.0, "a wall too tall to grab is not a ledge")
+	_true(GameCamera.peek_for_drop(4) < GameCamera.peek_for_drop(5),
+		"a deeper drop is looked at further")
+
+
+## `ahead()` reads the level a step or two in front of the feet. Built on a
+## little map of tiles rather than a Level, so each case says exactly what is
+## in front of the prince.
+func _check_ahead() -> void:
+	# Feet in row 4 at column 2, floor in row 5, facing right.
+	var floor_then_drop := _map([
+		"........",
+		"........",
+		"........",
+		"........",
+		"........",
+		"####....",
+		"........",
+		"........",
+		"........",
+		"########",
+	])
+	var feet := Vector2i(2, 4)
+	_true(GameCamera.ahead(floor_then_drop, feet, 1) == 4,
+		"one step from a lip, the drop below it is 4 tiles: %d"
+			% GameCamera.ahead(floor_then_drop, feet, 1))
+	_true(GameCamera.ahead(floor_then_drop, feet, -1) == 0,
+		"facing away from the lip, nothing is ahead")
+	var pit := _map(["........", "........", "........", "........", "........",
+		"###.....", "........", "........", "........", "........"])
+	_true(GameCamera.ahead(pit, feet, 1) == GameCamera.DROP_DEPTH_MAX,
+		"a drop with no bottom in reach counts as the deepest")
+	var spikes := _map(["........", "........", "........", "........", "........",
+		"###.....", "........", "...^^^^^", "........", "........"])
+	_true(GameCamera.ahead(spikes, feet, 1) == 2, "spikes are the bottom of a drop too")
+	var ledge := _map(["........", "....####", "....####", "....####", "....####",
+		"########"])
+	_true(GameCamera.ahead(ledge, feet, 1) == -4,
+		"a wall two steps ahead with its top four tiles up is a ledge: %d"
+			% GameCamera.ahead(ledge, feet, 1))
+	_true(GameCamera.look_for(GameCamera.ahead(ledge, feet, 1)) < 0.0,
+		"and the frame looks up at it")
+	var wall_before_lip := _map(["........", "........", "........", "...#....",
+		"...#....", "####....", "........", "........", "........", "########"])
+	_true(GameCamera.ahead(wall_before_lip, feet, 1) == -2,
+		"a wall in front of a lip hides the lip")
+	var far := _map(["........", "........", "........", "........", "........",
+		"######..", "........", "........", "........", "########"])
+	_true(GameCamera.ahead(far, feet, 1) == 0, "a lip beyond LOOK_TILES is not looked at")
+
+
+## A cell -> Tiles.Kind reader over rows of the ASCII level legend.
+func _map(rows: Array) -> Callable:
+	return func(cell: Vector2i) -> int:
+		if cell.y < 0 or cell.y >= rows.size():
+			return Tiles.Kind.EMPTY
+		var row: String = rows[cell.y]
+		if cell.x < 0 or cell.x >= row.length():
+			return Tiles.Kind.EMPTY
+		return int(Tiles.LEGEND.get(row[cell.x], Tiles.Kind.EMPTY))
+
+
+## One zoom, fixed, deliberately: see "A fixed 1.5x" in game_camera.gd. The
+## scale is set once and never moved, because a scale in motion passes through
+## every fraction and shimmers the nearest-filtered frame; and it keeps a
+## whole number of screen pixels a unit on the common desktop heights, which
+## is what made 1.5 acceptable at all. Checked in the source because the point
+## is that nobody adds a zoom beat later.
+func _check_fixed_zoom() -> void:
+	_true(is_equal_approx(GameCamera.ZOOM, 1.5), "the Adventure stands at 1.5x")
+	for height: int in [720, 1080, 1440]:
+		var per_unit := float(height) / 180.0 * GameCamera.ZOOM
+		_true(is_equal_approx(per_unit, roundf(per_unit)),
+			"%d px tall draws a whole %.2f px a unit" % [height, per_unit])
 	var file := FileAccess.open("res://scripts/render/game_camera.gd", FileAccess.READ)
 	if file == null:
 		_fail("cannot read game_camera.gd")
 		return
+	var writes: Array[String] = []
 	for line: String in file.get_as_text().split("\n"):
 		var code := line.strip_edges()
-		if code.begins_with("#") or code.begins_with("##"):
+		if code.begins_with("#"):
 			continue
-		_true(not code.begins_with("zoom") and not code.contains(" zoom ="),
-			"the camera never writes zoom: %s" % code)
+		if code.begins_with("zoom") or code.contains(" zoom =") or code.contains("zoom *=") \
+				or code.contains("zoom +=") or code.contains("zoom -="):
+			writes.append(code)
+	_true(writes == ["zoom = Vector2.ONE * ZOOM"],
+		"the camera writes zoom once, to ZOOM, and never again: %s" % [writes])
 
 
 ## A held frame is held. During a hitstop the camera must not move, must not
@@ -170,7 +272,8 @@ func _check_held_frame() -> void:
 	camera.setup(player, Vector2(640.0, 360.0))
 	for i: int in 40:
 		camera._physics_process(DT)
-	_true(camera.zoom == Vector2.ONE, "the camera is at 1:1 and stays there")
+	_true(camera.zoom == Vector2.ONE * GameCamera.ZOOM,
+		"the camera is at its fixed zoom and stays there")
 
 	var settled := camera.global_position
 	var flow := Flow.install(host)
