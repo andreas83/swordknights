@@ -216,10 +216,7 @@ func _begin(open: Callable, as_host: Variant = null) -> void:
 
 
 func _on_room_assigned(code: String, as_host: bool) -> void:
-	lobby.show_busy(
-		"ROOM %s  ·  TELL THE OTHER PLAYER" % code if as_host
-		else "ROOM %s  ·  CONNECTED" % code
-	)
+	lobby.show_room(code, as_host)
 	if session == null:
 		_start_session(as_host)
 

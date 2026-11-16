@@ -389,9 +389,17 @@ godot --headless --script tools/configure_project.gd
 
 ### Direct, on a LAN
 
-One player picks **Host directly** (listens on port 45678). The other picks
-**Join directly** and types the host's address — `192.168.1.20` is enough; a
-bare address, `host:port` and a full `ws://` URL are all accepted.
+One player picks **Host on this Wi-Fi** (listens on port 45678). Its screen
+shows a one-number code in large letters — `CODE 23`, the last number of its
+LAN address (`scripts/net/lan_code.gd`) — with the full address under it. The
+other picks **Join on this Wi-Fi** and types the code; the joining phone puts
+its own first three numbers in front of it. A bare address, `host:port` and a
+full `ws://` URL are accepted too, for networks that do not share a prefix.
+
+The code is the lobby's headline, apart from its status line. The two were once
+one line, and the transport's *"listening on port 45678"*, emitted inside the
+same call that opened the port, overwrote the code before a frame had shown it:
+on two phones the host had nothing to read out (`tests/unit/test_lobby_pairing.gd`).
 
 Lowest latency, no third machine. Needs both players on the same network, or a
 forwarded port.
