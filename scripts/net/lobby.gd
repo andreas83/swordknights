@@ -45,10 +45,21 @@ var page: Page = Page.MENU
 ## Seam, set before _ready: whether this is a phone, where LOCAL TWO-PLAYER
 ## is not offered.
 var handheld := UiLayout.handheld()
+## Seams, set before a page opens: where this device's LAN address comes from,
+## and the port HOST ON THIS WI-FI listens on.
+var my_address: Callable = LanCode.my_address
+var direct_port := WsTransport.DEFAULT_PORT
 
 var _font: Font
 var _time := 0.0
 var _status := ""
+## What a waiting page is for -- the code the other player types -- kept apart
+## from _status, which the transport rewrites with every change of link. Both
+## once shared one line, and the transport's "listening on port 45678",
+## arriving in the same call that opened the port, wrote over the host's code
+## before a single frame showed it: two phones, and nothing to type.
+var _headline := ""
+var _subline := ""
 var _hint := ""
 var _rows: VBoxContainer
 var _field: LineEdit
@@ -111,21 +122,37 @@ func _show_field(
 	_field.caret_column = _field.text.length()
 
 
+## The small line under the page: what the link is doing now. It never
+## touches the headline.
 func set_status(text: String) -> void:
 	_status = text
 	queue_redraw()
 
 
 ## Shown while a connection is being made, with nothing to press but escape.
-## SWORD gives up and puts the list back (DuelMatchOnline._offer_fallback());
-## it once said it played locally, which it never did, and on a phone could
-## not have.
-func show_busy(text: String) -> void:
+## `headline` is drawn large and stays until the page changes; `subline` sits
+## under it. SWORD gives up and puts the list back
+## (DuelMatchOnline._offer_fallback()); it once said it played locally, which
+## it never did, and on a phone could not have.
+func show_busy(headline: String, subline: String = "") -> void:
 	page = Page.BUSY
-	_status = text
+	_headline = headline
+	_subline = subline
+	_status = ""
 	_hint = "SWORD TO GIVE UP WAITING"
 	_set_rows([])
 	_field_row.visible = false
+
+
+## A relay's room, once it has one: the code is the headline for the host, who
+## has to read it out, and for the guest, who typed it.
+func show_room(code: String, as_host: bool) -> void:
+	show_busy("ROOM %s" % code, "TELL THE OTHER PLAYER" if as_host else "CONNECTED")
+
+
+## What the waiting page says in large letters, "" off it.
+func headline() -> String:
+	return _headline if page == Page.BUSY else ""
 
 
 func is_typing() -> bool:
@@ -211,12 +238,15 @@ func _on_join_room() -> void:
 func _on_host_direct() -> void:
 	# The code is what the other phone types; the full address is for a
 	# desktop, or a network where the two do not share the first three numbers.
-	var address := LanCode.my_address()
+	var address: String = my_address.call()
 	if address == "":
-		show_busy("LISTENING ON PORT %d…" % WsTransport.DEFAULT_PORT)
+		show_busy("NO WI-FI ADDRESS", "LISTENING ON PORT %d" % direct_port)
 	else:
-		show_busy("CODE %s   ·   OR %s" % [LanCode.code_for(address), address])
-	host_direct_requested.emit(WsTransport.DEFAULT_PORT)
+		show_busy(
+			"CODE %s" % LanCode.code_for(address),
+			"TYPE IT ON THE OTHER PHONE   ·   OR %s" % address
+		)
+	host_direct_requested.emit(direct_port)
 
 
 func _on_join_direct() -> void:
@@ -255,7 +285,7 @@ func _submit_field() -> void:
 			if value == "":
 				set_status("ENTER AN ADDRESS")
 				return
-			var target := LanCode.resolve(value, LanCode.my_address())
+			var target := LanCode.resolve(value, my_address.call())
 			show_busy("CONNECTING TO %s…" % target)
 			join_direct_requested.emit(target)
 		Page.ENTER_RELAY:
@@ -385,10 +415,17 @@ func _draw() -> void:
 		)
 
 	if page == Page.BUSY:
+		# A short headline is a code to read across a table: big. A long one
+		# ("CONNECTING TO 192.168.178.23…") has to fit a phone's width.
+		var big := _headline.length() <= 8
+		_centered(_headline, cx, view.y * 0.4, 18 if big else 9, Palette.PAPER,
+			4.0 if big else 1.6)
+		_centered(_subline, cx, view.y * 0.4 + (17.0 if big else 11.0), 6,
+			Palette.with_alpha(Palette.LIGHT_SOFT, 0.75), 1.2)
 		# Three dots marching, so a slow connection does not look like a freeze.
 		var lit := int(_time * 2.5) % 4
 		for i: int in 3:
-			var at := Vector2(cx - 10.0 + i * 10.0, view.y * 0.52)
+			var at := Vector2(cx - 10.0 + i * 10.0, view.y * 0.64)
 			draw_circle(at, 2.2, Palette.with_alpha(
 				Palette.LIGHT_SOFT, 0.85 if i < lit else 0.25
 			))

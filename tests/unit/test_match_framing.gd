@@ -3,7 +3,7 @@ extends GutTest
 ## model: no window, no match, a display frame at a time.
 ##
 ## Held here: the levels on the screens that matter -- far is a fighter an
-## eighth of the screen, close the adventure's 1.5x; the frame comes in as the two close
+## eighth of the screen, and close the same: the scale is fixed; the frame comes in as the two close
 ## and goes out as they part, and rests on a whole pixel per texel; a fencing
 ## exchange at the edge of a threshold does not pump it; a kill holds it; and,
 ## over a minute of two fighters running about the window at full speed, it
@@ -44,11 +44,11 @@ func _run(framing: MatchFraming, subjects: PackedVector2Array, seconds: float,
 func test_far_is_an_eighth_of_the_screen_and_close_is_the_adventures() -> void:
 	# [screen, pixels per unit, far, close]
 	var screens: Array = [
-		[Vector2(1920, 1080), 6.0, 6, 9],
-		[PHONE, 6.0, 6, 9],
-		[Vector2(2532, 1170), 6.5, 7, 9],
-		[Vector2(3200, 1440), 8.0, 8, 12],
-		[Vector2(1280, 720), 4.0, 4, 6],
+		[Vector2(1920, 1080), 6.0, 6, 6],
+		[PHONE, 6.0, 6, 6],
+		[Vector2(2532, 1170), 6.5, 7, 7],
+		[Vector2(3200, 1440), 8.0, 8, 8],
+		[Vector2(1280, 720), 4.0, 4, 4],
 	]
 	for screen: Array in screens:
 		var framing := _framing(screen[0], screen[1])
@@ -59,6 +59,8 @@ func test_far_is_an_eighth_of_the_screen_and_close_is_the_adventures() -> void:
 			"a fighter is an eighth of the screen at the far level, %s" % screen[0])
 		assert_lte(float(framing.close_level()), float(screen[1]) * GameCamera.ZOOM + 0.001,
 			"never closer than the adventure's 1.5x, %s" % screen[0])
+		assert_eq(framing.close_level(), framing.far_level(),
+			"and fixed: the frame never comes in past the far level, %s" % screen[0])
 
 
 func test_it_comes_in_as_they_close_and_goes_out_as_they_part() -> void:
