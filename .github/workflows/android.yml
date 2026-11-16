@@ -67,10 +67,10 @@ jobs:
       signer: ${{ steps.verify.outputs.signer }}
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -165,7 +165,7 @@ jobs:
       - name: Restore the debug keystore from the cache
         id: cache
         if: steps.keystore.outputs.source == 'cache'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.android/swordknights-debug.keystore
           key: android-debug-keystore-v1
@@ -316,10 +316,10 @@ jobs:
       SIGNER: ${{ needs.apk.outputs.signer }}
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download the APK
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: swordknights-debug-apk
           path: build/apk
