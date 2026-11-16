@@ -219,7 +219,7 @@ jobs:
 
       - name: Upload the encrypted keystore
         if: inputs.export_keystore && steps.keystore.outputs.source == 'cache'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: debug-keystore-encrypted
           path: ${{ runner.temp }}/keystore-export/swordknights-debug.keystore.enc
@@ -288,7 +288,7 @@ jobs:
           echo "All $(ls levels/*.txt | wc -l) level files are in the APK."
 
       - name: Upload the APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: swordknights-debug-apk
           path: dist/*.apk
